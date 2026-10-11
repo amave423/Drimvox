@@ -127,6 +127,13 @@ export class TaskRepo {
     return JSON.parse(this.row(id)?.messages ?? "[]") as ModelMessage[];
   }
 
+  /** One agent step's spending, for the day's total. */
+  addUsage(taskId: string, inputTokens: number, outputTokens: number, costUsd: number, priced: boolean): void {
+    this.db.sql
+      .prepare("insert into agent_usage values (?, ?, ?, ?, ?, ?)")
+      .run(taskId, inputTokens, outputTokens, costUsd, priced ? 1 : 0, Date.now());
+  }
+
   addEvent(taskId: string, kind: TaskEventKind, data: unknown): TaskEvent {
     const last = this.db.sql.prepare("select coalesce(max(seq), 0) as seq from task_events where task_id = ?").get(taskId) as {
       seq: number;

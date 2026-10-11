@@ -160,12 +160,17 @@ export class ChatRepo {
   usageSince(since: number): UsageSummary {
     const row = this.db.sql
       .prepare(
-        `select coalesce(sum(input_tokens), 0) as input, coalesce(sum(output_tokens), 0) as output,
-         coalesce(sum(cost_usd), 0) as cost,
-         sum(case when cost_usd is null and output_tokens is not null then 1 else 0 end) as unpriced
-         from messages where role = 'assistant' and created_at >= ?`,
+        `select coalesce(sum(i), 0) as input, coalesce(sum(o), 0) as output, coalesce(sum(c), 0) as cost, coalesce(sum(u), 0) as unpriced
+         from (
+           select input_tokens as i, output_tokens as o, cost_usd as c,
+                  case when cost_usd is null and output_tokens is not null then 1 else 0 end as u
+           from messages where role = 'assistant' and created_at >= ?
+           union all
+           select input_tokens, output_tokens, cost_usd, case when priced = 0 then 1 else 0 end
+           from agent_usage where created_at >= ?
+         )`,
       )
-      .get(since) as { input: number; output: number; cost: number; unpriced: number | null };
+      .get(since, since) as { input: number; output: number; cost: number; unpriced: number | null };
     return { inputTokens: row.input, outputTokens: row.output, costUsd: row.cost, unpricedMessages: row.unpriced ?? 0 };
   }
 

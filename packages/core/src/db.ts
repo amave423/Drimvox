@@ -76,6 +76,16 @@ const migrations: string[] = [
      created_at integer not null,
      primary key (task_id, seq)
    ) strict;`,
+  // Spending is history: it stays when a task or project is removed.
+  `create table agent_usage (
+     task_id text not null,
+     input_tokens integer not null,
+     output_tokens integer not null,
+     cost_usd real not null,
+     priced integer not null,
+     created_at integer not null
+   ) strict;
+   create index agent_usage_by_time on agent_usage (created_at);`,
 ];
 
 export interface Database {

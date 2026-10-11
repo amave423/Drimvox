@@ -195,6 +195,7 @@ export class AgentRunner {
         output += step.outputTokens;
         steps++;
         this.o.tasks.update(id, { messages: JSON.stringify(messages), cost_usd: cost, input_tokens: input, output_tokens: output, steps });
+        this.o.tasks.addUsage(id, step.inputTokens, step.outputTokens, step.costUsd, step.priced);
         this.publishTask(id);
       },
       hooks: {

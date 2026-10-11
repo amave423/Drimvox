@@ -24,7 +24,7 @@ export interface RunInput {
   hooks: Omit<ToolHooks, "onFinish">;
   onText(text: string): void;
   /** After every finished step: the messages it produced and its usage. */
-  onStep(step: { messages: ModelMessage[]; inputTokens: number; outputTokens: number; costUsd: number }): void;
+  onStep(step: { messages: ModelMessage[]; inputTokens: number; outputTokens: number; costUsd: number; priced: boolean }): void;
 }
 
 export type RunOutcome =
@@ -88,7 +88,13 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         const output = step.usage.outputTokens ?? 0;
         const cost = costOf(input, output);
         spent += cost;
-        i.onStep({ messages: step.response.messages as ModelMessage[], inputTokens: input, outputTokens: output, costUsd: cost });
+        i.onStep({
+          messages: step.response.messages as ModelMessage[],
+          inputTokens: input,
+          outputTokens: output,
+          costUsd: cost,
+          priced: i.price?.priceIn != null && i.price.priceOut != null,
+        });
       },
     });
 

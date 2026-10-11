@@ -178,6 +178,11 @@ describe("a task", () => {
     await env.call("POST", `/api/tasks/${id}/continue`, {});
     const done = await waitFor(id, ["done_empty"]);
     expect(done.budgetUsd).toBe(1);
+
+    // Agent spending counts in the day's total next to chat answers.
+    const usage = await (await env.call("GET", "/api/usage?since=0")).json();
+    expect(usage.costUsd).toBeCloseTo(done.costUsd, 9);
+    expect(usage.inputTokens).toBe(done.inputTokens);
   });
 
   it("can be stopped", async () => {
