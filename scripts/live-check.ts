@@ -1,11 +1,13 @@
 // Live check against real providers: connects each provider whose key is in .env through the real core API,
-// lists models, reads the balance and streams one short answer. Costs a fraction of a cent.
+// lists models, reads the balance, streams one short answer and gives an agent a tiny real coding task.
+// Costs a fraction of a cent. `npm run live-check -- --no-agent` skips the agent part.
 import { startServer } from "@artel/core";
 import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@artel/shared";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { checkAgent } from "./live-agent";
 
 interface Target {
   preset: PresetId;
@@ -13,6 +15,8 @@ interface Target {
   /** Preferred cheap chat models, first match wins. */
   models: string[];
   reasoningModel?: string;
+  /** Model for the agent check; needs tool calling. */
+  agentModel: string;
 }
 
 const targets: Target[] = [
@@ -20,12 +24,14 @@ const targets: Target[] = [
     preset: "openrouter",
     envKey: "OPENROUTER_API_KEY",
     models: ["deepseek/deepseek-chat-v3.1", "deepseek/deepseek-chat", "openai/gpt-4o-mini", "google/gemini-2.5-flash"],
+    agentModel: "deepseek/deepseek-chat-v3.1",
   },
-  { preset: "deepseek", envKey: "DEEPSEEK_API_KEY", models: ["deepseek-flash", "deepseek-chat"], reasoningModel: "deepseek-v4-pro" },
+  { preset: "deepseek", envKey: "DEEPSEEK_API_KEY", models: ["deepseek-flash", "deepseek-chat"], reasoningModel: "deepseek-v4-pro", agentModel: "deepseek-flash" },
   {
     preset: "nvidia",
     envKey: "NVIDIA_API_KEY",
     models: ["openai/gpt-oss-20b", "z-ai/glm-5.3-flash", "moonshotai/kimi-k3", "nvidia/nemotron-3-super-120b-a12b"],
+    agentModel: "z-ai/glm-5.3-flash",
   },
 ];
 
@@ -94,6 +100,15 @@ try {
         costUsd: answer.costUsd,
         error: answer.error,
       });
+    }
+
+    if (!process.argv.includes("--no-agent")) {
+      if (!list.some((m) => m.id === target.agentModel)) {
+        failures++;
+        log(`agent: model ${target.agentModel} is not in the list`);
+      } else if (!(await checkAgent(api, provider.id, target.agentModel, log))) {
+        failures++;
+      }
     }
   }
 } finally {
