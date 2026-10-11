@@ -58,15 +58,22 @@ export class Workspace {
     writeFileSync(file, content);
   }
 
-  /** Replaces one exact, unique fragment. Refuses when it is missing or ambiguous. */
+  /**
+   * Replaces one exact, unique fragment. Refuses when it is missing or ambiguous. Matching ignores
+   * Windows line endings, because read_file shows the model plain \n; the file keeps its own style.
+   */
   editFile(path: string, oldText: string, newText: string): void {
     const file = this.resolve(path);
     if (!existsSync(file)) throw new Error(`File not found: ${path}`);
-    const content = readFileSync(file, "utf8");
-    const count = oldText ? content.split(oldText).length - 1 : 0;
+    const raw = readFileSync(file, "utf8");
+    const crlf = raw.includes("\r\n");
+    const content = crlf ? raw.replace(/\r\n/g, "\n") : raw;
+    const find = oldText.replace(/\r\n/g, "\n");
+    const count = find ? content.split(find).length - 1 : 0;
     if (count === 0) throw new Error(`Fragment not found in ${path}; read the file and copy the text exactly`);
     if (count > 1) throw new Error(`Fragment occurs ${count} times in ${path}; include more surrounding lines`);
-    writeFileSync(file, content.replace(oldText, () => newText));
+    const edited = content.replace(find, () => newText.replace(/\r\n/g, "\n"));
+    writeFileSync(file, crlf ? edited.replace(/\n/g, "\r\n") : edited);
   }
 
   /** Lines matching a regular expression (or plain text if it is not a valid one). */

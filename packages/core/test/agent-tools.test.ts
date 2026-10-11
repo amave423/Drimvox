@@ -1,4 +1,4 @@
-import { readFileSync, rmSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, runCommand } from "../src/agent/commands";
@@ -44,6 +44,13 @@ describe("workspace", () => {
     expect(readFileSync(join(root, "src", "app.ts"), "utf8")).toBe("const a = 1;\nconst b = 3;\n");
     expect(() => ws.editFile("src/app.ts", "const", "let")).toThrow(/2 times/);
     expect(() => ws.editFile("src/app.ts", "nope", "x")).toThrow(/not found/);
+  });
+
+  it("edits files with Windows line endings using the text read_file showed", () => {
+    writeFileSync(join(root, "crlf.ts"), "const a = 1;\r\nconst b = 2;\r\n");
+    expect(ws.readFile("crlf.ts")).toBe("1\tconst a = 1;\n2\tconst b = 2;");
+    ws.editFile("crlf.ts", "const a = 1;\nconst b = 2;", "const a = 10;\nconst b = 20;");
+    expect(readFileSync(join(root, "crlf.ts"), "utf8")).toBe("const a = 10;\r\nconst b = 20;\r\n");
   });
 
   it("searches file contents", () => {
