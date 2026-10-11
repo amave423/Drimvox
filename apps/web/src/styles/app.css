@@ -52,7 +52,8 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
   display: flex;
   flex-direction: column;
   gap: 22px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .side-h { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
 .side-empty { margin: 0; font-size: 14px; color: var(--muted); }

@@ -84,6 +84,16 @@ function registerIpc() {
     return token;
   });
 
+  ipcMain.handle("artel:pick-folder", async (event) => {
+    if (!fromOurPage(event.senderFrame?.url)) throw new Error("Forbidden");
+    // Tests cannot click a native dialog; they hand the folder over through the environment.
+    if (process.env.ARTEL_TEST_PICK_FOLDER) return process.env.ARTEL_TEST_PICK_FOLDER;
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options = { properties: ["openDirectory", "createDirectory"] as ("openDirectory" | "createDirectory")[] };
+    const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
+
   const hex = /^#[0-9a-f]{6}$/i;
   ipcMain.on("artel:titlebar", (event, colors: { background?: unknown; symbols?: unknown }) => {
     const { background, symbols } = colors ?? {};

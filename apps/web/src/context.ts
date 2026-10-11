@@ -1,4 +1,4 @@
-import type { ChatView, ProviderView, Settings, SettingsPatch, UsageSummary } from "@artel/shared";
+import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@artel/shared";
 import { createContext, useContext } from "react";
 import type { Api } from "./api";
 import type { MessageKey } from "./i18n";
@@ -18,7 +18,9 @@ export type View =
   | { kind: "home" }
   | { kind: "settings" }
   | { kind: "providers" }
-  | { kind: "chat"; chatId: string | null; key: string };
+  | { kind: "chat"; chatId: string | null; key: string }
+  | { kind: "project"; projectId: string }
+  | { kind: "task"; taskId: string };
 
 export interface AppContextValue {
   api: Api;
@@ -39,6 +41,10 @@ export interface AppContextValue {
   reloadChats(): Promise<void>;
   today: UsageSummary | null;
   reloadToday(): Promise<void>;
+  projects: ProjectView[];
+  reloadProjects(): Promise<void>;
+  tasks: TaskView[];
+  reloadTasks(): Promise<void>;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);

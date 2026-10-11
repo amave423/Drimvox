@@ -1,12 +1,60 @@
 import { useApp } from "../context";
+import { AddProject } from "./projects/AddProject";
+import { StatusDot } from "./tasks/StatusDot";
+
+const FINISHED = new Set(["accepted", "discarded"]);
 
 export function Sidebar() {
-  const { t, status, view, navigate, openNewChat, chats, providers } = useApp();
+  const { t, status, view, navigate, openNewChat, chats, providers, projects, tasks } = useApp();
   const currentChat = view.kind === "chat" ? view.chatId : undefined;
+  const currentProject = view.kind === "project" ? view.projectId : undefined;
+  const currentTask = view.kind === "task" ? view.taskId : undefined;
 
   return (
     <aside className="side">
-      <section className="side-chats">
+      <section className="side-group">
+        <div className="side-row">
+          <h2 className="side-h">{t("side.projects")}</h2>
+          <AddProject />
+        </div>
+        {projects.length === 0 ? (
+          <p className="side-empty">{t("side.projectsEmpty")}</p>
+        ) : (
+          <ul className="side-list">
+            {projects.map((project) => {
+              const open = tasks.filter((task) => task.projectId === project.id && !FINISHED.has(task.status)).slice(0, 6);
+              return (
+                <li key={project.id}>
+                  <button
+                    className={`side-item${project.id === currentProject ? " is-on" : ""}`}
+                    onClick={() => navigate({ kind: "project", projectId: project.id })}
+                  >
+                    <span className="side-item-title">{project.name}</span>
+                  </button>
+                  {open.length > 0 && (
+                    <ul className="side-sublist">
+                      {open.map((task) => (
+                        <li key={task.id}>
+                          <button
+                            className={`side-item side-task${task.id === currentTask ? " is-on" : ""}`}
+                            onClick={() => navigate({ kind: "task", taskId: task.id })}
+                            aria-current={task.id === currentTask ? "page" : undefined}
+                          >
+                            <StatusDot status={task.status} />
+                            <span className="side-item-title">{task.title}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="side-group">
         <div className="side-row">
           <h2 className="side-h">{t("side.chats")}</h2>
           <button className="side-new" onClick={openNewChat}>

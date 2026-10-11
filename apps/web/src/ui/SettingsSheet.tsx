@@ -10,6 +10,7 @@ type SaveState = "idle" | "saved" | "failed";
 export function SettingsSheet() {
   const { t, settings, updateSettings } = useApp();
   const [state, setState] = useState<SaveState>("idle");
+  const [budget, setBudget] = useState(String(settings.agentBudgetUsd));
 
   async function save(patch: SettingsPatch) {
     setState((await updateSettings(patch)) ? "saved" : "failed");
@@ -40,6 +41,28 @@ export function SettingsSheet() {
           options={locales.map((v) => ({ value: v, label: localeNames[v] }))}
           onChange={(locale) => save({ locale })}
         />
+
+        <h2 className="sheet-h">{t("settings.agentBudget")}</h2>
+        <form
+          className="inline-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const value = Number(budget.replace(",", "."));
+            if (value >= 0.01) void save({ agentBudgetUsd: value });
+          }}
+        >
+          <input
+            className="field-input mono budget-input"
+            inputMode="decimal"
+            aria-label={t("settings.agentBudget")}
+            value={budget}
+            onChange={(e) => setBudget(e.target.value)}
+          />
+          <button className="btn" disabled={!(Number(budget.replace(",", ".")) >= 0.01)}>
+            {t("settings.save")}
+          </button>
+        </form>
+        <p className="muted">{t("settings.agentBudgetHint")}</p>
       </div>
       <aside className="margin" aria-live="polite">
         {state === "saved" && <p className="note is-ok">{t("settings.saved")}</p>}

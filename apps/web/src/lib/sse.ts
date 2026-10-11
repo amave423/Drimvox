@@ -23,19 +23,21 @@ export function createSseParser<T>() {
 }
 
 /** POSTs JSON and hands every event to `onEvent` until the stream ends or `signal` aborts. */
-export async function postStream<T>(
-  url: string,
-  token: string,
-  body: unknown,
-  onEvent: (event: T) => void,
-  signal: AbortSignal,
-): Promise<void> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
+export function postStream<T>(url: string, token: string, body: unknown, onEvent: (event: T) => void, signal: AbortSignal) {
+  return readStream<T>(
+    url,
+    { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal },
+    onEvent,
+  );
+}
+
+/** Follows a GET event stream until it ends or `signal` aborts. */
+export function getStream<T>(url: string, token: string, onEvent: (event: T) => void, signal: AbortSignal) {
+  return readStream<T>(url, { headers: { Authorization: `Bearer ${token}` }, signal }, onEvent);
+}
+
+async function readStream<T>(url: string, init: RequestInit, onEvent: (event: T) => void): Promise<void> {
+  const res = await fetch(url, init);
   if (!res.ok || !res.body) throw new Error(`Core answered ${res.status}`);
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   const parse = createSseParser<T>();

@@ -2,6 +2,8 @@
 interface ArtelBridge {
   getToken(): Promise<string>;
   setTitleBar(colors: { background: string; symbols: string }): void;
+  /** Native folder picker; null when the user cancels. */
+  pickFolder(): Promise<string | null>;
 }
 
 interface Window {

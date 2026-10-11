@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPrice, formatTokens, formatUsd, startOfToday } from "./format";
+import { formatBudget, formatPrice, formatTokens, formatUsd, startOfToday } from "./format";
 import { createSseParser } from "./sse";
 
 describe("formatUsd", () => {
@@ -31,6 +31,13 @@ describe("formatPrice", () => {
     expect(formatPrice(0.3)).toBe("$0.30");
     expect(formatPrice(15)).toBe("$15");
     expect(formatPrice(0.0035)).toBe("$0.0035");
+  });
+});
+
+describe("formatBudget", () => {
+  it("shows whole cents with the dollar sign", () => {
+    expect(formatBudget(0.5)).toBe("$0.50");
+    expect(formatBudget(2)).toBe("$2.00");
   });
 });
 

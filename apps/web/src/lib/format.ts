@@ -26,6 +26,11 @@ export function formatPrice(value: number): string {
   return `$${value < 0.01 ? value.toFixed(4) : value.toFixed(2)}`;
 }
 
+/** Budgets are whole cents. */
+export function formatBudget(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
 export function startOfToday(now = new Date()): number {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 }

@@ -1,4 +1,4 @@
-import type { ChatView, ProviderView, Settings, SettingsPatch, UsageSummary } from "@artel/shared";
+import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@artel/shared";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ok, type Api } from "./api";
 import { AppContext, type AppContextValue, type CoreStatus, type View } from "./context";
@@ -7,7 +7,9 @@ import { formatUsd, startOfToday } from "./lib/format";
 import { applyTheme, resolveTheme } from "./theme";
 import { ChatSheet } from "./ui/chat/ChatSheet";
 import { HomeSheet } from "./ui/HomeSheet";
+import { ProjectSheet } from "./ui/projects/ProjectSheet";
 import { ProvidersSheet } from "./ui/providers/ProvidersSheet";
+import { TaskSheet } from "./ui/tasks/TaskSheet";
 import { SettingsSheet } from "./ui/SettingsSheet";
 import { Sidebar } from "./ui/Sidebar";
 import { TopBar } from "./ui/TopBar";
@@ -25,6 +27,8 @@ export function App({ api, token, initialSettings, status }: Props) {
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [chats, setChats] = useState<ChatView[]>([]);
   const [today, setToday] = useState<UsageSummary | null>(null);
+  const [projects, setProjects] = useState<ProjectView[]>([]);
+  const [tasks, setTasks] = useState<TaskView[]>([]);
   const systemDark = useSystemDark();
 
   useEffect(() => applyTheme(resolveTheme(settings.theme, systemDark)), [settings.theme, systemDark]);
@@ -55,11 +59,31 @@ export function App({ api, token, initialSettings, status }: Props) {
     setToday(await api.usage.$get({ query: { since } }).then((r) => ok<UsageSummary>(r)).catch(() => null));
   }, [api]);
 
+  const reloadProjects = useCallback(async () => {
+    setProjects(await api.projects.$get().then((r) => ok<ProjectView[]>(r)).catch(() => []));
+  }, [api]);
+  const reloadTasks = useCallback(async () => {
+    setTasks(await api.tasks.$get().then((r) => ok<TaskView[]>(r)).catch(() => []));
+  }, [api]);
+
   useEffect(() => {
     void reloadProviders();
     void reloadChats();
     void reloadToday();
-  }, [reloadProviders, reloadChats, reloadToday]);
+    void reloadProjects();
+    void reloadTasks();
+  }, [reloadProviders, reloadChats, reloadToday, reloadProjects, reloadTasks]);
+
+  // Keep the sidebar's task statuses fresh while an agent is busy.
+  const busy = tasks.some((t) => t.status === "running" || t.status === "waiting");
+  useEffect(() => {
+    if (!busy) return;
+    const timer = setInterval(() => {
+      void reloadTasks();
+      void reloadToday();
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [busy, reloadTasks, reloadToday]);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -78,8 +102,29 @@ export function App({ api, token, initialSettings, status }: Props) {
       reloadChats,
       today,
       reloadToday,
+      projects,
+      reloadProjects,
+      tasks,
+      reloadTasks,
     }),
-    [api, token, settings, status, updateSettings, view, providers, reloadProviders, chats, reloadChats, today, reloadToday],
+    [
+      api,
+      token,
+      settings,
+      status,
+      updateSettings,
+      view,
+      providers,
+      reloadProviders,
+      chats,
+      reloadChats,
+      today,
+      reloadToday,
+      projects,
+      reloadProjects,
+      tasks,
+      reloadTasks,
+    ],
   );
 
   return (
@@ -92,6 +137,8 @@ export function App({ api, token, initialSettings, status }: Props) {
           {view.kind === "settings" && <SettingsSheet />}
           {view.kind === "providers" && <ProvidersSheet />}
           {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} />}
+          {view.kind === "project" && <ProjectSheet key={view.projectId} projectId={view.projectId} />}
+          {view.kind === "task" && <TaskSheet key={view.taskId} taskId={view.taskId} />}
         </main>
         <footer className="bottombar">
           {today && <span>{value.t("bottom.today", { cost: formatUsd(today.costUsd) })}</span>}

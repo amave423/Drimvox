@@ -10,6 +10,7 @@ import "./styles/app.css";
 import "./styles/components.css";
 import "./styles/providers.css";
 import "./styles/chat.css";
+import "./styles/tasks.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
