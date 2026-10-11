@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Варианты дизайна, раунд 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,600&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,600;1,8..60,500&family=Onest:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- Chooser chrome ---------- */
+:root { --ch-bg: #f2f3f5; --ch-fg: #1d2129; --ch-muted: #5d6573; --ch-line: #d6dae1; --ch-btn: #ffffff; --ch-on: #1d2129; --ch-onfg: #ffffff; }
+:root[data-theme="dark"] { --ch-bg: #1b1e24; --ch-fg: #e7e9ee; --ch-muted: #9aa1ad; --ch-line: #343944; --ch-btn: #262a32; --ch-on: #e7e9ee; --ch-onfg: #1b1e24; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ch-bg: #1b1e24; --ch-fg: #e7e9ee; --ch-muted: #9aa1ad; --ch-line: #343944; --ch-btn: #262a32; --ch-on: #e7e9ee; --ch-onfg: #1b1e24; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ch-bg); color: var(--ch-fg); font: 15px/1.5 "Onest", system-ui, sans-serif; }
+.chooser { max-width: 1440px; margin: 0 auto; padding: 20px 16px 8px; display: grid; gap: 14px; }
+.chooser h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.chooser-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ch-line); border-radius: 10px; padding: 3px; background: var(--ch-btn); }
+.seg button { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--ch-fg); padding: 7px 14px; border-radius: 7px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ch-on); color: var(--ch-onfg); }
+.seg button:focus-visible { outline: 2px solid #4c8dff; outline-offset: 2px; }
+.spacer { flex: 1; }
+.about { color: var(--ch-muted); max-width: 80ch; margin: 0; }
+.about b { color: var(--ch-fg); font-weight: 600; }
+.stage { max-width: 1440px; margin: 0 auto; padding: 8px 16px 32px; overflow-x: auto; }
+.app { display: none; height: 820px; min-width: 1200px; border-radius: 14px; overflow: hidden; }
+.app.on { display: grid; }
+svg { flex: none; }
+
+/* =========================================================
+   B2 — «Опрос» (Artel, бумага шалфей → голубая калька)
+   ========================================================= */
+.d {
+  --bg: #e2e7ea; --paper: #eef2f3; --sheet: #fafbfb; --line: #c5ced3; --fg: #1c2a33; --muted: #5a6a74;
+  --accent: #1f6f6b; --accent-soft: #d3e6e3; --hi: #b9861c; --hi-soft: #f3e6c4;
+  font-family: "Onest", system-ui, sans-serif; color: var(--fg); background: var(--bg);
+  grid-template-columns: 252px 1fr 52px; border: 1px solid var(--line);
+}
+:root[data-theme="dark"] .d {
+  --bg: #172024; --paper: #1d282d; --sheet: #233037; --line: #34444c; --fg: #e3eaec; --muted: #97a8b0;
+  --accent: #5fc0b8; --accent-soft: #1e3b3a; --hi: #e2b75a; --hi-soft: #3b3220;
+}
+.d .serif { font-family: "Literata", Georgia, serif; }
+.d-side { background: var(--paper); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 18px 12px 12px; gap: 4px; min-height: 0; }
+.d-logo { font: 600 22px "Literata", serif; padding: 0 8px 10px; }
+.d-proj { margin: 0 4px 10px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; display: flex; justify-content: space-between; background: var(--sheet); }
+.d-new { margin: 0 4px 14px; padding: 9px 12px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 500; }
+:root[data-theme="dark"] .d-new { color: #10221f; }
+.d-grp { font-size: 13px; color: var(--muted); padding: 8px 8px 4px; }
+.d-s { padding: 8px 10px; border-radius: 10px; font-size: 14px; display: grid; gap: 1px; }
+.d-s small { color: var(--muted); font-size: 12.5px; }
+.d-s.cur { background: var(--sheet); box-shadow: 0 1px 0 var(--line); }
+.d-s .q { color: var(--hi); }
+.d-foot { margin-top: auto; border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 2px; font-size: 14px; color: var(--muted); }
+.d-foot div { padding: 6px 8px; display: flex; justify-content: space-between; }
+.d-foot b { color: var(--fg); font-weight: 500; }
+.d-main { display: flex; flex-direction: column; align-items: center; min-height: 0; }
+.d-head { width: 100%; padding: 18px 32px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; }
+.d-head h2 { margin: 0; font: 600 22px "Literata", serif; }
+.d-head span { font-size: 13px; color: var(--muted); }
+.d-col { width: min(700px, 100% - 48px); flex: 1; overflow: hidden; padding: 20px 0 0; display: grid; gap: 14px; align-content: start; }
+.d-user { justify-self: end; max-width: 54ch; background: var(--sheet); border: 1px solid var(--line); padding: 12px 16px; border-radius: 16px 16px 4px 16px; font-size: 15px; }
+.d-said { font-size: 15px; line-height: 1.6; color: var(--fg); }
+.d-said .who { font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+.d-said p { margin: 0; }
+.d-answered { display: grid; gap: 6px; font-size: 14px; }
+.d-answered div { display: flex; gap: 10px; color: var(--muted); }
+.d-answered b { color: var(--fg); font-weight: 500; }
+.d-card { background: var(--sheet); border: 1px solid var(--line); border-radius: 18px; padding: 18px 22px 16px; box-shadow: 0 10px 30px -22px rgba(20, 40, 50, .45); }
+.d-prog { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.d-prog i { width: 22px; height: 4px; border-radius: 2px; background: var(--line); }
+.d-prog i.on { background: var(--accent); }
+.d-prog span { margin-left: 8px; }
+.d-card h3 { margin: 0 0 4px; font: 600 23px/1.3 "Literata", serif; }
+.d-card > p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+.d-opts { display: grid; gap: 7px; margin-bottom: 14px; }
+.d-opt { display: grid; grid-template-columns: 20px 1fr auto; gap: 12px; align-items: center; padding: 9px 14px; border: 1px solid var(--line); border-radius: 12px; font-size: 15px; }
+.d-opt small { display: block; color: var(--muted); font-size: 13px; }
+.d-opt .r { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); }
+.d-opt.sel { border-color: var(--accent); background: var(--accent-soft); }
+.d-opt.sel .r { border: 5px solid var(--accent); }
+.d-rec { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--hi-soft); color: var(--hi); }
+.d-own { border-style: dashed; color: var(--muted); }
+.d-acts { display: flex; gap: 10px; align-items: center; }
+.d-btn { font: inherit; font-size: 14px; padding: 9px 18px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+.d-btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+:root[data-theme="dark"] .d-btn.pri { color: #10221f; }
+.d-acts small { margin-left: auto; color: var(--muted); font-size: 13px; }
+.d-comp { width: min(700px, 100% - 48px); margin: 10px 0 18px; background: var(--sheet); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px 10px; color: var(--muted); font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+.d-go { width: 34px; height: 34px; border-radius: 50%; background: var(--fg); color: var(--sheet); display: grid; place-items: center; }
+.d-rail { border-left: 1px solid var(--line); background: var(--paper); display: flex; flex-direction: column; align-items: center; padding-top: 18px; gap: 10px; }
+.d-rail span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 13px; color: var(--muted); padding: 12px 6px; border-radius: 8px; }
+.d-rail span.on { background: var(--sheet); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
+
+/* =========================================================
+   B3 — «Ревью как корректура»
+   ========================================================= */
+.e {
+  --bg: #e4e5e0; --paper: #eeefea; --sheet: #fcfcfa; --line: #cfd0c8; --fg: #22211e; --muted: #6b6a63;
+  --pencil: #b3261e; --pencil-soft: #f6dedb; --ink: #2b4c7e; --ink-soft: #dde6f4; --ok: #2f6b45;
+  font-family: "Onest", system-ui, sans-serif; color: var(--fg); background: var(--bg);
+  grid-template-rows: 54px 1fr 68px; grid-template-columns: 264px 1fr; border: 1px solid var(--line);
+}
+:root[data-theme="dark"] .e {
+  --bg: #1b1b19; --paper: #222220; --sheet: #2a2a27; --line: #3d3d38; --fg: #e9e8e2; --muted: #a3a196;
+  --pencil: #f07468; --pencil-soft: #45231f; --ink: #8fb3ec; --ink-soft: #22314a; --ok: #7cc193;
+}
+.e .serif { font-family: "Source Serif 4", Georgia, serif; }
+.e .mono { font-family: "IBM Plex Mono", monospace; }
+.e-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--paper); font-size: 14px; }
+.e-logo { font: 600 21px "Source Serif 4", serif; }
+.e-crumb { color: var(--muted); }
+.e-crumb b { color: var(--fg); font-weight: 500; }
+.e-top .r { margin-left: auto; color: var(--muted); }
+.e-side { background: var(--paper); border-right: 1px solid var(--line); padding: 18px 14px; display: grid; gap: 18px; align-content: start; overflow: hidden; }
+.e-h { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+.e-files { display: grid; gap: 2px; font-size: 13px; }
+.e-files div { display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 8px; }
+.e-files div.on { background: var(--sheet); box-shadow: 0 1px 0 var(--line); }
+.e-checks { display: grid; gap: 6px; font-size: 14px; }
+.e-checks div { display: flex; gap: 8px; align-items: center; }
+.e-checks i { width: 18px; height: 18px; border-radius: 50%; background: var(--ok); color: #fff; font: normal 11px/18px sans-serif; text-align: center; }
+.e-shot { border: 1px solid var(--line); border-radius: 10px; background: var(--sheet); padding: 10px; display: grid; gap: 6px; }
+.e-shot .mini { height: 92px; border-radius: 6px; background: var(--bg); padding: 8px; display: grid; gap: 5px; align-content: start; }
+.e-shot .mini b { display: block; height: 7px; border-radius: 3px; background: var(--line); }
+.e-shot .mini .row { display: flex; gap: 5px; }
+.e-shot .mini .row b { flex: 1; }
+.e-shot .mini .btn { flex: 0 0 52px; background: var(--ink); height: 12px; }
+.e-shot small { color: var(--muted); font-size: 12.5px; }
+.e-page { overflow: hidden; padding: 26px 40px 0; display: flex; justify-content: center; }
+.e-sheet { width: 100%; max-width: 900px; background: var(--sheet); border: 1px solid var(--line); border-bottom: 0; padding: 30px 36px; display: grid; grid-template-columns: 1fr 230px; gap: 0 28px; align-content: start; box-shadow: 0 18px 40px -30px rgba(40, 35, 20, .5); }
+.e-sheet h2 { grid-column: 1 / -1; margin: 0; font: 600 28px/1.2 "Source Serif 4", serif; letter-spacing: -0.01em; }
+.e-sheet .lede { grid-column: 1 / -1; margin: 6px 0 22px; color: var(--muted); font-size: 15px; }
+.e-file { grid-column: 1 / -1; font: 500 13px "IBM Plex Mono", monospace; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 10px; }
+.e-code { font: 13.5px/1.9 "IBM Plex Mono", monospace; white-space: pre; }
+.e-code .del { color: var(--pencil); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.e-code .ins { color: var(--ink); background: var(--ink-soft); border-radius: 3px; padding: 1px 2px; }
+.e-code .mk { position: relative; }
+.e-code .mk::after { content: "1"; position: absolute; right: -16px; top: -6px; font: 600 10px "Onest", sans-serif; color: var(--pencil); }
+.e-margin { display: grid; gap: 14px; align-content: start; font-size: 13.5px; line-height: 1.5; }
+.e-note { border-left: 2px solid var(--ink); padding: 2px 0 2px 12px; }
+.e-note small { display: block; color: var(--muted); font-size: 12px; }
+.e-note.mine { border-left-color: var(--pencil); }
+.e-note.mine em { font-style: italic; font-family: "Source Serif 4", serif; font-size: 15px; color: var(--pencil); }
+.e-bar { grid-column: 2; border-top: 1px solid var(--line); background: var(--paper); display: flex; align-items: center; gap: 10px; padding: 0 40px; }
+.e-bar small { color: var(--muted); font-size: 13.5px; margin-right: auto; }
+.e-btn { font: inherit; font-size: 14px; padding: 9px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--sheet); color: var(--fg); }
+.e-btn.red { color: var(--pencil); border-color: var(--pencil); background: transparent; }
+.e-btn.pri { background: var(--fg); border-color: var(--fg); color: var(--sheet); font-weight: 500; }
+.e-side-bottom { grid-column: 1; grid-row: 3; border-right: 1px solid var(--line); border-top: 1px solid var(--line); background: var(--paper); display: flex; align-items: center; padding: 0 16px; font-size: 13px; color: var(--muted); gap: 6px; }
+
+/* =========================================================
+   iOS 1 — сгруппированные списки
+   ========================================================= */
+.f {
+  --bg: #f2f2f7; --card: #ffffff; --side: #ebebf0; --sep: rgba(60, 60, 67, .16); --fg: #1c1c1e; --muted: #8a8a8e;
+  --blue: #007aff; --green: #34c759; --orange: #ff9500; --red: #ff3b30; --purple: #af52de; --teal: #30b0c7; --fill: #e9e9eb; --track: #e5e5ea;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; color: var(--fg); background: var(--bg);
+  grid-template-columns: 300px 1fr 340px; border: 1px solid var(--sep); border-radius: 18px;
+  -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
+}
+:root[data-theme="dark"] .f {
+  --bg: #000000; --card: #1c1c1e; --side: #101012; --sep: rgba(84, 84, 88, .5); --fg: #ffffff; --muted: #8d8d93;
+  --blue: #0a84ff; --green: #30d158; --orange: #ff9f0a; --red: #ff453a; --purple: #bf5af2; --teal: #40c8e0; --fill: #26252a; --track: #39393d;
+}
+.f-side { background: var(--side); border-right: 1px solid var(--sep); padding: 14px 14px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+.f-lights { display: flex; gap: 8px; padding: 2px 4px; }
+.f-lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+.f-lights i:nth-child(2) { background: #febc2e; } .f-lights i:nth-child(3) { background: #28c840; }
+.f-big { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; padding: 0 6px; }
+.f-search { background: var(--fill); border-radius: 10px; padding: 7px 10px; color: var(--muted); font-size: 15px; display: flex; gap: 6px; align-items: center; }
+.f-gh { font-size: 13px; color: var(--muted); padding: 0 16px; margin-bottom: -8px; }
+.f-group { background: var(--card); border-radius: 12px; overflow: hidden; }
+.f-row { display: flex; align-items: center; gap: 12px; padding: 0 14px; min-height: 44px; font-size: 15px; position: relative; }
+.f-row + .f-row::before { content: ""; position: absolute; top: 0; right: 0; left: 52px; height: 1px; background: var(--sep); }
+.f-row.sel { background: var(--blue); color: #fff; }
+.f-row.sel .f-sub, .f-row.sel .chev { color: rgba(255, 255, 255, .8); }
+.f-row.sel + .f-row::before { display: none; }
+.sq { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 600; }
+.f-row .txt { flex: 1; display: grid; line-height: 1.25; padding: 8px 0; }
+.f-sub { font-size: 13px; color: var(--muted); }
+.chev { color: var(--muted); font-size: 18px; }
+.badge { min-width: 20px; height: 20px; border-radius: 10px; background: var(--orange); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; padding: 0 6px; }
+.f-main { display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
+.f-nav { padding: 18px 24px 12px; display: grid; gap: 12px; }
+.f-navtop { display: flex; justify-content: space-between; align-items: center; color: var(--blue); font-size: 16px; }
+.f-nav h2 { margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.025em; }
+.f-segc { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--track); border-radius: 9px; padding: 2px; font-size: 13px; font-weight: 500; text-align: center; }
+.f-segc span { padding: 6px; border-radius: 7px; }
+.f-segc span.on { background: var(--card); box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04); }
+:root[data-theme="dark"] .f-segc span.on { background: #636366; }
+.f-chat { flex: 1; overflow: hidden; padding: 6px 24px; display: grid; gap: 8px; align-content: start; }
+.f-time { text-align: center; font-size: 12px; color: var(--muted); margin: 6px 0; }
+.bub { max-width: 68%; padding: 9px 14px; border-radius: 20px; font-size: 15px; line-height: 1.35; }
+.bub.me { justify-self: end; background: var(--blue); color: #fff; border-bottom-right-radius: 6px; }
+.bub.them { justify-self: start; background: var(--fill); border-bottom-left-radius: 6px; }
+.f-who { font-size: 12px; color: var(--muted); margin: 8px 0 -4px 14px; }
+.f-live { justify-self: start; width: 70%; background: var(--card); border-radius: 16px; overflow: hidden; }
+.f-live .hd { display: flex; align-items: center; gap: 8px; padding: 12px 14px 6px; font-size: 13px; color: var(--muted); }
+.f-live .hd b { color: var(--fg); font-weight: 600; font-size: 15px; flex: 1; }
+.f-live .f-row { min-height: 40px; font-size: 14px; }
+.f-live .f-row .txt { font-family: ui-monospace, "SF Mono", "IBM Plex Mono", monospace; font-size: 13px; }
+.ring { width: 22px; height: 22px; border-radius: 50%; background: conic-gradient(var(--green) 0 66%, var(--track) 66% 100%); display: grid; place-items: center; }
+.ring::after { content: ""; width: 14px; height: 14px; border-radius: 50%; background: var(--card); }
+.f-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.f-input { margin: 8px 24px 18px; display: flex; gap: 10px; align-items: center; }
+.f-plus { width: 34px; height: 34px; border-radius: 50%; background: var(--fill); display: grid; place-items: center; color: var(--muted); font-size: 22px; }
+.f-field { flex: 1; border: 1px solid var(--sep); border-radius: 18px; padding: 8px 8px 8px 16px; display: flex; justify-content: space-between; align-items: center; color: var(--muted); background: var(--card); font-size: 15px; }
+.f-send { width: 28px; height: 28px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-size: 16px; }
+.f-insp { border-left: 1px solid var(--sep); padding: 22px 16px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; background: var(--bg); }
+.f-insp .f-row { font-size: 15px; }
+.f-val { color: var(--muted); }
+.tog { width: 51px; height: 31px; border-radius: 16px; background: var(--green); position: relative; flex: none; }
+.tog::after { content: ""; position: absolute; top: 2px; right: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .15); }
+.tog.off { background: var(--track); }
+.tog.off::after { right: auto; left: 2px; }
+.f-foot { font-size: 13px; color: var(--muted); padding: 0 16px; margin-top: -8px; line-height: 1.4; }
+.f-btnrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.f-b { text-align: center; padding: 12px; border-radius: 12px; font-size: 15px; font-weight: 600; background: var(--card); color: var(--blue); }
+.f-b.pri { background: var(--blue); color: #fff; }
+.f-b.dis { opacity: .4; }
+
+/* =========================================================
+   iOS 2 — «Жидкое стекло» + iPhone
+   ========================================================= */
+.g {
+  --wall: radial-gradient(60% 70% at 12% 18%, #b8e8d9 0%, transparent 60%), radial-gradient(50% 60% at 78% 12%, #d9c8f5 0%, transparent 62%), radial-gradient(60% 70% at 60% 95%, #ffd5bd 0%, transparent 60%), #eef0f6;
+  --glass: rgba(255, 255, 255, .52); --glass-2: rgba(255, 255, 255, .72); --edge: rgba(255, 255, 255, .75); --edge-2: rgba(20, 20, 40, .08);
+  --fg: #15151c; --muted: #5f6070; --blue: #007aff; --green: #2fb954; --orange: #f08c00; --red: #ff3b30;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; color: var(--fg);
+  background: var(--wall); grid-template-columns: 212px 1fr 324px; min-width: 1380px; gap: 14px; padding: 14px; border-radius: 22px;
+  -webkit-font-smoothing: antialiased; letter-spacing: -0.01em;
+}
+:root[data-theme="dark"] .g {
+  --wall: radial-gradient(60% 70% at 12% 18%, #12403a 0%, transparent 60%), radial-gradient(50% 60% at 80% 10%, #2e2160 0%, transparent 62%), radial-gradient(60% 70% at 60% 95%, #4a2414 0%, transparent 60%), #0b0b12;
+  --glass: rgba(40, 40, 56, .45); --glass-2: rgba(60, 60, 80, .55); --edge: rgba(255, 255, 255, .14); --edge-2: rgba(0, 0, 0, .3);
+  --fg: #f2f2f7; --muted: #a2a3b3; --blue: #0a84ff; --green: #30d158; --orange: #ff9f0a; --red: #ff453a;
+}
+.glass { background: var(--glass); backdrop-filter: blur(28px) saturate(1.7); -webkit-backdrop-filter: blur(28px) saturate(1.7); border: 1px solid var(--edge); box-shadow: inset 0 1px 0 var(--edge), 0 10px 30px -18px rgba(20, 20, 60, .35); }
+.g-side { border-radius: 24px; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+.g-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 14px; font-size: 18px; font-weight: 700; }
+.g-icon { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(145deg, #34c3a5, #5b6cff); display: grid; place-items: center; color: #fff; font: 700 15px -apple-system, "Inter", sans-serif; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4); }
+.g-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; font-size: 15px; }
+.g-item.on { background: var(--glass-2); box-shadow: inset 0 1px 0 var(--edge), 0 1px 2px var(--edge-2); font-weight: 600; }
+.g-item .n { margin-left: auto; font-size: 13px; color: var(--muted); }
+.g-item .n.o { color: var(--orange); font-weight: 600; }
+.g-sub { font-size: 13px; color: var(--muted); padding: 14px 10px 4px; }
+.g-main { display: flex; flex-direction: column; gap: 14px; min-height: 0; position: relative; }
+.g-goal { border-radius: 24px; padding: 18px 22px; display: grid; gap: 10px; }
+.g-goal h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.025em; }
+.g-goal .sub { display: flex; gap: 10px; align-items: center; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+.g-cap { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; background: var(--glass-2); border: 1px solid var(--edge); color: var(--fg); font-size: 13px; }
+.g-steps { display: flex; gap: 4px; }
+.g-steps i { flex: 1; height: 6px; border-radius: 3px; background: var(--edge-2); }
+.g-steps i.d { background: var(--green); } .g-steps i.w { background: var(--blue); } .g-steps i.o { background: var(--orange); }
+.g-cols { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; min-height: 0; overflow: hidden; padding-bottom: 70px; }
+.g-colh { font-size: 14px; font-weight: 600; padding: 0 6px 8px; display: flex; justify-content: space-between; color: var(--muted); }
+.g-colh.o { color: var(--orange); }
+.g-card { border-radius: 20px; padding: 14px; display: grid; gap: 8px; margin-bottom: 10px; font-size: 14px; }
+.g-card h4 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.015em; }
+.g-card .who { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+.g-av { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+.g-bar { height: 5px; border-radius: 3px; background: var(--edge-2); overflow: hidden; }
+.g-bar i { display: block; height: 100%; background: var(--blue); border-radius: 3px; }
+.g-meta { display: flex; gap: 10px; font-size: 12.5px; color: var(--muted); }
+.g-meta .ok { color: var(--green); font-weight: 600; } .g-meta .bad { color: var(--red); font-weight: 600; }
+.g-card.o { box-shadow: inset 0 1px 0 var(--edge), 0 0 0 2px var(--orange), 0 14px 30px -18px rgba(240, 140, 0, .6); }
+.g-pill { display: flex; gap: 8px; }
+.g-pill span { padding: 7px 14px; border-radius: 99px; font-size: 14px; font-weight: 600; background: var(--glass-2); border: 1px solid var(--edge); }
+.g-pill span.pri { background: var(--orange); color: #fff; border-color: transparent; }
+.g-esc { font-size: 13px; color: var(--red); line-height: 1.4; }
+.g-tab { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); border-radius: 99px; padding: 6px; display: flex; gap: 4px; font-size: 13px; font-weight: 600; }
+.g-tab span { padding: 8px 18px; border-radius: 99px; color: var(--muted); }
+.g-tab span.on { background: var(--glass-2); color: var(--blue); box-shadow: inset 0 1px 0 var(--edge); }
+.g-phonewrap { display: grid; place-items: center; gap: 10px; align-content: center; }
+.g-phonecap { font-size: 13px; color: var(--muted); text-align: center; max-width: 30ch; }
+.phone { width: 300px; height: 630px; border-radius: 52px; background: #0d0d10; padding: 10px; box-shadow: 0 0 0 2px #3a3a40, 0 30px 60px -30px rgba(0, 0, 0, .6); }
+.screen { width: 100%; height: 100%; border-radius: 43px; overflow: hidden; position: relative; color: #fff;
+  background: radial-gradient(80% 60% at 20% 20%, #3fc5a7 0%, transparent 60%), radial-gradient(70% 60% at 90% 40%, #6a5cff 0%, transparent 60%), radial-gradient(80% 60% at 40% 100%, #ff8a5c 0%, transparent 60%), #1a1840; }
+.island { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 96px; height: 28px; border-radius: 20px; background: #000; }
+.lk-date { position: absolute; top: 62px; width: 100%; text-align: center; font-size: 16px; font-weight: 600; opacity: .9; }
+.lk-time { position: absolute; top: 80px; width: 100%; text-align: center; font-size: 84px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.lk-act { position: absolute; left: 12px; right: 12px; bottom: 210px; border-radius: 24px; padding: 14px; background: rgba(20, 20, 30, .45); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, .18); display: grid; gap: 9px; }
+.lk-act .t { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.lk-act .t .g-icon { width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
+.lk-act .t span:last-child { margin-left: auto; opacity: .7; font-weight: 500; }
+.lk-act .big { font-size: 17px; font-weight: 600; line-height: 1.25; }
+.lk-act .g-steps i { background: rgba(255, 255, 255, .22); height: 5px; }
+.lk-act .g-steps i.d { background: #30d158; } .lk-act .g-steps i.w { background: #0a84ff; } .lk-act .g-steps i.o { background: #ff9f0a; }
+.lk-act .sm { font-size: 12.5px; opacity: .8; }
+.lk-note { position: absolute; left: 12px; right: 12px; bottom: 120px; border-radius: 20px; padding: 11px 13px; background: rgba(255, 255, 255, .22); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); font-size: 13px; line-height: 1.35; display: grid; grid-template-columns: 30px 1fr; gap: 0 10px; }
+.lk-note .g-icon { width: 30px; height: 30px; grid-row: span 2; }
+.lk-note b { font-weight: 600; }
+.lk-btm { position: absolute; bottom: 34px; left: 34px; right: 34px; display: flex; justify-content: space-between; }
+.lk-btm i { width: 46px; height: 46px; border-radius: 50%; background: rgba(0, 0, 0, .35); backdrop-filter: blur(10px); }
+.lk-bar { position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%); width: 120px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .85); }
+</style>
+</head>
+<body>
+
+<header class="chooser">
+  <div class="chooser-row">
+    <h1>Раунд 2: семейство B и стиль iPhone</h1>
+    <span class="spacer"></span>
+    <div class="seg" role="group" aria-label="Вариант">
+      <button data-pick="d" aria-pressed="true">B2 · Опрос</button>
+      <button data-pick="e" aria-pressed="false">B3 · Корректура</button>
+      <button data-pick="f" aria-pressed="false">iOS 1 · Списки</button>
+      <button data-pick="g" aria-pressed="false">iOS 2 · Стекло</button>
+    </div>
+    <div class="seg" role="group" aria-label="Тема">
+      <button data-theme-pick="light" aria-pressed="false">Светлая</button>
+      <button data-theme-pick="dark" aria-pressed="false">Тёмная</button>
+    </div>
+  </div>
+  <p class="about" data-about="d"><b>B2, голубая калька.</b> Тот же спокойный чат, что в B, но слева появились проекты и сессии, а панель спеки свёрнута в боковые закладки. Цвет — холодная бумага и бирюза, заголовки в Literata. Показан опрос перед задачей: карточка с вариантами, рекомендуемый помечен.</p>
+  <p class="about" data-about="e" hidden><b>B3, корректура.</b> Ревью выглядит как вычитка рукописи: удалённое зачёркнуто красным карандашом, добавленное вписано синими чернилами, на полях — пояснения агента и твои замечания. Слева — проверки и скриншот страницы. Это экран, на котором ты принимаешь работу.</p>
+  <p class="about" data-about="f" hidden><b>iOS 1, сгруппированные списки.</b> Язык iPadOS и macOS: крупный заголовок, сегментированный переключатель, чат как в iMessage, справа настройки сессии в виде списков с тумблерами. Знакомо любому владельцу iPhone, ничего не надо объяснять.</p>
+  <p class="about" data-about="g" hidden><b>iOS 2, «жидкое стекло».</b> Полупрозрачные панели на мягких обоях, плавающая панель вкладок, доска оркестратора. Справа идея на будущее: когда приложение будет стоять на твоём Ubuntu-сервере, ход работы можно смотреть с iPhone — карточка на экране блокировки и уведомление об эскалации.</p>
+</header>
+
+<main class="stage">
+
+<!-- ===================== B2 ===================== -->
+<div class="app d on" data-v="d">
+  <aside class="d-side">
+    <div class="d-logo">Artel</div>
+    <div class="d-proj"><span>print-ledger</span><span>▾</span></div>
+    <div class="d-new">+ Новая задача</div>
+    <div class="d-grp">Сейчас</div>
+    <div class="d-s cur"><span>Экспорт отчёта в Excel</span><small class="q">Ждёт твоих ответов</small></div>
+    <div class="d-s"><span>Тёмная тема</span><small>Готово к ревью</small></div>
+    <div class="d-grp">Раньше</div>
+    <div class="d-s"><span>Фильтр по материалу</span><small>Принято вчера</small></div>
+    <div class="d-s"><span>Расчёт себестоимости пластика</span><small>Принято 8 октября</small></div>
+    <div class="d-foot"><div>Агенты <b>5</b></div><div>Ключи и модели <b>4</b></div><div>Потрачено сегодня <b>$1.84</b></div></div>
+  </aside>
+
+  <section class="d-main">
+    <div class="d-head"><h2>Экспорт отчёта в Excel</h2><span>Solo, планировщик на DeepSeek V3</span></div>
+    <div class="d-col">
+      <div class="d-user">Добавь выгрузку месячного отчёта по заказам в Excel. Кнопка рядом с фильтрами.</div>
+      <div class="d-said"><div class="who">Планировщик</div><p>Прежде чем писать спеку, задам четыре вопроса. Ответы сразу попадут в неё.</p></div>
+      <div class="d-answered"><div>Формат файла <b>.xlsx, один лист на месяц</b></div></div>
+      <div class="d-card">
+        <div class="d-prog"><i class="on"></i><i class="on"></i><i></i><i></i><span>Вопрос 2 из 4</span></div>
+        <h3>Какие заказы попадают в отчёт?</h3>
+        <p>От этого зависит итоговая прибыль в последней строке.</p>
+        <div class="d-opts">
+          <div class="d-opt sel"><span class="r"></span><span>Только оплаченные<small>Прибыль совпадёт с тем, что реально пришло</small></span><span class="d-rec">Рекомендую</span></div>
+          <div class="d-opt"><span class="r"></span><span>Все, кроме черновиков<small>Включая ожидающие оплаты</small></span><span></span></div>
+          <div class="d-opt"><span class="r"></span><span>Все, включая отменённые<small>Отменённые — отдельным цветом</small></span><span></span></div>
+          <div class="d-opt d-own"><span class="r"></span><span>Свой ответ…</span><span></span></div>
+        </div>
+        <div class="d-acts"><button class="d-btn pri">Дальше</button><button class="d-btn">Пропустить опрос</button><small>Ответы можно поменять в спеке</small></div>
+      </div>
+    </div>
+    <div class="d-comp"><span>Или напиши ответ своими словами</span><span class="d-go">↑</span></div>
+  </section>
+
+  <aside class="d-rail"><span>Спека</span><span>Изменения</span><span>Файлы</span></aside>
+</div>
+
+<!-- ===================== B3 ===================== -->
+<div class="app e" data-v="e">
+  <div class="e-top">
+    <span class="e-logo">Artel</span>
+    <span class="e-crumb">print-ledger / <b>Экспорт отчёта в Excel</b></span>
+    <span class="r">Задача стоила $0.08, 11 минут</span>
+  </div>
+
+  <aside class="e-side">
+    <div>
+      <p class="e-h">Проверки</p>
+      <div class="e-checks">
+        <div><i>✓</i>Тесты 6 из 6</div>
+        <div><i>✓</i>Сборка прошла</div>
+        <div><i>✓</i>Страница совпала со спекой</div>
+      </div>
+    </div>
+    <div>
+      <p class="e-h">Изменённые файлы</p>
+      <div class="e-files mono">
+        <div class="on"><span>reports/excel.ts</span><span>новый</span></div>
+        <div><span>ui/Filters.tsx</span><span>+9 −2</span></div>
+        <div><span>tests/excel.test.ts</span><span>новый</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="e-h">Так выглядит страница</p>
+      <div class="e-shot">
+        <div class="mini"><b style="width:40%"></b><div class="row"><b></b><b></b><b class="btn"></b></div><b></b><b></b><b style="width:70%"></b></div>
+        <small>Кнопка «Скачать Excel» справа от фильтров</small>
+      </div>
+    </div>
+  </aside>
+
+  <section class="e-page">
+    <div class="e-sheet">
+      <h2>Агент закончил. Посмотри правки</h2>
+      <p class="lede">Все проверки пройдены, осталось твоё решение. Твоё замечание учтено, пояснения агента на полях.</p>
+      <div class="e-file">src/reports/excel.ts</div>
+      <div class="e-code">export function buildSheet(rows: Order[]) {
+  const ws = utils.json_to_sheet(rows.map(toRow));
+  <span class="del">const total = sum(rows, r =&gt; r.profit);</span>
+  <span class="ins mk">const paid = rows.filter(r =&gt; r.status === "paid");</span>
+  <span class="ins">const total = sum(paid, r =&gt; r.profit);</span>
+  utils.sheet_add_aoa(ws, [["Итого", total]], {
+    origin: -1,
+  });
+  <span class="ins">ws["!cols"] = COLUMN_WIDTHS;</span>
+  return ws;
+}</div>
+      <div class="e-margin">
+        <div class="e-note mine"><small>Ты, вчера</small><em>Отменённые тоже не считай.</em></div>
+        <div class="e-note"><small>Кодер, к правке 1</small>Фильтр теперь пропускает только оплаченные заказы. Добавил тест на месяц, где все заказы отменены.</div>
+        <div class="e-note"><small>Кодер</small>Ширина колонок задана, чтобы даты и суммы не превращались в «###».</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="e-side-bottom">Ветка artel/excel-export, твой main не тронут</div>
+  <div class="e-bar">
+    <small>Можно отметить строку и написать замечание на полях</small>
+    <button class="e-btn red">Вернуть на доработку</button>
+    <button class="e-btn pri">Принять в main</button>
+  </div>
+</div>
+
+<!-- ===================== iOS 1 ===================== -->
+<div class="app f" data-v="f">
+  <aside class="f-side">
+    <div class="f-lights"><i></i><i></i><i></i></div>
+    <div class="f-big">Artel</div>
+    <div class="f-search"><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9.5 9.5 13 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Поиск</div>
+    <div class="f-gh">Проекты</div>
+    <div class="f-group">
+      <div class="f-row"><span class="sq" style="background:var(--blue)">P</span><span class="txt">print-ledger</span><span class="f-sub">3</span><span class="chev">›</span></div>
+      <div class="f-row"><span class="sq" style="background:var(--purple)">B</span><span class="txt">barber-bot</span><span class="f-sub">1</span><span class="chev">›</span></div>
+    </div>
+    <div class="f-gh">Сессии</div>
+    <div class="f-group">
+      <div class="f-row sel"><span class="sq" style="background:rgba(255,255,255,.25)">✎</span><span class="txt">Экспорт в Excel<span class="f-sub">Кодер пишет код</span></span></div>
+      <div class="f-row"><span class="sq" style="background:var(--orange)">!</span><span class="txt">Тёмная тема<span class="f-sub">Ждёт ревью</span></span><span class="badge">1</span></div>
+      <div class="f-row"><span class="sq" style="background:var(--teal)">◎</span><span class="txt">Запись на время<span class="f-sub">Оркестратор, 2 из 5</span></span></div>
+      <div class="f-row"><span class="sq" style="background:var(--green)">✓</span><span class="txt">Фильтр по материалу<span class="f-sub">Принято вчера</span></span></div>
+    </div>
+    <div class="f-group" style="margin-top:auto">
+      <div class="f-row"><span class="sq" style="background:#8e8e93">⚙</span><span class="txt">Настройки</span><span class="chev">›</span></div>
+    </div>
+  </aside>
+
+  <section class="f-main">
+    <div class="f-nav">
+      <div class="f-navtop"><span>‹ print-ledger</span><span>Стоп</span></div>
+      <h2>Экспорт в Excel</h2>
+      <div class="f-segc"><span class="on">Чат</span><span>План</span><span>Изменения 3</span></div>
+    </div>
+    <div class="f-chat">
+      <div class="f-time">Сегодня, 14:12</div>
+      <div class="bub me">Добавь выгрузку месячного отчёта по заказам в Excel. Кнопка рядом с фильтрами.</div>
+      <div class="f-who">Планировщик</div>
+      <div class="bub them">Спека готова, ты её одобрил. Тесты написаны и пока красные, как и должно быть. Передаю кодеру.</div>
+      <div class="f-who">Кодер</div>
+      <div class="f-live">
+        <div class="hd"><span class="f-dot"></span><b>Работает</b><span>2:14</span></div>
+        <div class="f-row"><span class="sq" style="background:var(--teal)">◧</span><span class="txt">reports/monthly.ts</span><span class="f-sub">прочитал</span></div>
+        <div class="f-row"><span class="sq" style="background:var(--blue)">+</span><span class="txt">reports/excel.ts</span><span class="f-sub" style="color:var(--green)">+48</span></div>
+        <div class="f-row"><span class="sq" style="background:var(--orange)">✎</span><span class="txt">ui/Filters.tsx</span><span class="f-sub">+9 −2</span></div>
+        <div class="f-row"><span class="ring"></span><span class="txt">npm test</span><span class="f-sub">4 из 6</span></div>
+      </div>
+    </div>
+    <div class="f-input"><span class="f-plus">+</span><span class="f-field">Сообщение агенту<span class="f-send">↑</span></span></div>
+  </section>
+
+  <aside class="f-insp">
+    <div class="f-gh" style="margin-bottom:-10px">Агент</div>
+    <div class="f-group">
+      <div class="f-row"><span class="txt">Режим</span><span class="f-val">Solo</span><span class="chev">›</span></div>
+      <div class="f-row"><span class="txt">Роль</span><span class="f-val">Кодер</span><span class="chev">›</span></div>
+      <div class="f-row"><span class="txt">Модель</span><span class="f-val">DeepSeek V3</span><span class="chev">›</span></div>
+    </div>
+    <div class="f-gh" style="margin-bottom:-10px">Порядок работы</div>
+    <div class="f-group">
+      <div class="f-row"><span class="txt">Опрос перед задачей</span><span class="tog"></span></div>
+      <div class="f-row"><span class="txt">Тесты до кода</span><span class="tog"></span></div>
+      <div class="f-row"><span class="txt">Проверка скриншотом</span><span class="tog"></span></div>
+      <div class="f-row"><span class="txt">Спрашивать перед push</span><span class="tog"></span></div>
+    </div>
+    <div class="f-foot">Агент работает в своей копии проекта. Твой main не изменится, пока ты не нажмёшь «Принять».</div>
+    <div class="f-gh" style="margin-bottom:-10px">Расход</div>
+    <div class="f-group">
+      <div class="f-row"><span class="txt">Эта сессия</span><span class="f-val">$0.04</span></div>
+      <div class="f-row"><span class="txt">Баланс DeepSeek</span><span class="f-val">$8.12</span></div>
+    </div>
+    <div class="f-btnrow" style="margin-top:auto"><span class="f-b">Вернуть</span><span class="f-b pri dis">Принять</span></div>
+  </aside>
+</div>
+
+<!-- ===================== iOS 2 ===================== -->
+<div class="app g" data-v="g">
+  <aside class="g-side glass">
+    <div class="g-brand"><span class="g-icon">A</span>Artel</div>
+    <div class="g-item on"><span>Запись на время</span><span class="n o">1</span></div>
+    <div class="g-item"><span>Экспорт в Excel</span><span class="n">код</span></div>
+    <div class="g-item"><span>Тёмная тема</span><span class="n">ревью</span></div>
+    <div class="g-sub">Проекты</div>
+    <div class="g-item"><span>barber-bot</span><span class="n">1</span></div>
+    <div class="g-item"><span>print-ledger</span><span class="n">3</span></div>
+    <div class="g-sub">Команда</div>
+    <div class="g-item"><span>Агенты</span><span class="n">5</span></div>
+    <div class="g-item"><span>Ключи и модели</span><span class="n">4</span></div>
+  </aside>
+
+  <section class="g-main">
+    <div class="g-goal glass">
+      <h2>Бот записи в барбершоп</h2>
+      <div class="g-steps"><i class="d"></i><i class="o"></i><i class="w"></i><i class="w"></i><i></i></div>
+      <div class="sub"><span class="g-cap"><span style="width:8px;height:8px;border-radius:50%;background:var(--green)"></span>Оркестратор ведёт 5 подзадач</span><span>Kimi K2 через OpenRouter</span><span>$0.62 из $3.00</span></div>
+    </div>
+    <div class="g-cols">
+      <div>
+        <div class="g-colh"><span>В работе</span><span>2</span></div>
+        <div class="g-card glass"><h4>Запись на свободное время</h4><div class="who"><span class="g-av" style="background:#007aff">К</span>Кодер, DeepSeek V3</div><div class="g-bar"><i style="width:62%"></i></div><div class="g-meta"><span class="ok">тесты 8/13</span><span>6 мин</span></div></div>
+        <div class="g-card glass"><h4>Уведомления мастеру</h4><div class="who"><span class="g-av" style="background:#ff3b30">К</span>Передано Claude Sonnet</div><div class="g-esc">Три попытки не прошли тест на часовой пояс, задачу взяла модель посильнее.</div><div class="g-meta"><span class="bad">тесты 5/7</span><span>9 мин</span></div></div>
+      </div>
+      <div>
+        <div class="g-colh"><span>Проверка</span><span>1</span></div>
+        <div class="g-card glass"><h4>Админка: расписание мастеров</h4><div class="who"><span class="g-av" style="background:#30b0c7">Р</span>Ревьюер, Qwen3 Coder</div><div class="g-bar"><i style="width:85%;background:var(--green)"></i></div><div class="g-meta"><span class="ok">тесты 11/11</span><span>делает скриншот</span></div></div>
+        <div class="g-colh" style="margin-top:8px"><span>В очереди</span><span>1</span></div>
+        <div class="g-card glass" style="opacity:.75"><h4>Напоминание за 2 часа</h4><div class="who"><span class="g-av" style="background:#8e8e93">К</span>Ждёт «Запись на время»</div></div>
+      </div>
+      <div>
+        <div class="g-colh o"><span>Ждёт тебя</span><span>1</span></div>
+        <div class="g-card glass o"><h4>Схема БД и миграции</h4><div class="who"><span class="g-av" style="background:#007aff">К</span>Кодер, DeepSeek V3</div><div class="g-meta"><span class="ok">тесты 9/9</span><span class="ok">сборка</span><span>+214</span></div><div class="g-pill"><span class="pri">Смотреть</span><span>Принять</span></div></div>
+      </div>
+    </div>
+    <div class="g-tab glass"><span class="on">Доска</span><span>Чат</span><span>Изменения</span><span>Расход</span></div>
+  </section>
+
+  <div class="g-phonewrap">
+    <div class="phone"><div class="screen">
+      <div class="island"></div>
+      <div class="lk-date">Воскресенье, 11 октября</div>
+      <div class="lk-time">14:32</div>
+      <div class="lk-act">
+        <div class="t"><span class="g-icon">A</span><span>barber-bot</span><span>2 из 5</span></div>
+        <div class="big">Схема БД ждёт твоего ревью</div>
+        <div class="g-steps"><i class="d"></i><i class="o"></i><i class="w"></i><i class="w"></i><i></i></div>
+        <div class="sm">3 агента работают, потрачено $0.62</div>
+      </div>
+      <div class="lk-note"><span class="g-icon">A</span><b>Уведомления мастеру</b><span>Эскалация: задачу взял Claude Sonnet</span></div>
+      <div class="lk-btm"><i></i><i></i></div>
+      <div class="lk-bar"></div>
+    </div></div>
+    <div class="g-phonecap">Идея на будущее: ход работы на экране блокировки через твой сервер</div>
+  </div>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  function setTheme(t) {
+    root.setAttribute("data-theme", t);
+    document.querySelectorAll("[data-theme-pick]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.themePick === t)); });
+    try { localStorage.setItem("variants2-theme", t); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem("variants2-theme"); } catch (e) {}
+  setTheme(saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  document.querySelectorAll("[data-theme-pick]").forEach(function (b) { b.addEventListener("click", function () { setTheme(b.dataset.themePick); }); });
+  function pick(v) {
+    document.querySelectorAll("[data-pick]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.pick === v)); });
+    document.querySelectorAll(".app").forEach(function (a) { a.classList.toggle("on", a.dataset.v === v); });
+    document.querySelectorAll("[data-about]").forEach(function (p) { p.hidden = p.dataset.about !== v; });
+    try { localStorage.setItem("variants2-pick", v); } catch (e) {}
+  }
+  document.querySelectorAll("[data-pick]").forEach(function (b) { b.addEventListener("click", function () { pick(b.dataset.pick); }); });
+  var sp = null;
+  try { sp = localStorage.getItem("variants2-pick"); } catch (e) {}
+  if (sp) pick(sp);
+})();
+</script>
+</body>
+</html>

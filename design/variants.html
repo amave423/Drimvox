@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Варианты дизайна</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Spectral:ital,wght@0,500;0,600;1,500&family=Onest:wght@400;500;600&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- Chooser chrome ---------- */
+:root {
+  --ch-bg: #f2f3f5; --ch-fg: #1d2129; --ch-muted: #5d6573; --ch-line: #d6dae1; --ch-btn: #ffffff; --ch-on: #1d2129; --ch-onfg: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --ch-bg: #1b1e24; --ch-fg: #e7e9ee; --ch-muted: #9aa1ad; --ch-line: #343944; --ch-btn: #262a32; --ch-on: #e7e9ee; --ch-onfg: #1b1e24; }
+}
+:root[data-theme="dark"] { --ch-bg: #1b1e24; --ch-fg: #e7e9ee; --ch-muted: #9aa1ad; --ch-line: #343944; --ch-btn: #262a32; --ch-on: #e7e9ee; --ch-onfg: #1b1e24; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ch-bg); color: var(--ch-fg); font: 15px/1.5 "Onest", system-ui, sans-serif; }
+.chooser { max-width: 1440px; margin: 0 auto; padding: 20px 16px 8px; display: grid; gap: 14px; }
+.chooser h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.chooser-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--ch-line); border-radius: 10px; padding: 3px; background: var(--ch-btn); }
+.seg button { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--ch-fg); padding: 7px 14px; border-radius: 7px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ch-on); color: var(--ch-onfg); }
+.seg button:focus-visible, .chooser a:focus-visible { outline: 2px solid #4c8dff; outline-offset: 2px; }
+.spacer { flex: 1; }
+.about { color: var(--ch-muted); max-width: 78ch; margin: 0; }
+.about b { color: var(--ch-fg); font-weight: 600; }
+.stage { max-width: 1440px; margin: 0 auto; padding: 8px 16px 32px; overflow-x: auto; }
+.app { display: none; height: 820px; min-width: 1200px; border-radius: 14px; overflow: hidden; }
+.app.on { display: grid; }
+svg { flex: none; }
+
+/* =========================================================
+   A — «Чертёж» / Quorum
+   ========================================================= */
+.a {
+  --bg: #e9edf2; --panel: #f6f8fb; --sunk: #dfe4eb; --line: #c9d1dc; --fg: #17202c; --muted: #5a6677;
+  --accent: #2563c9; --accent-soft: #d6e3f8; --ok: #1f8a4c; --ok-soft: #d7efe0; --bad: #c2413a; --bad-soft: #f6dcda; --warn: #a86a00;
+  --grid: rgba(37, 99, 201, 0.07);
+  font-family: "IBM Plex Sans", system-ui, sans-serif; color: var(--fg); background: var(--bg);
+  grid-template-columns: 264px 1fr 520px; border: 1px solid var(--line);
+}
+.a-dark, :root[data-theme="dark"] .a {
+  --bg: #1c222b; --panel: #232a35; --sunk: #181d25; --line: #333c4a; --fg: #e3e8f0; --muted: #8e9aac;
+  --accent: #6aa2ff; --accent-soft: #24365a; --ok: #4fc485; --ok-soft: #1d3a2c; --bad: #f07a72; --bad-soft: #4a2427; --warn: #e3a948;
+  --grid: rgba(106, 162, 255, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .a {
+    --bg: #1c222b; --panel: #232a35; --sunk: #181d25; --line: #333c4a; --fg: #e3e8f0; --muted: #8e9aac;
+    --accent: #6aa2ff; --accent-soft: #24365a; --ok: #4fc485; --ok-soft: #1d3a2c; --bad: #f07a72; --bad-soft: #4a2427; --warn: #e3a948;
+    --grid: rgba(106, 162, 255, 0.06);
+  }
+}
+.a .mono { font-family: "IBM Plex Mono", monospace; }
+.a-rail { background: var(--sunk); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.a-brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; font-weight: 600; font-size: 16px; }
+.a-mark { width: 22px; height: 22px; border: 2px solid var(--accent); border-radius: 50%; position: relative; }
+.a-mark::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--accent); }
+.a-new { margin: 0 12px 12px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: 14px; }
+.a-proj { padding: 10px 16px 4px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; }
+.a-sess { margin: 2px 8px; padding: 8px 10px; border-radius: 8px; display: grid; grid-template-columns: 10px 1fr; gap: 2px 10px; font-size: 14px; }
+.a-sess small { grid-column: 2; color: var(--muted); font-size: 12px; }
+.a-sess.cur { background: var(--panel); box-shadow: inset 2px 0 0 var(--accent); }
+.dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--muted); }
+.dot.run { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.dot.wait { background: var(--warn); }
+.dot.done { background: var(--ok); }
+.a-foot { margin-top: auto; border-top: 1px solid var(--line); padding: 10px 8px; display: grid; gap: 2px; font-size: 14px; }
+.a-foot div { padding: 6px 10px; border-radius: 6px; display: flex; justify-content: space-between; color: var(--muted); }
+.a-foot div b { color: var(--fg); font-weight: 500; }
+
+.a-center { display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
+.a-head { padding: 14px 24px 0; display: grid; gap: 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.a-title { display: flex; align-items: center; gap: 10px; }
+.a-title h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.chip.acc { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+.a-steps { display: flex; gap: 0; margin: 0 -24px; padding: 0 24px; list-style: none; counter-reset: st; }
+.a-steps li { counter-increment: st; padding: 8px 14px 10px 0; margin-right: 14px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; display: flex; gap: 6px; align-items: center; }
+.a-steps li::before { content: counter(st); font: 500 11px "IBM Plex Mono", monospace; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line); }
+.a-steps li.ok { color: var(--fg); }
+.a-steps li.ok::before { content: "✓"; background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.a-steps li.now { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+.a-steps li.now::before { border-color: var(--accent); }
+.a-feed { flex: 1; overflow: hidden; padding: 20px 24px; display: grid; gap: 14px; align-content: start;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; }
+.a-msg { max-width: 62ch; justify-self: end; background: var(--accent); color: #fff; padding: 10px 14px; border-radius: 12px 12px 2px 12px; font-size: 14px; }
+.a-block { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.a-block h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.a-block p { margin: 0; color: var(--muted); }
+.a-acts { display: grid; gap: 2px; font-size: 13px; }
+.a-act { display: grid; grid-template-columns: 74px 1fr auto; gap: 10px; padding: 5px 0; border-top: 1px solid var(--line); }
+.a-act:first-child { border-top: 0; }
+.a-act span:first-child { color: var(--muted); }
+.a-act .mono { font-size: 12.5px; }
+.plus { color: var(--ok); } .minus { color: var(--bad); }
+.a-test { display: flex; gap: 4px; margin-top: 8px; }
+.a-test i { width: 22px; height: 6px; border-radius: 2px; background: var(--ok); }
+.a-test i.r { background: var(--bad); }
+.a-comp { margin: 0 24px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; }
+.a-comp .ph { color: var(--muted); font-size: 14px; }
+.a-comp-row { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.a-send { margin-left: auto; background: var(--accent); color: #fff; border-radius: 8px; padding: 6px 14px; font-weight: 500; }
+
+.a-right { background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.a-tabs { display: flex; gap: 18px; padding: 0 18px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.a-tabs span { padding: 13px 0 11px; color: var(--muted); border-bottom: 2px solid transparent; }
+.a-tabs span.on { color: var(--fg); border-bottom-color: var(--fg); font-weight: 500; }
+.a-files { padding: 10px 12px; display: grid; gap: 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.a-file { display: flex; gap: 10px; padding: 5px 8px; border-radius: 6px; }
+.a-file.on { background: var(--accent-soft); }
+.a-file .st { font: 500 12px "IBM Plex Mono", monospace; width: 14px; color: var(--warn); }
+.a-file .st.n { color: var(--ok); }
+.a-file .num { margin-left: auto; font: 12px "IBM Plex Mono", monospace; }
+.a-diff { flex: 1; overflow: hidden; font: 12.5px/1.65 "IBM Plex Mono", monospace; padding: 8px 0; }
+.ln { display: grid; grid-template-columns: 40px 18px 1fr; padding-right: 12px; white-space: pre; }
+.ln b { font-weight: 400; color: var(--muted); text-align: right; padding-right: 10px; opacity: .7; }
+.ln.add { background: var(--ok-soft); } .ln.add i { color: var(--ok); }
+.ln.del { background: var(--bad-soft); } .ln.del i { color: var(--bad); }
+.ln i { font-style: normal; }
+.a-note { margin: 4px 12px 6px 58px; border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 8px; padding: 8px 10px; font: 13px/1.45 "IBM Plex Sans", sans-serif; background: var(--bg); }
+.a-note small { color: var(--muted); display: block; margin-bottom: 2px; }
+.a-gate { border-top: 1px solid var(--line); padding: 12px 16px; display: grid; gap: 10px; }
+.a-checks { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.a-checks span { display: flex; gap: 6px; align-items: center; }
+.a-btns { display: flex; gap: 8px; }
+.btn { font-size: 14px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.off { opacity: .45; }
+
+/* =========================================================
+   B — «Мастерская» / Artel
+   ========================================================= */
+.b {
+  --bg: #e4e8df; --paper: #f3f4ee; --sheet: #fbfbf7; --line: #c9cfbf; --fg: #1f2620; --muted: #5e6a5c;
+  --accent: #9a5f0c; --accent-soft: #f0e2c6; --ink2: #2e4a3a; --ok: #2f6b45;
+  font-family: "Onest", system-ui, sans-serif; color: var(--fg); background: var(--bg);
+  grid-template-rows: 54px 1fr; grid-template-columns: 1fr 440px; border: 1px solid var(--line);
+}
+:root[data-theme="dark"] .b {
+  --bg: #1d221d; --paper: #252b25; --sheet: #2b322b; --line: #3c463c; --fg: #e6e9df; --muted: #a1ab9c;
+  --accent: #e0a84a; --accent-soft: #3d321f; --ink2: #b9d4bf; --ok: #7cc193;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .b {
+    --bg: #1d221d; --paper: #252b25; --sheet: #2b322b; --line: #3c463c; --fg: #e6e9df; --muted: #a1ab9c;
+    --accent: #e0a84a; --accent-soft: #3d321f; --ink2: #b9d4bf; --ok: #7cc193;
+  }
+}
+.b .serif { font-family: "Spectral", Georgia, serif; }
+.b-top { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--paper); font-size: 14px; }
+.b-logo { font: 600 21px "Spectral", Georgia, serif; letter-spacing: 0.01em; }
+.b-proj { padding: 5px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.b-tabs { display: flex; gap: 4px; }
+.b-tabs span { padding: 6px 12px; border-radius: 8px; color: var(--muted); }
+.b-tabs span.on { background: var(--sheet); color: var(--fg); box-shadow: 0 1px 0 var(--line); }
+.b-tabs span em { font-style: normal; color: var(--accent); }
+.b-spend { margin-left: auto; color: var(--muted); }
+.b-spend b { color: var(--fg); font-weight: 500; }
+.b-chat { overflow: hidden; display: flex; flex-direction: column; align-items: center; min-height: 0; }
+.b-col { width: min(720px, 100% - 48px); flex: 1; overflow: hidden; padding: 28px 0 0; display: grid; gap: 22px; align-content: start; }
+.b-user { justify-self: end; max-width: 56ch; background: var(--ink2); color: var(--paper); padding: 12px 16px; border-radius: 16px 16px 4px 16px; font-size: 15px; }
+.b-agent { display: grid; grid-template-columns: 32px 1fr; gap: 12px; }
+.b-ava { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font: 600 15px "Spectral", serif; }
+.b-said { font-size: 15px; line-height: 1.6; }
+.b-said p { margin: 0 0 8px; }
+.b-said .who { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.b-done { font-size: 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-between; }
+.b-plan { background: var(--sheet); border: 1px solid var(--line); border-radius: 4px 14px 14px 14px; padding: 20px 22px; box-shadow: 0 1px 0 var(--line), 0 8px 24px -16px rgba(30, 40, 30, .35); }
+.b-plan h3 { margin: 0 0 4px; font: 600 22px/1.25 "Spectral", serif; }
+.b-plan > p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+.b-plan ol { margin: 0 0 16px; padding: 0; list-style: none; counter-reset: p; display: grid; gap: 10px; }
+.b-plan li { counter-increment: p; display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; font-size: 15px; align-items: baseline; }
+.b-plan li::before { content: counter(p); font: italic 500 17px "Spectral", serif; color: var(--accent); }
+.b-plan li small { color: var(--muted); font-size: 13px; }
+.b-plan-foot { display: flex; gap: 10px; align-items: center; border-top: 1px dashed var(--line); padding-top: 14px; }
+.b-btn { font: inherit; font-size: 14px; padding: 9px 16px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+.b-btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+:root[data-theme="dark"] .b-btn.pri { color: #1d221d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .b-btn.pri { color: #1d221d; } }
+.b-plan-foot small { margin-left: auto; color: var(--muted); font-size: 13px; }
+.b-comp { width: min(720px, 100% - 48px); margin: 12px 0 22px; background: var(--sheet); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px 10px; }
+.b-comp .ph { color: var(--muted); font-size: 15px; padding-bottom: 14px; }
+.b-comp-row { display: flex; gap: 8px; font-size: 13px; color: var(--muted); align-items: center; }
+.b-pill { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+.b-pill.on { background: var(--accent-soft); border-color: transparent; color: var(--fg); }
+.b-go { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; background: var(--ink2); color: var(--paper); display: grid; place-items: center; }
+.b-drawer { border-left: 1px solid var(--line); background: var(--paper); display: flex; flex-direction: column; min-height: 0; }
+.b-dtabs { display: flex; gap: 6px; padding: 14px 18px 0; font-size: 14px; }
+.b-dtabs span { padding: 6px 12px; border-radius: 8px 8px 0 0; color: var(--muted); }
+.b-dtabs span.on { background: var(--sheet); color: var(--fg); border: 1px solid var(--line); border-bottom-color: var(--sheet); margin-bottom: -1px; }
+.b-sheet { flex: 1; margin: 0 18px 18px; background: var(--sheet); border: 1px solid var(--line); padding: 22px 24px; overflow: hidden; font-size: 14px; line-height: 1.6; }
+.b-sheet h3 { margin: 0 0 2px; font: 600 20px "Spectral", serif; }
+.b-sheet .meta { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+.b-sheet h5 { margin: 16px 0 6px; font: italic 500 16px "Spectral", serif; color: var(--accent); }
+.b-sheet ul { margin: 0; padding-left: 18px; }
+.b-sheet li { margin: 2px 0; }
+.b-sheet code { font: 12.5px "IBM Plex Mono", monospace; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+
+/* =========================================================
+   C — «Диспетчерская» / Relay
+   ========================================================= */
+.c {
+  --bg: #e6ecee; --panel: #f5f8f9; --card: #ffffff; --line: #cbd6da; --fg: #102127; --muted: #5a6e75;
+  --sig: #c77a00; --sig-soft: #fbecd2; --run: #0f7f8c; --run-soft: #d3eef0; --ok: #2c8a52; --bad: #c4423a; --bad-soft: #f7dedb;
+  font-family: "Golos Text", system-ui, sans-serif; color: var(--fg); background: var(--bg);
+  grid-template-columns: 56px 1fr; grid-template-rows: auto 1fr 196px; border: 1px solid var(--line);
+}
+:root[data-theme="dark"] .c {
+  --bg: #0f1d22; --panel: #142630; --card: #1a2f3a; --line: #26404b; --fg: #dcebef; --muted: #86a2ab;
+  --sig: #ffb547; --sig-soft: #3d2e14; --run: #4fd1dc; --run-soft: #123a42; --ok: #5ed58e; --bad: #ff7f74; --bad-soft: #43221f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .c {
+    --bg: #0f1d22; --panel: #142630; --card: #1a2f3a; --line: #26404b; --fg: #dcebef; --muted: #86a2ab;
+    --sig: #ffb547; --sig-soft: #3d2e14; --run: #4fd1dc; --run-soft: #123a42; --ok: #5ed58e; --bad: #ff7f74; --bad-soft: #43221f;
+  }
+}
+.c .mono { font-family: "JetBrains Mono", monospace; }
+.c-rail { grid-row: 1 / -1; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 0; }
+.c-logo { width: 30px; height: 30px; margin-bottom: 12px; }
+.c-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); }
+.c-ico.on { background: var(--run-soft); color: var(--run); }
+.c-goal { padding: 16px 22px; border-bottom: 1px solid var(--line); background: var(--panel); display: grid; grid-template-columns: 1fr auto; gap: 10px 24px; align-items: center; }
+.c-goal h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.c-goal .sub { font-size: 13px; color: var(--muted); display: flex; gap: 16px; align-items: center; }
+.c-orch { display: inline-flex; gap: 8px; align-items: center; }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--run); box-shadow: 0 0 0 0 var(--run); animation: pulse 1.8s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--run) 60%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+.c-budget { grid-row: 1 / 3; grid-column: 2; display: grid; gap: 6px; min-width: 260px; font-size: 13px; }
+.c-budget .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.c-budget .bar i { display: block; height: 100%; width: 21%; background: var(--run); }
+.c-budget .row { display: flex; justify-content: space-between; color: var(--muted); }
+.c-budget .row b { color: var(--fg); font: 500 13px "JetBrains Mono", monospace; }
+.c-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 16px 22px; overflow: hidden; min-height: 0; }
+.c-colh { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; padding: 0 2px 10px; color: var(--muted); }
+.c-colh.sig { color: var(--sig); }
+.c-cards { display: grid; gap: 10px; align-content: start; }
+.c-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; font-size: 13px; }
+.c-card h4 { margin: 0; font-size: 14.5px; font-weight: 600; line-height: 1.3; }
+.c-who { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+.role { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font: 700 11px "JetBrains Mono", monospace; color: #fff; }
+.r-code { background: #2f7fd1; } .r-test { background: #8b5bd6; } .r-rev { background: #1b9a8a; } .r-des { background: #d1497b; } .r-plan { background: #c77a00; }
+.c-live { font: 12px "JetBrains Mono", monospace; color: var(--run); background: var(--run-soft); padding: 5px 8px; border-radius: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.c-meta { display: flex; gap: 12px; color: var(--muted); font: 12px "JetBrains Mono", monospace; }
+.c-meta .ok { color: var(--ok); } .c-meta .bad { color: var(--bad); }
+.c-prog { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.c-prog i { display: block; height: 100%; background: var(--run); }
+.c-card.sig { border-color: var(--sig); box-shadow: 0 0 0 3px var(--sig-soft); }
+.c-card.esc { border-style: dashed; }
+.c-esc { font-size: 12.5px; color: var(--bad); background: var(--bad-soft); border-radius: 6px; padding: 6px 8px; line-height: 1.4; }
+.c-card .acts { display: flex; gap: 6px; }
+.c-b { font: 500 13px "Golos Text", sans-serif; padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--fg); }
+.c-b.sig { background: var(--sig); border-color: var(--sig); color: #1a1205; }
+.c-card.q { opacity: .8; }
+.c-bottom { border-top: 1px solid var(--line); background: var(--panel); display: grid; grid-template-columns: 1fr 380px; min-height: 0; }
+.c-log { padding: 12px 22px; overflow: hidden; font: 12.5px/1.75 "JetBrains Mono", monospace; border-right: 1px solid var(--line); }
+.c-log .t { color: var(--muted); margin-right: 10px; }
+.c-log .o { color: var(--sig); }
+.c-team { padding: 12px 18px; display: grid; gap: 6px; align-content: start; font-size: 13px; }
+.c-team .r { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 10px; align-items: center; }
+.c-team .r span:nth-child(3) { color: var(--muted); font: 12px "JetBrains Mono", monospace; }
+.c-team .r span:nth-child(4) { font: 12px "JetBrains Mono", monospace; min-width: 48px; text-align: right; }
+.c-sect { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<header class="chooser">
+  <div class="chooser-row">
+    <h1>Три направления дизайна</h1>
+    <span class="spacer"></span>
+    <div class="seg" role="group" aria-label="Вариант">
+      <button data-pick="a" aria-pressed="true">A · Чертёж</button>
+      <button data-pick="b" aria-pressed="false">B · Мастерская</button>
+      <button data-pick="c" aria-pressed="false">C · Диспетчерская</button>
+    </div>
+    <div class="seg" role="group" aria-label="Тема">
+      <button data-theme-pick="light" aria-pressed="false">Светлая</button>
+      <button data-theme-pick="dark" aria-pressed="false">Тёмная</button>
+    </div>
+  </div>
+  <p class="about" data-about="a"><b>Quorum.</b> Строгий pro-инструмент из трёх колонок: сессии, ход работы с этапами пайплайна, файлы и построчный diff. Фон — сетка чертежа, цвет — синяя «калька». Плотно и точно, как в Linear или Cursor. Показан Solo-агент на этапе кода.</p>
+  <p class="about" data-about="b" hidden><b>Artel</b> (артель — кооператив мастеров). Спокойный чат по центру, справа выезжает «лист» со спекой и diff. Шалфейная бумага, охра, серифные заголовки. Ощущение мастерской, а не пульта. Показан момент, когда агент принёс план и ждёт «ОК».</p>
+  <p class="about" data-about="c" hidden><b>Relay</b> (эстафета). Командный центр оркестратора: цель сверху, доска подзадач, живые статусы агентов, янтарный сигнал «ждёт тебя», журнал оркестратора и расходы внизу. Показана эскалация застрявшей задачи.</p>
+</header>
+
+<main class="stage">
+
+<!-- ===================== A ===================== -->
+<div class="app a on" data-v="a">
+  <aside class="a-rail">
+    <div class="a-brand"><span class="a-mark"></span>Quorum</div>
+    <div class="a-new">+ Новая задача</div>
+    <div class="a-proj"><span>print-ledger</span><span>3</span></div>
+    <div class="a-sess cur"><span class="dot run"></span><span>Экспорт отчёта в Excel</span><small>Solo, код 4/6</small></div>
+    <div class="a-sess"><span class="dot wait"></span><span>Тёмная тема</span><small>Ждёт твоего ревью</small></div>
+    <div class="a-sess"><span class="dot done"></span><span>Фильтр по материалу</span><small>Слито вчера</small></div>
+    <div class="a-proj"><span>barber-bot</span><span>1</span></div>
+    <div class="a-sess"><span class="dot run"></span><span>Запись на время</span><small>Оркестратор, 2 из 5</small></div>
+    <div class="a-foot">
+      <div>Агенты <b>5</b></div>
+      <div>Провайдеры <b>4</b></div>
+      <div>Сегодня <b class="mono">$1.84</b></div>
+      <div>Настройки</div>
+    </div>
+  </aside>
+
+  <section class="a-center">
+    <div class="a-head">
+      <div class="a-title"><h2>Экспорт отчёта в Excel</h2><span class="chip acc">Solo</span><span class="chip">Кодер, DeepSeek V3</span><span class="chip mono">quorum/excel-export</span></div>
+      <ol class="a-steps">
+        <li class="ok">Опрос</li><li class="ok">Спека</li><li class="ok">Тесты</li><li class="now">Код</li><li>Проверка</li><li>Ревью</li>
+      </ol>
+    </div>
+    <div class="a-feed">
+      <div class="a-msg">Добавь выгрузку месячного отчёта по заказам в Excel. Кнопка рядом с фильтрами.</div>
+      <div class="a-block"><h4>Спека утверждена</h4><p>Файл .xlsx, лист на месяц: дата, клиент, материал, граммы, себестоимость, цена, прибыль. Итоговая строка. Имя файла <span class="mono">orders-2026-10.xlsx</span>.</p></div>
+      <div class="a-block"><h4>Тесты написаны до кода</h4><p>6 тестов. Перед началом все были красными, сейчас зелёных 4.</p>
+        <div class="a-test"><i></i><i></i><i></i><i></i><i class="r"></i><i class="r"></i></div></div>
+      <div class="a-block">
+        <h4><span class="dot run" style="margin:0"></span>Агент работает, 2 мин 14 с</h4>
+        <div class="a-acts">
+          <div class="a-act"><span>Читает</span><span class="mono">src/reports/monthly.ts</span><span></span></div>
+          <div class="a-act"><span>Создал</span><span class="mono">src/reports/excel.ts</span><span class="mono plus">+48</span></div>
+          <div class="a-act"><span>Правит</span><span class="mono">src/ui/Filters.tsx</span><span class="mono"><span class="plus">+9</span> <span class="minus">−2</span></span></div>
+          <div class="a-act"><span>Запустил</span><span class="mono">npm test</span><span class="mono">4/6</span></div>
+          <div class="a-act"><span>Чинит</span><span class="mono">итоговая строка считает пустые заказы</span><span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="a-comp">
+      <div class="ph">Уточнение для агента или новая задача…</div>
+      <div class="a-comp-row"><span class="chip acc">Solo</span><span class="chip">Оркестратор</span><span class="chip">Модель: DeepSeek V3</span><span class="chip">Без опроса</span><span class="a-send">Отправить</span></div>
+    </div>
+  </section>
+
+  <aside class="a-right">
+    <div class="a-tabs"><span class="on">Изменения 3</span><span>Файлы</span><span>Спека</span></div>
+    <div class="a-files">
+      <div class="a-file on"><span class="st n">A</span><span class="mono">src/reports/excel.ts</span><span class="num plus">+48</span></div>
+      <div class="a-file"><span class="st">M</span><span class="mono">src/ui/Filters.tsx</span><span class="num"><span class="plus">+9</span> <span class="minus">−2</span></span></div>
+      <div class="a-file"><span class="st n">A</span><span class="mono">tests/excel.test.ts</span><span class="num plus">+61</span></div>
+    </div>
+    <div class="a-diff">
+      <div class="ln"><b>12</b><i></i>export function buildSheet(rows: Order[]) {</div>
+      <div class="ln"><b>13</b><i></i>  const ws = utils.json_to_sheet(rows.map(toRow));</div>
+      <div class="ln del"><b>14</b><i>−</i>  const total = sum(rows, r =&gt; r.profit);</div>
+      <div class="ln add"><b>14</b><i>+</i>  const paid = rows.filter(r =&gt; r.status !== "draft");</div>
+      <div class="ln add"><b>15</b><i>+</i>  const total = sum(paid, r =&gt; r.profit);</div>
+      <div class="a-note"><small>Твоё замечание к строке 14</small>Отменённые заказы тоже не считай, только оплаченные.</div>
+      <div class="ln"><b>16</b><i></i>  utils.sheet_add_aoa(ws, [["Итого", total]], {</div>
+      <div class="ln"><b>17</b><i></i>    origin: -1,</div>
+      <div class="ln"><b>18</b><i></i>  });</div>
+      <div class="ln add"><b>19</b><i>+</i>  ws["!cols"] = COLUMN_WIDTHS;</div>
+      <div class="ln"><b>20</b><i></i>  return ws;</div>
+      <div class="ln"><b>21</b><i></i>}</div>
+    </div>
+    <div class="a-gate">
+      <div class="a-checks"><span><span class="dot run" style="margin:0"></span>Тесты 4/6</span><span><span class="dot" style="margin:0"></span>Сборка ждёт</span><span><span class="dot" style="margin:0"></span>Скриншот ждёт</span></div>
+      <div class="a-btns"><span class="btn">Вернуть с замечаниями (1)</span><span class="btn pri off">Принять в main</span></div>
+    </div>
+  </aside>
+</div>
+
+<!-- ===================== B ===================== -->
+<div class="app b" data-v="b">
+  <div class="b-top">
+    <span class="b-logo">Artel</span>
+    <span class="b-proj">print-ledger ▾</span>
+    <div class="b-tabs"><span class="on">Экспорт в Excel</span><span>Тёмная тема <em>●</em></span><span>+</span></div>
+    <span class="b-spend">Сегодня потрачено <b>$1.84</b></span>
+  </div>
+
+  <section class="b-chat">
+    <div class="b-col">
+      <div class="b-user">Добавь выгрузку месячного отчёта по заказам в Excel. Кнопка рядом с фильтрами.</div>
+      <div class="b-done"><span>Опрос: 4 вопроса, ответы учтены в спеке</span><span>Показать</span></div>
+      <div class="b-agent">
+        <div class="b-ava">П</div>
+        <div class="b-said">
+          <div class="who">Планировщик, DeepSeek V3</div>
+          <p>Спеку собрал, она открыта справа. Ниже план. Если всё верно, запускаю: сначала тесты, потом код.</p>
+          <div class="b-plan">
+            <h3>План работы</h3>
+            <p>Одна копия проекта, ветка artel/excel-export. Примерно 12 минут и $0.09.</p>
+            <ol>
+              <li><span>Тесты на формат файла, итоговую строку и пустой месяц</span><small>тестировщик</small></li>
+              <li><span>Модуль сборки листа из заказов месяца</span><small>кодер</small></li>
+              <li><span>Кнопка «Скачать Excel» рядом с фильтрами</span><small>кодер</small></li>
+              <li><span>Проверка: тесты, сборка, скриншот страницы</span><small>ревьюер</small></li>
+            </ol>
+            <div class="b-plan-foot"><button class="b-btn pri">Начать работу</button><button class="b-btn">Поправить план</button><small>Шаги можно пропустить</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="b-comp">
+      <div class="ph">Ответь агенту или поставь новую задачу</div>
+      <div class="b-comp-row"><span class="b-pill on">Solo</span><span class="b-pill">Оркестратор</span><span class="b-pill">Опрос включён</span><span class="b-pill">Тесты до кода</span><span class="b-go">↑</span></div>
+    </div>
+  </section>
+
+  <aside class="b-drawer">
+    <div class="b-dtabs"><span class="on">Спека</span><span>Изменения</span><span>Файлы</span></div>
+    <div class="b-sheet">
+      <h3>Экспорт отчёта в Excel</h3>
+      <div class="meta">Версия 1, собрана из ответов на опрос</div>
+      <h5>Что должно получиться</h5>
+      <ul><li>Кнопка «Скачать Excel» справа от фильтров на странице заказов.</li><li>Скачивается <code>orders-2026-10.xlsx</code> за выбранный месяц.</li></ul>
+      <h5>Колонки</h5>
+      <ul><li>Дата, клиент, материал, граммы</li><li>Себестоимость, цена, прибыль</li><li>Последняя строка — итоги по оплаченным заказам</li></ul>
+      <h5>Как поймём, что готово</h5>
+      <ul><li>Все тесты зелёные, сборка проходит</li><li>Файл открывается в Excel без предупреждений</li><li>Пустой месяц даёт лист с заголовками и нулевым итогом</li></ul>
+      <h5>Вне задачи</h5>
+      <ul><li>PDF и CSV</li><li>Отчёты за год</li></ul>
+    </div>
+  </aside>
+</div>
+
+<!-- ===================== C ===================== -->
+<div class="app c" data-v="c">
+  <nav class="c-rail">
+    <svg class="c-logo" viewBox="0 0 30 30" aria-hidden="true"><path d="M4 22 L13 8 L17 14 L21 8 L26 22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" style="color:var(--run)"/></svg>
+    <span class="c-ico on" title="Доска"><svg width="18" height="18" viewBox="0 0 18 18"><rect x="1" y="2" width="4" height="14" rx="1" fill="currentColor"/><rect x="7" y="2" width="4" height="9" rx="1" fill="currentColor"/><rect x="13" y="2" width="4" height="11" rx="1" fill="currentColor"/></svg></span>
+    <span class="c-ico" title="Чат"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 3h14v9H7l-4 3v-3H2z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span>
+    <span class="c-ico" title="Изменения"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M5 2v14M13 2v6a4 4 0 0 1-4 4H5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span>
+    <span class="c-ico" title="Агенты"><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="6" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="13" cy="8" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M1 16c0-3 2-5 5-5s5 2 5 5M11 16c0-2 1-3.5 2.5-3.5S17 14 17 16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span>
+  </nav>
+
+  <div class="c-goal">
+    <h2>Бот записи в барбершоп с админкой</h2>
+    <div class="c-budget">
+      <div class="row"><span>Потрачено на цель</span><b>$0.62 из $3.00</b></div>
+      <div class="bar"><i></i></div>
+      <div class="row"><span>Токены</span><b>412k</b></div>
+    </div>
+    <div class="sub"><span class="c-orch"><span class="pulse"></span>Оркестратор, Kimi K2 через OpenRouter</span><span>barber-bot</span><span>5 подзадач</span><span>Идёт 18 мин</span></div>
+  </div>
+
+  <section class="c-board">
+    <div>
+      <div class="c-colh"><span>В очереди</span><span>1</span></div>
+      <div class="c-cards">
+        <div class="c-card q"><h4>Напоминание клиенту за 2 часа</h4><div class="c-who"><span class="role r-code">К</span>Кодер, ждёт «Запись на время»</div></div>
+        <div class="c-card q"><h4>Аватарки мастеров и логотип бота</h4><div class="c-who"><span class="role r-des">Д</span>Дизайнер, fal.ai Flux</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="c-colh"><span>В работе</span><span>2</span></div>
+      <div class="c-cards">
+        <div class="c-card"><h4>Запись на свободное время</h4><div class="c-who"><span class="role r-code">К</span>Кодер, DeepSeek V3</div><div class="c-live">правит handlers/booking.ts</div><div class="c-prog"><i style="width:62%"></i></div><div class="c-meta"><span class="ok">тесты 8/13</span><span>6 мин</span><span>$0.11</span></div></div>
+        <div class="c-card esc"><h4>Уведомления мастеру</h4><div class="c-who"><span class="role r-code">К</span>Кодер, Nemotron через NVIDIA</div><div class="c-esc">3 попытки, тест на часовой пояс падает. Передано Claude Sonnet через OpenRouter.</div><div class="c-meta"><span class="bad">тесты 5/7</span><span>9 мин</span><span>$0.07</span></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="c-colh"><span>Проверка</span><span>1</span></div>
+      <div class="c-cards">
+        <div class="c-card"><h4>Админка: расписание мастеров</h4><div class="c-who"><span class="role r-rev">Р</span>Ревьюер, Qwen3 Coder</div><div class="c-live">скриншот /admin/schedule → vision</div><div class="c-meta"><span class="ok">тесты 11/11</span><span class="ok">сборка ok</span></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="c-colh sig"><span>Ждёт тебя</span><span>1</span></div>
+      <div class="c-cards">
+        <div class="c-card sig"><h4>Схема БД и миграции</h4><div class="c-who"><span class="role r-code">К</span>Кодер, DeepSeek V3</div><div class="c-meta"><span class="ok">тесты 9/9</span><span class="ok">сборка ok</span><span>+214 −0</span></div><div class="acts"><button class="c-b sig">Смотреть diff</button><button class="c-b">Принять</button></div></div>
+      </div>
+      <div class="c-colh" style="margin-top:16px"><span>Слито</span><span>1</span></div>
+      <div class="c-cards"><div class="c-card q"><h4>Каркас бота и /start</h4><div class="c-meta"><span class="ok">тесты 4/4</span><span>принято 14:09</span></div></div></div>
+    </div>
+  </section>
+
+  <section class="c-bottom">
+    <div class="c-log">
+      <div class="c-sect" style="font-family:'Golos Text',sans-serif">Журнал оркестратора</div>
+      <div><span class="t">14:32</span><span class="o">оркестратор</span> «Уведомления мастеру»: 3 неудачи подряд, эскалирую на более сильную модель</div>
+      <div><span class="t">14:30</span>ревьюер: открыл /admin/schedule, делаю скриншот</div>
+      <div><span class="t">14:27</span>кодер: «Схема БД» — тесты 9/9, сборка ok → жду ревью владельца</div>
+      <div><span class="t">14:21</span><span class="o">оркестратор</span> «Напоминание» поставлено после «Записи на время»: общий модуль слотов</div>
+      <div><span class="t">14:14</span><span class="o">оркестратор</span> план утверждён владельцем, запускаю 3 агента</div>
+    </div>
+    <div class="c-team">
+      <div class="c-sect">Команда</div>
+      <div class="r"><span class="role r-plan">О</span><span>Оркестратор</span><span>Kimi K2</span><span>$0.21</span></div>
+      <div class="r"><span class="role r-code">К</span><span>Кодер ×2</span><span>DeepSeek V3</span><span>$0.24</span></div>
+      <div class="r"><span class="role r-test">Т</span><span>Тестировщик</span><span>DeepSeek V3</span><span>$0.06</span></div>
+      <div class="r"><span class="role r-rev">Р</span><span>Ревьюер</span><span>Qwen3 Coder</span><span>$0.04</span></div>
+      <div class="r"><span class="role r-des">Д</span><span>Дизайнер</span><span>fal.ai Flux</span><span>$0.00</span></div>
+    </div>
+  </section>
+</div>
+
+</main>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  function setTheme(t) {
+    root.setAttribute("data-theme", t);
+    document.querySelectorAll("[data-theme-pick]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.themePick === t)); });
+    try { localStorage.setItem("variants-theme", t); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem("variants-theme"); } catch (e) {}
+  setTheme(saved || (mq.matches ? "dark" : "light"));
+  document.querySelectorAll("[data-theme-pick]").forEach(function (b) { b.addEventListener("click", function () { setTheme(b.dataset.themePick); }); });
+
+  function pick(v) {
+    document.querySelectorAll("[data-pick]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.pick === v)); });
+    document.querySelectorAll(".app").forEach(function (a) { a.classList.toggle("on", a.dataset.v === v); });
+    document.querySelectorAll("[data-about]").forEach(function (p) { p.hidden = p.dataset.about !== v; });
+    try { localStorage.setItem("variants-pick", v); } catch (e) {}
+  }
+  document.querySelectorAll("[data-pick]").forEach(function (b) { b.addEventListener("click", function () { pick(b.dataset.pick); }); });
+  var sp = null;
+  try { sp = localStorage.getItem("variants-pick"); } catch (e) {}
+  if (sp) pick(sp);
+})();
+</script>
+</body>
+</html>
