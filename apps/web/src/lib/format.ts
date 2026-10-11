@@ -10,6 +10,10 @@ export function formatUsd(value: number): string {
 
 export function formatTokens(value: number, locale: Locale): string {
   if (value < 1000) return String(value);
+  if (value >= 1_000_000) {
+    const millions = (value / 1_000_000).toFixed(1).replace(/\.0$/, "");
+    return locale === "ru" ? `${millions.replace(".", ",")} млн` : `${millions}M`;
+  }
   const thousands = value / 1000;
   const short = thousands >= 100 ? Math.round(thousands).toString() : thousands.toFixed(1).replace(/\.0$/, "");
   return locale === "ru" ? `${short.replace(".", ",")} тыс.` : `${short}k`;

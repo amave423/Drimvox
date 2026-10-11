@@ -18,6 +18,9 @@ describe("formatTokens", () => {
     expect(formatTokens(12_345, "en")).toBe("12.3k");
     expect(formatTokens(2000, "en")).toBe("2k");
     expect(formatTokens(163_840, "ru")).toBe("164 тыс.");
+    expect(formatTokens(1_000_000, "ru")).toBe("1 млн");
+    expect(formatTokens(1_048_576, "en")).toBe("1M");
+    expect(formatTokens(2_500_000, "ru")).toBe("2,5 млн");
   });
 });
 
