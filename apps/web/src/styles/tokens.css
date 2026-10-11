@@ -1,0 +1,56 @@
+/* Design tokens — see docs/DESIGN.md. Both themes are defined here and nowhere else. */
+:root {
+  color-scheme: light;
+  --bg: #e4e5e0;
+  --paper: #eeefea;
+  --sheet: #fcfcfa;
+  --line: #cfd0c8;
+  --fg: #22211e;
+  --muted: #6b6a63;
+  --ink: #2b4c7e;
+  --ink-soft: #dde6f4;
+  --pencil: #b3261e;
+  --pencil-soft: #f6dedb;
+  --ok: #2f6b45;
+  --ok-soft: #dcebe0;
+  --wait: #9a6200;
+  --wait-soft: #f3e5c8;
+  --sheet-shadow: 0 18px 40px -30px rgba(40, 35, 20, 0.5);
+
+  --font-ui: "Onest", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --topbar-h: 44px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1b19;
+  --paper: #222220;
+  --sheet: #2a2a27;
+  --line: #3d3d38;
+  --fg: #e9e8e2;
+  --muted: #a3a196;
+  --ink: #8fb3ec;
+  --ink-soft: #22314a;
+  --pencil: #f07468;
+  --pencil-soft: #45231f;
+  --ok: #7cc193;
+  --ok-soft: #1f3326;
+  --wait: #e3a948;
+  --wait-soft: #3a2e18;
+  --sheet-shadow: 0 18px 40px -30px rgba(0, 0, 0, 0.8);
+}
+
+/* Before the app picks a theme, follow the system so the first paint does not flash. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #1b1b19;
+    --paper: #222220;
+    --sheet: #2a2a27;
+    --line: #3d3d38;
+    --fg: #e9e8e2;
+    --muted: #a3a196;
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@artel/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Artel desktop app",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "electron .",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@artel/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "esbuild": "^0.28.2"
+  }
+}

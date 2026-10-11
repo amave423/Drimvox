@@ -1,0 +1,73 @@
+import { _electron as electron, expect, test, type ElectronApplication } from "@playwright/test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
+
+let userData: string;
+let app: ElectronApplication | undefined;
+
+test.beforeEach(() => {
+  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+});
+
+test.afterEach(async () => {
+  await app?.close();
+  app = undefined;
+  rmSync(userData, { recursive: true, force: true });
+});
+
+function launch() {
+  return electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData } });
+}
+
+test("opens with a working core and remembers theme and language", async () => {
+  app = await launch();
+  let page = await app.firstWindow();
+
+  await expect(page.getByRole("heading", { name: "Добро пожаловать в Artel" })).toBeVisible();
+  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByText("База данных, схема 1")).toBeVisible();
+  await expect(page.getByText("Artel 0.1.0")).toBeVisible();
+
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await page.getByRole("radio", { name: "Тёмное" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByText("Сохранено")).toBeVisible();
+
+  await page.getByRole("radio", { name: "English" }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+  await app.close();
+  app = await launch();
+  page = await app.firstWindow();
+
+  await expect(page.getByRole("heading", { name: "Welcome to Artel" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});
+
+test("the core refuses callers that do not have the token", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await expect(page.getByText("Ядро запущено")).toBeVisible();
+
+  const origin = new URL(page.url()).origin;
+  const res = await fetch(`${origin}/api/settings`);
+  expect(res.status).toBe(401);
+});
+
+test("the page has no access to Node", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await expect(page.getByText("Ядро запущено")).toBeVisible();
+
+  const exposed = await page.evaluate(() => ({
+    require: typeof (window as unknown as { require?: unknown }).require,
+    process: typeof (window as unknown as { process?: unknown }).process,
+    bridge: Object.keys((window as unknown as { artel?: object }).artel ?? {}).sort(),
+  }));
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["getToken", "setTitleBar"] });
+});
