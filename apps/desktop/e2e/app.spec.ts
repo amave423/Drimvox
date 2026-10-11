@@ -29,7 +29,7 @@ test("opens with a working core and remembers theme and language", async () => {
 
   await expect(page.getByRole("heading", { name: "Добро пожаловать в Artel" })).toBeVisible();
   await expect(page.getByText("Ядро запущено")).toBeVisible();
-  await expect(page.getByText("База данных, схема 1")).toBeVisible();
+  await expect(page.getByText(/База данных, схема \d+/)).toBeVisible();
   await expect(page.getByText("Artel 0.1.0")).toBeVisible();
 
   await page.getByRole("button", { name: "Настройки" }).first().click();

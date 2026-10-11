@@ -1,23 +1,30 @@
 /** Entry of the Electron utility process that runs the core. Same core runs headless in server mode. */
 import { startServer } from "@artel/core";
 
-const env = process.env;
-
-function required(name: string): string {
-  const value = env[name];
-  if (!value) throw new Error(`${name} is not set`);
-  return value;
+export interface InitMessage {
+  type: "init";
+  token: string;
+  /** base64 of the 32-byte key that encrypts provider keys. */
+  secretKey: string;
+  dataDir: string;
+  version: string;
+  port: number;
+  webDir?: string;
 }
 
-startServer({
-  token: required("ARTEL_TOKEN"),
-  dataDir: required("ARTEL_DATA_DIR"),
-  version: env.ARTEL_VERSION ?? "0.0.0",
-  port: Number(env.ARTEL_PORT ?? 0),
-  webDir: env.ARTEL_WEB_DIR || undefined,
-})
-  .then((server) => process.parentPort.postMessage({ type: "ready", port: server.port }))
-  .catch((err: unknown) => {
-    process.parentPort.postMessage({ type: "error", error: err instanceof Error ? err.message : String(err) });
-    process.exit(1);
-  });
+// Secrets arrive by message rather than environment variables, which other processes can read.
+process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
+  startServer({
+    token: data.token,
+    secretKey: Buffer.from(data.secretKey, "base64"),
+    dataDir: data.dataDir,
+    version: data.version,
+    port: data.port,
+    webDir: data.webDir,
+  })
+    .then((server) => process.parentPort.postMessage({ type: "ready", port: server.port }))
+    .catch((err: unknown) => {
+      process.parentPort.postMessage({ type: "error", error: err instanceof Error ? err.message : String(err) });
+      process.exit(1);
+    });
+});

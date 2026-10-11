@@ -1,6 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell, utilityProcess, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
+import type { InitMessage } from "./core-process";
+import { loadSecretKey } from "./keyring";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
@@ -46,18 +48,20 @@ function webDir(): string {
 }
 
 function startCore(): Promise<number> {
+  const dataDir = app.getPath("userData");
+  const init: InitMessage = {
+    type: "init",
+    token,
+    secretKey: loadSecretKey(dataDir).toString("base64"),
+    dataDir,
+    version: __ARTEL_VERSION__,
+    port: devServerUrl ? DEV_CORE_PORT : 0,
+    webDir: devServerUrl ? undefined : webDir(),
+  };
+
   return new Promise((resolve, reject) => {
-    const child = utilityProcess.fork(join(__dirname, "core.cjs"), [], {
-      serviceName: "Artel core",
-      env: {
-        ...process.env,
-        ARTEL_TOKEN: token,
-        ARTEL_DATA_DIR: app.getPath("userData"),
-        ARTEL_VERSION: __ARTEL_VERSION__,
-        ARTEL_PORT: devServerUrl ? String(DEV_CORE_PORT) : "0",
-        ARTEL_WEB_DIR: devServerUrl ? "" : webDir(),
-      },
-    });
+    const child = utilityProcess.fork(join(__dirname, "core.cjs"), [], { serviceName: "Artel core" });
+    child.postMessage(init);
     child.once("message", (msg: { type: string; port?: number; error?: string }) => {
       if (msg.type === "ready" && msg.port) resolve(msg.port);
       else reject(new Error(msg.error ?? "Ядро ответило непонятным сообщением"));

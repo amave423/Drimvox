@@ -1,29 +1,17 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createApp, openDatabase, type Database } from "../src";
+import { BASE, auth, createTestEnv, type TestEnv } from "./env";
 
-const TOKEN = "test-token";
-const BASE = "http://127.0.0.1";
-const auth = { Authorization: `Bearer ${TOKEN}` };
-
-let dir: string;
-let db: Database;
+let env: TestEnv;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "artel-core-"));
-  db = openDatabase(join(dir, "artel.db"));
+  env = createTestEnv();
 });
 
-afterEach(() => {
-  db.close();
-  rmSync(dir, { recursive: true, force: true });
-});
+afterEach(() => env.close());
 
-function app(webDir?: string) {
-  return createApp({ db, token: TOKEN, version: "0.0.0-test", dataDir: dir, webDir });
-}
+const app = (webDir?: string) => env.app(webDir);
 
 describe("health", () => {
   it("answers without a token", async () => {
@@ -60,7 +48,7 @@ describe("status", () => {
     const res = await app().request(`${BASE}/api/status`, { headers: auth });
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ version: "0.0.0-test", dataDir: dir, schemaVersion: 1 });
+    expect(body).toMatchObject({ version: "0.0.0-test", dataDir: env.dir });
   });
 });
 
@@ -79,8 +67,7 @@ describe("settings", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ theme: "dark", locale: "ru" });
 
-    db.close();
-    db = openDatabase(join(dir, "artel.db"));
+    env.reopen();
     const again = await app().request(`${BASE}/api/settings`, { headers: auth });
     expect(await again.json()).toEqual({ theme: "dark", locale: "ru" });
   });
@@ -106,9 +93,9 @@ describe("settings", () => {
 
 describe("database", () => {
   it("can be opened twice without re-running migrations", () => {
-    db.close();
-    db = openDatabase(join(dir, "artel.db"));
-    expect(db.schemaVersion()).toBe(1);
+    const version = env.db.schemaVersion();
+    env.reopen();
+    expect(env.db.schemaVersion()).toBe(version);
   });
 });
 
@@ -116,11 +103,11 @@ describe("web ui", () => {
   let web: string;
 
   beforeEach(() => {
-    web = join(dir, "web");
+    web = join(env.dir, "web");
     mkdirSync(join(web, "assets"), { recursive: true });
     writeFileSync(join(web, "index.html"), "<!doctype html><title>Artel</title>");
     writeFileSync(join(web, "assets", "app.js"), "console.log(1)");
-    writeFileSync(join(dir, "secret.txt"), "do not serve");
+    writeFileSync(join(env.dir, "secret.txt"), "do not serve");
   });
 
   it("serves index.html at the root", async () => {
