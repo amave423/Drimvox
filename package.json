@@ -13,7 +13,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "e2e": "npm run build && playwright test",
-    "verify": "npm run typecheck && npm run test && npm run e2e"
+    "verify": "npm run typecheck && npm run test && npm run e2e",
+    "live-check": "node scripts/live-check.mjs"
   },
   "engines": {
     "node": ">=22.13"
@@ -24,5 +25,6 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
-  }
+  },
+  "license": "MIT"
 }
