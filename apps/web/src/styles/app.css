@@ -67,8 +67,6 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .side-link { margin: 0 -8px; display: flex; justify-content: space-between; align-items: baseline; padding: 7px 8px; border-radius: 8px; font-size: 14px; text-align: left; }
 .side-link:hover { background: var(--sheet); }
 .side-link small { color: var(--muted); font-size: 12px; }
-.side-link.is-soon { color: var(--muted); cursor: default; }
-.side-link.is-soon:hover { background: none; }
 
 .desk { overflow: auto; padding: 28px 40px 0; display: flex; justify-content: center; align-items: flex-start; }
 .desk.is-alone { height: 100%; }

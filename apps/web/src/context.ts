@@ -1,4 +1,4 @@
-import type { Settings, SettingsPatch } from "@artel/shared";
+import type { ChatView, ProviderView, Settings, SettingsPatch, UsageSummary } from "@artel/shared";
 import { createContext, useContext } from "react";
 import type { Api } from "./api";
 import type { MessageKey } from "./i18n";
@@ -10,13 +10,35 @@ export interface CoreStatus {
   node: string;
 }
 
+/**
+ * `key` keeps a chat screen alive while a new chat gets its id, so a streaming answer
+ * is not lost when the draft turns into a saved chat.
+ */
+export type View =
+  | { kind: "home" }
+  | { kind: "settings" }
+  | { kind: "providers" }
+  | { kind: "chat"; chatId: string | null; key: string };
+
 export interface AppContextValue {
   api: Api;
+  token: string;
   settings: Settings;
   status: CoreStatus;
   /** Saves a change; resolves to false when the core refused or did not answer. */
   updateSettings(patch: SettingsPatch): Promise<boolean>;
   t(key: MessageKey, vars?: Record<string, string | number>): string;
+
+  view: View;
+  navigate(view: View): void;
+  openNewChat(): void;
+
+  providers: ProviderView[];
+  reloadProviders(): Promise<void>;
+  chats: ChatView[];
+  reloadChats(): Promise<void>;
+  today: UsageSummary | null;
+  reloadToday(): Promise<void>;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);

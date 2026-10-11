@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { providerCreateSchema, providerUpdateSchema } from "@artel/shared";
 import { Hono } from "hono";
+import { z } from "zod";
 import { fetchBalance } from "../providers/balance";
 import { listModels } from "../providers/catalog";
 import { describeError } from "../providers/errors";
@@ -32,11 +33,11 @@ export function providerRoutes(providers: ProviderRepo) {
       }
     })
     .delete("/:id", (c) => (providers.remove(c.req.param("id")) ? c.body(null, 204) : c.json(notFound, 404)))
-    .get("/:id/models", async (c) => {
+    .get("/:id/models", zValidator("query", z.object({ fresh: z.literal("1").optional() })), async (c) => {
       const conn = providers.connection(c.req.param("id"));
       if (!conn) return c.json(notFound, 404);
       try {
-        return c.json(await listModels(conn, c.req.query("fresh") === "1"), 200);
+        return c.json(await listModels(conn, c.req.valid("query").fresh === "1"), 200);
       } catch (err) {
         return c.json({ error: describeError(err) }, 502);
       }

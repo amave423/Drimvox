@@ -7,6 +7,9 @@ import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
 import "./styles/tokens.css";
 import "./styles/app.css";
+import "./styles/components.css";
+import "./styles/providers.css";
+import "./styles/chat.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -26,14 +29,15 @@ async function boot() {
     return;
   }
   try {
-    const api = createApi(await window.artel.getToken());
+    const token = await window.artel.getToken();
+    const api = createApi(token);
     const [settings, status] = await Promise.all([
       ok<Settings>(await api.settings.$get()),
       ok<CoreStatus>(await api.status.$get()),
     ]);
     root.render(
       <StrictMode>
-        <App api={api} initialSettings={settings} status={status} />
+        <App api={api} token={token} initialSettings={settings} status={status} />
       </StrictMode>,
     );
   } catch (err) {

@@ -1,0 +1,81 @@
+/* Chat sheet: messages read like a manuscript, the composer stays at the bottom of the desk. */
+.sheet.chat { padding-bottom: 0; grid-template-rows: 1fr; align-content: stretch; }
+.chat-body { display: flex; flex-direction: column; min-height: 100%; }
+.chat-head { display: grid; gap: 12px; margin-bottom: 18px; }
+.chat-head h1 { overflow-wrap: anywhere; }
+.chat-tools { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+
+.messages { flex: 1; display: grid; gap: 22px; align-content: start; padding-bottom: 20px; }
+.msg-user {
+  justify-self: end; max-width: 80%;
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: 14px 14px 4px 14px; padding: 10px 14px;
+}
+.msg-user p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg-assistant { display: grid; gap: 6px; min-width: 0; }
+.msg-who { color: var(--ink); font-size: 12px; }
+.msg-meta { margin: 0; color: var(--muted); font-size: 12px; }
+.msg-flag { margin: 0; color: var(--pencil); font-size: 13px; }
+.caret { display: inline-block; width: 8px; height: 18px; background: var(--ink); opacity: 0.6; }
+@media (prefers-reduced-motion: no-preference) {
+  .caret { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+}
+
+.reasoning { border-left: 2px solid var(--line); padding-left: 12px; color: var(--muted); font-size: 14px; }
+.reasoning summary { cursor: pointer; font-family: var(--font-serif); font-style: italic; }
+.reasoning p { margin: 6px 0 0; white-space: pre-wrap; }
+
+/* Markdown answers */
+.md { overflow-wrap: anywhere; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p, .md ul, .md ol, .md pre, .md table, .md blockquote { margin: 0 0 10px; }
+.md h1, .md h2, .md h3 { font-family: var(--font-serif); margin: 16px 0 8px; line-height: 1.3; }
+.md h1 { font-size: 22px; } .md h2 { font-size: 19px; } .md h3 { font-size: 17px; }
+.md code { font-family: var(--font-mono); font-size: 0.88em; background: var(--paper); padding: 1px 4px; border-radius: 4px; }
+.md pre { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
+.md pre code { background: none; padding: 0; font-size: 13px; line-height: 1.6; }
+.md blockquote { border-left: 2px solid var(--line); padding-left: 12px; color: var(--muted); }
+.md table { border-collapse: collapse; font-size: 14px; display: block; overflow-x: auto; }
+.md th, .md td { border: 1px solid var(--line); padding: 5px 10px; text-align: left; }
+
+/* Composer */
+.composer {
+  position: sticky; bottom: 0;
+  display: flex; gap: 10px; align-items: flex-end;
+  padding: 12px 0 18px; background: var(--sheet);
+  border-top: 1px solid var(--line);
+}
+.composer textarea {
+  flex: 1; resize: none; min-height: 48px;
+  padding: 11px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--sheet); color: var(--fg);
+  font: inherit; line-height: 1.5; overflow-y: hidden;
+}
+
+/* Model picker */
+.picker { position: relative; }
+.picker-button {
+  display: inline-flex; gap: 10px; align-items: center;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper);
+  font-size: 13px; max-width: 100%;
+}
+.picker-button .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-panel {
+  position: absolute; z-index: 10; top: calc(100% + 6px); left: 0;
+  width: min(560px, 80vw); max-height: 420px;
+  display: grid; grid-template-rows: auto auto 1fr; gap: 8px;
+  padding: 10px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--sheet); box-shadow: var(--sheet-shadow);
+}
+.picker-panel > .muted, .picker-panel > .error-note { margin: 4px 6px; }
+.picker-providers { display: flex; flex-wrap: wrap; gap: 4px; }
+.picker-providers button { padding: 4px 10px; border-radius: 999px; font-size: 13px; color: var(--muted); }
+.picker-providers button.is-on { background: var(--fg); color: var(--sheet); }
+.picker-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
+.picker-list button { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 7px 8px; border-radius: 8px; text-align: left; }
+.picker-list button:hover, .picker-list [aria-selected="true"] button { background: var(--paper); }
+.picker-name { display: grid; font-size: 14px; min-width: 0; }
+.picker-name small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+.picker-facts { display: flex; gap: 12px; color: var(--muted); font-size: 12px; white-space: nowrap; }
