@@ -14,11 +14,17 @@ export async function fetchBalance(preset: PresetId, baseUrl: string, apiKey: st
     const body = (await fetchJson(`${new URL(baseUrl).origin}/user/balance`, apiKey)) as {
       balance_infos?: { currency?: string; total_balance?: string }[];
     };
-    const infos = body.balance_infos ?? [];
-    const info = infos.find((i) => i.currency === "USD") ?? infos[0];
-    const amount = Number(info?.total_balance);
-    if (!info?.currency || !Number.isFinite(amount)) return null;
-    return { amount: round(amount), currency: info.currency };
+    const infos = (body.balance_infos ?? [])
+      .map((i) => ({ currency: i.currency ?? "", amount: Number(i.total_balance) }))
+      .filter((i) => i.currency && Number.isFinite(i.amount));
+    // Money sits in the currency it was topped up in; prefer dollars only when they are there.
+    const funded = infos.filter((i) => i.amount > 0);
+    const info =
+      funded.find((i) => i.currency === "USD") ??
+      funded.sort((a, b) => b.amount - a.amount)[0] ??
+      infos.find((i) => i.currency === "USD") ??
+      infos[0];
+    return info ? { amount: round(info.amount), currency: info.currency } : null;
   }
   return null;
 }

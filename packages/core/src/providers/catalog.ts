@@ -3,13 +3,21 @@ import { fetchJson } from "./http";
 import type { Connection } from "./repo";
 
 /**
- * DeepSeek does not publish prices through its API. USD per 1M tokens, cache-miss input,
- * from the public price list (Dec 2025). Shown in the UI as an estimate.
+ * DeepSeek does not publish prices through its API. USD per 1M tokens from
+ * api-docs.deepseek.com/quick_start/pricing (checked 2026-10-12): peak-hour rate, cache-miss input,
+ * so the estimate errs high. Legacy names are served by the Flash model at Flash prices.
  */
+const flash: [number, number] = [0.3, 1.2];
 const deepseekPrices: Record<string, [number, number]> = {
-  "deepseek-chat": [0.28, 0.42],
-  "deepseek-reasoner": [0.28, 0.42],
+  "deepseek-flash": flash,
+  "deepseek-v4-pro": [1.32, 3.96],
+  "deepseek-v4-flash": flash,
+  "deepseek-chat": flash,
+  "deepseek-reasoner": flash,
 };
+
+/** NVIDIA lists embedding, safety, parsing and vision-detection models next to chat models. */
+const nvidiaNonChat = /embed|retriever|reward|guard|safety|parse|clip|detector|calibration|deplot|kosmos|riva-translate/i;
 
 type Raw = Record<string, unknown>;
 
@@ -21,6 +29,7 @@ export function normalizeModels(preset: PresetId, items: unknown[]): ModelInfo[]
     if (!item || typeof item !== "object") continue;
     const raw = item as Raw;
     if (typeof raw.id !== "string" || !raw.id) continue;
+    if (preset === "nvidia" && nvidiaNonChat.test(raw.id)) continue;
 
     let priceIn = perMillion((raw.pricing as Raw | undefined)?.prompt);
     let priceOut = perMillion((raw.pricing as Raw | undefined)?.completion);

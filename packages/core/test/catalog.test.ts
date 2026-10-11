@@ -34,9 +34,23 @@ describe("normalizeModels", () => {
   });
 
   it("uses the built-in price table for DeepSeek and marks it as an estimate", () => {
-    const [model] = normalizeModels("deepseek", [{ id: "deepseek-chat" }]);
-    expect(model).toMatchObject({ id: "deepseek-chat", priceEstimated: true });
+    const [model] = normalizeModels("deepseek", [{ id: "deepseek-flash", name: "DeepSeek-V4.1-Flash", context_window: 1048576 }]);
+    expect(model).toMatchObject({ id: "deepseek-flash", name: "DeepSeek-V4.1-Flash", contextLength: 1048576, priceEstimated: true });
     expect(model?.priceIn).toBeGreaterThan(0);
+  });
+
+  it("leaves NVIDIA models that cannot chat out of the list", () => {
+    const ids = normalizeModels("nvidia", [
+      { id: "moonshotai/kimi-k3" },
+      { id: "nvidia/nv-embedqa-mistral-7b-v2" },
+      { id: "nvidia/llama-3.1-nemoguard-8b-content-safety" },
+      { id: "nvidia/nemotron-4-340b-reward" },
+      { id: "nvidia/nemotron-parse" },
+      { id: "nvidia/nvclip" },
+      { id: "nvidia/ai-synthetic-video-detector" },
+      { id: "z-ai/glm-5.3-flash" },
+    ]).map((m) => m.id);
+    expect(ids).toEqual(["moonshotai/kimi-k3", "z-ai/glm-5.3-flash"]);
   });
 
   it("prices local models at zero", () => {
@@ -76,6 +90,21 @@ describe("fetchBalance", () => {
       },
     });
     expect(await fetchBalance("deepseek", fake.baseUrl, "k")).toEqual({ amount: 4.2, currency: "USD" });
+  });
+
+  it("shows the DeepSeek balance in the currency that actually holds money", async () => {
+    fake = await startFakeProvider({
+      routes: {
+        "/user/balance": {
+          is_available: true,
+          balance_infos: [
+            { currency: "CNY", total_balance: "19.51" },
+            { currency: "USD", total_balance: "0.00" },
+          ],
+        },
+      },
+    });
+    expect(await fetchBalance("deepseek", fake.baseUrl, "k")).toEqual({ amount: 19.51, currency: "CNY" });
   });
 
   it("has no balance for providers without such an API", async () => {

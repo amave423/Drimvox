@@ -8,12 +8,17 @@ import { presetName } from "./presetName";
 
 type Mode = "idle" | "replaceKey" | "confirmRemove";
 
-function formatBalance(b: Balance): string {
-  return b.currency === "USD" ? formatUsd(b.amount) : `${b.amount} ${b.currency}`;
+function formatBalance(b: Balance, locale: string): string {
+  if (b.currency === "USD") return formatUsd(b.amount);
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency: b.currency }).format(b.amount);
+  } catch {
+    return `${b.amount} ${b.currency}`;
+  }
 }
 
 export function ProviderRow({ provider }: { provider: ProviderView }) {
-  const { api, t, reloadProviders, reloadChats } = useApp();
+  const { api, t, settings, reloadProviders, reloadChats } = useApp();
   const [check, setCheck] = useState<ModelsResult | null>(null);
   const [balance, setBalance] = useState<Balance | null>(null);
   const [mode, setMode] = useState<Mode>("idle");
@@ -67,7 +72,7 @@ export function ProviderRow({ provider }: { provider: ProviderView }) {
         {check && "models" in check && (
           <span className="facts">
             <span className="is-ok">✓ {t("providers.models", { count: check.models.length })}</span>
-            {balance && <span>{t("providers.balance", { amount: formatBalance(balance) })}</span>}
+            {balance && <span>{t("providers.balance", { amount: formatBalance(balance, settings.locale) })}</span>}
             {provider.billing === "credits" && <span>{t("providers.billing.credits")}</span>}
             {provider.billing === "free" && <span>{t("providers.billing.free")}</span>}
           </span>

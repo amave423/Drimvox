@@ -21,11 +21,11 @@ const targets: Target[] = [
     envKey: "OPENROUTER_API_KEY",
     models: ["deepseek/deepseek-chat-v3.1", "deepseek/deepseek-chat", "openai/gpt-4o-mini", "google/gemini-2.5-flash"],
   },
-  { preset: "deepseek", envKey: "DEEPSEEK_API_KEY", models: ["deepseek-chat"], reasoningModel: "deepseek-reasoner" },
+  { preset: "deepseek", envKey: "DEEPSEEK_API_KEY", models: ["deepseek-flash", "deepseek-chat"], reasoningModel: "deepseek-v4-pro" },
   {
     preset: "nvidia",
     envKey: "NVIDIA_API_KEY",
-    models: ["meta/llama-3.3-70b-instruct", "meta/llama-3.1-8b-instruct", "nvidia/llama-3.1-nemotron-70b-instruct"],
+    models: ["openai/gpt-oss-20b", "z-ai/glm-5.3-flash", "moonshotai/kimi-k3", "nvidia/nemotron-3-super-120b-a12b"],
   },
 ];
 
