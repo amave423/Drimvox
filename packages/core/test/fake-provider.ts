@@ -5,7 +5,21 @@ export interface FakeChunk {
   text?: string;
 }
 
+/** One model reply in a scripted conversation: some text and/or tool calls. */
+export interface FakeTurn {
+  text?: string;
+  toolCalls?: { name: string; args: Record<string, unknown> }[];
+  usage?: { prompt_tokens: number; completion_tokens: number };
+  /** Wait before answering, ms. */
+  delayMs?: number;
+}
+
 export interface FakeProviderOptions {
+  /**
+   * Replies for successive chat requests. When the script runs out, the model answers "Done."
+   * Takes precedence over `chunks`.
+   */
+  script?: FakeTurn[];
   key?: string;
   /** Items of GET /models; OpenRouter-style fields are optional. */
   models?: Record<string, unknown>[];
@@ -31,6 +45,7 @@ export interface FakeProvider {
 export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<FakeProvider> {
   const key = o.key ?? "good-key";
   const requests: FakeProvider["requests"] = [];
+  let scriptIndex = 0;
   let markAborted!: () => void;
   const aborted = new Promise<void>((r) => (markAborted = r));
 
@@ -58,6 +73,21 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
       });
       const chunk = (delta: object, extra: object = {}, finish: string | null = null) =>
         `data: ${JSON.stringify({ id: "c", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta, finish_reason: finish }], ...extra })}\n\n`;
+      if (o.script) {
+        const turn = o.script[scriptIndex++] ?? { text: "Done." };
+        if (turn.delayMs) await new Promise((r) => setTimeout(r, turn.delayMs));
+        if (res.destroyed) return;
+        if (turn.text) res.write(chunk({ role: "assistant", content: turn.text }));
+        (turn.toolCalls ?? []).forEach((call, index) => {
+          const id = `call_${scriptIndex}_${index}`;
+          res.write(chunk({ tool_calls: [{ index, id, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) } }] }));
+        });
+        const usage = turn.usage ?? { prompt_tokens: 100, completion_tokens: 20 };
+        const finish = turn.toolCalls?.length ? "tool_calls" : "stop";
+        res.write(chunk({}, { usage: { ...usage, total_tokens: usage.prompt_tokens + usage.completion_tokens } }, finish));
+        res.end("data: [DONE]\n\n");
+        return;
+      }
       for (const c of o.chunks ?? [{ text: "Hello" }]) {
         if (res.destroyed) return;
         res.write(chunk(c.reasoning ? { reasoning_content: c.reasoning } : { content: c.text }));

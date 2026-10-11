@@ -55,7 +55,7 @@ describe("status", () => {
 describe("settings", () => {
   it("returns defaults on a fresh database", async () => {
     const res = await app().request(`${BASE}/api/settings`, { headers: auth });
-    expect(await res.json()).toEqual({ theme: "system", locale: "ru" });
+    expect(await res.json()).toEqual({ theme: "system", locale: "ru", agentBudgetUsd: 0.5 });
   });
 
   it("saves a partial update and keeps it after reopening the database", async () => {
@@ -65,11 +65,11 @@ describe("settings", () => {
       body: JSON.stringify({ theme: "dark" }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ theme: "dark", locale: "ru" });
+    expect(await res.json()).toEqual({ theme: "dark", locale: "ru", agentBudgetUsd: 0.5 });
 
     env.reopen();
     const again = await app().request(`${BASE}/api/settings`, { headers: auth });
-    expect(await again.json()).toEqual({ theme: "dark", locale: "ru" });
+    expect(await again.json()).toEqual({ theme: "dark", locale: "ru", agentBudgetUsd: 0.5 });
   });
 
   it("refuses unknown values", async () => {

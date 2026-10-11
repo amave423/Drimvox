@@ -6,6 +6,8 @@ export const locales = ["ru", "en"] as const;
 export const settingsSchema = z.object({
   theme: z.enum(themes),
   locale: z.enum(locales),
+  /** How much one agent task may spend before it stops and asks. */
+  agentBudgetUsd: z.number().min(0.01).max(1000),
 });
 
 export const settingsPatchSchema = settingsSchema.partial().strict();
@@ -15,4 +17,4 @@ export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru" };
+export const defaultSettings: Settings = { theme: "system", locale: "ru", agentBudgetUsd: 0.5 };

@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { join } from "node:path";
-import { createApp, type AppOptions } from "./app";
+import { createCore, type AppOptions } from "./app";
 import { openDatabase } from "./db";
 
 export interface ServerOptions extends Omit<AppOptions, "db"> {
@@ -16,19 +16,19 @@ export interface RunningServer {
 
 export function startServer(o: ServerOptions): Promise<RunningServer> {
   const db = openDatabase(join(o.dataDir, "artel.db"));
-  const app = createApp({ ...o, db });
+  const { app, shutdown } = createCore({ ...o, db });
 
   return new Promise((resolvePromise, reject) => {
     const server = serve({ fetch: app.fetch, hostname: o.host ?? "127.0.0.1", port: o.port ?? 0 }, (info) => {
       resolvePromise({
         port: info.port,
-        close: () =>
-          new Promise((done) => {
-            server.close(() => {
-              db.close();
-              done();
-            });
-          }),
+        close: async () => {
+          await shutdown();
+          // Live task streams stay open forever; cut them so close() can finish.
+          (server as { closeAllConnections?: () => void }).closeAllConnections?.();
+          await new Promise<void>((done) => server.close(() => done()));
+          db.close();
+        },
       });
     });
     server.once("error", (err) => {
