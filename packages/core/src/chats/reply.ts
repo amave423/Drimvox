@@ -14,6 +14,8 @@ export interface ReplyInput {
   content: string;
   /** Aborted when the client disconnects or presses Stop. */
   signal: AbortSignal;
+  /** Give up when the model sends nothing for this long. */
+  idleTimeoutMs: number;
   emit(event: StreamEvent): Promise<void>;
 }
 
@@ -40,15 +42,25 @@ export async function reply(i: ReplyInput): Promise<void> {
   let error: ProviderError | null = null;
   let usage: { inputTokens?: number; outputTokens?: number } | undefined;
 
+  // Some hosted models sit in a queue or hang; every streamed part resets the clock.
+  const silence = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const resetClock = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => silence.abort(), i.idleTimeoutMs);
+  };
+  resetClock();
+
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
       messages: history,
       maxRetries: 1,
-      abortSignal: i.signal,
+      abortSignal: AbortSignal.any([i.signal, silence.signal]),
       onError: () => {},
     });
     for await (const part of result.fullStream) {
+      resetClock();
       if (part.type === "text-delta") {
         text += part.text;
         await i.emit({ type: "text", text: part.text });
@@ -63,9 +75,12 @@ export async function reply(i: ReplyInput): Promise<void> {
     }
   } catch (err) {
     if (!i.signal.aborted) error = describeError(err);
+  } finally {
+    clearTimeout(timer);
   }
 
   const stopped = i.signal.aborted;
+  if (!stopped && silence.signal.aborted) error = { code: "timeout" };
   const inputTokens = usage?.inputTokens ?? null;
   const outputTokens = usage?.outputTokens ?? null;
   const price = inputTokens !== null && outputTokens !== null ? await findModel(i.conn, i.model) : undefined;

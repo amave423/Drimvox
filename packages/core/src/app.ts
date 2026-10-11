@@ -22,6 +22,8 @@ export interface AppOptions {
   /** Built UI to serve. Omitted in development, where Vite serves it. */
   webDir?: string;
   allowedHosts?: string[];
+  /** How long a model may stay silent mid-answer before the answer fails. Default 2 minutes. */
+  idleTimeoutMs?: number;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
@@ -45,7 +47,7 @@ export function createApp(o: AppOptions) {
       c.json(writeSettings(o.db, c.req.valid("json"))),
     )
     .route("/providers", providerRoutes(providers))
-    .route("/chats", chatRoutes(chats, providers))
+    .route("/chats", chatRoutes(chats, providers, o.idleTimeoutMs ?? 120_000))
     .route("/usage", usageRoutes(chats));
 
   const app = new Hono()

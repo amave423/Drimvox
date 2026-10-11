@@ -132,6 +132,13 @@ describe("sending a message", () => {
     expect(answer).toMatchObject({ status: "stopped", content: "Часть" });
   });
 
+  it("gives up on a model that stays silent", async () => {
+    const { chat } = await setup({ chunks: [{ text: "Начал" }, { text: " и замолчал" }], delayMs: 400 });
+    env.setIdleTimeout(150);
+    const events = await readEvents(await send(chat.id, "Привет"));
+    expect(events.at(-1).message).toMatchObject({ status: "error", content: "Начал", error: { code: "timeout" } });
+  });
+
   it("answers 404 for an unknown chat", async () => {
     await setup();
     expect((await send("nope", "hi")).status).toBe(404);

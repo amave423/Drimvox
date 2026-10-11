@@ -129,6 +129,7 @@ export const providerErrorCodes = [
   "model_not_found",
   "provider_error",
   "unreachable",
+  "timeout",
   "no_key",
   "unknown",
 ] as const;

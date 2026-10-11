@@ -19,17 +19,24 @@ export interface TestEnv {
   /** JSON request against the API with the token. */
   call(method: string, path: string, body?: unknown): Promise<JsonResponse>;
   reopen(): void;
+  /** Shortens how long a reply may stay silent, so tests do not wait 90 seconds. */
+  setIdleTimeout(ms: number): void;
   close(): void;
 }
 
 export function createTestEnv(): TestEnv {
   const dir = mkdtempSync(join(tmpdir(), "artel-core-"));
   const secretKey = randomBytes(32);
+  let idleTimeoutMs: number | undefined;
   const env: TestEnv = {
     dir,
     db: openDatabase(join(dir, "artel.db")),
     secretKey,
-    app: (webDir) => createApp({ db: env.db, token: TOKEN, secretKey, version: "0.0.0-test", dataDir: dir, webDir }),
+    app: (webDir) =>
+      createApp({ db: env.db, token: TOKEN, secretKey, version: "0.0.0-test", dataDir: dir, webDir, idleTimeoutMs }),
+    setIdleTimeout(ms) {
+      idleTimeoutMs = ms;
+    },
     call: async (method, path, body) =>
       await env.app().request(`${BASE}${path}`, {
         method,

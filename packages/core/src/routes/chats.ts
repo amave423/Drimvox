@@ -9,7 +9,7 @@ import type { ProviderRepo } from "../providers/repo";
 
 const notFound = { error: { code: "not_found" } } as const;
 
-export function chatRoutes(chats: ChatRepo, providers: ProviderRepo) {
+export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, idleTimeoutMs: number) {
   return new Hono()
     .get("/", (c) => c.json(chats.list()))
     .post("/", zValidator("json", chatCreateSchema), (c) => {
@@ -47,6 +47,7 @@ export function chatRoutes(chats: ChatRepo, providers: ProviderRepo) {
           model: chat.model!,
           content: c.req.valid("json").content,
           signal: controller.signal,
+          idleTimeoutMs,
           emit: async (event) => {
             if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
           },
