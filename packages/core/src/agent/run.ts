@@ -43,7 +43,9 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let steps = 0;
 
   const costOf = (input: number, output: number) =>
-    i.price?.priceIn != null && i.price.priceOut != null ? (input * i.price.priceIn + output * i.price.priceOut) / 1_000_000 : 0;
+    i.price?.priceIn != null && i.price.priceOut != null
+      ? Number(((input * i.price.priceIn + output * i.price.priceOut) / 1_000_000).toFixed(9))
+      : 0;
   const overBudget: StopCondition<ToolSet> = ({ steps: done }) =>
     i.spentUsd + done.reduce((sum, s) => sum + costOf(s.usage.inputTokens ?? 0, s.usage.outputTokens ?? 0), 0) >= i.budgetUsd;
 

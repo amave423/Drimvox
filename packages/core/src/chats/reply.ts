@@ -99,5 +99,6 @@ export async function reply(i: ReplyInput): Promise<void> {
 
 function cost(model: ModelInfo | undefined, input: number | null, output: number | null): number | null {
   if (!model || model.priceIn === null || model.priceOut === null || input === null || output === null) return null;
-  return (input * model.priceIn + output * model.priceOut) / 1_000_000;
+  // Rounded to a billionth of a dollar so sums do not show float noise like 0.00006089999999.
+  return Number(((input * model.priceIn + output * model.priceOut) / 1_000_000).toFixed(9));
 }
