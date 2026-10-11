@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, runCommand } from "../src/agent/commands";
 import { parseDiff } from "../src/agent/diff";
+import { feedbackMessage } from "../src/agent/prompt";
 import { Workspace } from "../src/agent/workspace";
 import { makeRepo } from "./git-repo";
 
@@ -92,10 +93,29 @@ describe("runCommand", () => {
     expect(result.timedOut).toBe(true);
   });
 
+  it.runIf(process.platform === "win32")("prints PowerShell errors as plain text", async () => {
+    const result = await runCommand("Get-Item does-not-exist.txt", root, 30_000);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("does-not-exist.txt");
+    expect(result.output).not.toContain("CLIXML");
+  });
+
   it("keeps only the end of long output", async () => {
     const result = await runCommand(`node -e "console.log('x'.repeat(50000) + 'END')"`, root, 30_000);
     expect(result.output.length).toBeLessThan(13_000);
     expect(result.output).toContain("END");
+  });
+});
+
+describe("feedbackMessage", () => {
+  it("tells the model which comments are on removed lines", () => {
+    const text = feedbackMessage("Почти", [
+      { path: "a.ts", line: 2, side: "new", text: "переименуй" },
+      { path: "a.ts", line: 2, side: "old", text: "зачем удалил?" },
+    ]);
+    expect(text).toContain("- a.ts:2 — переименуй");
+    expect(text).toContain("- a.ts:2 (a line you removed; number in the original file) — зачем удалил?");
+    expect(text).toContain("General comment: Почти");
   });
 });
 

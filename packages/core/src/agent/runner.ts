@@ -1,4 +1,4 @@
-import type { PendingApproval, TaskEvent, TaskFeedback, TaskView } from "@artel/shared";
+import type { PendingApproval, TaskEvent, TaskFeedback, TaskUpdate, TaskView } from "@artel/shared";
 import type { ModelMessage } from "ai";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -9,8 +9,6 @@ import { feedbackMessage } from "./prompt";
 import { toTaskView, type ProjectRepo, type TaskRepo, type TaskRow } from "./repo";
 import { acceptTask, discardTask, hasChanges, snapshot, taskDiff } from "./review";
 import { runAgent, type RunOutcome } from "./run";
-
-export type TaskUpdate = { type: "event"; event: TaskEvent } | { type: "task"; task: TaskView };
 
 interface Live {
   controller: AbortController;

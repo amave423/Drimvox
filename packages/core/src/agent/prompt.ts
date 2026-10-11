@@ -22,11 +22,17 @@ export function systemPrompt(root: string, platform = process.platform): string 
 }
 
 /** Message that sends the user's review back to the agent. */
-export function feedbackMessage(note: string | undefined, comments: { path: string; line: number; text: string }[]): string {
+export function feedbackMessage(
+  note: string | undefined,
+  comments: { path: string; line: number; side?: "old" | "new"; text: string }[],
+): string {
   const parts = ["The user reviewed your changes and asks for more work."];
   if (comments.length) {
     parts.push("", "Comments on lines (path:line — comment):");
-    for (const c of comments) parts.push(`- ${c.path}:${c.line} — ${c.text}`);
+    for (const c of comments) {
+      const where = c.side === "old" ? `${c.path}:${c.line} (a line you removed; number in the original file)` : `${c.path}:${c.line}`;
+      parts.push(`- ${where} — ${c.text}`);
+    }
   }
   if (note) parts.push("", `General comment: ${note}`);
   parts.push("", "Address every comment, then call finish again.");

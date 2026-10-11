@@ -47,11 +47,15 @@ function absolutePaths(command: string): string[] {
  * (plain -Command turns every failure into 1). Encoding avoids quoting problems.
  */
 function encodePowerShell(command: string): string {
+  // With output redirected, PowerShell serialises progress bars and errors as CLIXML; the agent
+  // needs them as plain text. Native programs set LASTEXITCODE; failed cmdlets only fill $Error.
   const script = [
     "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+    "$ProgressPreference = 'SilentlyContinue'",
     "$global:LASTEXITCODE = $null",
-    command,
-    "if ($global:LASTEXITCODE -ne $null) { exit $global:LASTEXITCODE } elseif (-not $?) { exit 1 }",
+    "$Error.Clear()",
+    `& {\n${command}\n} 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { $_ } } | Out-String -Stream -Width 4096`,
+    "if ($global:LASTEXITCODE -ne $null) { exit $global:LASTEXITCODE } elseif ($Error.Count -gt 0) { exit 1 }",
   ].join("\n");
   return Buffer.from(script, "utf16le").toString("base64");
 }

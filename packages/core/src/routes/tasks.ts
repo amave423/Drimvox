@@ -1,12 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
-import { approvalAnswerSchema, taskAcceptSchema, taskContinueSchema, taskFeedbackSchema } from "@artel/shared";
+import { approvalAnswerSchema, taskAcceptSchema, taskContinueSchema, taskFeedbackSchema, type TaskUpdate } from "@artel/shared";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { GitError } from "../agent/git";
 import type { TaskRepo } from "../agent/repo";
 import { AcceptRefused } from "../agent/review";
-import { TaskBusy, type AgentRunner, type TaskUpdate } from "../agent/runner";
+import { TaskBusy, type AgentRunner } from "../agent/runner";
 
 const notFound = { error: { code: "not_found" } } as const;
 

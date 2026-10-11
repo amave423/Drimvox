@@ -23,7 +23,15 @@ export const taskFeedbackSchema = z
   .object({
     note: z.string().trim().max(20_000).optional(),
     comments: z
-      .array(z.object({ path: z.string().min(1), line: z.number().int().min(1), text: z.string().trim().min(1).max(5000) }))
+      .array(
+        z.object({
+          path: z.string().min(1),
+          line: z.number().int().min(1),
+          /** "old": a removed line, numbered as in the original file. */
+          side: z.enum(["old", "new"]).default("new"),
+          text: z.string().trim().min(1).max(5000),
+        }),
+      )
       .max(200)
       .default([]),
   })
@@ -85,6 +93,9 @@ export interface TaskEvent {
   data: any;
   createdAt: number;
 }
+
+/** Messages of GET /api/tasks/:id/stream: the task's current state or a new event. */
+export type TaskUpdate = { type: "event"; event: TaskEvent } | { type: "task"; task: TaskView };
 
 export interface DiffLine {
   kind: "context" | "add" | "del";
