@@ -29,7 +29,12 @@ export function AssistantMessage({ content, reasoning, model, streaming, message
   let meta: string | null = null;
   if (message && message.inputTokens !== null && message.outputTokens !== null) {
     const vars = { input: tokens(message.inputTokens), output: tokens(message.outputTokens) };
-    meta = message.costUsd !== null ? t("msg.meta", { ...vars, cost: formatUsd(message.costUsd) }) : t("msg.metaNoCost", vars);
+    meta =
+      message.costUsd === null
+        ? t("msg.metaNoCost", vars)
+        : message.costUsd === 0
+          ? t("msg.metaFree", vars)
+          : t("msg.meta", { ...vars, cost: formatUsd(message.costUsd) });
   }
 
   return (

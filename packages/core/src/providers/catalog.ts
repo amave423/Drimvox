@@ -22,7 +22,8 @@ const nvidiaNonChat = /embed|retriever|reward|guard|safety|parse|clip|detector|c
 type Raw = Record<string, unknown>;
 
 export function normalizeModels(preset: PresetId, items: unknown[]): ModelInfo[] {
-  const free = presets[preset].billing === "free";
+  // Local models cost nothing; NVIDIA's hosted models run on free developer credits, not money.
+  const free = presets[preset].billing !== "paid";
   const models: ModelInfo[] = [];
 
   for (const item of items) {

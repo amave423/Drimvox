@@ -57,8 +57,12 @@ describe("normalizeModels", () => {
     expect(normalizeModels("ollama", [{ id: "qwen3:8b" }])[0]).toMatchObject({ priceIn: 0, priceOut: 0 });
   });
 
+  it("prices NVIDIA models at zero: they run on free developer credits", () => {
+    expect(normalizeModels("nvidia", [{ id: "moonshotai/kimi-k3" }])[0]).toMatchObject({ priceIn: 0, priceOut: 0 });
+  });
+
   it("leaves prices unknown when the provider does not publish them", () => {
-    expect(normalizeModels("nvidia", [{ id: "meta/llama-3.3-70b-instruct" }])[0]).toMatchObject({
+    expect(normalizeModels("custom", [{ id: "some/model" }])[0]).toMatchObject({
       priceIn: null,
       priceOut: null,
       tools: null,

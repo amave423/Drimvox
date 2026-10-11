@@ -96,6 +96,7 @@ export const ru = {
 
   "msg.meta": "Токены: {input} → {output}, {cost}",
   "msg.metaNoCost": "Токены: {input} → {output}",
+  "msg.metaFree": "Токены: {input} → {output}, бесплатно",
 
   "model.pick": "Выбери модель",
   "model.search": "Поиск модели",
@@ -106,6 +107,8 @@ export const ru = {
   "model.priceEstimated": "Цена — оценка по прайсу провайдера.",
   "model.priceUnknown": "Провайдер не публикует цену.",
   "model.free": "Бесплатно",
+  "model.freeCredits": "Бесплатно, по кредитам",
+  "model.creditsNote": "Бесплатно для разработчиков: NVIDIA списывает кредиты (около одного за запрос) и ограничивает число запросов в минуту.",
   "model.tools": "Умеет вызывать инструменты",
 
   "boot.failedTitle": "Ядро не отвечает",

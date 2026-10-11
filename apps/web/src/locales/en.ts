@@ -97,6 +97,7 @@ export const en: Record<keyof typeof ru, string> = {
 
   "msg.meta": "Tokens: {input} → {output}, {cost}",
   "msg.metaNoCost": "Tokens: {input} → {output}",
+  "msg.metaFree": "Tokens: {input} → {output}, free",
 
   "model.pick": "Choose a model",
   "model.search": "Search models",
@@ -107,6 +108,8 @@ export const en: Record<keyof typeof ru, string> = {
   "model.priceEstimated": "The price is an estimate from the provider's price list.",
   "model.priceUnknown": "The provider does not publish a price.",
   "model.free": "Free",
+  "model.freeCredits": "Free, on credits",
+  "model.creditsNote": "Free for developers: NVIDIA deducts credits (about one per request) and limits requests per minute.",
   "model.tools": "Can call tools",
 
   "boot.failedTitle": "The core is not responding",

@@ -92,7 +92,7 @@ export function ModelPicker({ value, onChange }: { value: ModelChoice | null; on
                     {m.name}
                     {m.name !== m.id && <small className="mono">{m.id}</small>}
                   </span>
-                  <ModelFacts model={m} />
+                  <ModelFacts model={m} credits={providers.find((p) => p.id === providerId)?.billing === "credits"} />
                 </button>
               </li>
             ))}
@@ -103,13 +103,13 @@ export function ModelPicker({ value, onChange }: { value: ModelChoice | null; on
   );
 }
 
-function ModelFacts({ model }: { model: ModelInfo }) {
+function ModelFacts({ model, credits }: { model: ModelInfo; credits: boolean }) {
   const { t, settings } = useApp();
   const price =
     model.priceIn === null || model.priceOut === null
       ? "—"
       : model.priceIn === 0 && model.priceOut === 0
-        ? t("model.free")
+        ? t(credits ? "model.freeCredits" : "model.free")
         : `${model.priceEstimated ? "≈" : ""}${formatPrice(model.priceIn)} / ${formatPrice(model.priceOut)}`;
   return (
     <span className="picker-facts mono">
