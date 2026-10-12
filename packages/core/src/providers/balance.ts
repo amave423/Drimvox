@@ -3,12 +3,18 @@ import { fetchJson } from "./http";
 
 /** Remaining money on the account, where the provider exposes it. Null when it does not. */
 export async function fetchBalance(preset: PresetId, baseUrl: string, apiKey: string | null): Promise<Balance | null> {
-  if (preset === "openrouter") {
-    const body = (await fetchJson(`${baseUrl}/credits`, apiKey)) as { data?: { total_credits?: number; total_usage?: number } };
+  if (preset === "openrouter" || preset === "routerai") {
+    // RouterAI answers like OpenRouter, in rubles.
+    const body = (await fetchJson(`${baseUrl}/credits`, apiKey)) as {
+      data?: { total_credits?: number; total_usage?: number; balance?: number };
+      balance?: number;
+    };
+    const currency = preset === "routerai" ? "RUB" : "USD";
     const credits = body.data?.total_credits;
     const usage = body.data?.total_usage;
-    if (typeof credits !== "number" || typeof usage !== "number") return null;
-    return { amount: round(credits - usage), currency: "USD" };
+    if (typeof credits === "number" && typeof usage === "number") return { amount: round(credits - usage), currency };
+    const left = body.data?.balance ?? body.balance;
+    return typeof left === "number" ? { amount: round(left), currency } : null;
   }
   if (preset === "deepseek") {
     const body = (await fetchJson(`${new URL(baseUrl).origin}/user/balance`, apiKey)) as {

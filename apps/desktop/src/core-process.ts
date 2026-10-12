@@ -21,6 +21,8 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     version: data.version,
     port: data.port,
     webDir: data.webDir,
+    // Tests pin the dollar rate instead of asking the Central Bank.
+    usdRub: process.env.ARTEL_TEST_USD_RUB ? async () => Number(process.env.ARTEL_TEST_USD_RUB) : undefined,
   })
     .then((server) => process.parentPort.postMessage({ type: "ready", port: server.port }))
     .catch((err: unknown) => {

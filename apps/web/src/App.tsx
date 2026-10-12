@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ok, type Api } from "./api";
 import { AppContext, type AppContextValue, type CoreStatus, type View } from "./context";
 import { translate } from "./i18n";
-import { formatUsd, startOfToday } from "./lib/format";
+import { formatUsd, setDisplayCurrency, startOfToday } from "./lib/format";
 import { applyTheme, resolveTheme } from "./theme";
 import { ChatSheet } from "./ui/chat/ChatSheet";
 import { HomeSheet } from "./ui/HomeSheet";
@@ -30,7 +30,18 @@ export function App({ api, token, initialSettings, status }: Props) {
   const [today, setToday] = useState<UsageSummary | null>(null);
   const [projects, setProjects] = useState<ProjectView[]>([]);
   const [tasks, setTasks] = useState<TaskView[]>([]);
+  const [usdRub, setUsdRub] = useState(0);
   const systemDark = useSystemDark();
+
+  useEffect(() => {
+    void api.rates
+      .$get()
+      .then((r) => ok<{ usdRub: number }>(r))
+      .then((r) => setUsdRub(r.usdRub))
+      .catch(() => null);
+  }, [api]);
+  // Every amount on screen goes through the formatters, which read this before the tree renders.
+  setDisplayCurrency(usdRub > 0 ? settings.currency : "USD", usdRub);
 
   useEffect(() => applyTheme(resolveTheme(settings.theme, systemDark)), [settings.theme, systemDark]);
   useEffect(() => {
@@ -92,6 +103,7 @@ export function App({ api, token, initialSettings, status }: Props) {
       token,
       settings,
       status,
+      usdRub,
       updateSettings,
       t: (key, vars) => translate(settings.locale, key, vars),
       view,
@@ -113,6 +125,7 @@ export function App({ api, token, initialSettings, status }: Props) {
       token,
       settings,
       status,
+      usdRub,
       updateSettings,
       view,
       providers,

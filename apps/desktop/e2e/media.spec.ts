@@ -74,12 +74,12 @@ test("a picture in a chat: the price before, the picture after, the gallery", as
   await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByRole("option", { name: /Dear Painter/ }).click();
   // A dear picture names its price on the button.
-  await expect(page.getByRole("button", { name: "Запустить за ≈ $0.25" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Запустить за ≈ 20,00 ₽" })).toBeVisible();
 
   await page.getByRole("button", { name: /img\/dear/ }).click();
   await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByRole("option", { name: /Cheap Painter/ }).click();
-  await expect(page.getByText("≈ $0.04")).toBeVisible();
+  await expect(page.getByText("≈ 3,20 ₽")).toBeVisible();
   await page.getByLabel("Формат").selectOption("16:9");
   await page.getByLabel(/Опиши картинку/).fill("Лиса в шарфе");
   await page.getByRole("button", { name: "Создать" }).click();
@@ -87,7 +87,7 @@ test("a picture in a chat: the price before, the picture after, the gallery", as
   const picture = page.getByRole("img", { name: "Лиса в шарфе" });
   await expect(picture).toBeVisible();
   expect(await picture.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
-  await expect(page.getByText("$0.039").first()).toBeVisible();
+  await expect(page.getByText("3,12 ₽").first()).toBeVisible();
   const sent = fake!.requests.find((r) => r.path === "/v1/images")!.body;
   expect(sent).toMatchObject({ model: "img/cheap", prompt: "Лиса в шарфе", aspect_ratio: "16:9" });
 

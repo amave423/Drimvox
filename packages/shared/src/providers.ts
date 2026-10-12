@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const presetIds = ["openrouter", "deepseek", "nvidia", "ollama", "lmstudio", "custom"] as const;
+export const presetIds = ["openrouter", "routerai", "deepseek", "nvidia", "ollama", "lmstudio", "custom"] as const;
 export type PresetId = (typeof presetIds)[number];
 
 export interface Preset {
@@ -15,6 +15,8 @@ export interface Preset {
   editableUrl: boolean;
   /** How usage is billed: real money, provider credits, or nothing (local). */
   billing: "paid" | "credits" | "free";
+  /** What the provider's prices and costs are in. Artel converts rubles to dollars internally. */
+  currency: "USD" | "RUB";
 }
 
 export const presets: Record<PresetId, Preset> = {
@@ -26,6 +28,17 @@ export const presets: Record<PresetId, Preset> = {
     keyUrl: "https://openrouter.ai/settings/keys",
     editableUrl: false,
     billing: "paid",
+    currency: "USD",
+  },
+  routerai: {
+    id: "routerai",
+    name: "RouterAI",
+    baseUrl: "https://routerai.ru/api/v1",
+    keyRequired: true,
+    keyUrl: "https://routerai.ru/",
+    editableUrl: false,
+    billing: "paid",
+    currency: "RUB",
   },
   deepseek: {
     id: "deepseek",
@@ -35,6 +48,7 @@ export const presets: Record<PresetId, Preset> = {
     keyUrl: "https://platform.deepseek.com/api_keys",
     editableUrl: false,
     billing: "paid",
+    currency: "USD",
   },
   nvidia: {
     id: "nvidia",
@@ -44,6 +58,7 @@ export const presets: Record<PresetId, Preset> = {
     keyUrl: "https://build.nvidia.com/settings/api-keys",
     editableUrl: false,
     billing: "credits",
+    currency: "USD",
   },
   ollama: {
     id: "ollama",
@@ -52,6 +67,7 @@ export const presets: Record<PresetId, Preset> = {
     keyRequired: false,
     editableUrl: true,
     billing: "free",
+    currency: "USD",
   },
   lmstudio: {
     id: "lmstudio",
@@ -60,6 +76,7 @@ export const presets: Record<PresetId, Preset> = {
     keyRequired: false,
     editableUrl: true,
     billing: "free",
+    currency: "USD",
   },
   custom: {
     id: "custom",
@@ -68,6 +85,7 @@ export const presets: Record<PresetId, Preset> = {
     keyRequired: false,
     editableUrl: true,
     billing: "paid",
+    currency: "USD",
   },
 };
 
@@ -106,6 +124,7 @@ export interface ProviderView {
   baseUrl: string;
   hasKey: boolean;
   billing: Preset["billing"];
+  currency: Preset["currency"];
   createdAt: number;
 }
 

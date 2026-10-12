@@ -65,11 +65,11 @@ test("connects a provider, streams an answer and counts tokens and money", async
   await expect(page.getByText("Моделей: 1")).toBeVisible();
 
   await startChat(page);
-  await expect(page.getByText("За 1M токенов: $1 вход, $2 выход")).toBeVisible();
+  await expect(page.getByText("За 1M токенов: 80 ₽ вход, 160 ₽ выход")).toBeVisible();
   await say(page, "Привет");
 
   await expect(page.getByText("Привет! Я тестовая модель.")).toBeVisible();
-  await expect(page.getByText("Токены: 12 → 3, < $0.0001")).toBeVisible();
+  await expect(page.getByText("Токены: 12 → 3, 0,001 ₽")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Привет fake-model/ })).toBeVisible();
   await expect(page.getByText("Размышления модели")).toBeVisible();
   await expect(page.getByText(/Сегодня потрачено/)).toBeVisible();

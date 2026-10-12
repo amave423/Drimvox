@@ -123,6 +123,9 @@ const migrations: string[] = [
    create index media_by_message on media (message_id);
    alter table chats add column kind text not null default 'text';
    alter table messages add column media_job text;`,
+  // RouterAI added by hand as a custom provider becomes the RouterAI preset: ruble prices, balance, media.
+  `update providers set preset = 'routerai', base_url = 'https://routerai.ru/api/v1'
+     where preset = 'custom' and (base_url like 'https://routerai.ru%' or base_url like 'https://www.routerai.ru%');`,
 ];
 
 export interface Database {

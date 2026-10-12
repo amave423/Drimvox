@@ -7,6 +7,8 @@ import type { Cipher } from "../secrets";
 export interface Connection {
   id: string;
   preset: PresetId;
+  /** What the provider's prices and costs are in. */
+  currency: "USD" | "RUB";
   baseUrl: string;
   apiKey: string | null;
   /** Changes whenever the address or key changes, so cached catalogs go stale. */
@@ -26,11 +28,20 @@ interface Row {
   updated_at: number;
 }
 
+/** A custom address that is really a known service gets that service's preset: prices, currency, media. */
+const KNOWN_HOSTS: Partial<Record<string, PresetId>> = { "routerai.ru": "routerai", "openrouter.ai": "openrouter" };
+
 export class ProviderRepo {
   constructor(
     private readonly db: Database,
     private readonly cipher: Cipher,
+    /** Tests point fixed presets at a fake server. */
+    private readonly presetUrls: Partial<Record<PresetId, string>> = {},
   ) {}
+
+  private urlOf(preset: PresetId): string {
+    return this.presetUrls[preset] ?? presets[preset].baseUrl;
+  }
 
   list(): ProviderView[] {
     return this.rows("select * from providers order by created_at").map(toView);
@@ -41,10 +52,12 @@ export class ProviderRepo {
     return row ? toView(row) : null;
   }
 
-  create(input: ProviderCreate): ProviderView {
+  create(given: ProviderCreate): ProviderView {
+    const known = given.preset === "custom" && given.baseUrl ? KNOWN_HOSTS[hostOf(given.baseUrl)] : undefined;
+    const input: ProviderCreate = known ? { ...given, preset: known, baseUrl: undefined } : given;
     const preset = presets[input.preset];
     if (input.baseUrl && !preset.editableUrl) throw new InvalidInput(`The address of ${preset.name} cannot be changed`);
-    const baseUrl = input.baseUrl ?? preset.baseUrl;
+    const baseUrl = input.baseUrl ?? this.urlOf(input.preset);
     if (!baseUrl) throw new InvalidInput("An address is required");
     if (preset.keyRequired && !input.apiKey) throw new InvalidInput("A key is required");
 
@@ -97,7 +110,9 @@ export class ProviderRepo {
         apiKey = null;
       }
     }
-    return { id, preset: row.preset, baseUrl: row.base_url, apiKey, cacheKey: `${id}:${row.updated_at}` };
+    // Fixed presets always use their own address, so a test override or a moved endpoint applies at once.
+    const baseUrl = presets[row.preset].editableUrl ? row.base_url : this.urlOf(row.preset);
+    return { id, preset: row.preset, currency: presets[row.preset].currency, baseUrl, apiKey, cacheKey: `${id}:${row.updated_at}` };
   }
 
   private row(id: string): Row | undefined {
@@ -109,6 +124,14 @@ export class ProviderRepo {
   }
 }
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 function toView(row: Row): ProviderView {
   return {
     id: row.id,
@@ -117,6 +140,7 @@ function toView(row: Row): ProviderView {
     baseUrl: row.base_url,
     hasKey: row.secret !== null,
     billing: presets[row.preset].billing,
+    currency: presets[row.preset].currency,
     createdAt: row.created_at,
   };
 }

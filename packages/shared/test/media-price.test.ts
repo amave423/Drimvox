@@ -9,6 +9,7 @@ const image = (lines: { billable: string; unit: string; costUsd: number; variant
   resolutions: [],
   durations: [],
   audio: false,
+  viaChat: false,
   pricing: { lines: lines.map((l) => ({ variant: null, ...l })), skus: {} },
   ...extra,
 });
@@ -21,6 +22,7 @@ const video = (skus: Record<string, string>, extra: Partial<MediaModel> = {}): M
   resolutions: ["720p", "1080p"],
   durations: [8, 4, 6],
   audio: true,
+  viaChat: false,
   pricing: { lines: [], skus },
   ...extra,
 });

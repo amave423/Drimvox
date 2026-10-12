@@ -20,6 +20,8 @@ export interface MediaModel {
   durations: number[];
   /** Video only: the model can add sound. */
   audio: boolean;
+  /** Draws through chat completions (Gemini-style models that answer with text and pictures). */
+  viaChat: boolean;
   /** Null until loaded: image prices live on a separate endpoint per model. */
   pricing: { lines: PriceLine[]; skus: Record<string, string> } | null;
 }

@@ -1,5 +1,6 @@
-import { locales, themes, type SettingsPatch } from "@artel/shared";
-import { useState } from "react";
+import { CONFIRM_ABOVE_USD, currencies, locales, themes, type SettingsPatch } from "@artel/shared";
+import { formatUsd } from "../lib/format";
+import { useEffect, useState } from "react";
 import { useApp } from "../context";
 import { ModelPicker } from "./chat/ModelPicker";
 import { Segmented } from "./Segmented";
@@ -9,9 +10,13 @@ const localeNames = { ru: "Русский", en: "English" } as const;
 type SaveState = "idle" | "saved" | "failed";
 
 export function SettingsSheet() {
-  const { t, settings, updateSettings } = useApp();
+  const { t, settings, updateSettings, usdRub } = useApp();
   const [state, setState] = useState<SaveState>("idle");
-  const [budget, setBudget] = useState(String(settings.agentBudgetUsd));
+  // The budget is kept in dollars and edited in the currency on screen.
+  const perUsd = settings.currency === "RUB" && usdRub > 0 ? usdRub : 1;
+  const shown = (usd: number) => String(Number((usd * perUsd).toFixed(perUsd === 1 ? 2 : 0)));
+  const [budget, setBudget] = useState(shown(settings.agentBudgetUsd));
+  useEffect(() => setBudget(shown(settings.agentBudgetUsd)), [perUsd]);
 
   async function save(patch: SettingsPatch) {
     setState((await updateSettings(patch)) ? "saved" : "failed");
@@ -43,13 +48,24 @@ export function SettingsSheet() {
           onChange={(locale) => save({ locale })}
         />
 
-        <h2 className="sheet-h">{t("settings.agentBudget")}</h2>
+        <h2 className="sheet-h" id="currency-label">
+          {t("settings.currency")}
+        </h2>
+        <Segmented
+          labelledBy="currency-label"
+          value={settings.currency}
+          options={currencies.map((v) => ({ value: v, label: t(`settings.currency.${v}`) }))}
+          onChange={(currency) => save({ currency })}
+        />
+        <p className="muted">{usdRub > 0 ? t("settings.currencyHint", { rate: usdRub.toFixed(2).replace(".", ",") }) : null}</p>
+
+        <h2 className="sheet-h">{t(perUsd === 1 ? "settings.agentBudget" : "settings.agentBudgetRub")}</h2>
         <form
           className="inline-form"
           onSubmit={(e) => {
             e.preventDefault();
-            const value = Number(budget.replace(",", "."));
-            if (value >= 0.01) void save({ agentBudgetUsd: value });
+            const value = Number(budget.replace(",", ".")) / perUsd;
+            if (value >= 0.01) void save({ agentBudgetUsd: Number(value.toFixed(4)) });
           }}
         >
           <input
@@ -59,7 +75,7 @@ export function SettingsSheet() {
             value={budget}
             onChange={(e) => setBudget(e.target.value)}
           />
-          <button className="btn" disabled={!(Number(budget.replace(",", ".")) >= 0.01)}>
+          <button className="btn" disabled={!(Number(budget.replace(",", ".")) / perUsd >= 0.01)}>
             {t("settings.save")}
           </button>
         </form>
@@ -89,7 +105,7 @@ export function SettingsSheet() {
             </button>
           )}
         </div>
-        <p className="muted">{t("settings.imageModelHint")}</p>
+        <p className="muted">{t("settings.imageModelHint", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>
       </div>
       <aside className="margin" aria-live="polite">
         {state === "saved" && <p className="note is-ok">{t("settings.saved")}</p>}

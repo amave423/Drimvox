@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { PresetId } from "@artel/shared";
 import { createCore, openDatabase, type Database } from "../src";
 
 export const TOKEN = "test-token";
@@ -23,6 +24,10 @@ export interface TestEnv {
   setIdleTimeout(ms: number): void;
   /** Checks clips being rendered this often instead of every 10 seconds. */
   setMediaPollMs(ms: number): void;
+  /** A fixed rate instead of the Central Bank's feed. */
+  setUsdRub(rate: number): void;
+  /** Points a fixed preset, such as RouterAI, at a fake server. */
+  setPresetUrl(preset: PresetId, url: string): void;
   close(): void;
   /** Stops running agents first; use when a test may leave one running. */
   closeAsync(): Promise<void>;
@@ -33,10 +38,23 @@ export function createTestEnv(): TestEnv {
   const secretKey = randomBytes(32);
   let idleTimeoutMs: number | undefined;
   let mediaPollMs: number | undefined;
+  // Never the network in tests.
+  let usdRub = 80;
+  const presetUrls: Partial<Record<PresetId, string>> = {};
   // One core per open database: running agents and pending approvals live in it between requests.
   let core: ReturnType<typeof createCore> | undefined;
   const coreFor = (webDir?: string) => {
-    const options = { db: env.db, token: TOKEN, secretKey, version: "0.0.0-test", dataDir: dir, idleTimeoutMs, mediaPollMs };
+    const options = {
+      db: env.db,
+      token: TOKEN,
+      secretKey,
+      version: "0.0.0-test",
+      dataDir: dir,
+      idleTimeoutMs,
+      mediaPollMs,
+      usdRub: async () => usdRub,
+      presetUrls,
+    };
     if (webDir) return createCore({ ...options, webDir });
     core ??= createCore(options);
     return core;
@@ -57,6 +75,14 @@ export function createTestEnv(): TestEnv {
     },
     setMediaPollMs(ms) {
       mediaPollMs = ms;
+      void dropCore();
+    },
+    setUsdRub(rate) {
+      usdRub = rate;
+      void dropCore();
+    },
+    setPresetUrl(preset, url) {
+      presetUrls[preset] = url;
       void dropCore();
     },
     call: async (method, path, body) =>

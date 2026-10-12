@@ -1,6 +1,7 @@
 import type { MediaModel, MediaOptions } from "@artel/shared";
 import { codeForStatus, describeError, detailFromBody, ProviderFailure } from "../providers/errors";
 import type { Connection } from "../providers/repo";
+import { usdPer } from "../rates";
 
 const headers = (conn: Connection, json = true) => ({
   Accept: json ? "application/json" : "*/*",
@@ -44,6 +45,7 @@ export interface Generated {
 
 /** Draws one picture. Pictures take seconds to a minute; five minutes is the limit. */
 export async function generateImage(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal): Promise<Generated> {
+  if (model.viaChat) return drawInChat(conn, model, prompt, o, signal);
   const body = await postJson(
     conn,
     "/images",
@@ -53,7 +55,39 @@ export async function generateImage(conn: Connection, model: MediaModel, prompt:
   );
   const first = Array.isArray(body?.data) ? body.data[0] : undefined;
   if (!first || typeof first.b64_json !== "string") throw new ProviderFailure({ code: "provider_error", detail: "No picture in the answer" });
-  return { bytes: Buffer.from(first.b64_json, "base64"), mime: typeof first.media_type === "string" ? first.media_type : "image/png", costUsd: costOf(body) };
+  return {
+    bytes: Buffer.from(first.b64_json, "base64"),
+    mime: typeof first.media_type === "string" ? first.media_type : sniff(first.b64_json),
+    costUsd: await costOf(conn, body),
+  };
+}
+
+/** Gemini-style models answer a chat request with text and pictures as data: URLs. */
+async function drawInChat(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal): Promise<Generated> {
+  const aspect = pick(model.aspectRatios, o.aspectRatio);
+  const body = await postJson(
+    conn,
+    "/chat/completions",
+    {
+      model: model.id,
+      messages: [{ role: "user", content: prompt }],
+      modalities: ["image", "text"],
+      ...(aspect ? { image_config: { aspect_ratio: aspect } } : {}),
+    },
+    5 * 60_000,
+    signal,
+  );
+  const url = body?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  const match = typeof url === "string" ? url.match(/^data:([^;,]+);base64,(.*)$/s) : null;
+  if (!match) throw new ProviderFailure({ code: "provider_error", detail: "No picture in the answer" });
+  return { bytes: Buffer.from(match[2]!, "base64"), mime: match[1]!, costUsd: await costOf(conn, body) };
+}
+
+/** PNG and JPEG are told apart by their first bytes when the answer does not say. */
+function sniff(b64: string): string {
+  if (b64.startsWith("/9j/")) return "image/jpeg";
+  if (b64.startsWith("UklGR")) return "image/webp";
+  return "image/png";
 }
 
 /** Starts a clip; the provider renders it in the background. Returns the job id. */
@@ -87,7 +121,7 @@ export async function pollVideo(conn: Connection, jobId: string): Promise<VideoJ
   const status = String(body.status ?? "");
   if (status === "completed") {
     const urls = Array.isArray(body.unsigned_urls) ? body.unsigned_urls : [];
-    return { state: "done", url: typeof urls[0] === "string" ? urls[0] : null, costUsd: costOf(body) };
+    return { state: "done", url: typeof urls[0] === "string" ? urls[0] : null, costUsd: await costOf(conn, body) };
   }
   if (status === "failed" || status === "cancelled" || status === "expired") {
     return { state: "failed", detail: typeof body.error === "string" && body.error ? body.error : status };
@@ -112,7 +146,9 @@ function sameOrigin(a: string, b: string): boolean {
   }
 }
 
-function costOf(body: any): number | null {
+/** The provider's own cost of a request, in dollars; RouterAI reports rubles. */
+async function costOf(conn: Connection, body: any): Promise<number | null> {
   const cost = body?.usage?.cost;
-  return typeof cost === "number" && Number.isFinite(cost) ? Number(cost.toFixed(9)) : null;
+  if (typeof cost !== "number" || !Number.isFinite(cost)) return null;
+  return Number((cost * (await usdPer(conn.currency))).toFixed(9));
 }

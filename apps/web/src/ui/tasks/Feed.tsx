@@ -1,6 +1,8 @@
+import { CONFIRM_ABOVE_USD } from "@artel/shared";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { exitCodeOf, type FeedItem } from "../../lib/activity";
+import { formatUsd } from "../../lib/format";
 import { Markdown } from "../chat/Markdown";
 
 interface Props {
@@ -96,7 +98,7 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
     return (
       <div className="approval" role={item.allowed === null ? "alert" : undefined}>
         <strong>{t("approval.title")}</strong>
-        <span>{t(`approval.reason.${item.reason}` as MessageKey)}</span>
+        <span>{t(`approval.reason.${item.reason}` as MessageKey, { limit: formatUsd(CONFIRM_ABOVE_USD) })}</span>
         <code className="mono">{item.command}</code>
         {item.allowed === null && onAnswer ? (
           <div className="actions">

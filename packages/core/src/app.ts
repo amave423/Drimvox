@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { settingsPatchSchema } from "@artel/shared";
+import { settingsPatchSchema, type PresetId } from "@artel/shared";
 import { Hono } from "hono";
 import { ProjectRepo, TaskRepo } from "./agent/repo";
 import { AgentRunner } from "./agent/runner";
@@ -14,6 +14,7 @@ import { mediaRoutes } from "./routes/media";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { taskRoutes } from "./routes/tasks";
+import { setRateSource, usdRub, type RateSource } from "./rates";
 import { createCipher } from "./secrets";
 import { readSettings, writeSettings } from "./settings";
 import { webHandler } from "./web";
@@ -34,13 +35,18 @@ export interface AppOptions {
   idleTimeoutMs?: number;
   /** How often a clip being rendered is checked. Default 10 seconds. */
   mediaPollMs?: number;
+  /** Rubles per dollar; the Central Bank's daily rate by default. */
+  usdRub?: RateSource;
+  /** Addresses of fixed presets, for tests against a fake server. */
+  presetUrls?: Partial<Record<PresetId, string>>;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
 
 /** The API plus a way to stop running agents before the database closes. */
 export function createCore(o: AppOptions) {
-  const providers = new ProviderRepo(o.db, createCipher(o.secretKey));
+  setRateSource(o.usdRub);
+  const providers = new ProviderRepo(o.db, createCipher(o.secretKey), o.presetUrls);
   const media = new MediaRepo(o.db, o.dataDir);
   const chats = new ChatRepo(o.db, media);
   const projects = new ProjectRepo(o.db);
@@ -70,6 +76,7 @@ export function createCore(o: AppOptions) {
         node: process.versions.node,
       }),
     )
+    .get("/rates", async (c) => c.json({ usdRub: await usdRub() }))
     .get("/settings", (c) => c.json(readSettings(o.db)))
     .patch("/settings", zValidator("json", settingsPatchSchema), (c) =>
       c.json(writeSettings(o.db, c.req.valid("json"))),

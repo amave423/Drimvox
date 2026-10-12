@@ -365,10 +365,10 @@ export const en: Record<keyof typeof ru, string> = {
   "gallery.remove": "Delete",
   "gallery.removeConfirm": "Really delete the file",
   "settings.imageModel": "Picture model for agents",
-  "settings.imageModelHint": "With it an agent can draw an icon, a background or an illustration and put it into the project. Pictures above $0.10 only with your permission. Without a model agents draw nothing.",
+  "settings.imageModelHint": "With it an agent can draw an icon, a background or an illustration and put it into the project. Pictures above {limit} only with your permission. Without a model agents draw nothing.",
   "action.generate_image": "Draws {target}",
-  "approval.reason.media_cost": "A paid picture above $0.10",
-  "media.emptyLede": "Describe what you need and pick the shape. The price shows before you start; video and anything above $0.10 starts only from the button with the price.",
+  "approval.reason.media_cost": "A paid picture above {limit}",
+  "media.emptyLede": "Describe what you need and pick the shape. The price shows before you start; video and anything above {limit} starts only from the button with the price.",
   "chat.totalsCost": "This chat: {cost}",
 
   "answer.title": "Answer",
@@ -376,4 +376,11 @@ export const en: Record<keyof typeof ru, string> = {
   "answer.ask": "Ask",
   "answer.howFound": "How the agent found the answer",
   "task.reason.answered": "The agent answered the question. The project did not change.",
+
+  "settings.currency": "Currency of prices and spending",
+  "settings.currency.RUB": "Rubles",
+  "settings.currency.USD": "Dollars",
+  "settings.currencyHint": "Central Bank rate today: {rate} ₽ per dollar. Dollar prices are converted at it.",
+  "settings.agentBudgetRub": "Agent budget per task, ₽",
+  "providers.hint.routerai": "Hundreds of models paid in rubles: text, pictures, video",
 };

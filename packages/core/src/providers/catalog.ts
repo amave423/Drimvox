@@ -1,5 +1,6 @@
 import { presets, type ModelInfo, type PresetId } from "@artel/shared";
 import { fetchJson } from "./http";
+import { usdPer } from "../rates";
 import type { Connection } from "./repo";
 
 /**
@@ -21,7 +22,11 @@ const nvidiaNonChat = /embed|retriever|reward|guard|safety|parse|clip|detector|c
 
 type Raw = Record<string, unknown>;
 
-export function normalizeModels(preset: PresetId, items: unknown[]): ModelInfo[] {
+/**
+ * Chat models of a catalog. `toUsd` converts the catalog's prices to dollars (RouterAI prices in rubles).
+ * Models that cannot chat (embeddings, speech, pictures, video) are left out; they live elsewhere.
+ */
+export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): ModelInfo[] {
   // Local models cost nothing; NVIDIA's hosted models run on free developer credits, not money.
   const free = presets[preset].billing !== "paid";
   const models: ModelInfo[] = [];
@@ -31,9 +36,11 @@ export function normalizeModels(preset: PresetId, items: unknown[]): ModelInfo[]
     const raw = item as Raw;
     if (typeof raw.id !== "string" || !raw.id) continue;
     if (preset === "nvidia" && nvidiaNonChat.test(raw.id)) continue;
+    const out = (raw.architecture as { output_modalities?: unknown } | undefined)?.output_modalities;
+    if (Array.isArray(out) && !out.includes("text")) continue;
 
-    let priceIn = perMillion((raw.pricing as Raw | undefined)?.prompt);
-    let priceOut = perMillion((raw.pricing as Raw | undefined)?.completion);
+    let priceIn = perMillion((raw.pricing as Raw | undefined)?.prompt, toUsd);
+    let priceOut = perMillion((raw.pricing as Raw | undefined)?.completion, toUsd);
     let priceEstimated = false;
     const table = preset === "deepseek" ? deepseekPrices[raw.id] : undefined;
     if (priceIn === null && table) {
@@ -59,11 +66,11 @@ export function normalizeModels(preset: PresetId, items: unknown[]): ModelInfo[]
   return models.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Prices arrive as USD per token strings; "-1" means "varies". */
-function perMillion(value: unknown): number | null {
+/** Prices arrive per token, as strings or numbers; "-1" means "varies". */
+function perMillion(value: unknown, toUsd: number): number | null {
   const n = typeof value === "string" || typeof value === "number" ? Number(value) : NaN;
   if (!Number.isFinite(n) || n < 0) return null;
-  return Number((n * 1_000_000).toFixed(6));
+  return Number((n * 1_000_000 * toUsd).toFixed(6));
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -78,7 +85,7 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
   if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.models;
   const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey)) as { data?: unknown };
   const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
-  const models = normalizeModels(conn.preset, items);
+  const models = normalizeModels(conn.preset, items, await usdPer(conn.currency));
   cache.set(conn.cacheKey, { at: Date.now(), models });
   return models;
 }

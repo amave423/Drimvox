@@ -1,6 +1,7 @@
 import {
   estimateCost,
   needsConfirmation,
+  CONFIRM_ABOVE_USD,
   type ChatView,
   type ChatWithMessages,
   type MediaModel,
@@ -172,7 +173,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           <h1>{chat?.title ?? t("chat.emptyTitle")}</h1>
         </header>
 
-        {empty && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede")}</p>}
+        {empty && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
 
         <div className="messages">
           {messages.map((m) =>

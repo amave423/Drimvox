@@ -32,6 +32,8 @@ export interface AppContextValue {
   updateSettings(patch: SettingsPatch): Promise<boolean>;
   t(key: MessageKey, vars?: Record<string, string | number>): string;
 
+  /** Rubles per dollar from the core; 0 until known. */
+  usdRub: number;
   view: View;
   navigate(view: View): void;
   openNewChat(): void;
