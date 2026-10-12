@@ -125,7 +125,7 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
         : item.name === "list_files"
           ? (input.path ?? ".")
           : input.path;
-  const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command"].includes(item.name);
+  const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image"].includes(item.name);
   const label = known ? t(`action.${item.name}` as MessageKey, { target: target ?? "" }) : item.name;
 
   let outcome: { text: string; bad: boolean } | null = null;

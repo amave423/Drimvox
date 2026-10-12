@@ -40,6 +40,13 @@ export interface PassContext {
   askApproval: ToolHooks["askApproval"];
   /** A goal's plan is settled: hand the subtasks to the team. */
   startTeam(): void;
+  /** The picture tool when the settings name an image model; none otherwise. */
+  imageTools(
+    row: TaskRow,
+    hooks: Omit<ToolHooks, "onFinish">,
+    onSpend: (usd: number) => void,
+    budgetLeft: () => number,
+  ): Promise<ToolSet>;
 }
 
 /** The step after the spec, or after the interview when there is no spec step. */
@@ -88,13 +95,29 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   let input = row.input_tokens;
   let output = row.output_tokens;
   let steps = row.steps;
+  const hooks = {
+    onCall: (call: { callId: string; name: string; input: unknown }) => ctx.event("tool_call", call),
+    onResult: (result: { callId: string; name: string; ok: boolean; output: string }) => ctx.event("tool_result", result),
+    askApproval: ctx.askApproval,
+  };
+  const mode = phase === "interview" || phase === "spec" ? "read" : "write";
+  if (mode === "write") {
+    // Pictures cost money outside the model's own usage: they go into the task's spending at once.
+    const spend = (usd: number) => {
+      cost += usd;
+      ctx.tasks.update(id, { cost_usd: cost });
+      ctx.tasks.addUsage(id, 0, 0, usd, true);
+      ctx.publish();
+    };
+    extraTools = { ...extraTools, ...(await ctx.imageTools(row, hooks, spend, () => row.budget_usd - cost)) };
+  }
   const outcome = await runAgent({
     conn,
     model: row.model,
     price: await findModel(conn, row.model),
     worktree: row.worktree,
     messages,
-    mode: phase === "interview" || phase === "spec" ? "read" : "write",
+    mode,
     extraTools,
     stopTools,
     instructions: planning ? planInstructions() : phaseInstructions(phase, JSON.parse(row.checks) as string[]),
@@ -114,11 +137,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       ctx.tasks.addUsage(id, step.inputTokens, step.outputTokens, step.costUsd, step.priced);
       ctx.publish();
     },
-    hooks: {
-      onCall: (call) => ctx.event("tool_call", call),
-      onResult: (result) => ctx.event("tool_result", result),
-      askApproval: ctx.askApproval,
-    },
+    hooks,
   });
   if (ctx.closed()) return null;
 

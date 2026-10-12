@@ -1,11 +1,21 @@
-import type { ChatView, ChatWithMessages, StreamEvent } from "@artel/shared";
+import {
+  estimateCost,
+  needsConfirmation,
+  type ChatView,
+  type ChatWithMessages,
+  type MediaModel,
+  type MediaOptions as Options,
+  type StreamEvent,
+} from "@artel/shared";
 import { useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import { formatTokens, formatUsd } from "../../lib/format";
 import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/lastModel";
+import { loadMediaModel } from "../../lib/media";
 import { postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
+import { MediaOptions } from "./MediaOptions";
 import { AssistantMessage, UserMessage } from "./Messages";
 import { ModelNote } from "./ModelNote";
 import { ModelPicker } from "./ModelPicker";
@@ -15,7 +25,12 @@ interface Draft {
   text: string;
   reasoning: string;
   model: string;
+  /** A picture or a clip is being made rather than text streamed. */
+  media: boolean;
 }
+
+/** Answers still being made on the provider's side, such as clips, are checked this often. */
+const PENDING_POLL_MS = 3000;
 
 export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey: string }) {
   const { api, token, t, settings, providers, navigate, reloadChats, reloadToday } = useApp();
@@ -24,15 +39,38 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const [draft, setDraft] = useState<Draft | null>(null);
   const [failed, setFailed] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [mediaModel, setMediaModel] = useState<MediaModel | null>(null);
+  const [options, setOptions] = useState<Options>({});
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const kind = choice?.kind ?? "text";
 
   async function load(id: string) {
     const loaded = await api.chats[":id"].$get({ param: { id } }).then((r) => ok<ChatWithMessages>(r)).catch(() => null);
     if (!loaded) return;
     setChat(loaded);
-    if (loaded.providerId && loaded.model) setChoice({ providerId: loaded.providerId, model: loaded.model });
+    if (loaded.providerId && loaded.model) setChoice({ providerId: loaded.providerId, model: loaded.model, kind: loaded.kind });
   }
+
+  // Pictures and clips: the model's options and prices, for the estimate under the prompt.
+  useEffect(() => {
+    setMediaModel(null);
+    setOptions({});
+    if (!choice || kind === "text") return;
+    let live = true;
+    void loadMediaModel(api, choice.providerId, kind, choice.model).then((m) => live && setMediaModel(m));
+    return () => {
+      live = false;
+    };
+  }, [api, choice?.providerId, choice?.model, kind]);
+
+  // A clip renders for minutes on the provider's side; the chat checks on it until it arrives.
+  const pending = !draft && !!chat?.messages.some((m) => m.status === "streaming");
+  useEffect(() => {
+    if (!pending || !chat) return;
+    const timer = setTimeout(() => void load(chat.id).then(() => void reloadToday()), PENDING_POLL_MS);
+    return () => clearTimeout(timer);
+  }, [pending, chat]);
 
   useEffect(() => {
     if (chatId && chatId !== chat?.id) void load(chatId);
@@ -49,18 +87,22 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
     end.current?.scrollIntoView({ block: "end" });
   }, [chat?.messages.length, draft?.text, draft?.reasoning]);
 
+  const estimateUsd = mediaModel ? estimateCost(mediaModel, options) : null;
+  const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
+
   async function send(content: string) {
     if (!choice) return;
     setFailed(false);
     let id = chat?.id;
+    const target = { providerId: choice.providerId, model: choice.model, kind };
     try {
       if (!id) {
-        const created = await ok<ChatView>(await api.chats.$post({ json: choice }));
+        const created = await ok<ChatView>(await api.chats.$post({ json: target }));
         id = created.id;
         setChat({ ...created, messages: [] });
         navigate({ kind: "chat", chatId: id, key: viewKey });
-      } else if (chat && (chat.providerId !== choice.providerId || chat.model !== choice.model)) {
-        await ok(await api.chats[":id"].$patch({ param: { id }, json: choice }));
+      } else if (chat && (chat.providerId !== choice.providerId || chat.model !== choice.model || chat.kind !== kind)) {
+        await ok(await api.chats[":id"].$patch({ param: { id }, json: target }));
       }
     } catch {
       setFailed(true);
@@ -70,12 +112,13 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
 
     const controller = new AbortController();
     abort.current = controller;
-    setDraft({ user: content, text: "", reasoning: "", model: choice.model });
+    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text" });
     try {
       await postStream<StreamEvent>(
         `/api/chats/${id}/messages`,
         token,
-        { content },
+        // The price was on the button the user pressed; that is the confirmation.
+        kind === "text" ? { content } : { content, options, confirm },
         (e) => {
           if (e.type === "text") setDraft((d) => d && { ...d, text: d.text + e.text });
           if (e.type === "reasoning") setDraft((d) => d && { ...d, reasoning: d.reasoning + e.text });
@@ -129,7 +172,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           <h1>{chat?.title ?? t("chat.emptyTitle")}</h1>
         </header>
 
-        {empty && <p className="lede">{t("chat.emptyLede")}</p>}
+        {empty && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede")}</p>}
 
         <div className="messages">
           {messages.map((m) =>
@@ -142,7 +185,13 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           {draft && (
             <>
               <UserMessage content={draft.user} />
-              <AssistantMessage content={draft.text} reasoning={draft.reasoning || null} model={draft.model} streaming />
+              <AssistantMessage
+                content={draft.text}
+                reasoning={draft.reasoning || null}
+                model={draft.model}
+                streaming
+                making={draft.media ? kind : undefined}
+              />
             </>
           )}
           <div ref={end} />
@@ -150,11 +199,22 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
 
         {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
         <Composer
-          disabled={!choice}
+          disabled={!choice || (kind !== "text" && !mediaModel)}
           streaming={!!draft}
           onSend={(text) => void send(text)}
           onStop={() => abort.current?.abort()}
-          tools={<ModelPicker value={choice} onChange={setChoice} placement="above" />}
+          tools={<ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />}
+          extra={mediaModel && <MediaOptions model={mediaModel} value={options} onChange={setOptions} estimateUsd={estimateUsd} />}
+          placeholder={kind === "text" ? undefined : t(kind === "image" ? "media.placeholderImage" : "media.placeholderVideo")}
+          sendLabel={
+            kind === "text"
+              ? undefined
+              : confirm
+                ? estimateUsd === null
+                  ? t("media.startUnknown")
+                  : t("media.startFor", { cost: formatUsd(estimateUsd) })
+                : t("media.make")
+          }
         />
       </div>
 
@@ -163,7 +223,9 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         {choice && <ModelNote choice={choice} />}
         {answers.length > 0 && (
           <p className="note">
-            {t("chat.totals", { cost: formatUsd(spent), tokens: formatTokens(tokens, settings.locale) })}
+            {tokens === 0
+              ? t("chat.totalsCost", { cost: formatUsd(spent) })
+              : t("chat.totals", { cost: formatUsd(spent), tokens: formatTokens(tokens, settings.locale) })}
             {unpriced && (
               <>
                 <br />

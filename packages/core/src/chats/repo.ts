@@ -1,12 +1,14 @@
-import type { ChatUpdate, ChatView, ChatWithMessages, MessageStatus, MessageView, ProviderError, UsageSummary } from "@artel/shared";
+import type { ChatKind, ChatUpdate, ChatView, ChatWithMessages, MessageStatus, MessageView, ProviderError, UsageSummary } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
+import type { MediaRepo } from "../media/repo";
 
 interface ChatRow {
   id: string;
   title: string | null;
   provider_id: string | null;
   model: string | null;
+  kind: ChatKind;
   created_at: number;
   updated_at: number;
 }
@@ -26,6 +28,18 @@ interface MessageRow {
   error_code: string | null;
   error_detail: string | null;
   created_at: number;
+  media_job: string | null;
+}
+
+/** A clip the provider is still rendering for an answer. */
+export interface PendingJob {
+  messageId: string;
+  chatId: string;
+  providerId: string | null;
+  model: string;
+  prompt: string;
+  jobId: string;
+  createdAt: number;
 }
 
 export interface NewMessage {
@@ -48,7 +62,10 @@ export interface FinishedAnswer {
 }
 
 export class ChatRepo {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly media: MediaRepo,
+  ) {}
 
   list(): ChatView[] {
     return (this.db.sql.prepare("select * from chats order by updated_at desc").all() as unknown as ChatRow[]).map(toChat);
@@ -60,13 +77,18 @@ export class ChatRepo {
     const messages = this.db.sql
       .prepare("select * from messages where chat_id = ? order by created_at, rowid")
       .all(id) as unknown as MessageRow[];
-    return { ...toChat(row), messages: messages.map(toMessage) };
+    const media = this.media.forMessages(messages.map((m) => m.id));
+    return { ...toChat(row), messages: messages.map((m) => toMessage(m, media.get(m.id) ?? [])) };
   }
 
-  create(providerId: string, model: string): ChatView {
+  create(providerId: string, model: string, kind: ChatKind = "text"): ChatView {
     const now = Date.now();
-    const row: ChatRow = { id: randomUUID(), title: null, provider_id: providerId, model, created_at: now, updated_at: now };
-    this.db.sql.prepare("insert into chats values (:id, :title, :provider_id, :model, :created_at, :updated_at)").run({ ...row });
+    const row: ChatRow = { id: randomUUID(), title: null, provider_id: providerId, model, kind, created_at: now, updated_at: now };
+    this.db.sql
+      .prepare(
+        "insert into chats (id, title, provider_id, model, kind, created_at, updated_at) values (:id, :title, :provider_id, :model, :kind, :created_at, :updated_at)",
+      )
+      .run({ ...row });
     return toChat(row);
   }
 
@@ -78,11 +100,14 @@ export class ChatRepo {
       title: patch.title ?? row.title,
       provider_id: patch.providerId ?? row.provider_id,
       model: patch.model ?? row.model,
+      kind: patch.kind ?? row.kind,
       updated_at: Date.now(),
     };
     this.db.sql
-      .prepare("update chats set title = :title, provider_id = :provider_id, model = :model, updated_at = :updated_at where id = :id")
-      .run({ id, title: next.title, provider_id: next.provider_id, model: next.model, updated_at: next.updated_at });
+      .prepare(
+        "update chats set title = :title, provider_id = :provider_id, model = :model, kind = :kind, updated_at = :updated_at where id = :id",
+      )
+      .run({ id, title: next.title, provider_id: next.provider_id, model: next.model, kind: next.kind, updated_at: next.updated_at });
     return toChat(next);
   }
 
@@ -113,15 +138,47 @@ export class ChatRepo {
       error_code: null,
       error_detail: null,
       created_at: Date.now(),
+      media_job: null,
     };
+    const cols = Object.keys(row);
     this.db.sql
-      .prepare(
-        `insert into messages values (:id, :chat_id, :role, :content, :reasoning, :provider_id, :model, :input_tokens,
-         :output_tokens, :cost_usd, :status, :error_code, :error_detail, :created_at)`,
-      )
+      .prepare(`insert into messages (${cols.join(", ")}) values (${cols.map((c) => `:${c}`).join(", ")})`)
       .run({ ...row });
     this.db.sql.prepare("update chats set updated_at = ? where id = ?").run(row.created_at, m.chatId);
-    return toMessage(row);
+    return toMessage(row, []);
+  }
+
+  /** Remembers the provider's job for a clip, so waiting survives a restart. */
+  setMediaJob(messageId: string, jobId: string | null): void {
+    this.db.sql.prepare("update messages set media_job = ? where id = ?").run(jobId, messageId);
+  }
+
+  pendingJobs(): PendingJob[] {
+    const rows = this.db.sql
+      .prepare(
+        `select a.id, a.chat_id, a.provider_id, a.model, a.media_job, a.created_at,
+                (select u.content from messages u where u.chat_id = a.chat_id and u.role = 'user' and u.created_at <= a.created_at
+                 order by u.created_at desc, u.rowid desc limit 1) as prompt
+         from messages a where a.status = 'streaming' and a.media_job is not null`,
+      )
+      .all() as {
+      id: string;
+      chat_id: string;
+      provider_id: string | null;
+      model: string;
+      media_job: string;
+      created_at: number;
+      prompt: string | null;
+    }[];
+    return rows.map((r) => ({
+      messageId: r.id,
+      chatId: r.chat_id,
+      providerId: r.provider_id,
+      model: r.model,
+      prompt: r.prompt ?? "",
+      jobId: r.media_job,
+      createdAt: r.created_at,
+    }));
   }
 
   finishAnswer(id: string, a: FinishedAnswer): MessageView {
@@ -142,7 +199,12 @@ export class ChatRepo {
         error_code: a.error?.code ?? null,
         error_detail: a.error?.detail ?? null,
       });
-    return toMessage(this.db.sql.prepare("select * from messages where id = ?").get(id) as unknown as MessageRow);
+    return this.message(id)!;
+  }
+
+  message(id: string): MessageView | null {
+    const row = this.db.sql.prepare("select * from messages where id = ?").get(id) as unknown as MessageRow | undefined;
+    return row ? toMessage(row, this.media.forMessages([id]).get(id) ?? []) : null;
   }
 
   /** What the model sees: finished turns only. Failed and empty answers are left out. */
@@ -180,10 +242,18 @@ export class ChatRepo {
 }
 
 function toChat(r: ChatRow): ChatView {
-  return { id: r.id, title: r.title, providerId: r.provider_id, model: r.model, createdAt: r.created_at, updatedAt: r.updated_at };
+  return {
+    id: r.id,
+    title: r.title,
+    providerId: r.provider_id,
+    model: r.model,
+    kind: r.kind,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
 }
 
-function toMessage(r: MessageRow): MessageView {
+function toMessage(r: MessageRow, media: MessageView["media"]): MessageView {
   return {
     id: r.id,
     role: r.role,
@@ -196,6 +266,7 @@ function toMessage(r: MessageRow): MessageView {
     costUsd: r.cost_usd,
     status: r.status,
     error: r.error_code ? ({ code: r.error_code, ...(r.error_detail ? { detail: r.error_detail } : {}) } as ProviderError) : null,
+    media,
     createdAt: r.created_at,
   };
 }

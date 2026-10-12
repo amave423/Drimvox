@@ -1,7 +1,11 @@
+import type { ChatKind } from "@artel/shared";
+
 /** The model picked last, so a new chat starts with it. A per-device convenience, not settings. */
 export interface ModelChoice {
   providerId: string;
   model: string;
+  /** What the model makes; text when absent. */
+  kind?: ChatKind;
 }
 
 const KEY = "artel.lastModel";

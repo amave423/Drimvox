@@ -16,10 +16,13 @@ const contentTypes: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
 };
 
-/** The UI loads nothing from the network: fonts are bundled, the API is same-origin. */
+/**
+ * The UI loads nothing from the network: fonts are bundled, the API is same-origin. Pictures and clips
+ * come from the API with the token and are shown as blob: URLs.
+ */
 const csp =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; " +
-  "img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+  "img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 
 /** Serves the built UI. Paths without an extension are app routes and get index.html. */
 export function webHandler(root: string): Handler {

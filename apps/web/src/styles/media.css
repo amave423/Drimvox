@@ -1,0 +1,27 @@
+/* Pictures and clips: in chat answers, in the gallery and in the review. */
+.media { margin: 8px 0 4px; display: grid; gap: 6px; justify-items: start; }
+.media img, .media video { display: block; max-width: 100%; max-height: 520px; border: 1px solid var(--line); background: var(--paper); }
+.media figcaption { font-size: 13px; }
+.media-wait { width: 240px; max-width: 100%; aspect-ratio: 1; border: 1px dashed var(--line); background: var(--paper); }
+.msg-making { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: var(--muted); font-size: 14px; }
+
+.media-options { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; padding: 8px 0 2px; font-size: 13px; }
+.media-option { display: grid; gap: 3px; color: var(--muted); }
+.media-option select { padding: 4px 8px; font-size: 13px; }
+.media-price { margin-left: auto; color: var(--fg); font-size: 13px; }
+
+.picker-kinds { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
+.picker-kinds button { padding: 6px 12px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.picker-kinds button.is-on { color: var(--ink); border-bottom-color: var(--ink); }
+
+.gallery { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+.gallery-card { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.gallery-card .media { margin: 0; justify-items: stretch; }
+.gallery-card .media img, .gallery-card .media video { width: 100%; max-height: 260px; object-fit: contain; }
+.gallery-prompt { margin: 0; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.gallery-meta { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.gallery-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.gallery-actions .link { font-size: 13px; }
+
+.diff-image { padding: 10px 14px; }
+.diff-image img { display: block; max-width: 100%; max-height: 360px; border: 1px solid var(--line); background: var(--paper); }

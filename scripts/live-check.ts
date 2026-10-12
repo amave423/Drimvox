@@ -1,7 +1,8 @@
 // Live check against real providers: connects each provider whose key is in .env through the real core API,
 // lists models, reads the balance, streams one short answer and gives an agent a tiny real coding task.
 // Costs a fraction of a cent. `npm run live-check -- --no-agent` skips the agent part;
-// `--team` gives the task to a team of agents instead of one.
+// `--team` gives the task to a team of agents instead of one. `--media` draws one cheap picture through
+// OpenRouter (about a cent); `--video` also makes the cheapest clip (tens of cents).
 import { startServer } from "@artel/core";
 import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@artel/shared";
 import { randomBytes } from "node:crypto";
@@ -9,6 +10,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkAgent } from "./live-agent";
+import { checkMedia } from "./live-media";
 import { checkTeam } from "./live-team";
 
 interface Target {
@@ -119,6 +121,12 @@ try {
         failures++;
       }
     }
+
+    const wantsMedia = process.argv.includes("--media") || process.argv.includes("--video");
+    if (wantsMedia && target.preset === "openrouter") {
+      if (lowFunds) log(`media: skipped, balance $${funds.amount.toFixed(4)} is below $${MIN_USD_FOR_AGENT} — top up to run it`);
+      else if (!(await checkMedia(api, sendEvents, provider.id, process.argv.includes("--video"), log))) failures++;
+    }
   }
 } finally {
   await server.close();
@@ -128,6 +136,16 @@ if (checked === 0) failures++;
 const summary = checked === 0 ? "No keys in .env, nothing was checked" : failures === 0 ? "ALL OK" : `${failures} problem(s)`;
 log(`\n${summary}`);
 process.exit(failures === 0 ? 0 : 1);
+
+async function sendEvents(chatId: string, body: unknown): Promise<StreamEvent[]> {
+  const res = await fetch(`${base}/chats/${chatId}/messages`, { method: "POST", headers, body: JSON.stringify(body) });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${redact(text).slice(0, 300)}`);
+  return text
+    .split("\n")
+    .filter((l) => l.startsWith("data: "))
+    .map((l) => JSON.parse(l.slice(6)) as StreamEvent);
+}
 
 async function ask(providerId: string, model: string, content: string): Promise<MessageView> {
   const chat = (await api("POST", "/chats", { providerId, model })).body as ChatView;

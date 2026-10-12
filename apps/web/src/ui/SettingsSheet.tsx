@@ -75,6 +75,21 @@ export function SettingsSheet() {
           )}
         </div>
         <p className="muted">{t("settings.strongModelHint")}</p>
+
+        <h2 className="sheet-h">{t("settings.imageModel")}</h2>
+        <div className="actions">
+          <ModelPicker
+            value={settings.imageModel && { ...settings.imageModel, kind: "image" }}
+            kinds={["image"]}
+            onChange={({ providerId, model }) => void save({ imageModel: { providerId, model } })}
+          />
+          {settings.imageModel && (
+            <button className="link" onClick={() => void save({ imageModel: null })}>
+              {t("settings.clear")}
+            </button>
+          )}
+        </div>
+        <p className="muted">{t("settings.imageModelHint")}</p>
       </div>
       <aside className="margin" aria-live="polite">
         {state === "saved" && <p className="note is-ok">{t("settings.saved")}</p>}

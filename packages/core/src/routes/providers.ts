@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { providerCreateSchema, providerUpdateSchema } from "@artel/shared";
 import { Hono } from "hono";
 import { z } from "zod";
+import { listMediaModels, mediaModel } from "../media/catalog";
 import { fetchBalance } from "../providers/balance";
 import { listModels } from "../providers/catalog";
 import { describeError } from "../providers/errors";
@@ -41,6 +42,18 @@ export function providerRoutes(providers: ProviderRepo) {
       } catch (err) {
         return c.json({ error: describeError(err) }, 502);
       }
+    })
+    .get("/:id/media-models", zValidator("query", z.object({ kind: z.enum(["image", "video"]) })), async (c) => {
+      const conn = providers.connection(c.req.param("id"));
+      if (!conn) return c.json(notFound, 404);
+      return c.json(await listMediaModels(conn, c.req.valid("query").kind), 200);
+    })
+    .get("/:id/media-models/one", zValidator("query", z.object({ kind: z.enum(["image", "video"]), model: z.string().min(1).max(200) })), async (c) => {
+      const conn = providers.connection(c.req.param("id"));
+      if (!conn) return c.json(notFound, 404);
+      const { kind, model } = c.req.valid("query");
+      const found = await mediaModel(conn, kind, model);
+      return found ? c.json(found, 200) : c.json(notFound, 404);
     })
     .get("/:id/balance", async (c) => {
       const conn = providers.connection(c.req.param("id"));

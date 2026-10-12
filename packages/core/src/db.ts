@@ -104,6 +104,25 @@ const migrations: string[] = [
    alter table tasks add column requeues integer not null default 0;
    alter table tasks add column fixes integer not null default 0;
    create index tasks_by_parent on tasks (parent_id);`,
+  `create table media (
+     id text primary key,
+     kind text not null check (kind in ('image', 'video')),
+     mime text not null,
+     file text not null,
+     prompt text not null,
+     provider_id text,
+     model text not null,
+     cost_usd real,
+     chat_id text references chats(id) on delete set null,
+     message_id text,
+     task_id text references tasks(id) on delete set null,
+     path text,
+     created_at integer not null
+   ) strict;
+   create index media_by_time on media (created_at);
+   create index media_by_message on media (message_id);
+   alter table chats add column kind text not null default 'text';
+   alter table messages add column media_job text;`,
 ];
 
 export interface Database {
@@ -117,7 +136,8 @@ export function openDatabase(file: string): Database {
   sql.exec("pragma journal_mode = wal; pragma foreign_keys = on;");
   migrate(sql);
   // Answers that were streaming when the app died will never finish.
-  sql.exec("update messages set status = 'stopped' where status = 'streaming'");
+  // A clip being made on the provider's side is still coming: its job id is kept and polled again.
+  sql.exec("update messages set status = 'stopped' where status = 'streaming' and media_job is null");
   // Agent tasks live in memory while they run; after a restart they can only be resumed by hand.
   // Waiting for answers, a spec review or "Continue" survives a restart; a pending command approval does not.
   sql.exec(

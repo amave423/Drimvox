@@ -6,8 +6,11 @@ import { AgentRunner } from "./agent/runner";
 import { ChatRepo } from "./chats/repo";
 import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
+import { MediaRepo } from "./media/repo";
+import { Studio } from "./media/studio";
 import { ProviderRepo } from "./providers/repo";
 import { chatRoutes, usageRoutes } from "./routes/chats";
+import { mediaRoutes } from "./routes/media";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { taskRoutes } from "./routes/tasks";
@@ -29,6 +32,8 @@ export interface AppOptions {
   allowedHosts?: string[];
   /** How long a model may stay silent mid-answer before the answer fails. Default 2 minutes. */
   idleTimeoutMs?: number;
+  /** How often a clip being rendered is checked. Default 10 seconds. */
+  mediaPollMs?: number;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
@@ -36,7 +41,8 @@ const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
 /** The API plus a way to stop running agents before the database closes. */
 export function createCore(o: AppOptions) {
   const providers = new ProviderRepo(o.db, createCipher(o.secretKey));
-  const chats = new ChatRepo(o.db);
+  const media = new MediaRepo(o.db, o.dataDir);
+  const chats = new ChatRepo(o.db, media);
   const projects = new ProjectRepo(o.db);
   const tasks = new TaskRepo(o.db);
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
@@ -47,8 +53,12 @@ export function createCore(o: AppOptions) {
     dataDir: o.dataDir,
     budgetUsd: () => readSettings(o.db).agentBudgetUsd,
     strongModel: () => readSettings(o.db).strongModel,
+    imageModel: () => readSettings(o.db).imageModel,
+    media,
     idleTimeoutMs,
   });
+  const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });
+  studio.resume();
 
   const api = new Hono()
     .get("/health", (c) => c.json({ ok: true as const }))
@@ -65,7 +75,8 @@ export function createCore(o: AppOptions) {
       c.json(writeSettings(o.db, c.req.valid("json"))),
     )
     .route("/providers", providerRoutes(providers))
-    .route("/chats", chatRoutes(chats, providers, idleTimeoutMs))
+    .route("/chats", chatRoutes(chats, providers, studio, idleTimeoutMs))
+    .route("/media", mediaRoutes(media))
     .route("/usage", usageRoutes(chats))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/tasks", taskRoutes(tasks, runner));
@@ -77,7 +88,13 @@ export function createCore(o: AppOptions) {
 
   app.all("/api/*", (c) => c.json({ error: "not_found" }, 404));
   if (o.webDir) app.get("*", webHandler(o.webDir));
-  return { app, shutdown: () => runner.shutdown() };
+  return {
+    app,
+    shutdown: () => {
+      studio.shutdown();
+      return runner.shutdown();
+    },
+  };
 }
 
 export function createApp(o: AppOptions) {

@@ -160,6 +160,14 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner) {
         return c.json(refusal(err), 409);
       }
     })
+    .get("/:id/file", zValidator("query", z.object({ path: z.string().min(1).max(1000) })), async (c) => {
+      const path = c.req.valid("query").path;
+      // Paths inside the project only: git show would read any object, the path is all that limits it.
+      if (path.startsWith("/") || path.split(/[\\/]/).includes("..")) return c.json(notFound, 404);
+      const bytes = await runner.file(c.req.param("id"), path);
+      if (!bytes) return c.json(notFound, 404);
+      return c.body(new Uint8Array(bytes), 200, { "Content-Type": mimeFor(path) });
+    })
     .get("/:id/diff", async (c) => {
       const diff = await runner.diff(c.req.param("id"));
       return diff ? c.json(diff, 200) : c.json(notFound, 404);
@@ -184,4 +192,19 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner) {
         return c.json(refusal(err), 409);
       }
     });
+}
+
+const MIME: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  svg: "image/svg+xml",
+  mp4: "video/mp4",
+  webm: "video/webm",
+};
+
+function mimeFor(path: string): string {
+  return MIME[path.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
 }

@@ -99,7 +99,7 @@ export function Review({ task, comments, setComments }: Props) {
       {diff && diff.length > 0 && (
         <>
           <p className="muted review-hint">{t("review.commentHint")}</p>
-          <DiffView files={diff} comments={comments} onComment={(c) => setComments([...comments, c])} />
+          <DiffView taskId={task.id} files={diff} comments={comments} onComment={(c) => setComments([...comments, c])} />
         </>
       )}
 

@@ -10,6 +10,8 @@ export const settingsSchema = z.object({
   agentBudgetUsd: z.number().min(0.01).max(1000),
   /** Model a stuck task escalates to; null means report to the user instead. */
   strongModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
+  /** Image model agents draw with; null means agents have no picture tool. */
+  imageModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
 });
 
 export const settingsPatchSchema = settingsSchema.partial().strict();
@@ -19,4 +21,4 @@ export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru", agentBudgetUsd: 0.5, strongModel: null };
+export const defaultSettings: Settings = { theme: "system", locale: "ru", agentBudgetUsd: 0.5, strongModel: null, imageModel: null };

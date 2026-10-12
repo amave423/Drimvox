@@ -96,6 +96,9 @@ export function Sidebar() {
       </section>
 
       <nav className="side-nav">
+        <button className={`side-link${view.kind === "gallery" ? " is-on" : ""}`} onClick={() => navigate({ kind: "gallery" })}>
+          {t("side.gallery")}
+        </button>
         <button
           className={`side-link${view.kind === "providers" ? " is-on" : ""}`}
           onClick={() => navigate({ kind: "providers" })}

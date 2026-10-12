@@ -12,8 +12,10 @@ import type {
 } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { imageToolsFor } from "../media/agent-tool";
+import type { MediaRepo } from "../media/repo";
 import type { ProviderRepo } from "../providers/repo";
-import { addWorktree, headCommit, removeWorktree } from "./git";
+import { addWorktree, headCommit, removeWorktree, showFile } from "./git";
 import { runPass, startWork, enterPhase, type PassContext } from "./pass";
 import { answersMessage, specMessage } from "./phases";
 import { feedbackMessage } from "./prompt";
@@ -37,6 +39,9 @@ export interface RunnerOptions {
   dataDir: string;
   budgetUsd(): number;
   strongModel(): { providerId: string; model: string } | null;
+  /** The model agents draw pictures with; null leaves them without the picture tool. */
+  imageModel(): { providerId: string; model: string } | null;
+  media: MediaRepo;
   idleTimeoutMs: number;
 }
 
@@ -227,6 +232,15 @@ export class AgentRunner {
     return taskDiff(project.path, row);
   }
 
+  /** A file as the task's branch has it, for showing pictures in the review. */
+  async file(id: string, path: string): Promise<Buffer | null> {
+    const row = this.o.tasks.row(id);
+    if (!row || ["accepted", "discarded", "merged", "queued"].includes(row.status)) return null;
+    if (!this.live.has(id) && row.kind !== "goal") await snapshot(row);
+    const project = this.o.projects.get(row.project_id);
+    return project ? showFile(project.path, row.branch, path) : null;
+  }
+
   async accept(id: string, message?: string): Promise<string | null> {
     const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"]);
     const project = this.o.projects.get(row.project_id)!;
@@ -327,6 +341,8 @@ export class AgentRunner {
       publish: () => this.publishTask(id),
       askApproval: (command, reason, signal) => (live ? this.askApproval(id, live, command, reason, signal) : Promise.resolve(false)),
       startTeam: () => this.team.start(id),
+      imageTools: (row, hooks, onSpend, budgetLeft) =>
+        imageToolsFor(this.o.imageModel(), this.o.providers, { worktree: row.worktree, taskId: id, media: this.o.media, hooks, budgetLeft, onSpend }),
     };
   }
 

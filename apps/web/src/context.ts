@@ -18,6 +18,7 @@ export type View =
   | { kind: "home" }
   | { kind: "settings" }
   | { kind: "providers" }
+  | { kind: "gallery" }
   | { kind: "chat"; chatId: string | null; key: string }
   | { kind: "project"; projectId: string }
   | { kind: "task"; taskId: string };

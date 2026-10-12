@@ -1,8 +1,9 @@
-import type { ModelInfo } from "@artel/shared";
+import type { ChatKind, MediaModel, ModelInfo } from "@artel/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
 import { formatPrice, formatTokens } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
+import { loadMediaModels } from "../../lib/media";
 import { loadModels, type ModelsResult } from "../../lib/models";
 import { ErrorNote } from "../ErrorNote";
 
@@ -13,25 +14,33 @@ interface PickerProps {
   onChange(choice: ModelChoice): void;
   /** "above" opens the list upwards, for a picker at the bottom of the screen. */
   placement?: "below" | "above";
+  /** Which kinds of models to offer; more than one shows tabs. Text only by default. */
+  kinds?: ChatKind[];
 }
 
-export function ModelPicker({ value, onChange, placement = "below" }: PickerProps) {
+type Listed = { id: string; name: string; info: ModelInfo | null };
+
+export function ModelPicker({ value, onChange, placement = "below", kinds = ["text"] }: PickerProps) {
   const { api, t, providers } = useApp();
   const [open, setOpen] = useState(false);
   const [providerId, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
+  const [kind, setKind] = useState<ChatKind>(value?.kind && kinds.includes(value.kind) ? value.kind : kinds[0]!);
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<ModelsResult | null>(null);
+  const [media, setMedia] = useState<MediaModel[] | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open || !providerId) return;
     setResult(null);
+    setMedia(null);
     let live = true;
-    void loadModels(api, providerId).then((r) => live && setResult(r));
+    if (kind === "text") void loadModels(api, providerId).then((r) => live && setResult(r));
+    else void loadMediaModels(api, providerId, kind).then((m) => live && setMedia(m));
     return () => {
       live = false;
     };
-  }, [api, open, providerId]);
+  }, [api, open, providerId, kind]);
 
   useEffect(() => {
     if (!open) return;
@@ -47,12 +56,18 @@ export function ModelPicker({ value, onChange, placement = "below" }: PickerProp
     };
   }, [open]);
 
-  const shown = useMemo(() => {
-    if (!result || !("models" in result)) return [];
+  const shown = useMemo((): Listed[] => {
+    const all: Listed[] =
+      kind === "text"
+        ? result && "models" in result
+          ? result.models.map((m) => ({ id: m.id, name: m.name, info: m }))
+          : []
+        : (media ?? []).map((m) => ({ id: m.id, name: m.name, info: null }));
     const q = query.trim().toLowerCase();
-    const list = q ? result.models.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : result.models;
+    const list = q ? all.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : all;
     return list.slice(0, LIMIT);
-  }, [result, query]);
+  }, [result, media, kind, query]);
+  const loading = kind === "text" ? result === null : media === null;
 
   const providerName = providers.find((p) => p.id === value?.providerId)?.name;
   const label = value && providerName ? `${providerName} / ${value.model}` : t("model.pick");
@@ -74,6 +89,15 @@ export function ModelPicker({ value, onChange, placement = "below" }: PickerProp
               ))}
             </div>
           )}
+          {kinds.length > 1 && (
+            <div className="picker-kinds" role="tablist">
+              {kinds.map((k) => (
+                <button key={k} role="tab" aria-selected={k === kind} className={k === kind ? "is-on" : undefined} onClick={() => setKind(k)}>
+                  {t(`model.kind.${k}`)}
+                </button>
+              ))}
+            </div>
+          )}
           <input
             className="field-input"
             placeholder={t("model.search")}
@@ -82,16 +106,18 @@ export function ModelPicker({ value, onChange, placement = "below" }: PickerProp
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
           />
-          {result === null && <p className="muted">{t("model.loading")}</p>}
-          {result && "error" in result && <ErrorNote error={result.error} />}
-          {result && "models" in result && shown.length === 0 && <p className="muted">{t("model.nothing")}</p>}
+          {loading && <p className="muted">{t("model.loading")}</p>}
+          {kind === "text" && result && "error" in result && <ErrorNote error={result.error} />}
+          {!loading && shown.length === 0 && !(kind === "text" && result && "error" in result) && (
+            <p className="muted">{kind !== "text" && media?.length === 0 ? t("model.noMedia") : t("model.nothing")}</p>
+          )}
           <ul className="picker-list" role="listbox">
             {shown.map((m) => (
               <li key={m.id} role="option" aria-selected={value?.providerId === providerId && value?.model === m.id}>
                 <button
                   onClick={() => {
                     if (!providerId) return;
-                    onChange({ providerId, model: m.id });
+                    onChange({ providerId, model: m.id, kind });
                     setOpen(false);
                   }}
                 >
@@ -99,7 +125,7 @@ export function ModelPicker({ value, onChange, placement = "below" }: PickerProp
                     {m.name}
                     {m.name !== m.id && <small className="mono">{m.id}</small>}
                   </span>
-                  <ModelFacts model={m} credits={providers.find((p) => p.id === providerId)?.billing === "credits"} />
+                  {m.info && <ModelFacts model={m.info} credits={providers.find((p) => p.id === providerId)?.billing === "credits"} />}
                 </button>
               </li>
             ))}

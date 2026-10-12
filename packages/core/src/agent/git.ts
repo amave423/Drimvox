@@ -146,3 +146,12 @@ export async function mergeBranch(worktree: string, branch: string, message: str
   await runGit(worktree, ["merge", "--abort"], true);
   return conflicts.length ? conflicts : ["(merge failed)"];
 }
+
+/** A file's bytes at a commit or branch; null when it is not there. */
+export function showFile(repo: string, ref: string, path: string): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    execFile("git", ["show", `${ref}:${path}`], { cwd: repo, encoding: "buffer", maxBuffer: 256 * 1024 * 1024, windowsHide: true }, (err, stdout) =>
+      resolve(err ? null : stdout),
+    );
+  });
+}

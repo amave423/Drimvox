@@ -21,6 +21,8 @@ export interface TestEnv {
   reopen(): void;
   /** Shortens how long a reply may stay silent, so tests do not wait 90 seconds. */
   setIdleTimeout(ms: number): void;
+  /** Checks clips being rendered this often instead of every 10 seconds. */
+  setMediaPollMs(ms: number): void;
   close(): void;
   /** Stops running agents first; use when a test may leave one running. */
   closeAsync(): Promise<void>;
@@ -30,11 +32,13 @@ export function createTestEnv(): TestEnv {
   const dir = mkdtempSync(join(tmpdir(), "artel-core-"));
   const secretKey = randomBytes(32);
   let idleTimeoutMs: number | undefined;
+  let mediaPollMs: number | undefined;
   // One core per open database: running agents and pending approvals live in it between requests.
   let core: ReturnType<typeof createCore> | undefined;
   const coreFor = (webDir?: string) => {
-    if (webDir) return createCore({ db: env.db, token: TOKEN, secretKey, version: "0.0.0-test", dataDir: dir, webDir, idleTimeoutMs });
-    core ??= createCore({ db: env.db, token: TOKEN, secretKey, version: "0.0.0-test", dataDir: dir, idleTimeoutMs });
+    const options = { db: env.db, token: TOKEN, secretKey, version: "0.0.0-test", dataDir: dir, idleTimeoutMs, mediaPollMs };
+    if (webDir) return createCore({ ...options, webDir });
+    core ??= createCore(options);
     return core;
   };
   const dropCore = async () => {
@@ -49,6 +53,10 @@ export function createTestEnv(): TestEnv {
     app: (webDir) => coreFor(webDir).app,
     setIdleTimeout(ms) {
       idleTimeoutMs = ms;
+      void dropCore();
+    },
+    setMediaPollMs(ms) {
+      mediaPollMs = ms;
       void dropCore();
     },
     call: async (method, path, body) =>

@@ -8,9 +8,14 @@ interface Props {
   onStop(): void;
   /** Controls shown under the text field, e.g. the model picker. */
   tools?: ReactNode;
+  /** A row between the text field and the controls, e.g. picture options. */
+  extra?: ReactNode;
+  /** Replaces "Send", e.g. with the price of a clip. */
+  sendLabel?: string;
+  placeholder?: string;
 }
 
-export function Composer({ disabled, streaming, onSend, onStop, tools }: Props) {
+export function Composer({ disabled, streaming, onSend, onStop, tools, extra, sendLabel, placeholder }: Props) {
   const { t } = useApp();
   const [text, setText] = useState("");
   const area = useRef<HTMLTextAreaElement>(null);
@@ -50,8 +55,8 @@ export function Composer({ disabled, streaming, onSend, onStop, tools }: Props) 
         ref={area}
         rows={2}
         value={text}
-        placeholder={t("chat.placeholder")}
-        aria-label={t("chat.placeholder")}
+        placeholder={placeholder ?? t("chat.placeholder")}
+        aria-label={placeholder ?? t("chat.placeholder")}
         onChange={(e) => {
           setText(e.target.value);
           grow();
@@ -59,6 +64,7 @@ export function Composer({ disabled, streaming, onSend, onStop, tools }: Props) 
         onKeyDown={onKeyDown}
         disabled={disabled}
       />
+      {extra}
       <div className="composer-bar">
         {tools}
         <span className="spacer" />
@@ -68,7 +74,7 @@ export function Composer({ disabled, streaming, onSend, onStop, tools }: Props) 
           </button>
         ) : (
           <button className="btn is-primary" disabled={disabled || !text.trim()}>
-            {t("chat.send")}
+            {sendLabel ?? t("chat.send")}
           </button>
         )}
       </div>

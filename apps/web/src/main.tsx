@@ -11,6 +11,7 @@ import "./styles/components.css";
 import "./styles/providers.css";
 import "./styles/chat.css";
 import "./styles/tasks.css";
+import "./styles/media.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

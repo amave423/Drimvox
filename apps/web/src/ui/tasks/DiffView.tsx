@@ -1,6 +1,7 @@
 import type { DiffFile, DiffLine } from "@artel/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
+import { useAuthorizedUrl } from "../../lib/media";
 
 export interface LineComment {
   path: string;
@@ -11,6 +12,8 @@ export interface LineComment {
 }
 
 interface Props {
+  /** Pictures in the review are shown from the task's branch. */
+  taskId: string;
   files: DiffFile[];
   comments: LineComment[];
   /** Absent when the review is closed: lines are then read-only. */
@@ -18,7 +21,7 @@ interface Props {
 }
 
 /** The agent's changes as proofreading: removed text struck in red pencil, added text in ink. */
-export function DiffView({ files, comments, onComment }: Props) {
+export function DiffView({ taskId, files, comments, onComment }: Props) {
   const { t } = useApp();
   return (
     <div className="diff">
@@ -30,7 +33,9 @@ export function DiffView({ files, comments, onComment }: Props) {
               <span className="is-ink">+{file.added}</span> <span className="is-pencil-text">−{file.removed}</span>
             </span>
           </header>
-          {file.binary ? (
+          {file.binary && IMAGE.test(file.path) && file.status !== "deleted" ? (
+            <DiffImage taskId={taskId} path={file.path} />
+          ) : file.binary ? (
             <p className="muted diff-binary">{t("review.binary")}</p>
           ) : (
             file.hunks.map((hunk, h) => (
@@ -123,4 +128,13 @@ function Line({ path, line, comments, onComment }: { path: string; line: DiffLin
       )}
     </>
   );
+}
+
+const IMAGE = /\.(png|jpe?g|webp|gif|svg)$/i;
+
+/** A new or changed picture, shown as it is on the task's branch. */
+function DiffImage({ taskId, path }: { taskId: string; path: string }) {
+  const { token } = useApp();
+  const src = useAuthorizedUrl(`/api/tasks/${taskId}/file?path=${encodeURIComponent(path)}`, token);
+  return <div className="diff-image">{src ? <img src={src} alt={path} /> : <div className="media-wait" aria-busy />}</div>;
 }

@@ -32,6 +32,15 @@ export interface FakeProviderOptions {
   /** Answer chat requests with this status and an OpenAI-style error body. */
   failWith?: { status: number; message: string };
   routes?: Record<string, unknown>;
+  /** Answers any authorized request before the built-in endpoints; undefined falls through to them. */
+  handle?: (method: string, path: string, body: any) => FakeReply | undefined;
+}
+
+export interface FakeReply {
+  status?: number;
+  json?: unknown;
+  bytes?: Buffer;
+  contentType?: string;
 }
 
 export interface FakeProvider {
@@ -63,6 +72,16 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
 
     if (o.routes && path in o.routes) return json(200, o.routes[path]);
     if (req.headers.authorization !== `Bearer ${key}`) return json(401, { error: { message: "Invalid API key" } });
+
+    const handled = o.handle?.(req.method ?? "GET", path, body ? JSON.parse(body) : null);
+    if (handled) {
+      if (handled.bytes) {
+        res.writeHead(handled.status ?? 200, { "content-type": handled.contentType ?? "application/octet-stream" });
+        res.end(handled.bytes);
+        return;
+      }
+      return json(handled.status ?? 200, handled.json ?? {});
+    }
 
     if (path === "/v1/models") {
       return json(200, { object: "list", data: o.models ?? [{ id: "fake-small" }, { id: "fake-large" }] });
