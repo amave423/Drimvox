@@ -3,13 +3,23 @@ import type { ModelMessage, ToolSet } from "ai";
 import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
 import { failureReport, runChecks, safeChecks } from "./checks";
-import { interviewTools, phaseInstructions, specMessage, specTools, type SpecProposal } from "./phases";
+import {
+  interviewTools,
+  phaseInstructions,
+  planInstructions,
+  planTools,
+  specMessage,
+  specTools,
+  type PlanProposal,
+  type SpecProposal,
+} from "./phases";
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
 import { runAgent } from "./run";
 import type { ToolHooks } from "./tools";
 
 const SPEC_REMINDER = "You must call propose_spec with the spec, the checks and the plan.";
+const PLAN_REMINDER = "You must call propose_plan with the spec, the checks and the subtasks.";
 
 /** Red check rounds in a row before a task escalates or stops. */
 export const MAX_ATTEMPTS = 3;
@@ -28,6 +38,8 @@ export interface PassContext {
   setStatus(status: TaskRow["status"], reason: string | null): void;
   publish(): void;
   askApproval: ToolHooks["askApproval"];
+  /** A goal's plan is settled: hand the subtasks to the team. */
+  startTeam(): void;
 }
 
 /** The step after the spec, or after the interview when there is no spec step. */
@@ -57,11 +69,16 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
 
   let questions: Question[] | null = null;
   let proposal: SpecProposal | null = null;
+  let teamPlan: PlanProposal | null = null;
+  const planning = row.kind === "goal" && phase === "spec";
   let extraTools: ToolSet | undefined;
   let stopTools: string[] | undefined;
   if (phase === "interview") {
     extraTools = interviewTools((q) => (questions = q));
     stopTools = ["ask_questions"];
+  } else if (planning) {
+    extraTools = planTools((p) => (teamPlan = p));
+    stopTools = ["propose_plan"];
   } else if (phase === "spec") {
     extraTools = specTools((p) => (proposal = p));
     stopTools = ["propose_spec"];
@@ -80,7 +97,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     mode: phase === "interview" || phase === "spec" ? "read" : "write",
     extraTools,
     stopTools,
-    instructions: phaseInstructions(phase, JSON.parse(row.checks) as string[]),
+    instructions: planning ? planInstructions() : phaseInstructions(phase, JSON.parse(row.checks) as string[]),
     spentUsd: row.cost_usd,
     budgetUsd: row.budget_usd,
     signal: ctx.signal,
@@ -125,6 +142,26 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     }
     enterPhase(ctx, id, "code");
     return "Nothing to ask. Implement the task now.";
+  }
+
+  if (planning) {
+    const planned = teamPlan as PlanProposal | null;
+    if (!planned) {
+      if (messages.some((m) => m.role === "user" && m.content === PLAN_REMINDER)) return finish(ctx, "failed", "no_spec");
+      return PLAN_REMINDER;
+    }
+    ctx.tasks.update(id, {
+      spec: planned.spec,
+      checks: JSON.stringify(planned.checks),
+      plan: JSON.stringify(planned.plan),
+      planned: JSON.stringify(planned.subtasks),
+    });
+    ctx.event("plan", { spec: planned.spec, checks: planned.checks, subtasks: planned.subtasks });
+    if (stages.approveSpec) return finish(ctx, "waiting", "plan_review");
+    const { kept } = safeChecks(planned.checks, row.worktree);
+    ctx.tasks.update(id, { checks: JSON.stringify(kept) });
+    ctx.startTeam();
+    return null;
   }
 
   if (phase === "spec") {

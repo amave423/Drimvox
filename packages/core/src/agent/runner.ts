@@ -1,5 +1,7 @@
 import type {
+  ModelRef,
   PendingApproval,
+  PlannedSubtask,
   Question,
   TaskEvent,
   TaskFeedback,
@@ -11,12 +13,13 @@ import type {
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ProviderRepo } from "../providers/repo";
-import { addWorktree, headCommit } from "./git";
+import { addWorktree, headCommit, removeWorktree } from "./git";
 import { runPass, startWork, enterPhase, type PassContext } from "./pass";
 import { answersMessage, specMessage } from "./phases";
 import { feedbackMessage } from "./prompt";
 import { toTaskView, type ProjectRepo, type TaskRepo, type TaskRow } from "./repo";
 import { acceptTask, discardTask, snapshot, taskDiff } from "./review";
+import { Team } from "./team";
 
 interface Live {
   controller: AbortController;
@@ -38,24 +41,41 @@ export interface RunnerOptions {
 }
 
 /** Waiting states that need an answer from the user rather than "Continue". */
-const ANSWER_REASONS = new Set(["questions", "spec_review", "approval"]);
+const ANSWER_REASONS = new Set(["questions", "spec_review", "plan_review", "approval"]);
 
 /** Owns every running agent: starts them, relays their events, answers approvals, stops them. */
 export class AgentRunner {
   private readonly live = new Map<string, Live>();
   private readonly listeners = new Map<string, Set<(u: TaskUpdate) => void>>();
   private closed = false;
+  private readonly team: Team;
 
-  constructor(private readonly o: RunnerOptions) {}
+  constructor(private readonly o: RunnerOptions) {
+    this.team = new Team({
+      tasks: o.tasks,
+      projects: o.projects,
+      dataDir: o.dataDir,
+      closed: () => this.closed,
+      isRunning: (id) => this.live.has(id),
+      launch: (id, message) => this.launch(id, message),
+      event: (id, kind, data) => this.event(id, kind, data),
+      finish: (id, status, reason, detail) => this.finish(id, status, reason, detail),
+      setStatus: (id, status, reason) => this.setStatus(id, status, reason),
+    });
+  }
 
   view(id: string): TaskView | null {
     const row = this.o.tasks.row(id);
     if (!row) return null;
     const approval = this.live.get(id)?.approval;
-    return toTaskView(row, approval ? { id: approval.id, command: approval.command, reason: approval.reason } : null);
+    const pending = approval ? { id: approval.id, command: approval.command, reason: approval.reason } : null;
+    return toTaskView(row, pending, row.kind === "goal" ? this.o.tasks.children(id) : []);
   }
 
-  async start(projectId: string, input: { task: string; providerId: string; model: string; stages: TaskStages }): Promise<TaskView> {
+  async start(
+    projectId: string,
+    input: { task: string; providerId: string; model: string; stages: TaskStages; team?: ModelRef },
+  ): Promise<TaskView> {
     const project = this.o.projects.get(projectId);
     if (!project) throw new Error("Unknown project");
     const id = randomUUID();
@@ -64,6 +84,8 @@ export class AgentRunner {
     const base = await headCommit(project.path);
     await addWorktree(project.path, worktree, branch, base);
 
+    // A team always plans first: the plan is what splits the goal into subtasks.
+    const stages = input.team ? { ...input.stages, spec: true } : input.stages;
     const firstLine = input.task.trim().split("\n")[0]!.trim();
     this.o.tasks.create(
       {
@@ -79,9 +101,10 @@ export class AgentRunner {
         base_commit: base,
         budget_usd: this.o.budgetUsd(),
       },
-      input.stages,
+      stages,
+      input.team ? { kind: "goal", team: JSON.stringify(input.team) } : {},
     );
-    const first: TaskPhase = input.stages.interview ? "interview" : input.stages.spec ? "spec" : "code";
+    const first: TaskPhase = stages.interview ? "interview" : stages.spec ? "spec" : "code";
     enterPhase(this.context(id, new AbortController()), id, first);
     this.launch(id, input.task);
     return this.view(id)!;
@@ -110,8 +133,30 @@ export class AgentRunner {
   }
 
   reviseSpec(id: string, note: string): TaskView {
-    this.requireWaiting(id, "spec_review");
-    this.launch(id, `The user asks to rewrite the spec: ${note}\n\nCall propose_spec again with the new version.`);
+    const row = this.require(id, ["waiting"]);
+    const plan = row.status_reason === "plan_review";
+    if (!plan && row.status_reason !== "spec_review") throw new TaskBusy(`Task waits for ${row.status_reason}`);
+    const what = plan ? "plan" : "spec";
+    this.launch(id, `The user asks to rewrite the ${what}: ${note}\n\nCall propose_${what} again with the new version.`);
+    return this.view(id)!;
+  }
+
+  /** The user's OK on a goal's plan, possibly edited: the team starts on the subtasks. */
+  approvePlan(id: string, p: { spec: string; checks: string[]; subtasks: PlannedSubtask[] }): TaskView {
+    const row = this.requireWaiting(id, "plan_review");
+    const ids = new Set(p.subtasks.map((s) => s.id));
+    if (ids.size !== p.subtasks.length) throw new TaskBusy("Subtask ids repeat");
+    // Dependencies on removed subtasks would never be met.
+    const subtasks = p.subtasks.map((s) => ({ ...s, dependsOn: [...new Set(s.dependsOn)].filter((d) => ids.has(d) && d !== s.id) }));
+    const edited = p.spec !== row.spec || JSON.stringify(p.checks) !== row.checks || JSON.stringify(subtasks) !== row.planned;
+    this.o.tasks.update(id, {
+      spec: p.spec,
+      checks: JSON.stringify(p.checks),
+      plan: JSON.stringify(subtasks.map((s) => s.title)),
+      planned: JSON.stringify(subtasks),
+    });
+    if (edited) this.event(id, "plan", { spec: p.spec, checks: p.checks, subtasks, edited: true });
+    this.team.start(id);
     return this.view(id)!;
   }
 
@@ -119,9 +164,31 @@ export class AgentRunner {
   continue(id: string, note?: string): TaskView {
     const row = this.require(id, ["waiting", "stopped", "failed"]);
     if (row.status === "waiting" && ANSWER_REASONS.has(row.status_reason ?? "")) throw new TaskBusy("Task waits for an answer");
+    if (row.kind === "goal" && row.phase === "orchestrate") {
+      this.team.resume(id, note, (sub) => {
+        try {
+          this.continue(sub);
+        } catch {
+          // A subtask that waits for an answer or already runs needs no push.
+        }
+      });
+      return this.view(id)!;
+    }
+    if (row.kind === "subtask" && row.status_reason === "conflict") {
+      this.team.restart(id);
+      return this.view(id)!;
+    }
     if (row.status_reason === "budget") this.o.tasks.update(id, { budget_usd: row.budget_usd + this.o.budgetUsd() });
     if (row.status_reason === "stuck") this.o.tasks.update(id, { attempts: 0 });
     this.launch(id, note || (row.status_reason === "stuck" ? "The checks still fail. Try a different approach." : "Continue the task."));
+    return this.view(id)!;
+  }
+
+  /** Takes a subtask that is stuck or not started out of its goal; the rest of the team goes on. */
+  dropSubtask(id: string): TaskView {
+    const row = this.require(id, ["queued", "waiting", "stopped", "failed"]);
+    if (row.kind !== "subtask") throw new TaskBusy("Only a subtask can be dropped");
+    this.team.drop(id);
     return this.view(id)!;
   }
 
@@ -132,6 +199,12 @@ export class AgentRunner {
   }
 
   stop(id: string): boolean {
+    const row = this.o.tasks.row(id);
+    if (row?.kind === "goal" && row.phase === "orchestrate" && (row.status === "running" || row.status === "waiting")) {
+      // The goal stops first, so its stopped subtasks do not read as stuck.
+      this.finish(id, "stopped", "user");
+      for (const sub of this.o.tasks.children(id)) this.stop(sub.id);
+    }
     const live = this.live.get(id);
     live?.controller.abort();
     return !!live;
@@ -148,8 +221,9 @@ export class AgentRunner {
     const row = this.o.tasks.row(id);
     if (!row) return null;
     const project = this.o.projects.get(row.project_id);
-    if (!project || row.status === "accepted" || row.status === "discarded") return [];
-    if (!this.live.has(id)) await snapshot(row);
+    if (!project || ["accepted", "discarded", "merged", "queued"].includes(row.status)) return [];
+    // A goal's copy changes only through the commits of merged subtasks.
+    if (!this.live.has(id) && row.kind !== "goal") await snapshot(row);
     return taskDiff(project.path, row);
   }
 
@@ -157,6 +231,7 @@ export class AgentRunner {
     const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"]);
     const project = this.o.projects.get(row.project_id)!;
     const commit = await acceptTask(project.path, row, message ?? row.commit_message ?? row.title);
+    await this.closeSubtasks(row);
     this.setStatus(id, "accepted", null);
     return commit;
   }
@@ -165,7 +240,19 @@ export class AgentRunner {
     const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"]);
     const project = this.o.projects.get(row.project_id)!;
     await discardTask(project.path, row);
+    await this.closeSubtasks(row);
     this.setStatus(id, "discarded", null);
+  }
+
+  /** A goal that ends takes its unmerged subtasks and their copies with it. */
+  private async closeSubtasks(goal: TaskRow): Promise<void> {
+    if (goal.kind !== "goal") return;
+    const project = this.o.projects.get(goal.project_id)!;
+    for (const sub of this.o.tasks.children(goal.id)) {
+      if (sub.status === "merged") continue;
+      await removeWorktree(project.path, sub.worktree, sub.branch);
+      this.o.tasks.update(sub.id, { status: "discarded", status_reason: null });
+    }
   }
 
   subscribe(id: string, listener: (u: TaskUpdate) => void): () => void {
@@ -189,6 +276,7 @@ export class AgentRunner {
     const row = this.o.tasks.row(id);
     if (!row) throw new Error("Unknown task");
     if (this.live.has(id) || !allowed.includes(row.status)) throw new TaskBusy(`Task is ${row.status}`);
+    if (row.kind === "goal" && this.o.tasks.children(id).some((s) => this.live.has(s.id))) throw new TaskBusy("Subtasks are running");
     return row;
   }
 
@@ -208,7 +296,10 @@ export class AgentRunner {
       })
       .finally(() => {
         this.live.delete(id);
-        if (!this.closed) this.publishTask(id);
+        if (this.closed) return;
+        this.publishTask(id);
+        const parent = this.o.tasks.row(id)?.parent_id;
+        if (parent) void this.team.drive(parent);
       });
   }
 
@@ -235,6 +326,7 @@ export class AgentRunner {
       setStatus: (status, reason) => this.setStatus(id, status, reason),
       publish: () => this.publishTask(id),
       askApproval: (command, reason, signal) => (live ? this.askApproval(id, live, command, reason, signal) : Promise.resolve(false)),
+      startTeam: () => this.team.start(id),
     };
   }
 
@@ -265,6 +357,9 @@ export class AgentRunner {
     if (this.closed) return;
     this.o.tasks.update(id, { status, status_reason: reason });
     this.publishTask(id);
+    // A subtask's progress is the goal's business: the goal decides what happens next.
+    const parent = this.o.tasks.row(id)?.parent_id;
+    if (parent) void this.team.drive(parent);
   }
 
   private event(id: string, kind: TaskEvent["kind"], data: unknown): void {
@@ -277,5 +372,6 @@ export class AgentRunner {
     const task = this.view(id);
     if (!task) return;
     for (const listener of this.listeners.get(id) ?? []) listener({ type: "task", task });
+    if (task.parentId) this.publishTask(task.parentId);
   }
 }

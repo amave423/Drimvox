@@ -15,6 +15,8 @@ export interface FakeTurn {
 }
 
 export interface FakeProviderOptions {
+  /** Picks the reply from the request itself; for parallel agents whose request order is not fixed. */
+  respond?: (body: any) => FakeTurn;
   /**
    * Replies for successive chat requests. When the script runs out, the model answers "Done."
    * Takes precedence over `chunks`.
@@ -73,8 +75,10 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
       });
       const chunk = (delta: object, extra: object = {}, finish: string | null = null) =>
         `data: ${JSON.stringify({ id: "c", object: "chat.completion.chunk", created: 1, model: "m", choices: [{ index: 0, delta, finish_reason: finish }], ...extra })}\n\n`;
-      if (o.script) {
-        const turn = o.script[scriptIndex++] ?? { text: "Done." };
+      if (o.script || o.respond) {
+        const parsed = body ? JSON.parse(body) : {};
+        const turn = o.respond ? o.respond(parsed) : (o.script![scriptIndex] ?? { text: "Done." });
+        scriptIndex++;
         if (turn.delayMs) await new Promise((r) => setTimeout(r, turn.delayMs));
         if (res.destroyed) return;
         if (turn.text) res.write(chunk({ role: "assistant", content: turn.text }));

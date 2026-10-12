@@ -22,44 +22,57 @@ function remember(stages: TaskStages) {
   }
 }
 
-export function StageSwitches({ value, onChange }: { value: TaskStages; onChange(stages: TaskStages): void }) {
+/** For a team the plan is not optional: it is what splits the goal between the agents. */
+export function StageSwitches({ value, onChange, team = false }: { value: TaskStages; onChange(stages: TaskStages): void; team?: boolean }) {
   const { t } = useApp();
   const set = (patch: Partial<TaskStages>) => {
     const next = { ...value, ...patch };
     remember(next);
     onChange(next);
   };
-  const box = (key: keyof TaskStages, disabled = false) => (
-    <label className={`stage-switch${disabled ? " is-disabled" : ""}`}>
-      <input type="checkbox" checked={value[key] && !disabled} disabled={disabled} onChange={(e) => set({ [key]: e.target.checked })} />
-      {t(`stages.${key}` as MessageKey)}
+  const spec = value.spec || team;
+  const box = (key: keyof TaskStages, disabled = false, forced = false) => (
+    <label className={`stage-switch${disabled || forced ? " is-disabled" : ""}`}>
+      <input
+        type="checkbox"
+        checked={forced || (value[key] && !disabled)}
+        disabled={disabled || forced}
+        onChange={(e) => set({ [key]: e.target.checked })}
+      />
+      {t((team && key === "spec" ? "stages.plan" : `stages.${key}`) as MessageKey)}
     </label>
   );
   return (
     <fieldset className="stages">
       <legend>{t("stages.title")}</legend>
       {box("interview")}
-      {box("spec")}
-      {box("approveSpec", !value.spec)}
-      {box("testsFirst", !value.spec)}
+      {box("spec", false, team)}
+      {box("approveSpec", !spec)}
+      {box("testsFirst", !spec)}
     </fieldset>
   );
 }
 
-type Step = "interview" | "spec" | "tests" | "code" | "review";
+type Step = "interview" | "spec" | "tests" | "code" | "plan" | "team" | "review";
 
 /** Where the task is in its sequence of steps; skipped steps are not shown. */
 export function PhaseSteps({ task }: { task: TaskView }) {
   const { t } = useApp();
+  const goal = task.kind === "goal";
   const steps: Step[] = [];
   if (task.stages.interview) steps.push("interview");
-  if (task.stages.spec) steps.push("spec");
-  if (task.stages.spec && task.stages.testsFirst) steps.push("tests");
-  steps.push("code", "review");
+  if (goal) steps.push("plan", "team");
+  else {
+    if (task.stages.spec) steps.push("spec");
+    if (task.stages.spec && task.stages.testsFirst) steps.push("tests");
+    steps.push("code");
+  }
+  steps.push("review");
   if (steps.length <= 2) return null;
 
   const reviewing = ["review", "done_empty", "accepted", "discarded"].includes(task.status);
-  const current: Step = reviewing ? "review" : (task.phase ?? "code");
+  const phase = task.phase ?? "code";
+  const current: Step = reviewing ? "review" : goal ? (phase === "interview" ? "interview" : phase === "spec" ? "plan" : "team") : (phase as Step);
   const at = steps.indexOf(current);
   return (
     <ol className="phase-steps">

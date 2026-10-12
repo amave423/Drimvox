@@ -95,6 +95,15 @@ const migrations: string[] = [
    alter table tasks add column attempts integer not null default 0;
    alter table tasks add column escalated integer not null default 0;
    alter table tasks add column tests_nudged integer not null default 0;`,
+  `alter table tasks add column kind text not null default 'solo';
+   alter table tasks add column parent_id text references tasks(id) on delete cascade;
+   alter table tasks add column plan_id text;
+   alter table tasks add column depends_on text not null default '[]';
+   alter table tasks add column team text;
+   alter table tasks add column planned text not null default '[]';
+   alter table tasks add column requeues integer not null default 0;
+   alter table tasks add column fixes integer not null default 0;
+   create index tasks_by_parent on tasks (parent_id);`,
 ];
 
 export interface Database {

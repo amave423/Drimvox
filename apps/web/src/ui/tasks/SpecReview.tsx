@@ -2,6 +2,7 @@ import type { TaskView } from "@artel/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import { Markdown } from "../chat/Markdown";
+import { ChecksEditor } from "./ChecksEditor";
 
 /** The agent's spec on a sheet: read it, edit text and check commands, start or send back. */
 export function SpecReview({ task }: { task: TaskView }) {
@@ -55,27 +56,7 @@ export function SpecReview({ task }: { task: TaskView }) {
         </>
       )}
 
-      <h3 className="spec-sub">{t("spec.checks")}</h3>
-      <p className="muted spec-hint">{t("spec.checksHint")}</p>
-      <ul className="check-list">
-        {checks.map((c, i) => (
-          <li key={i}>
-            <input
-              className="field-input mono"
-              value={c}
-              aria-label={t("spec.checkLabel", { n: i + 1 })}
-              onChange={(e) => setChecks(checks.map((x, j) => (j === i ? e.target.value : x)))}
-            />
-            <button className="link is-pencil" onClick={() => setChecks(checks.filter((_, j) => j !== i))}>
-              {t("spec.removeCheck")}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {checks.length === 0 && <p className="error-note">{t("spec.noChecks")}</p>}
-      <button className="link" onClick={() => setChecks([...checks, ""])}>
-        {t("spec.addCheck")}
-      </button>
+      <ChecksEditor checks={checks} onChange={setChecks} />
 
       {revising && (
         <label className="field spec-revise">

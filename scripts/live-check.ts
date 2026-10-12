@@ -1,6 +1,7 @@
 // Live check against real providers: connects each provider whose key is in .env through the real core API,
 // lists models, reads the balance, streams one short answer and gives an agent a tiny real coding task.
-// Costs a fraction of a cent. `npm run live-check -- --no-agent` skips the agent part.
+// Costs a fraction of a cent. `npm run live-check -- --no-agent` skips the agent part;
+// `--team` gives the task to a team of agents instead of one.
 import { startServer } from "@artel/core";
 import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@artel/shared";
 import { randomBytes } from "node:crypto";
@@ -8,6 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkAgent } from "./live-agent";
+import { checkTeam } from "./live-team";
 
 interface Target {
   preset: PresetId;
@@ -113,7 +115,7 @@ try {
       if (!list.some((m) => m.id === target.agentModel)) {
         failures++;
         log(`agent: model ${target.agentModel} is not in the list`);
-      } else if (!(await checkAgent(api, provider.id, target.agentModel, log))) {
+      } else if (!(await (process.argv.includes("--team") ? checkTeam : checkAgent)(api, provider.id, target.agentModel, log))) {
         failures++;
       }
     }

@@ -85,9 +85,10 @@ export function Review({ task, comments, setComments }: Props) {
   if (task.status === "discarded") return <p className="note result-note">{t("review.discarded")}</p>;
 
   const empty = diff !== null && diff.length === 0;
+  const team = task.kind === "goal";
   return (
     <section className="review">
-      <h2 className="sheet-h">{stuck ? t("review.titleStuck") : empty ? t("review.empty") : t("review.title")}</h2>
+      <h2 className="sheet-h">{stuck ? t("review.titleStuck") : empty ? t(team ? "team.reviewEmpty" : "review.empty") : t(team ? "team.reviewTitle" : "review.title")}</h2>
       {task.summary && !stuck && <p className="review-summary">{task.summary}</p>}
       {!stuck && task.phase !== null && (
         <p className={task.checks.length ? "note is-ok checks-note" : "muted checks-note"}>

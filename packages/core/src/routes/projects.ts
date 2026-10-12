@@ -64,7 +64,9 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
       const project = projects.get(c.req.param("id"));
       if (!project) return c.json(notFound, 404);
       const input = c.req.valid("json");
-      if (!providers.get(input.providerId)) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
+      if (!providers.get(input.providerId) || (input.team && !providers.get(input.team.providerId))) {
+        return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
+      }
       if (!(await isRepoRoot(project.path))) return c.json({ error: { code: "not_repo" } }, 409);
       try {
         return c.json(await runner.start(project.id, input), 201);

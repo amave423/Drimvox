@@ -1,4 +1,17 @@
-import type { ProjectView, Question, TaskEvent, TaskEventKind, TaskPhase, TaskStatus, TaskStages, TaskView } from "@artel/shared";
+import type {
+  ModelRef,
+  PlannedSubtask,
+  ProjectView,
+  Question,
+  SubtaskCard,
+  TaskEvent,
+  TaskEventKind,
+  TaskKind,
+  TaskPhase,
+  TaskStatus,
+  TaskStages,
+  TaskView,
+} from "@artel/shared";
 import type { ModelMessage } from "ai";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
@@ -41,6 +54,14 @@ export interface TaskRow {
   attempts: number;
   escalated: number;
   tests_nudged: number;
+  kind: TaskKind;
+  parent_id: string | null;
+  plan_id: string | null;
+  depends_on: string;
+  team: string | null;
+  planned: string;
+  requeues: number;
+  fixes: number;
 }
 
 export class ProjectRepo {
@@ -94,6 +115,13 @@ export type TaskPatch = Partial<
     | "tests_nudged"
     | "provider_id"
     | "model"
+    | "branch"
+    | "worktree"
+    | "base_commit"
+    | "planned"
+    | "requeues"
+    | "fixes"
+    | "depends_on"
   >
 >;
 
@@ -104,16 +132,23 @@ export class TaskRepo {
     return (this.db.sql.prepare("select * from tasks where id = ?").get(id) as TaskRow | undefined) ?? null;
   }
 
+  /** Top-level tasks: one-agent tasks and goals. Subtasks belong to their goal. */
   list(projectId?: string): TaskRow[] {
     const sql = projectId
-      ? this.db.sql.prepare("select * from tasks where project_id = ? order by created_at desc")
-      : this.db.sql.prepare("select * from tasks order by created_at desc");
+      ? this.db.sql.prepare("select * from tasks where project_id = ? and kind <> 'subtask' order by created_at desc")
+      : this.db.sql.prepare("select * from tasks where kind <> 'subtask' order by created_at desc");
     return (projectId ? sql.all(projectId) : sql.all()) as unknown as TaskRow[];
+  }
+
+  /** A goal's subtasks in the order they were planned. */
+  children(goalId: string): TaskRow[] {
+    return this.db.sql.prepare("select * from tasks where parent_id = ? order by created_at, rowid").all(goalId) as unknown as TaskRow[];
   }
 
   create(
     row: Pick<TaskRow, "id" | "project_id" | "title" | "task" | "provider_id" | "model" | "status" | "branch" | "worktree" | "base_commit" | "budget_usd">,
     stages: TaskStages,
+    extra: Partial<Pick<TaskRow, "kind" | "parent_id" | "plan_id" | "depends_on" | "team" | "checks" | "spec">> = {},
   ): TaskRow {
     const now = Date.now();
     const full: TaskRow = {
@@ -127,6 +162,15 @@ export class TaskRepo {
       attempts: 0,
       escalated: 0,
       tests_nudged: 0,
+      kind: "solo",
+      parent_id: null,
+      plan_id: null,
+      depends_on: "[]",
+      team: null,
+      planned: "[]",
+      requeues: 0,
+      fixes: 0,
+      ...extra,
       status_reason: null,
       cost_usd: 0,
       input_tokens: 0,
@@ -188,7 +232,21 @@ function toProject(row: ProjectRow): Omit<ProjectView, "gitState"> {
   return { id: row.id, name: row.name, path: row.path, createdAt: row.created_at };
 }
 
-export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingApproval"]): TaskView {
+export function toSubtaskCard(row: TaskRow): SubtaskCard {
+  return {
+    id: row.plan_id ?? row.id,
+    taskId: row.id,
+    title: row.title,
+    status: row.status,
+    statusReason: row.status_reason,
+    phase: row.phase,
+    model: row.model,
+    costUsd: row.cost_usd,
+    dependsOn: JSON.parse(row.depends_on) as string[],
+  };
+}
+
+export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingApproval"], children: TaskRow[] = []): TaskView {
   return {
     id: row.id,
     projectId: row.project_id,
@@ -200,10 +258,11 @@ export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingAppro
     statusReason: row.status_reason,
     branch: row.branch,
     budgetUsd: row.budget_usd,
-    costUsd: row.cost_usd,
-    inputTokens: row.input_tokens,
-    outputTokens: row.output_tokens,
-    steps: row.steps,
+    // A goal costs what its lead and every subtask cost together.
+    costUsd: row.cost_usd + children.reduce((s, c) => s + c.cost_usd, 0),
+    inputTokens: row.input_tokens + children.reduce((s, c) => s + c.input_tokens, 0),
+    outputTokens: row.output_tokens + children.reduce((s, c) => s + c.output_tokens, 0),
+    steps: row.steps + children.reduce((s, c) => s + c.steps, 0),
     summary: row.summary,
     commitMessage: row.commit_message,
     pendingApproval,
@@ -215,6 +274,11 @@ export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingAppro
     questions: JSON.parse(row.questions) as Question[],
     attempts: row.attempts,
     escalated: row.escalated === 1,
+    kind: row.kind,
+    parentId: row.parent_id,
+    team: row.team ? (JSON.parse(row.team) as ModelRef) : null,
+    plannedSubtasks: JSON.parse(row.planned) as PlannedSubtask[],
+    subtasks: children.map(toSubtaskCard),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

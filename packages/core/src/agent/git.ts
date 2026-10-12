@@ -134,3 +134,15 @@ function lines(text: string): string[] {
   return text.split("\n").map((l) => l.trim()).filter(Boolean);
 }
 
+
+/**
+ * Merges a subtask branch into a goal's copy. Returns null on success, or the conflicting files after
+ * aborting the merge, so the goal's branch stays exactly as it was.
+ */
+export async function mergeBranch(worktree: string, branch: string, message: string): Promise<string[] | null> {
+  const res = await runGit(worktree, [...artelIdentity, "merge", "--no-ff", "--no-edit", "-m", message, branch], true);
+  if (res.code === 0) return null;
+  const conflicts = lines((await runGit(worktree, ["diff", "--name-only", "--diff-filter=U"], true)).stdout);
+  await runGit(worktree, ["merge", "--abort"], true);
+  return conflicts.length ? conflicts : ["(merge failed)"];
+}

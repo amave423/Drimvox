@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import {
   approvalAnswerSchema,
+  planApproveSchema,
   specApproveSchema,
   specReviseSchema,
   taskAcceptSchema,
@@ -119,6 +120,24 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner) {
       try {
         const { spec, checks } = c.req.valid("json");
         return c.json(runner.approveSpec(id, spec, checks), 200);
+      } catch (err) {
+        return c.json(refusal(err), 409);
+      }
+    })
+    .post("/:id/plan", zValidator("json", planApproveSchema), (c) => {
+      const id = c.req.param("id");
+      if (!runner.view(id)) return c.json(notFound, 404);
+      try {
+        return c.json(runner.approvePlan(id, c.req.valid("json")), 200);
+      } catch (err) {
+        return c.json(refusal(err), 409);
+      }
+    })
+    .post("/:id/drop", (c) => {
+      const id = c.req.param("id");
+      if (!runner.view(id)) return c.json(notFound, 404);
+      try {
+        return c.json(runner.dropSubtask(id), 200);
       } catch (err) {
         return c.json(refusal(err), 409);
       }

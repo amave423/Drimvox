@@ -18,7 +18,9 @@ export type FeedItem =
   | { kind: "answers"; seq: number; answers: { id: string; answer: string }[]; skipped: boolean }
   | { kind: "spec"; seq: number; spec: string; checks: string[]; edited: boolean }
   | { kind: "check"; seq: number; phase: string; command: string; exitCode: number | null; ok: boolean; output: string }
-  | { kind: "escalation"; seq: number; from: string; to: string };
+  | { kind: "escalation"; seq: number; from: string; to: string }
+  | { kind: "plan"; seq: number; spec: string; checks: string[]; subtasks: { id: string; title: string }[]; edited: boolean }
+  | { kind: "subtask"; seq: number; id: string; taskId: string | null; title: string; action: string; files: string[] };
 
 /** Folds the task's event log into feed lines: a tool call and its result become one line. */
 export function buildFeed(events: TaskEvent[]): FeedItem[] {
@@ -37,7 +39,7 @@ export function buildFeed(events: TaskEvent[]): FeedItem[] {
         break;
       case "tool_call": {
         // finish is shown as the task summary; questions and the spec have lines of their own.
-        if (d.name === "finish" || d.name === "ask_questions" || d.name === "propose_spec") break;
+        if (["finish", "ask_questions", "propose_spec", "propose_plan"].includes(d.name)) break;
         const item = { kind: "action" as const, seq: e.seq, callId: d.callId, name: d.name, input: d.input ?? {}, result: null };
         actions.set(d.callId, item);
         items.push(item);
@@ -78,6 +80,12 @@ export function buildFeed(events: TaskEvent[]): FeedItem[] {
         break;
       case "escalation":
         items.push({ kind: "escalation", seq: e.seq, from: d.from, to: d.to });
+        break;
+      case "plan":
+        items.push({ kind: "plan", seq: e.seq, spec: d.spec ?? "", checks: d.checks ?? [], subtasks: d.subtasks ?? [], edited: !!d.edited });
+        break;
+      case "subtask":
+        items.push({ kind: "subtask", seq: e.seq, id: d.id, taskId: d.taskId ?? null, title: d.title ?? d.id, action: d.action, files: d.files ?? [] });
         break;
     }
   }

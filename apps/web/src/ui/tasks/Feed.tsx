@@ -46,14 +46,27 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
     );
   }
 
-  if (item.kind === "spec") {
+  if (item.kind === "subtask") {
+    const text = t(`feed.subtask.${item.action}` as MessageKey, { title: item.title, files: item.files.join(", ") });
+    return <p className={item.action === "conflict" ? "feed-escalation" : "feed-step"}>{text}</p>;
+  }
+
+  if (item.kind === "spec" || item.kind === "plan") {
+    const label = item.kind === "plan" ? (item.edited ? "feed.planEdited" : "feed.plan") : item.edited ? "feed.specEdited" : "feed.spec";
     return (
       <details className="action feed-spec">
         <summary>
-          <span className="action-label">{t(item.edited ? "feed.specEdited" : "feed.spec")}</span>
+          <span className="action-label">{t(label)}</span>
         </summary>
         <div className="feed-spec-body">
           <Markdown text={item.spec} />
+          {item.kind === "plan" && (
+            <ol className="feed-checks">
+              {item.subtasks.map((s) => (
+                <li key={s.id}>{s.title}</li>
+              ))}
+            </ol>
+          )}
           {item.checks.length > 0 && (
             <ul className="feed-checks mono muted">
               {item.checks.map((c) => (

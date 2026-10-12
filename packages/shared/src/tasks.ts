@@ -11,6 +11,9 @@ export interface ProjectView {
   createdAt: number;
 }
 
+export const modelRefSchema = z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) });
+export type ModelRef = z.infer<typeof modelRefSchema>;
+
 /** Which steps a task goes through before the code. All on unless the user turns them off. */
 export const taskStagesSchema = z
   .object({
@@ -28,6 +31,27 @@ export const taskCreateSchema = z
     providerId: z.string().min(1),
     model: z.string().min(1).max(200),
     stages: taskStagesSchema.default({ interview: true, spec: true, approveSpec: true, testsFirst: true }),
+    /** Present for a team goal: the model the worker agents use. `model` then leads and plans. */
+    team: modelRefSchema.optional(),
+  })
+  .strict();
+
+/** A subtask as the lead agent planned it; `id` is a short slug other subtasks depend on. */
+export const plannedSubtaskSchema = z.object({
+  id: z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9_-]+$/),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(10_000),
+  dependsOn: z.array(z.string()).max(8).default([]),
+  /** Commands that pass once this subtask alone is done; the goal's checks pass once all are merged. */
+  checks: z.array(z.string().trim().min(1).max(500)).max(10).default([]),
+});
+export type PlannedSubtask = z.infer<typeof plannedSubtaskSchema>;
+
+export const planApproveSchema = z
+  .object({
+    spec: z.string().trim().min(1).max(100_000),
+    checks: z.array(z.string().trim().min(1).max(500)).max(20),
+    subtasks: z.array(plannedSubtaskSchema).min(1).max(8),
   })
   .strict();
 
@@ -58,7 +82,25 @@ export interface Question {
 }
 
 /** Which step a task is on. Null for tasks that skip straight to the code. */
-export type TaskPhase = "interview" | "spec" | "tests" | "code";
+export type TaskPhase = "interview" | "spec" | "tests" | "code" | "orchestrate";
+
+/** A one-agent task, a team goal, or one subtask of a goal. */
+export type TaskKind = "solo" | "goal" | "subtask";
+
+/** A subtask as the goal's board shows it. */
+export interface SubtaskCard {
+  /** The planned id, such as "auth-api". */
+  id: string;
+  /** The task that does the work. */
+  taskId: string;
+  title: string;
+  status: TaskStatus;
+  statusReason: string | null;
+  phase: TaskPhase | null;
+  model: string;
+  costUsd: number;
+  dependsOn: string[];
+}
 
 export const taskFeedbackSchema = z
   .object({
@@ -92,7 +134,11 @@ export type TaskStatus =
   | "failed"
   | "stopped"
   | "accepted"
-  | "discarded";
+  | "discarded"
+  /** A subtask waiting for a free slot or for the subtasks it depends on. */
+  | "queued"
+  /** A subtask whose work is in the goal's branch. */
+  | "merged";
 
 /** Why a task waits, failed or stopped: approval, budget, steps, restart, or a provider error code. */
 export type TaskReason = string;
@@ -133,6 +179,15 @@ export interface TaskView {
   /** Red check runs in a row in the current attempt round. */
   attempts: number;
   escalated: boolean;
+  kind: TaskKind;
+  /** For a subtask: its goal. */
+  parentId: string | null;
+  /** For a goal: the worker model. */
+  team: ModelRef | null;
+  /** For a goal: the subtasks as planned (and as the user edited them). */
+  plannedSubtasks: PlannedSubtask[];
+  /** For a goal: the subtasks at work. */
+  subtasks: SubtaskCard[];
   createdAt: number;
   updatedAt: number;
 }
@@ -149,7 +204,9 @@ export type TaskEventKind =
   | "answers"
   | "spec"
   | "check"
-  | "escalation";
+  | "escalation"
+  | "plan"
+  | "subtask";
 
 export interface TaskEvent {
   seq: number;

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
-import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/lastModel";
+import { readLastModel, rememberLastModel, TEAM_MODEL_KEY, type ModelChoice } from "../../lib/lastModel";
 import { loadModels } from "../../lib/models";
 import { ModelPicker } from "../chat/ModelPicker";
 import { ModelNote } from "../chat/ModelNote";
@@ -11,22 +11,22 @@ import { StageSwitches, readStages } from "../tasks/Stages";
 import { StatusChip } from "../tasks/StatusDot";
 
 type GitProblem = "no_identity" | "no_git" | null;
+type Mode = "solo" | "team";
 
-export function ProjectSheet({ projectId }: { projectId: string }) {
-  const { api, t, projects, tasks, providers, navigate, reloadProjects, reloadTasks } = useApp();
-  const project = projects.find((p) => p.id === projectId);
-  const [text, setText] = useState("");
-  const [choice, setChoice] = useState<ModelChoice | null>(() => {
-    const last = readLastModel();
-    return last && providers.some((p) => p.id === last.providerId) ? last : null;
-  });
+const MODE_KEY = "artel.taskMode";
+
+function readMode(): Mode {
+  try {
+    return localStorage.getItem(MODE_KEY) === "team" ? "team" : "solo";
+  } catch {
+    return "solo";
+  }
+}
+
+/** What the catalog says about a picked model; null while loading or when unknown. */
+function useModelInfo(choice: ModelChoice | null): ModelInfo | null {
+  const { api } = useApp();
   const [model, setModel] = useState<ModelInfo | null>(null);
-  const [stages, setStages] = useState(readStages);
-  const [gitProblem, setGitProblem] = useState<GitProblem>(null);
-  const [startFailed, setStartFailed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState(false);
-
   useEffect(() => {
     if (!choice) return setModel(null);
     let live = true;
@@ -37,10 +37,44 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
       live = false;
     };
   }, [api, choice]);
+  return model;
+}
+
+export function ProjectSheet({ projectId }: { projectId: string }) {
+  const { api, t, projects, tasks, providers, navigate, reloadProjects, reloadTasks } = useApp();
+  const project = projects.find((p) => p.id === projectId);
+  const [text, setText] = useState("");
+  const [choice, setChoice] = useState<ModelChoice | null>(() => {
+    const last = readLastModel();
+    return last && providers.some((p) => p.id === last.providerId) ? last : null;
+  });
+  const [mode, setModeState] = useState<Mode>(readMode);
+  const [teamChoice, setTeamChoice] = useState<ModelChoice | null>(() => {
+    const last = readLastModel(TEAM_MODEL_KEY);
+    return last && providers.some((p) => p.id === last.providerId) ? last : null;
+  });
+  const model = useModelInfo(choice);
+  const teamModel = useModelInfo(mode === "team" ? teamChoice : null);
+  const [stages, setStages] = useState(readStages);
+  const [gitProblem, setGitProblem] = useState<GitProblem>(null);
+  const [startFailed, setStartFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   if (!project) return null;
   const own = tasks.filter((task) => task.projectId === project.id);
-  const noTools = model?.tools === false;
+  const team = mode === "team";
+  const noTools = model?.tools === false || (team && teamModel?.tools === false);
+  const ready = !!choice && !!text.trim() && (!team || !!teamChoice);
+
+  function setMode(next: Mode) {
+    setModeState(next);
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      // Without storage the next visit starts with one agent.
+    }
+  }
 
   async function initGit(p: ProjectView) {
     setBusy(true);
@@ -56,16 +90,18 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
   }
 
   async function start() {
-    if (!choice || !text.trim()) return;
+    if (!choice || !ready) return;
     setBusy(true);
     setStartFailed(false);
+    const json = { task: text.trim(), providerId: choice.providerId, model: choice.model, stages, ...(team && teamChoice ? { team: teamChoice } : {}) };
     const task = await api.projects[":id"].tasks
-      .$post({ param: { id: projectId }, json: { task: text.trim(), providerId: choice.providerId, model: choice.model, stages } })
+      .$post({ param: { id: projectId }, json })
       .then((r) => ok<TaskView>(r))
       .catch(() => null);
     setBusy(false);
     if (!task) return setStartFailed(true);
     rememberLastModel(choice);
+    if (team && teamChoice) rememberLastModel(teamChoice, TEAM_MODEL_KEY);
     setText("");
     await reloadTasks();
     navigate({ kind: "task", taskId: task.id });
@@ -111,13 +147,38 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
                 aria-label={t("project.newTask")}
                 onChange={(e) => setText(e.target.value)}
               />
-              <StageSwitches value={stages} onChange={setStages} />
-              <div className="actions">
-                <ModelPicker value={choice} onChange={setChoice} />
-                <button className="btn is-primary" disabled={busy || !choice || !text.trim() || noTools}>
-                  {t("project.start")}
-                </button>
-              </div>
+              <fieldset className="mode-switch">
+                <legend className="visually-hidden">{t("team.mode")}</legend>
+                {(["solo", "team"] as const).map((m) => (
+                  <label key={m} className={mode === m ? "is-on" : undefined}>
+                    <input type="radio" name="mode" checked={mode === m} onChange={() => setMode(m)} />
+                    {t(`team.mode.${m}`)}
+                  </label>
+                ))}
+              </fieldset>
+              <StageSwitches value={stages} onChange={setStages} team={team} />
+              {team ? (
+                <div className="team-models">
+                  <div className="team-model">
+                    <span>{t("team.lead")}</span>
+                    <ModelPicker value={choice} onChange={setChoice} />
+                  </div>
+                  <div className="team-model">
+                    <span>{t("team.worker")}</span>
+                    <ModelPicker value={teamChoice} onChange={setTeamChoice} />
+                  </div>
+                  <button className="btn is-primary" disabled={busy || !ready || noTools}>
+                    {t("team.start")}
+                  </button>
+                </div>
+              ) : (
+                <div className="actions">
+                  <ModelPicker value={choice} onChange={setChoice} />
+                  <button className="btn is-primary" disabled={busy || !ready || noTools}>
+                    {t("project.start")}
+                  </button>
+                </div>
+              )}
               {noTools && <p className="error-note">{t("project.toolsWarning")}</p>}
               {startFailed && <p className="error-note">{t("project.startFailed")}</p>}
             </form>
@@ -160,7 +221,7 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
         </div>
       </div>
       <aside className="margin">
-        <p className="note">{t("project.copyNote")}</p>
+        <p className="note">{t(team ? "team.note" : "project.copyNote")}</p>
         {choice && <ModelNote choice={choice} />}
       </aside>
     </article>

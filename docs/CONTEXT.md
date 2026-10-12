@@ -156,7 +156,7 @@ packages/shared — типы и схемы (zod), общие для UI и core
 | M1 ✓ | Провайдеры + чат с любой моделью | Сделано 2026-10-12: пресеты OpenRouter, DeepSeek, NVIDIA, Ollama, LM Studio и любой OpenAI-совместимый; ключи зашифрованы; стриминг со «Стоп»; токены и $ по ответу и за день; балансы OpenRouter и DeepSeek. fal.ai — в M5 |
 | M2 ✓ | Solo-агент: worktree, инструменты (файлы/команды), diff-ревью, merge | Сделано 2026-10-12, спека в `docs/specs/solo-agent.md`. Проверено вживую на OpenRouter, DeepSeek и NVIDIA |
 | M3 ✓ | Пайплайн: опрос-карточки → спека → тесты → код → гейты проверки | Сделано 2026-10-12, спека в `docs/specs/pipeline.md`. Проверено вживую на OpenRouter, DeepSeek и NVIDIA |
-| M4 | Оркестратор: план → ОК → параллельные агенты → слияние | Цель из 3+ подзадач доходит до ревью без ручного вмешательства |
+| M4 ✓ | Оркестратор: план → ОК → параллельные агенты → слияние | Сделано 2026-10-12, спека в `docs/specs/orchestrator.md`. Проверено вживую на DeepSeek и NVIDIA (`npm run live-check -- --team`) |
 | M5 | fal.ai: картинки в чате + агент-дизайнер с ассетами | — |
 | M6 | MCP, скиллы, веб-поиск, Playwright-визуальная проверка, уведомления | — |
 | M7 | CLI-агенты (Claude Code / Codex / Gemini CLI), прямые API Anthropic/OpenAI/Gemini/xAI | — |
