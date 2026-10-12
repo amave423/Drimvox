@@ -76,7 +76,8 @@ describe("sending a message", () => {
     await readEvents(await send(chat.id, "Первый"));
     await readEvents(await send(chat.id, "Второй"));
 
-    const sent = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)?.body.messages;
+    // After the system line with the date.
+    const sent = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)?.body.messages.slice(1);
     expect(sent).toEqual([
       { role: "user", content: "Первый" },
       { role: "assistant", content: "Ответ" },
@@ -84,6 +85,15 @@ describe("sending a message", () => {
     ]);
     const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
     expect(saved.messages.map((m: { content: string }) => m.content)).toEqual(["Первый", "Ответ", "Второй", "Ответ"]);
+  });
+
+  it("tells the model today's date and time", async () => {
+    const { chat } = await setup();
+    await readEvents(await send(chat.id, "Какое сегодня число?"));
+    const messages = fake.requests.find((r) => r.path === "/v1/chat/completions")!.body.messages;
+    expect(messages[0].role).toBe("system");
+    expect(messages[0].content).toContain(String(new Date().getFullYear()));
+    expect(messages[0].content).toMatch(/\d{2}:\d{2}/);
   });
 
   it("names the chat after the first message", async () => {
@@ -107,7 +117,8 @@ describe("sending a message", () => {
     const { chat } = await setup({ failWith: { status: 500, message: "boom" } });
     await readEvents(await send(chat.id, "Раз"));
     await readEvents(await send(chat.id, "Два"));
-    const sent = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)?.body.messages;
+    // After the system line with the date.
+    const sent = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)?.body.messages.slice(1);
     expect(sent).toEqual([
       { role: "user", content: "Раз" },
       { role: "user", content: "Два" },

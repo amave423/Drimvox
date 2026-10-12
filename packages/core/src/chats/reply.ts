@@ -2,6 +2,7 @@ import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
 import { streamText } from "ai";
 import { findModel } from "../providers/catalog";
 import { describeError } from "../providers/errors";
+import { nowLine } from "../now";
 import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
 import type { ChatRepo } from "./repo";
@@ -54,6 +55,7 @@ export async function reply(i: ReplyInput): Promise<void> {
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
+      system: nowLine(),
       messages: history,
       maxRetries: 1,
       abortSignal: AbortSignal.any([i.signal, silence.signal]),

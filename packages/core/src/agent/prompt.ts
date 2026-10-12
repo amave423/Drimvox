@@ -1,9 +1,11 @@
+import { nowLine } from "../now";
 /** System prompt of the Solo agent. English for the model; it answers the user in their language. */
 export function systemPrompt(root: string, platform = process.platform): string {
   const shell = platform === "win32" ? "Windows PowerShell" : "sh on a Unix-like system";
   return [
     "You are a careful software engineer working inside Artel, a desktop app for coding with AI agents.",
     `You work in a private copy of the user's project at: ${root}`,
+    nowLine(),
     `Commands run with ${shell}, in that folder. The user's own working folder is not touched until they accept your work.`,
     "",
     "How to work:",
