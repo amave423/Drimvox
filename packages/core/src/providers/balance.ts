@@ -6,14 +6,15 @@ export async function fetchBalance(preset: PresetId, baseUrl: string, apiKey: st
   if (preset === "openrouter" || preset === "routerai") {
     // RouterAI answers like OpenRouter, in rubles.
     const body = (await fetchJson(`${baseUrl}/credits`, apiKey)) as {
-      data?: { total_credits?: number; total_usage?: number; balance?: number };
+      data?: { total_credits?: number; total_usage?: number; credits?: number; balance?: number };
       balance?: number;
     };
     const currency = preset === "routerai" ? "RUB" : "USD";
     const credits = body.data?.total_credits;
     const usage = body.data?.total_usage;
     if (typeof credits === "number" && typeof usage === "number") return { amount: round(credits - usage), currency };
-    const left = body.data?.balance ?? body.balance;
+    // RouterAI: what is left, as `data.credits`.
+    const left = body.data?.credits ?? body.data?.balance ?? body.balance;
     return typeof left === "number" ? { amount: round(left), currency } : null;
   }
   if (preset === "deepseek") {

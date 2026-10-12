@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateCost, needsConfirmation, type MediaModel } from "../src/media";
+import { estimateCost, isRoughEstimate, needsConfirmation, type MediaModel } from "../src/media";
 
 const image = (lines: { billable: string; unit: string; costUsd: number; variant?: string }[], extra: Partial<MediaModel> = {}): MediaModel => ({
   id: "x/img",
@@ -88,6 +88,17 @@ describe("video prices", () => {
 
   it("does not know prices it cannot read", () => {
     expect(estimateCost(video({ cents_per_megapixel_second_precise: "7.5" }), {})).toBeNull();
+  });
+});
+
+describe("rough estimates", () => {
+  it("calls a per-token picture price rough and always asks before it", () => {
+    const tokens = image([{ billable: "output_image", unit: "token", costUsd: 0.0000022 }]);
+    expect(isRoughEstimate(tokens)).toBe(true);
+    expect(needsConfirmation(tokens, estimateCost(tokens, {}))).toBe(true);
+    const flat = image([{ billable: "output_image", unit: "image", costUsd: 0.01 }]);
+    expect(isRoughEstimate(flat)).toBe(false);
+    expect(needsConfirmation(flat, 0.01)).toBe(false);
   });
 });
 

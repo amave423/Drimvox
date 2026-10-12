@@ -386,10 +386,14 @@ export const en: Record<keyof typeof ru, string> = {
 
   "web.label": "Internet",
   "web.off": "No internet",
-  "web.free": "Internet: Artel search",
-  "web.provider": "Internet: provider search (paid)",
+  "web.free": "Artel search",
+  "web.provider": "{name} search",
   "web.searching": "Searching: “{query}”",
   "web.reading": "Reading {url}",
   "action.web_search": "Searches the web: {target}",
   "action.open_page": "Reads {target}",
+  "web.hint.off": "The model answers only from what it knows",
+  "web.hint.free": "Free: searches DuckDuckGo and reads pages. Needs a model with tools",
+  "web.hint.provider": "Paid, about 2 ₽ per answer: the provider searches, usually more precise",
+  "media.estimateRough": "≈ {cost}, may cost more",
 };

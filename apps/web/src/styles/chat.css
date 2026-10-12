@@ -86,5 +86,14 @@
 .chat-margin { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 140px); overflow-y: auto; }
 .margin-action { justify-self: start; font-size: 13.5px; }
 .delete-confirm .actions { margin-top: 8px; }
-.web-switch { width: auto; max-width: 260px; padding: 6px 10px; font-size: 13px; border-radius: 999px; }
+/* Internet switch: a pill like the model picker; ink when the model may go online. */
+.web-switch .picker-button.is-on { border-color: var(--ink); color: var(--ink); background: var(--ink-soft); }
+.web-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--muted); }
+.web-dot.is-free { background: var(--ink); }
+.web-dot.is-provider { background: var(--wait); }
+.web-panel { width: min(340px, 80vw); grid-template-rows: none; gap: 2px; list-style: none; margin: 0; }
+.web-panel button { width: 100%; display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; text-align: left; }
+.web-panel button:hover, .web-panel button.is-on { background: var(--paper); }
+.web-option-name { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.web-panel small { padding-left: 15px; font-size: 12px; line-height: 1.4; }
 .msg-activity { list-style: none; margin: 4px 0 8px; padding: 0 0 0 12px; border-left: 2px solid var(--line); font-size: 13px; display: grid; gap: 2px; }

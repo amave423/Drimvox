@@ -385,10 +385,14 @@ export const ru = {
 
   "web.label": "Интернет",
   "web.off": "Без интернета",
-  "web.free": "Интернет: поиск Artel",
-  "web.provider": "Интернет: поиск провайдера (платно)",
+  "web.free": "Поиск Artel",
+  "web.provider": "Поиск {name}",
   "web.searching": "Ищет: «{query}»",
   "web.reading": "Читает {url}",
   "action.web_search": "Ищет в интернете: {target}",
   "action.open_page": "Читает {target}",
+  "web.hint.off": "Модель отвечает только из того, что знает сама",
+  "web.hint.free": "Бесплатно: ищет в DuckDuckGo и читает страницы. Нужна модель с инструментами",
+  "web.hint.provider": "Платно, около 2 ₽ за ответ: поиск на стороне провайдера, обычно точнее",
+  "media.estimateRough": "≈ {cost}, может выйти дороже",
 } as const;

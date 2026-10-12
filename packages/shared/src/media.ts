@@ -40,7 +40,16 @@ export type MediaOptions = z.infer<typeof mediaOptionsSchema>;
 export const CONFIRM_ABOVE_USD = 0.1;
 
 export function needsConfirmation(model: MediaModel, estimate: number | null): boolean {
-  return model.kind === "video" || estimate === null || estimate > CONFIRM_ABOVE_USD;
+  return model.kind === "video" || estimate === null || estimate > CONFIRM_ABOVE_USD || isRoughEstimate(model);
+}
+
+/**
+ * Per-token picture prices depend on how many tokens the model spends, which differs tenfold between models
+ * (live check 2026-10-12: about 1300 for Gemini, about 14 000 for Hunyuan). Such estimates are shown, but
+ * the picture still waits for "Start".
+ */
+export function isRoughEstimate(model: MediaModel): boolean {
+  return model.kind === "image" && !!model.pricing?.lines.some((l) => l.billable === "output_image" && l.unit === "token");
 }
 
 /** Side of a square picture for each resolution name. */

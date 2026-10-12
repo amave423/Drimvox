@@ -1,4 +1,4 @@
-import type { MediaModel, MediaOptions as Options } from "@artel/shared";
+import { isRoughEstimate, type MediaModel, type MediaOptions as Options } from "@artel/shared";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
 
@@ -38,7 +38,9 @@ export function MediaOptions({ model, value, onChange, estimateUsd }: Props) {
         </label>
       )}
       <span className="media-price mono">
-        {estimateUsd === null ? t("media.priceUnknown") : t("media.estimate", { cost: formatUsd(estimateUsd) })}
+        {estimateUsd === null
+          ? t("media.priceUnknown")
+          : t(isRoughEstimate(model) ? "media.estimateRough" : "media.estimate", { cost: formatUsd(estimateUsd) })}
       </span>
     </div>
   );

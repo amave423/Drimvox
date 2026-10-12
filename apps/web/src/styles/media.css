@@ -7,7 +7,11 @@
 
 .media-options { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; padding: 8px 0 2px; font-size: 13px; }
 .media-option { display: grid; gap: 3px; color: var(--muted); }
-.media-option select { padding: 4px 8px; font-size: 13px; }
+.media-option select {
+  appearance: none; width: auto; padding: 5px 28px 5px 12px; font-size: 13px; border-radius: 999px; background-color: var(--paper);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; cursor: pointer;
+}
 .media-price { margin-left: auto; color: var(--fg); font-size: 13px; }
 
 .picker-kinds { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }

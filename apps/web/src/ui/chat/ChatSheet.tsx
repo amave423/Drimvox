@@ -1,6 +1,7 @@
 import {
   estimateCost,
   needsConfirmation,
+  presets,
   CONFIRM_ABOVE_USD,
   type ChatView,
   type ChatWithMessages,
@@ -95,6 +96,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const estimateUsd = mediaModel ? estimateCost(mediaModel, options) : null;
   const preset = providers.find((p) => p.id === choice?.providerId)?.preset;
   const providerSearch = preset === "openrouter" || preset === "routerai";
+  const searchProvider = providerSearch && preset ? presets[preset].name : null;
   const webMode = web === "provider" && !providerSearch ? "free" : web;
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
 
@@ -219,7 +221,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           tools={
             <>
               <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />
-              {kind === "text" && choice && <WebSwitch value={web} onChange={setWeb} providerSearch={providerSearch} />}
+              {kind === "text" && choice && <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} />}
             </>
           }
           extra={mediaModel && <MediaOptions model={mediaModel} value={options} onChange={setOptions} estimateUsd={estimateUsd} />}

@@ -1,5 +1,5 @@
 // Media part of the live check (`--media`, `--video`): a real picture and, if asked, a real clip on the cheapest models.
-import { estimateCost, type MediaModel, type MediaOptions, type MessageView, type StreamEvent } from "@artel/shared";
+import { estimateCost, isRoughEstimate, type MediaModel, type MediaOptions, type MessageView, type StreamEvent } from "@artel/shared";
 
 type Api = (method: string, path: string, body?: unknown) => Promise<{ status: number; body: any }>;
 type Send = (chatId: string, body: unknown) => Promise<StreamEvent[]>;
@@ -18,7 +18,7 @@ export async function checkMedia(api: Api, send: Send, providerId: string, withV
 
   // A catalog with prices (RouterAI) gives the cheapest picture model; otherwise a known cheap one.
   const cheapest = images
-    .filter((m) => m.pricing && !m.viaChat)
+    .filter((m) => m.pricing && !m.viaChat && !isRoughEstimate(m))
     .map((m) => ({ m, usd: estimateCost(m, {}) }))
     .filter((x): x is { m: MediaModel; usd: number } => x.usd !== null && x.usd > 0)
     .sort((a, b) => a.usd - b.usd)[0]?.m.id;

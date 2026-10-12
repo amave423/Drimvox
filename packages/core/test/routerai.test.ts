@@ -60,7 +60,8 @@ beforeEach(async () => {
     key: KEY,
     models: catalog,
     handle: (method, path, body) => {
-      if (method === "GET" && path === "/v1/credits") return { json: { data: { total_credits: 300, total_usage: 12.5 } } };
+      // What RouterAI really answers (checked 2026-10-12): what is left, in rubles.
+      if (method === "GET" && path === "/v1/credits") return { json: { data: { credits: 287.5 } } };
       if (method === "POST" && path === "/v1/images") {
         return { json: { data: [{ b64_json: PNG.toString("base64") }], usage: { cost: 8 } } };
       }
