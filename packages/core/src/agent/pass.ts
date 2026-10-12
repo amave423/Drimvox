@@ -18,6 +18,7 @@ import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
 import { runAgent } from "./run";
 import { webTools } from "../internet/tools";
+import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 import type { WebAccess } from "../internet/web";
 import type { ToolHooks } from "./tools";
 
@@ -45,6 +46,8 @@ export interface PassContext {
   startTeam(): void;
   /** Search and page reading for every step: documentation, versions, current facts. */
   web: WebAccess;
+  /** Shared skills of Artel; the project's own are found in the copy. */
+  skillsDir: string;
   /** The picture tool when the settings name an image model; none otherwise. */
   imageTools(
     row: TaskRow,
@@ -111,7 +114,9 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     askApproval: ctx.askApproval,
   };
   const mode = phase === "interview" || phase === "spec" ? "read" : "write";
-  extraTools = { ...extraTools, ...webTools(ctx.web, hooks) };
+  // The project's skills first: they win over shared ones of the same name.
+  const skills = findSkills([...projectSkillRoots(row.worktree), { dir: ctx.skillsDir, scope: "shared" }]);
+  let ownTools: ToolSet = { ...webTools(ctx.web, hooks), ...skillTools(skills, row.worktree, hooks) };
   if (mode === "write") {
     // Pictures cost money outside the model's own usage: they go into the task's spending at once.
     const spend = (usd: number) => {
@@ -120,7 +125,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       ctx.tasks.addUsage(id, 0, 0, usd, true);
       ctx.publish();
     };
-    extraTools = { ...extraTools, ...(await ctx.imageTools(row, hooks, spend, () => row.budget_usd - cost)) };
+    ownTools = { ...ownTools, ...(await ctx.imageTools(row, hooks, spend, () => row.budget_usd - cost)) };
   }
   const outcome = await runAgent({
     conn,
@@ -130,8 +135,11 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     messages,
     mode,
     extraTools,
+    ownTools,
     stopTools,
-    instructions: planning ? planInstructions() : phaseInstructions(phase, JSON.parse(row.checks) as string[]),
+    instructions: [planning ? planInstructions() : phaseInstructions(phase, JSON.parse(row.checks) as string[]), skillsInstructions(skills)]
+      .filter(Boolean)
+      .join("\n\n"),
     spentUsd: row.cost_usd,
     budgetUsd: row.budget_usd,
     signal: ctx.signal,

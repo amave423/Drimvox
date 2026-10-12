@@ -130,8 +130,12 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
             ? input.query
             : item.name === "open_page"
               ? input.url
-              : input.path;
-  const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image", "web_search", "open_page"].includes(
+              : item.name === "use_skill"
+                ? input.name
+                : item.name === "read_skill_file"
+                  ? `${input.name}/${input.path}`
+                  : input.path;
+  const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image", "web_search", "open_page", "use_skill", "read_skill_file"].includes(
     item.name,
   );
   const label = known ? t(`action.${item.name}` as MessageKey, { target: target ?? "" }) : item.name;

@@ -51,3 +51,10 @@ a { color: var(--ink); }
 .side-item-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-item small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-link.is-on { background: var(--sheet); }
+
+/* Skills in the settings and on a project's margin. */
+.skills { margin-top: 8px; }
+.skill-list { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 6px; }
+.skill-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); }
+.skill-list.is-compact li { grid-template-columns: 1fr; gap: 2px; padding: 4px 0; border: 0; font-size: 13px; }
+.skill-form { display: grid; gap: 10px; margin: 8px 0; max-width: 640px; }

@@ -44,6 +44,8 @@ export interface RunnerOptions {
   imageModel(): { providerId: string; model: string } | null;
   media: MediaRepo;
   web: WebAccess;
+  /** Shared skills; project skills are read from each task's copy. */
+  skillsDir: string;
   idleTimeoutMs: number;
 }
 
@@ -345,6 +347,7 @@ export class AgentRunner {
       askApproval: (command, reason, signal) => (live ? this.askApproval(id, live, command, reason, signal) : Promise.resolve(false)),
       startTeam: () => this.team.start(id),
       web: this.o.web,
+      skillsDir: this.o.skillsDir,
       imageTools: (row, hooks, onSpend, budgetLeft) =>
         imageToolsFor(this.o.imageModel(), this.o.providers, { worktree: row.worktree, taskId: id, media: this.o.media, hooks, budgetLeft, onSpend }),
     };

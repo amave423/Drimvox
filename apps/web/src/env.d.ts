@@ -6,6 +6,8 @@ interface ArtelBridge {
   pickFolder(): Promise<string | null>;
   /** A Windows notification; shown only while the window is not in front. */
   notify(notice: { title: string; body: string; taskId: string }): void;
+  /** Opens Artel's shared skills folder in Explorer. */
+  openSkillsFolder(): void;
   /** Called when the user clicks a notification; returns a function that stops listening. */
   onOpenTask(listener: (taskId: string) => void): () => void;
 }

@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("artel", {
   getToken: (): Promise<string> => ipcRenderer.invoke("artel:token"),
   setTitleBar: (colors: { background: string; symbols: string }) => ipcRenderer.send("artel:titlebar", colors),
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke("artel:pick-folder"),
+  openSkillsFolder: () => ipcRenderer.send("artel:open-skills"),
   notify: (notice: { title: string; body: string; taskId: string }) => ipcRenderer.send("artel:notify", notice),
   onOpenTask: (listener: (taskId: string) => void) => {
     const handler = (_event: unknown, taskId: unknown) => typeof taskId === "string" && listener(taskId);

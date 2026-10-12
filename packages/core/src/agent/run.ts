@@ -20,6 +20,8 @@ export interface RunInput {
   mode: "read" | "write";
   /** Tools of the current step, such as ask_questions or propose_spec. */
   extraTools?: ToolSet;
+  /** Tools that report their calls to the feed themselves (internet, skills, pictures); passed as they are. */
+  ownTools?: ToolSet;
   /** Calling any of these ends the pass, like finish does. */
   stopTools?: string[];
   /** The current step's instructions, added to the system prompt. */
@@ -84,7 +86,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
     },
     onFinish: (result: { summary: string; commitMessage: string }) => (finished = result),
   };
-  const tools = buildTools(new Workspace(i.worktree), hooks, i.mode, i.extraTools);
+  const tools = { ...buildTools(new Workspace(i.worktree), hooks, i.mode, i.extraTools), ...i.ownTools };
 
   resetClock();
   try {

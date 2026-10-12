@@ -7,6 +7,7 @@ import { readLastModel, rememberLastModel, TEAM_MODEL_KEY, type ModelChoice } fr
 import { loadModels } from "../../lib/models";
 import { ModelPicker } from "../chat/ModelPicker";
 import { ModelNote } from "../chat/ModelNote";
+import { ProjectSkills } from "../SkillsSection";
 import { StageSwitches, readStages } from "../tasks/Stages";
 import { StatusChip } from "../tasks/StatusDot";
 
@@ -222,6 +223,7 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
       </div>
       <aside className="margin">
         <p className="note">{t(team ? "team.note" : "project.copyNote")}</p>
+        <ProjectSkills projectId={project.id} />
         {choice && <ModelNote choice={choice} />}
       </aside>
     </article>

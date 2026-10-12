@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "../context";
 import { ModelPicker } from "./chat/ModelPicker";
 import { Segmented } from "./Segmented";
+import { SkillsSection } from "./SkillsSection";
 
 const localeNames = { ru: "Русский", en: "English" } as const;
 
@@ -112,6 +113,8 @@ export function SettingsSheet() {
           )}
         </div>
         <p className="muted">{t("settings.imageModelHint", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>
+
+        <SkillsSection />
       </div>
       <aside className="margin" aria-live="polite">
         {state === "saved" && <p className="note is-ok">{t("settings.saved")}</p>}

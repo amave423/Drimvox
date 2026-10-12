@@ -69,5 +69,24 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { artel?: object }).artel ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["getToken", "notify", "onOpenTask", "pickFolder", "setTitleBar"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["getToken", "notify", "onOpenTask", "openSkillsFolder", "pickFolder", "setTitleBar"] });
+});
+
+test("creates and deletes a shared skill in the settings", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+
+  await page.getByRole("button", { name: "Создать скилл" }).click();
+  await page.getByLabel("Название").fill("Отчёты");
+  await page.getByLabel("Когда он нужен").fill("Когда нужен отчёт для клиента");
+  await page.getByLabel("Инструкция для агента").fill("Вывод первой строкой.");
+  await page.getByRole("button", { name: "Сохранить скилл" }).click();
+
+  const row = page.locator(".skill-list li", { hasText: "otchety" });
+  await expect(row).toContainText("Когда нужен отчёт для клиента");
+  await row.getByRole("button", { name: "Удалить" }).click();
+  await row.getByRole("button", { name: "Точно удалить" }).click();
+  await expect(page.getByText("Общих скиллов пока нет.")).toBeVisible();
 });

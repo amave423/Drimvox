@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { settingsPatchSchema, type PresetId } from "@artel/shared";
 import { Hono } from "hono";
+import { join } from "node:path";
 import { ProjectRepo, TaskRepo } from "./agent/repo";
 import { AgentRunner } from "./agent/runner";
 import { ChatRepo } from "./chats/repo";
@@ -12,6 +13,7 @@ import { Studio } from "./media/studio";
 import { ProviderRepo } from "./providers/repo";
 import { chatRoutes, usageRoutes } from "./routes/chats";
 import { mediaRoutes } from "./routes/media";
+import { skillRoutes } from "./routes/skills";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { taskRoutes } from "./routes/tasks";
@@ -66,6 +68,7 @@ export function createCore(o: AppOptions) {
     imageModel: () => readSettings(o.db).imageModel,
     media,
     web,
+    skillsDir: join(o.dataDir, "skills"),
     idleTimeoutMs,
   });
   const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });
@@ -89,6 +92,7 @@ export function createCore(o: AppOptions) {
     .route("/providers", providerRoutes(providers))
     .route("/chats", chatRoutes(chats, providers, studio, web, idleTimeoutMs))
     .route("/media", mediaRoutes(media))
+    .route("/skills", skillRoutes(join(o.dataDir, "skills")))
     .route("/usage", usageRoutes(chats))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/tasks", taskRoutes(tasks, runner));

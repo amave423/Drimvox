@@ -1,4 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
+import { findSkills, projectSkillRoots, toSkillView } from "../skills/skills";
 import { projectCreateSchema, taskCreateSchema, type ProjectView } from "@artel/shared";
 import { Hono } from "hono";
 import { existsSync, statSync } from "node:fs";
@@ -54,6 +55,11 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
       }
       projects.remove(project.id);
       return c.body(null, 204);
+    })
+    .get("/:id/skills", (c) => {
+      const project = projects.get(c.req.param("id"));
+      if (!project) return c.json(notFound, 404);
+      return c.json(findSkills(projectSkillRoots(project.path)).map((s) => toSkillView(s, project.path)), 200);
     })
     .get("/:id/tasks", (c) => {
       const project = projects.get(c.req.param("id"));

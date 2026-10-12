@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell, utilityProcess, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { InitMessage } from "./core-process";
 import { loadSecretKey } from "./keyring";
@@ -94,6 +95,14 @@ function registerIpc() {
     const options = { properties: ["openDirectory", "createDirectory"] as ("openDirectory" | "createDirectory")[] };
     const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
     return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
+
+  // Only this one folder: the page cannot ask the main process to open arbitrary paths.
+  ipcMain.on("artel:open-skills", (event) => {
+    if (!fromOurPage(event.senderFrame?.url)) return;
+    const dir = join(app.getPath("userData"), "skills");
+    mkdirSync(dir, { recursive: true });
+    void shell.openPath(dir);
   });
 
   ipcMain.on("artel:notify", (event, notice: { title?: unknown; body?: unknown; taskId?: unknown }) => {
