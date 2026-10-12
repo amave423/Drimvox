@@ -370,4 +370,10 @@ export const en: Record<keyof typeof ru, string> = {
   "approval.reason.media_cost": "A paid picture above $0.10",
   "media.emptyLede": "Describe what you need and pick the shape. The price shows before you start; video and anything above $0.10 starts only from the button with the price.",
   "chat.totalsCost": "This chat: {cost}",
+
+  "answer.title": "Answer",
+  "answer.more": "Ask something else about the project…",
+  "answer.ask": "Ask",
+  "answer.howFound": "How the agent found the answer",
+  "task.reason.answered": "The agent answered the question. The project did not change.",
 };

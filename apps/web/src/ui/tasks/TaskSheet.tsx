@@ -8,6 +8,7 @@ import { dictionaries } from "../../i18n";
 import { ErrorNote } from "../ErrorNote";
 import type { LineComment } from "./DiffView";
 import { Feed } from "./Feed";
+import { Answer } from "./Answer";
 import { Interview } from "./Interview";
 import { PlanReview } from "./PlanReview";
 import { Review } from "./Review";
@@ -35,7 +36,8 @@ export function TaskSheet({ taskId }: { taskId: string }) {
   );
   const stuck = task.status === "waiting" && task.statusReason === "stuck";
   // A subtask is never reviewed on its own: the goal merges it and the user reviews the goal.
-  const reviewing = task.kind !== "subtask" && (REVIEW_STATES.has(task.status) || stuck);
+  const answered = task.status === "done_empty" && task.statusReason === "answered";
+  const reviewing = task.kind !== "subtask" && !answered && (REVIEW_STATES.has(task.status) || stuck);
   const waitingFor = task.status === "waiting" ? task.statusReason : null;
 
   const answer = (approvalId: string, allow: boolean) =>
@@ -52,7 +54,7 @@ export function TaskSheet({ taskId }: { taskId: string }) {
             <span className="mono muted">{task.model}</span>
             {task.team && <span className="muted">{t("team.workers", { model: task.team.model })}</span>}
           </div>
-          <PhaseSteps task={task} />
+          {!answered && <PhaseSteps task={task} />}
         </header>
 
         <TaskNotice task={task} feed={feed} />
@@ -61,7 +63,13 @@ export function TaskSheet({ taskId }: { taskId: string }) {
         {waitingFor === "plan_review" && <PlanReview key={task.updatedAt} task={task} />}
         {task.subtasks.length > 0 && <SubtaskBoard task={task} />}
 
-        {reviewing ? (
+        {answered && <Answer task={task} />}
+        {answered ? (
+          <details className="worked">
+            <summary>{t("answer.howFound")}</summary>
+            <Feed items={feed} />
+          </details>
+        ) : reviewing ? (
           <>
             <Review task={task} comments={comments} setComments={setComments} />
             <details className="worked">

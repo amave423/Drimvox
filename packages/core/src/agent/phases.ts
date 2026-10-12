@@ -2,6 +2,25 @@ import type { Question, TaskPhase } from "@artel/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
+/** A question about the project is answered, not turned into a task. */
+const ANSWER_HINT =
+  "If the user only asks a question (about the project, the code, an idea) and nothing in the project needs to change, " +
+  "do not ask questions or write a spec: read what you need, then call answer with the answer in Markdown in the user's language.";
+
+/** Ends a read-only step with an answer to a question instead of a task. */
+export function answerTools(onAnswer: (answer: string) => void): ToolSet {
+  return {
+    answer: tool({
+      description: "Answer the user's question when they asked a question rather than for a change in the project.",
+      inputSchema: z.object({ answer: z.string().min(1).max(50_000) }),
+      execute: async ({ answer }) => {
+        onAnswer(answer);
+        return "Answered.";
+      },
+    }),
+  };
+}
+
 /** What the model is told on top of the base system prompt in each step. */
 export function phaseInstructions(phase: TaskPhase | null, checks: string[]): string {
   const checkList = checks.length ? checks.map((c) => `- ${c}`).join("\n") : "- (none)";
@@ -13,6 +32,7 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[]): st
         "only the user can make: scope, behaviour, user interface, technology choices. Skip what the code already answers.",
         "Each question has 2-4 options with a one-line description; mark the recommended option. Write in the user's language.",
         "If the task is already clear, call ask_questions with an empty list.",
+        ANSWER_HINT,
       ].join("\n");
     case "spec":
       return [
@@ -23,6 +43,7 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[]): st
         "If the project has no tests yet, plan to add the smallest fitting test runner first (node --test for plain Node,",
         "vitest for Vite projects, pytest for Python) and include its command in the checks.",
         "Then call propose_spec with the spec, the checks and a plan of 2-8 short steps.",
+        ANSWER_HINT,
       ].join("\n");
     case "tests":
       return [
@@ -131,6 +152,7 @@ export function planInstructions(): string {
     "If two must edit the same file, make one depend on the other.",
     "If the project has no tests yet, the first subtask sets up the test runner and the others depend on it.",
     "Call propose_plan with the spec, the goal's checks and the subtasks.",
+    ANSWER_HINT,
   ].join("\n");
 }
 

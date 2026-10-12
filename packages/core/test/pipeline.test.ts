@@ -148,6 +148,33 @@ describe("the full path", () => {
   });
 });
 
+describe("a question instead of a task", () => {
+  const answer = call("answer", { answer: "Это небольшой проект: **math.js** с функцией add и тест к ней." });
+
+  it("answers in the interview and stops: no spec, no checks, nothing to review", async () => {
+    const { id } = await start([call("read_file", { path: "math.js" }), answer]);
+    const done = await waitFor(id, status("done_empty"));
+    expect(done).toMatchObject({ statusReason: "answered", summary: expect.stringContaining("math.js"), spec: null, checks: [] });
+    expect(chatRequests()).toHaveLength(2);
+    const tools = chatRequests()[0]!.body.tools.map((t: any) => t.function.name);
+    expect(tools).toContain("answer");
+    expect(tools).not.toContain("write_file");
+  });
+
+  it("answers in the spec step when there is no interview", async () => {
+    const { id } = await start([answer], { interview: false });
+    expect(await waitFor(id, status("done_empty"))).toMatchObject({ statusReason: "answered" });
+  });
+
+  it("takes a follow-up question on the same task", async () => {
+    const { id } = await start([answer, call("answer", { answer: "Тестов один." })]);
+    await waitFor(id, status("done_empty"));
+    expect((await env.call("POST", `/api/tasks/${id}/feedback`, { note: "Сколько там тестов?", comments: [] })).status).toBe(200);
+    const again = await waitFor(id, (t) => t.status === "done_empty" && t.summary === "Тестов один.");
+    expect(again.statusReason).toBe("answered");
+  });
+});
+
 describe("the gate", () => {
   it("refuses to call red work done and feeds the failure back", async () => {
     const { id } = await start(

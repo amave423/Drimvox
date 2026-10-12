@@ -193,6 +193,7 @@ export interface TaskView {
 }
 
 export type TaskEventKind =
+  | "answer"
   | "user"
   | "text"
   | "tool_call"

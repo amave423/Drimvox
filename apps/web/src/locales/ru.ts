@@ -369,4 +369,10 @@ export const ru = {
   "approval.reason.media_cost": "Платная картинка дороже $0.10",
   "media.emptyLede": "Опиши, что нужно, и выбери формат. Цена видна до запуска; видео и всё дороже $0.10 запускается только по кнопке с ценой.",
   "chat.totalsCost": "В этом чате: {cost}",
+
+  "answer.title": "Ответ",
+  "answer.more": "Спросить ещё про проект…",
+  "answer.ask": "Спросить",
+  "answer.howFound": "Как агент искал ответ",
+  "task.reason.answered": "Агент ответил на вопрос. Проект не менялся.",
 } as const;

@@ -56,6 +56,10 @@ describe("workspace", () => {
   it("searches file contents", () => {
     expect(ws.search("const b")).toEqual(["src/app.ts:2: const b = 2;"]);
   });
+
+  it("searches one file when given a file", () => {
+    expect(ws.search("const", "src/app.ts")).toEqual(["src/app.ts:1: const a = 1;", "src/app.ts:2: const b = 2;"]);
+  });
 });
 
 describe("classifyCommand", () => {

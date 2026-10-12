@@ -4,6 +4,7 @@ import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
 import { failureReport, runChecks, safeChecks } from "./checks";
 import {
+  answerTools,
   interviewTools,
   phaseInstructions,
   planInstructions,
@@ -77,6 +78,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   let questions: Question[] | null = null;
   let proposal: SpecProposal | null = null;
   let teamPlan: PlanProposal | null = null;
+  let answered: string | null = null;
   const planning = row.kind === "goal" && phase === "spec";
   let extraTools: ToolSet | undefined;
   let stopTools: string[] | undefined;
@@ -89,6 +91,10 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   } else if (phase === "spec") {
     extraTools = specTools((p) => (proposal = p));
     stopTools = ["propose_spec"];
+  }
+  if (phase === "interview" || phase === "spec") {
+    extraTools = { ...extraTools, ...answerTools((a) => (answered = a)) };
+    stopTools = [...(stopTools ?? []), "answer"];
   }
 
   let cost = row.cost_usd;
@@ -144,6 +150,14 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   if (outcome.kind === "stopped") return finish(ctx, "stopped", "user");
   if (outcome.kind === "error") return finish(ctx, "failed", outcome.error.code, outcome.error.detail);
   if (outcome.kind === "budget" || outcome.kind === "steps") return finish(ctx, "waiting", outcome.kind);
+
+  // A question, not a task: the answer is the result and there is nothing to review.
+  const answer = answered as string | null;
+  if (answer !== null) {
+    ctx.tasks.update(id, { summary: answer });
+    ctx.event("answer", { text: answer });
+    return finish(ctx, "done_empty", "answered");
+  }
 
   const stages = JSON.parse(row.stages) as TaskStages;
   const asked = questions as Question[] | null;

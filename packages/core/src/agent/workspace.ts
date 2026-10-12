@@ -100,7 +100,18 @@ export class Workspace {
         }
       }
     };
-    walk(this.resolve(path));
+    const start = this.resolve(path);
+    // A file is searched on its own; models often pass one.
+    if (statSync(start).isFile()) {
+      const rel = relative(this.root, start).split(sep).join("/");
+      readFileSync(start, "utf8")
+        .split(/\r?\n/)
+        .forEach((line, i) => {
+          if (results.length < MAX_SEARCH_RESULTS && regex.test(line)) results.push(`${rel}:${i + 1}: ${line.trim()}`);
+        });
+      return results;
+    }
+    walk(start);
     return results;
   }
 }

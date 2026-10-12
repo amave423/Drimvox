@@ -198,8 +198,9 @@ export class AgentRunner {
   }
 
   feedback(id: string, f: TaskFeedback): TaskView {
-    this.require(id, ["review", "done_empty"]);
-    this.launch(id, feedbackMessage(f.note, f.comments));
+    const row = this.require(id, ["review", "done_empty"]);
+    // After an answer, "feedback" is simply the next question.
+    this.launch(id, row.status_reason === "answered" && f.note ? f.note : feedbackMessage(f.note, f.comments));
     return this.view(id)!;
   }
 
