@@ -16,9 +16,15 @@ export async function checkMedia(api: Api, send: Send, providerId: string, withV
   log(`media: ${images.length} image models, ${videos.length} video models`);
   if (images.length === 0) return false;
 
-  const image = (await api("GET", `/providers/${providerId}/media-models/one?kind=image&model=${IMAGE_MODEL}`)).body as MediaModel;
+  // A catalog with prices (RouterAI) gives the cheapest picture model; otherwise a known cheap one.
+  const cheapest = images
+    .filter((m) => m.pricing && !m.viaChat)
+    .map((m) => ({ m, usd: estimateCost(m, {}) }))
+    .filter((x): x is { m: MediaModel; usd: number } => x.usd !== null && x.usd > 0)
+    .sort((a, b) => a.usd - b.usd)[0]?.m.id;
+  const image = (await api("GET", `/providers/${providerId}/media-models/one?kind=image&model=${cheapest ?? IMAGE_MODEL}`)).body as MediaModel;
   const estimate = estimateCost(image, {});
-  log(`image ${IMAGE_MODEL}: estimate`, estimate);
+  log(`image ${image.id}: estimate $`, estimate);
   const picture = await make(api, send, providerId, image, "A small red fox in a green scarf, flat vector icon", {}, estimate === null || estimate > 0.1);
   log("  picture:", { status: picture.message.status, costUsd: picture.message.costUsd, media: picture.message.media.map((m) => m.mime), error: picture.message.error });
   if (picture.message.status !== "done" || picture.message.media.length !== 1) return false;
@@ -33,10 +39,10 @@ export async function checkMedia(api: Api, send: Send, providerId: string, withV
     })
     .filter((v): v is typeof v & { usd: number } => v.usd !== null)
     .sort((a, b) => a.usd - b.usd);
-  const cheapest = priced[0];
-  if (!cheapest) return false;
-  log(`video ${cheapest.m.id}: estimate $${cheapest.usd}`, cheapest.options);
-  const clip = await make(api, send, providerId, cheapest.m, "Waves rolling onto a beach at sunset, slow camera pan", cheapest.options, true);
+  const clipModel = priced[0];
+  if (!clipModel) return false;
+  log(`video ${clipModel.m.id}: estimate $${clipModel.usd}`, clipModel.options);
+  const clip = await make(api, send, providerId, clipModel.m, "Waves rolling onto a beach at sunset, slow camera pan", clipModel.options, true);
   let last = clip.message;
   const until = Date.now() + 15 * 60_000;
   while (last.status === "streaming" && Date.now() < until) {

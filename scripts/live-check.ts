@@ -2,7 +2,8 @@
 // lists models, reads the balance, streams one short answer and gives an agent a tiny real coding task.
 // Costs a fraction of a cent. `npm run live-check -- --no-agent` skips the agent part;
 // `--team` gives the task to a team of agents instead of one. `--media` draws one cheap picture through
-// OpenRouter (about a cent); `--video` also makes the cheapest clip (tens of cents).
+// OpenRouter or RouterAI (about a cent); `--video` also makes the cheapest clip. `--web` asks a question that
+// needs the internet. `--only=routerai` checks one provider.
 import { startServer } from "@artel/core";
 import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@artel/shared";
 import { randomBytes } from "node:crypto";
@@ -30,6 +31,13 @@ const targets: Target[] = [
     models: ["deepseek/deepseek-chat-v3.1", "deepseek/deepseek-chat", "openai/gpt-4o-mini", "google/gemini-2.5-flash"],
     agentModel: "deepseek/deepseek-chat-v3.1",
   },
+  {
+    // Rubles; cheap DeepSeek V4.1 Flash, about 4 ₽ in and 16 ₽ out per 1M tokens (2026-10-12).
+    preset: "routerai",
+    envKey: "ROUTERAI_API_KEY",
+    models: ["deepseek/deepseek-v4.1-flash", "mistralai/mistral-nemo"],
+    agentModel: "deepseek/deepseek-v4.1-flash",
+  },
   { preset: "deepseek", envKey: "DEEPSEEK_API_KEY", models: ["deepseek-flash", "deepseek-chat"], reasoningModel: "deepseek-v4-pro", agentModel: "deepseek-flash" },
   {
     preset: "nvidia",
@@ -40,6 +48,7 @@ const targets: Target[] = [
 ];
 
 const MIN_USD_FOR_AGENT = 0.1;
+const MIN_RUB = 10;
 
 const env = { ...readDotEnv(join(process.cwd(), ".env")), ...process.env };
 const secrets = targets.map((t) => env[t.envKey]).filter((v): v is string => !!v);
@@ -59,7 +68,8 @@ const api = async (method: string, path: string, body?: unknown) => {
 let failures = 0;
 let checked = 0;
 try {
-  for (const target of targets) {
+  const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7);
+  for (const target of targets.filter((t) => !only || t.preset === only)) {
     const key = env[target.envKey];
     log(`\n=== ${target.preset} ===`);
     if (!key) {
@@ -108,11 +118,22 @@ try {
       });
     }
 
+    if (process.argv.includes("--web")) {
+      const events = await sendEvents(
+        (await api("POST", "/chats", { providerId: provider.id, model: chatModel })).body.id,
+        { content: "Какая сейчас погода в Москве? Ответь в двух предложениях и назови источник.", web: "free" },
+      );
+      const done = events.find((e): e is Extract<StreamEvent, { type: "done" }> => e.type === "done")?.message;
+      const tools = events.filter((e): e is Extract<StreamEvent, { type: "tool" }> => e.type === "tool").map((e) => `${e.name} ${e.input}`);
+      log(`web ${chatModel}:`, { status: done?.status, tools, text: done?.content.slice(0, 300), costUsd: done?.costUsd, error: done?.error });
+      if (done?.status !== "done" || tools.length === 0) failures++;
+    }
+
     // An agent task costs a few cents; never let the check push an account below zero.
     const funds = balance.body?.balance as { amount: number; currency: string } | null | undefined;
-    const lowFunds = funds && funds.currency === "USD" && funds.amount < MIN_USD_FOR_AGENT;
+    const lowFunds = funds && ((funds.currency === "USD" && funds.amount < MIN_USD_FOR_AGENT) || (funds.currency === "RUB" && funds.amount < MIN_RUB));
     if (!process.argv.includes("--no-agent") && lowFunds) {
-      log(`agent: skipped, balance $${funds.amount.toFixed(4)} is below $${MIN_USD_FOR_AGENT} — top up to run it`);
+      log(`agent: skipped, balance ${funds.amount.toFixed(4)} ${funds.currency} is too low — top up to run it`);
     } else if (!process.argv.includes("--no-agent")) {
       if (!list.some((m) => m.id === target.agentModel)) {
         failures++;
@@ -123,8 +144,8 @@ try {
     }
 
     const wantsMedia = process.argv.includes("--media") || process.argv.includes("--video");
-    if (wantsMedia && target.preset === "openrouter") {
-      if (lowFunds) log(`media: skipped, balance $${funds.amount.toFixed(4)} is below $${MIN_USD_FOR_AGENT} — top up to run it`);
+    if (wantsMedia && (target.preset === "openrouter" || target.preset === "routerai")) {
+      if (lowFunds) log(`media: skipped, balance ${funds.amount.toFixed(4)} ${funds.currency} is too low — top up to run it`);
       else if (!(await checkMedia(api, sendEvents, provider.id, process.argv.includes("--video"), log))) failures++;
     }
   }
