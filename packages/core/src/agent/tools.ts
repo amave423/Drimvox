@@ -4,13 +4,14 @@ import { classifyCommand, runCommand, type CommandVerdict } from "./commands";
 import type { Workspace } from "./workspace";
 
 /** Why an agent needs the user's permission: a risky command or a dear picture. */
-export type ApprovalReason = Extract<CommandVerdict, { action: "ask" }>["reason"] | "media_cost";
+export type ApprovalReason = Extract<CommandVerdict, { action: "ask" }>["reason"] | "media_cost" | "mcp";
 
 export interface ToolHooks {
   onCall(call: { callId: string; name: string; input: unknown }): void;
   onResult(result: { callId: string; name: string; ok: boolean; output: string }): void;
   /** Resolves true when the user allows the command. */
-  askApproval(command: string, reason: ApprovalReason, signal?: AbortSignal): Promise<boolean>;
+  /** Resolves true when the user allows it once, "always" when for good (MCP tools), false when not. */
+  askApproval(command: string, reason: ApprovalReason, signal?: AbortSignal): Promise<boolean | "always">;
   onFinish(result: { summary: string; commitMessage: string }): void;
 }
 

@@ -1,18 +1,37 @@
 import { zValidator } from "@hono/zod-validator";
-import { chatCreateSchema, chatUpdateSchema, estimateCost, messageSendSchema, needsConfirmation, presets } from "@artel/shared";
+import {
+  approvalDecisionSchema,
+  chatCreateSchema,
+  chatUpdateSchema,
+  estimateCost,
+  messageSendSchema,
+  needsConfirmation,
+  presets,
+  type StreamEvent,
+} from "@artel/shared";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { reply } from "../chats/reply";
 import type { ChatRepo } from "../chats/repo";
 import { mediaModel } from "../media/catalog";
+import type { ChatApprovals } from "../chats/approvals";
 import type { WebAccess } from "../internet/web";
+import type { McpHub } from "../mcp/hub";
 import type { Studio } from "../media/studio";
 import type { ProviderRepo } from "../providers/repo";
 
 const notFound = { error: { code: "not_found" } } as const;
 
-export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, studio: Studio, web: WebAccess, idleTimeoutMs: number) {
+export function chatRoutes(
+  chats: ChatRepo,
+  providers: ProviderRepo,
+  studio: Studio,
+  web: WebAccess,
+  mcp: McpHub,
+  approvals: ChatApprovals,
+  idleTimeoutMs: number,
+) {
   return new Hono()
     .get("/", (c) => c.json(chats.list()))
     .post("/", zValidator("json", chatCreateSchema), (c) => {
@@ -33,6 +52,11 @@ export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, studio: Stu
       return chat ? c.json(chat, 200) : c.json(notFound, 404);
     })
     .delete("/:id", (c) => (chats.remove(c.req.param("id")) ? c.body(null, 204) : c.json(notFound, 404)))
+    .post("/:id/approvals/:approvalId", zValidator("json", approvalDecisionSchema), (c) => {
+      const { allow, always } = c.req.valid("json");
+      const known = approvals.answer(c.req.param("id"), c.req.param("approvalId"), allow, always);
+      return known ? c.json({ ok: true as const }, 200) : c.json(notFound, 404);
+    })
     .post("/:id/messages", zValidator("json", messageSendSchema), async (c) => {
       const chat = chats.get(c.req.param("id"));
       if (!chat) return c.json(notFound, 404);
@@ -64,6 +88,14 @@ export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, studio: Stu
       return streamSSE(c, async (stream) => {
         const controller = new AbortController();
         stream.onAbort(() => controller.abort());
+        const emit = async (event: StreamEvent) => {
+          if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
+        };
+        // MCP tools of the user's servers; each new tool asks in the answer first.
+        const mcpTools = await mcp.toolsFor((call) => approvals.ask(chat.id, emit, call), {
+          onCall: (call) => void emit({ type: "tool", name: call.name, input: JSON.stringify(call.input) }),
+          onResult: () => {},
+        });
         await reply({
           chats,
           chatId: chat.id,
@@ -74,9 +106,8 @@ export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, studio: Stu
           idleTimeoutMs,
           web: webMode,
           webAccess: web,
-          emit: async (event) => {
-            if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
-          },
+          extraTools: mcpTools,
+          emit,
         });
       });
     });

@@ -18,7 +18,7 @@ import { loadMediaModel } from "../../lib/media";
 import { postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
 import { MediaOptions } from "./MediaOptions";
-import { AssistantMessage, UserMessage } from "./Messages";
+import { AssistantMessage, UserMessage, type ChatApproval } from "./Messages";
 import { ModelNote } from "./ModelNote";
 import { ModelPicker } from "./ModelPicker";
 import { readWebMode, WebSwitch } from "./WebSwitch";
@@ -32,6 +32,8 @@ interface Draft {
   media: boolean;
   /** Searches and pages the model looked at while answering. */
   activity: string[];
+  /** MCP tools waiting for, or given, the user's permission. */
+  approvals: ChatApproval[];
 }
 
 /** Answers still being made on the provider's side, such as clips, are checked this often. */
@@ -132,7 +134,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
 
     const controller = new AbortController();
     abort.current = controller;
-    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text", activity: [] });
+    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text", activity: [], approvals: [] });
     try {
       await postStream<StreamEvent>(
         `/api/chats/${id}/messages`,
@@ -143,8 +145,21 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           if (e.type === "text") setDraft((d) => d && { ...d, text: d.text + e.text });
           if (e.type === "reasoning") setDraft((d) => d && { ...d, reasoning: d.reasoning + e.text });
           if (e.type === "tool") {
-            const line = e.name === "web_search" ? t("web.searching", { query: e.input }) : t("web.reading", { url: e.input });
+            const line =
+              e.name === "web_search"
+                ? t("web.searching", { query: e.input })
+                : e.name === "open_page"
+                  ? t("web.reading", { url: e.input })
+                  : t("chat.mcpCall", { name: e.name });
             setDraft((d) => d && { ...d, activity: [...d.activity, line] });
+          }
+          if (e.type === "approval") {
+            const card: ChatApproval = { id: e.id, server: e.server, tool: e.tool, input: e.input, state: "open" };
+            setDraft((d) => d && { ...d, approvals: [...d.approvals, card] });
+          }
+          if (e.type === "approved") {
+            const state = e.allowed ? "allowed" : "denied";
+            setDraft((d) => d && { ...d, approvals: d.approvals.map((a) => (a.id === e.id ? { ...a, state } : a)) });
           }
         },
         controller.signal,
@@ -216,6 +231,13 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
                 streaming
                 making={draft.media ? kind : undefined}
                 activity={draft.activity}
+                approvals={draft.approvals}
+                onApprove={(approvalId, allow, always) =>
+                  chat &&
+                  void api.chats[":id"].approvals[":approvalId"]
+                    .$post({ param: { id: chat.id, approvalId }, json: { allow, always } })
+                    .catch(() => null)
+                }
               />
             </>
           )}

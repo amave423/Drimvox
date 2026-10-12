@@ -26,7 +26,15 @@ describe("buildFeed", () => {
       ev(1, "approval", { id: "p", command: "git push", reason: "push", allowed: null }),
       ev(2, "approval", { id: "p", command: "git push", reason: "push", allowed: false }),
     ]);
-    expect(feed).toEqual([{ kind: "approval", seq: 1, id: "p", command: "git push", reason: "push", allowed: false }]);
+    expect(feed).toEqual([{ kind: "approval", seq: 1, id: "p", command: "git push", reason: "push", allowed: false, always: false }]);
+  });
+
+  it("remembers that an MCP tool was allowed for good", () => {
+    const feed = buildFeed([
+      ev(1, "approval", { id: "m", command: "demo: add {}", reason: "mcp", allowed: null }),
+      ev(2, "approval", { id: "m", command: "demo: add {}", reason: "mcp", allowed: true, always: true }),
+    ]);
+    expect(feed[0]).toMatchObject({ kind: "approval", allowed: true, always: true });
   });
 
   it("leaves finish out of the actions and keeps status lines", () => {

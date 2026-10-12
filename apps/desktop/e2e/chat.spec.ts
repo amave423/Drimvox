@@ -170,3 +170,32 @@ test("keeps the model picker and chat actions within reach in a long chat", asyn
   await page.getByRole("option", { name: /Other Model/ }).click();
   await expect(page.getByRole("button", { name: /Тестовый \/ other-model/ })).toBeInViewport();
 });
+
+test("an MCP server from the settings gives the chat a tool that asks first", async () => {
+  fake = await startFakeProvider({
+    key: KEY,
+    models,
+    script: [{ toolCalls: [{ name: "mcp_demo_echo", args: { text: "привет" } }] }, { text: "Сервер ответил: echo: привет" }],
+  });
+  const page = await launch();
+  await connect(page);
+  await expect(page.getByText("Моделей: 1")).toBeVisible();
+
+  const server = fileURLToPath(new URL("../../../packages/core/test/mcp-server.mjs", import.meta.url));
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await page.getByRole("button", { name: "Добавить сервер" }).click();
+  await page.getByLabel("Название").fill("demo");
+  await page.getByLabel("Команда", { exact: true }).fill(`node "${server}"`);
+  await page.getByRole("button", { name: "Подключить" }).click();
+  await expect(page.getByText(/Инструментов: 3/)).toBeVisible({ timeout: 20_000 });
+
+  await startChat(page);
+  await say(page, "Повтори привет через сервер");
+  await expect(page.getByText("Инструмент MCP-сервера")).toBeVisible();
+  await page.getByRole("button", { name: "Разрешать всегда" }).click();
+  await expect(page.getByText("Сервер ответил: echo: привет")).toBeVisible();
+
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await expect(page.getByText("Разрешены всегда:")).toBeVisible();
+  await expect(page.getByRole("button", { name: "echo ×" })).toBeVisible();
+});

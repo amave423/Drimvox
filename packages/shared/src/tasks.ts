@@ -122,7 +122,7 @@ export const taskFeedbackSchema = z
 
 export const taskContinueSchema = z.object({ note: z.string().trim().max(20_000).optional() }).strict();
 export const taskAcceptSchema = z.object({ message: z.string().trim().min(1).max(500).optional() }).strict();
-export const approvalAnswerSchema = z.object({ allow: z.boolean() }).strict();
+export const approvalAnswerSchema = z.object({ allow: z.boolean(), always: z.boolean().default(false) }).strict();
 
 export type TaskFeedback = z.infer<typeof taskFeedbackSchema>;
 
@@ -146,7 +146,7 @@ export type TaskReason = string;
 export interface PendingApproval {
   id: string;
   command: string;
-  /** push, global, outside, system, download, media_cost */
+  /** push, global, outside, system, download, media_cost, mcp */
   reason: string;
 }
 

@@ -18,6 +18,13 @@ const FIX_TITLE = "Fix the checks after a merge";
 /** Goal states in which subtasks keep going; any other waiting reason needs the user first. */
 const DRIVEN = new Set(["running", "waiting:subtask_stuck", "waiting:subtask_waiting"]);
 
+/** The user's plan, checked: ids must not repeat, and dependencies on removed subtasks are dropped. Null on repeats. */
+export function cleanPlan(subtasks: PlannedSubtask[]): PlannedSubtask[] | null {
+  const ids = new Set(subtasks.map((s) => s.id));
+  if (ids.size !== subtasks.length) return null;
+  return subtasks.map((s) => ({ ...s, dependsOn: [...new Set(s.dependsOn)].filter((d) => ids.has(d) && d !== s.id) }));
+}
+
 /** What the coordinator needs from the runner. */
 export interface TeamHost {
   tasks: TaskRepo;

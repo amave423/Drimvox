@@ -48,6 +48,8 @@ export interface PassContext {
   web: WebAccess;
   /** Shared skills of Artel; the project's own are found in the copy. */
   skillsDir: string;
+  /** Tools of the user's MCP servers; the first call of each asks the user. */
+  mcpTools(hooks: Omit<ToolHooks, "onFinish" | "askApproval">): Promise<ToolSet>;
   /** The picture tool when the settings name an image model; none otherwise. */
   imageTools(
     row: TaskRow,
@@ -116,7 +118,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   const mode = phase === "interview" || phase === "spec" ? "read" : "write";
   // The project's skills first: they win over shared ones of the same name.
   const skills = findSkills([...projectSkillRoots(row.worktree), { dir: ctx.skillsDir, scope: "shared" }]);
-  let ownTools: ToolSet = { ...webTools(ctx.web, hooks), ...skillTools(skills, row.worktree, hooks) };
+  let ownTools: ToolSet = { ...webTools(ctx.web, hooks), ...skillTools(skills, row.worktree, hooks), ...(await ctx.mcpTools(hooks)) };
   if (mode === "write") {
     // Pictures cost money outside the model's own usage: they go into the task's spending at once.
     const spend = (usd: number) => {

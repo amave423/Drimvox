@@ -1,6 +1,5 @@
 import type {
   ModelRef,
-  PendingApproval,
   PlannedSubtask,
   Question,
   TaskEvent,
@@ -14,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { imageToolsFor } from "../media/agent-tool";
 import type { WebAccess } from "../internet/web";
+import type { McpHub } from "../mcp/hub";
 import type { MediaRepo } from "../media/repo";
 import type { ProviderRepo } from "../providers/repo";
 import { addWorktree, headCommit, removeWorktree, showFile } from "./git";
@@ -22,11 +22,11 @@ import { answersMessage, specMessage } from "./phases";
 import { feedbackMessage } from "./prompt";
 import { toTaskView, type ProjectRepo, type TaskRepo, type TaskRow } from "./repo";
 import { acceptTask, discardTask, snapshot, taskDiff } from "./review";
-import { Team } from "./team";
+import { Team, cleanPlan } from "./team";
+import { waitForApproval, type ApprovalAnswer, type ApprovalSlot } from "./approvals";
 
-interface Live {
+interface Live extends ApprovalSlot {
   controller: AbortController;
-  approval: (PendingApproval & { resolve(allow: boolean): void }) | null;
   done: Promise<void>;
 }
 
@@ -44,6 +44,7 @@ export interface RunnerOptions {
   imageModel(): { providerId: string; model: string } | null;
   media: MediaRepo;
   web: WebAccess;
+  mcp: McpHub;
   /** Shared skills; project skills are read from each task's copy. */
   skillsDir: string;
   idleTimeoutMs: number;
@@ -153,10 +154,8 @@ export class AgentRunner {
   /** The user's OK on a goal's plan, possibly edited: the team starts on the subtasks. */
   approvePlan(id: string, p: { spec: string; checks: string[]; subtasks: PlannedSubtask[] }): TaskView {
     const row = this.requireWaiting(id, "plan_review");
-    const ids = new Set(p.subtasks.map((s) => s.id));
-    if (ids.size !== p.subtasks.length) throw new TaskBusy("Subtask ids repeat");
-    // Dependencies on removed subtasks would never be met.
-    const subtasks = p.subtasks.map((s) => ({ ...s, dependsOn: [...new Set(s.dependsOn)].filter((d) => ids.has(d) && d !== s.id) }));
+    const subtasks = cleanPlan(p.subtasks);
+    if (!subtasks) throw new TaskBusy("Subtask ids repeat");
     const edited = p.spec !== row.spec || JSON.stringify(p.checks) !== row.checks || JSON.stringify(subtasks) !== row.planned;
     this.o.tasks.update(id, {
       spec: p.spec,
@@ -220,10 +219,10 @@ export class AgentRunner {
     return !!live;
   }
 
-  answer(id: string, approvalId: string, allow: boolean): boolean {
+  answer(id: string, approvalId: string, allow: boolean, always = false): boolean {
     const approval = this.live.get(id)?.approval;
     if (!approval || approval.id !== approvalId) return false;
-    approval.resolve(allow);
+    approval.resolve(allow && always ? "always" : allow);
     return true;
   }
 
@@ -348,27 +347,22 @@ export class AgentRunner {
       startTeam: () => this.team.start(id),
       web: this.o.web,
       skillsDir: this.o.skillsDir,
+      mcpTools: (hooks) =>
+        this.o.mcp.toolsFor(
+          (call) => (live ? this.askApproval(id, live, `${call.server}: ${call.tool} ${JSON.stringify(call.input).slice(0, 500)}`, "mcp", call.signal) : Promise.resolve(false)),
+          hooks,
+        ),
       imageTools: (row, hooks, onSpend, budgetLeft) =>
         imageToolsFor(this.o.imageModel(), this.o.providers, { worktree: row.worktree, taskId: id, media: this.o.media, hooks, budgetLeft, onSpend }),
     };
   }
 
-  private askApproval(id: string, live: Live, command: string, reason: string, signal?: AbortSignal): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
-      const approvalId = randomUUID();
-      const settle = (allow: boolean) => {
-        live.approval = null;
-        signal?.removeEventListener("abort", onAbort);
-        this.event(id, "approval", { id: approvalId, command, reason, allowed: allow });
-        this.setStatus(id, "running", null);
-        resolve(allow);
-      };
-      const onAbort = () => settle(false);
-      live.approval = { id: approvalId, command, reason, resolve: settle };
-      signal?.addEventListener("abort", onAbort, { once: true });
-      this.event(id, "approval", { id: approvalId, command, reason, allowed: null });
-      this.setStatus(id, "waiting", "approval");
-    });
+  private askApproval(id: string, live: Live, command: string, reason: string, signal?: AbortSignal): Promise<ApprovalAnswer> {
+    const report = {
+      event: (data: object) => this.event(id, "approval", data),
+      waiting: (on: boolean) => (on ? this.setStatus(id, "waiting", "approval") : this.setStatus(id, "running", null)),
+    };
+    return waitForApproval(live, command, reason, report, signal);
   }
 
   private finish(id: string, status: TaskRow["status"], reason: string | null, detail?: string): void {

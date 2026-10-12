@@ -11,7 +11,7 @@ export type FeedItem =
       input: Record<string, unknown>;
       result: { ok: boolean; output: string } | null;
     }
-  | { kind: "approval"; seq: number; id: string; command: string; reason: string; allowed: boolean | null }
+  | { kind: "approval"; seq: number; id: string; command: string; reason: string; allowed: boolean | null; always: boolean }
   | { kind: "status"; seq: number; status: string; reason: string | null; detail: string | null }
   | { kind: "phase"; seq: number; phase: string }
   | { kind: "questions"; seq: number; questions: { id: string; question: string }[] }
@@ -52,9 +52,11 @@ export function buildFeed(events: TaskEvent[]): FeedItem[] {
       }
       case "approval": {
         const known = approvals.get(d.id);
-        if (known) known.allowed = d.allowed;
-        else {
-          const item = { kind: "approval" as const, seq: e.seq, id: d.id, command: d.command, reason: d.reason, allowed: d.allowed };
+        if (known) {
+          known.allowed = d.allowed;
+          known.always = !!d.always;
+        } else {
+          const item = { kind: "approval" as const, seq: e.seq, id: d.id, command: d.command, reason: d.reason, allowed: d.allowed, always: !!d.always };
           approvals.set(d.id, item);
           items.push(item);
         }

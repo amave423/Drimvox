@@ -40,8 +40,8 @@ export function TaskSheet({ taskId }: { taskId: string }) {
   const reviewing = task.kind !== "subtask" && !answered && (REVIEW_STATES.has(task.status) || stuck);
   const waitingFor = task.status === "waiting" ? task.statusReason : null;
 
-  const answer = (approvalId: string, allow: boolean) =>
-    void api.tasks[":id"].approvals[":approvalId"].$post({ param: { id: task.id, approvalId }, json: { allow } }).catch(() => null);
+  const answer = (approvalId: string, allow: boolean, always = false) =>
+    void api.tasks[":id"].approvals[":approvalId"].$post({ param: { id: task.id, approvalId }, json: { allow, always } }).catch(() => null);
 
   return (
     <article className="sheet task">

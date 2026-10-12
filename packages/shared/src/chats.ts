@@ -89,6 +89,9 @@ export type StreamEvent =
   | { type: "start"; userMessage: MessageView; assistantMessageId: string }
   | { type: "reasoning"; text: string }
   | { type: "text"; text: string }
-  /** The model searched or opened a page with Artel's internet tools. */
-  | { type: "tool"; name: "web_search" | "open_page"; input: string }
+  /** The model searched or opened a page with Artel's internet tools, or called an MCP tool ("server/tool"). */
+  | { type: "tool"; name: string; input: string }
+  /** An MCP tool waits for the user's permission; answered with POST /api/chats/:id/approvals/:id. */
+  | { type: "approval"; id: string; server: string; tool: string; input: unknown }
+  | { type: "approved"; id: string; allowed: boolean }
   | { type: "done"; message: MessageView };

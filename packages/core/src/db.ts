@@ -126,6 +126,24 @@ const migrations: string[] = [
   // RouterAI added by hand as a custom provider becomes the RouterAI preset: ruble prices, balance, media.
   `update providers set preset = 'routerai', base_url = 'https://routerai.ru/api/v1'
      where preset = 'custom' and (base_url like 'https://routerai.ru%' or base_url like 'https://www.routerai.ru%');`,
+  `create table mcp_servers (
+     id text primary key,
+     name text not null,
+     transport text not null check (transport in ('stdio', 'http')),
+     command text,
+     args text not null default '[]',
+     env_secret text,
+     url text,
+     headers_secret text,
+     enabled integer not null default 1,
+     created_at integer not null,
+     updated_at integer not null
+   ) strict;
+   create table mcp_allowed (
+     server_id text not null references mcp_servers(id) on delete cascade,
+     tool text not null,
+     primary key (server_id, tool)
+   ) strict;`,
 ];
 
 export interface Database {

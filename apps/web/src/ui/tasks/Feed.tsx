@@ -8,7 +8,7 @@ import { Markdown } from "../chat/Markdown";
 interface Props {
   items: FeedItem[];
   /** Present while the task waits for an answer. */
-  onAnswer?(approvalId: string, allow: boolean): void;
+  onAnswer?(approvalId: string, allow: boolean, always?: boolean): void;
 }
 
 /** The agent's work as one line per action; details open on click. */
@@ -105,13 +105,20 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
             <button className="btn is-primary" onClick={() => onAnswer(item.id, true)}>
               {t("approval.allow")}
             </button>
+            {item.reason === "mcp" && (
+              <button className="btn" onClick={() => onAnswer(item.id, true, true)}>
+                {t("approval.always")}
+              </button>
+            )}
             <button className="btn is-pencil" onClick={() => onAnswer(item.id, false)}>
               {t("approval.deny")}
             </button>
           </div>
         ) : (
           item.allowed !== null && (
-            <span className={item.allowed ? "is-ok" : "is-pencil-text"}>{t(item.allowed ? "approval.allowed" : "approval.denied")}</span>
+            <span className={item.allowed ? "is-ok" : "is-pencil-text"}>
+              {t(item.always ? "approval.allowedAlways" : item.allowed ? "approval.allowed" : "approval.denied")}
+            </span>
           )
         )}
       </div>
@@ -135,10 +142,15 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
                 : item.name === "read_skill_file"
                   ? `${input.name}/${input.path}`
                   : input.path;
+  const mcp = item.name.includes("/");
   const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image", "web_search", "open_page", "use_skill", "read_skill_file"].includes(
     item.name,
   );
-  const label = known ? t(`action.${item.name}` as MessageKey, { target: target ?? "" }) : item.name;
+  const label = mcp
+    ? t("action.mcp", { target: item.name })
+    : known
+      ? t(`action.${item.name}` as MessageKey, { target: target ?? "" })
+      : item.name;
 
   let outcome: { text: string; bad: boolean } | null = null;
   if (item.result && item.name === "run_command") {

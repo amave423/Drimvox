@@ -92,7 +92,8 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner) {
     })
     .post("/:id/approvals/:approvalId", zValidator("json", approvalAnswerSchema), (c) => {
       const id = c.req.param("id");
-      if (!runner.answer(id, c.req.param("approvalId"), c.req.valid("json").allow)) return c.json(notFound, 404);
+      const { allow, always } = c.req.valid("json");
+      if (!runner.answer(id, c.req.param("approvalId"), allow, always)) return c.json(notFound, 404);
       return c.json(runner.view(id)!, 200);
     })
     .post("/:id/continue", zValidator("json", taskContinueSchema), (c) => {

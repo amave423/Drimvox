@@ -1,6 +1,6 @@
 import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
 import type { WebMode } from "@artel/shared";
-import { isStepCount, streamText } from "ai";
+import { isStepCount, streamText, type ToolSet } from "ai";
 import { WEB_HINT, webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
@@ -27,6 +27,8 @@ export interface ReplyInput {
   idleTimeoutMs: number;
   web: WebMode;
   webAccess: WebAccess;
+  /** Tools besides the internet ones, such as the user's MCP servers. */
+  extraTools?: ToolSet;
   emit(event: StreamEvent): Promise<void>;
 }
 
@@ -62,6 +64,10 @@ export async function reply(i: ReplyInput): Promise<void> {
   };
   resetClock();
 
+  const tools: ToolSet = {
+    ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }) : {}),
+    ...i.extraTools,
+  };
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
@@ -73,10 +79,10 @@ export async function reply(i: ReplyInput): Promise<void> {
         .filter(Boolean)
         .join("\n"),
       messages: history,
-      ...(i.web === "free"
+      ...(Object.keys(tools).length
         ? {
-            tools: webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }),
-            // Search, read a page or two, answer.
+            tools,
+            // Search, read a page or two, call a tool or two, answer.
             stopWhen: isStepCount(8),
           }
         : {}),

@@ -26,9 +26,30 @@ interface AssistantProps {
   making?: ChatKind;
   /** What the model searched and read while answering. */
   activity?: string[];
+  /** MCP tools asking for permission in this answer. */
+  approvals?: ChatApproval[];
+  onApprove?(id: string, allow: boolean, always: boolean): void;
 }
 
-export function AssistantMessage({ content, reasoning, model, streaming, message, making, activity = [] }: AssistantProps) {
+export interface ChatApproval {
+  id: string;
+  server: string;
+  tool: string;
+  input: unknown;
+  state: "open" | "allowed" | "denied";
+}
+
+export function AssistantMessage({
+  content,
+  reasoning,
+  model,
+  streaming,
+  message,
+  making,
+  activity = [],
+  approvals = [],
+  onApprove,
+}: AssistantProps) {
   const { t, settings } = useApp();
   const tokens = (n: number) => formatTokens(n, settings.locale);
 
@@ -57,6 +78,30 @@ export function AssistantMessage({ content, reasoning, model, streaming, message
           ))}
         </ul>
       )}
+      {approvals.map((a) => (
+        <div key={a.id} className="approval" role={a.state === "open" ? "alert" : undefined}>
+          <strong>{t("approval.title")}</strong>
+          <span>{t("approval.reason.mcp")}</span>
+          <code className="mono">
+            {a.server}: {a.tool} {JSON.stringify(a.input)}
+          </code>
+          {a.state === "open" && onApprove ? (
+            <div className="actions">
+              <button className="btn is-primary" onClick={() => onApprove(a.id, true, false)}>
+                {t("approval.allow")}
+              </button>
+              <button className="btn" onClick={() => onApprove(a.id, true, true)}>
+                {t("approval.always")}
+              </button>
+              <button className="btn is-pencil" onClick={() => onApprove(a.id, false, false)}>
+                {t("approval.deny")}
+              </button>
+            </div>
+          ) : (
+            <span className={a.state === "allowed" ? "is-ok" : "is-pencil-text"}>{t(a.state === "allowed" ? "approval.allowed" : "approval.denied")}</span>
+          )}
+        </div>
+      ))}
       {reasoning && <Reasoning text={reasoning} thinking={!!streaming && !content} />}
       {content && <Markdown text={content} streaming={streaming} />}
       {message?.media.map((item) => <MediaView key={item.id} item={item} />)}

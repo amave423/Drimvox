@@ -4,14 +4,18 @@ import { Hono } from "hono";
 import { join } from "node:path";
 import { ProjectRepo, TaskRepo } from "./agent/repo";
 import { AgentRunner } from "./agent/runner";
+import { ChatApprovals } from "./chats/approvals";
 import { ChatRepo } from "./chats/repo";
 import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
 import { duckDuckGo, type WebAccess } from "./internet/web";
+import { McpHub } from "./mcp/hub";
+import { McpRepo } from "./mcp/repo";
 import { MediaRepo } from "./media/repo";
 import { Studio } from "./media/studio";
 import { ProviderRepo } from "./providers/repo";
 import { chatRoutes, usageRoutes } from "./routes/chats";
+import { mcpRoutes } from "./routes/mcp";
 import { mediaRoutes } from "./routes/media";
 import { skillRoutes } from "./routes/skills";
 import { projectRoutes } from "./routes/projects";
@@ -51,7 +55,11 @@ const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
 /** The API plus a way to stop running agents before the database closes. */
 export function createCore(o: AppOptions) {
   setRateSource(o.usdRub);
-  const providers = new ProviderRepo(o.db, createCipher(o.secretKey), o.presetUrls);
+  const cipher = createCipher(o.secretKey);
+  const providers = new ProviderRepo(o.db, cipher, o.presetUrls);
+  const mcpRepo = new McpRepo(o.db, cipher);
+  const mcp = new McpHub(mcpRepo);
+  const approvals = new ChatApprovals();
   const media = new MediaRepo(o.db, o.dataDir);
   const chats = new ChatRepo(o.db, media);
   const projects = new ProjectRepo(o.db);
@@ -68,6 +76,7 @@ export function createCore(o: AppOptions) {
     imageModel: () => readSettings(o.db).imageModel,
     media,
     web,
+    mcp,
     skillsDir: join(o.dataDir, "skills"),
     idleTimeoutMs,
   });
@@ -90,7 +99,8 @@ export function createCore(o: AppOptions) {
       c.json(writeSettings(o.db, c.req.valid("json"))),
     )
     .route("/providers", providerRoutes(providers))
-    .route("/chats", chatRoutes(chats, providers, studio, web, idleTimeoutMs))
+    .route("/chats", chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs))
+    .route("/mcp", mcpRoutes(mcpRepo, mcp))
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills")))
     .route("/usage", usageRoutes(chats))
@@ -106,9 +116,10 @@ export function createCore(o: AppOptions) {
   if (o.webDir) app.get("*", webHandler(o.webDir));
   return {
     app,
-    shutdown: () => {
+    shutdown: async () => {
       studio.shutdown();
-      return runner.shutdown();
+      await runner.shutdown();
+      await mcp.shutdown();
     },
   };
 }
