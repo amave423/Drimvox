@@ -35,6 +35,8 @@ const targets: Target[] = [
   },
 ];
 
+const MIN_USD_FOR_AGENT = 0.1;
+
 const env = { ...readDotEnv(join(process.cwd(), ".env")), ...process.env };
 const secrets = targets.map((t) => env[t.envKey]).filter((v): v is string => !!v);
 const redact = (text: string) => secrets.reduce((s, key) => s.split(key).join("***"), text);
@@ -102,7 +104,12 @@ try {
       });
     }
 
-    if (!process.argv.includes("--no-agent")) {
+    // An agent task costs a few cents; never let the check push an account below zero.
+    const funds = balance.body?.balance as { amount: number; currency: string } | null | undefined;
+    const lowFunds = funds && funds.currency === "USD" && funds.amount < MIN_USD_FOR_AGENT;
+    if (!process.argv.includes("--no-agent") && lowFunds) {
+      log(`agent: skipped, balance $${funds.amount.toFixed(4)} is below $${MIN_USD_FOR_AGENT} — top up to run it`);
+    } else if (!process.argv.includes("--no-agent")) {
       if (!list.some((m) => m.id === target.agentModel)) {
         failures++;
         log(`agent: model ${target.agentModel} is not in the list`);
