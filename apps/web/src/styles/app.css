@@ -40,7 +40,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 }
 .topbar button { -webkit-app-region: no-drag; }
 .logo { font: 600 21px var(--font-serif); }
-.crumb { color: var(--muted); }
+.crumb { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-link { padding: 5px 12px; border-radius: 999px; color: var(--muted); }
 .topbar-link:hover { color: var(--fg); }
 .topbar-link.is-on { background: var(--sheet); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }

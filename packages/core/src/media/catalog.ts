@@ -26,7 +26,7 @@ export async function listMediaModels(conn: Connection, kind: MediaKind): Promis
   let items: Raw[] = [];
   try {
     const url = how === "combined" ? `${conn.baseUrl}/models` : `${conn.baseUrl}/${kind === "image" ? "images" : "videos"}/models`;
-    const body = (await fetchJson(url, conn.apiKey)) as { data?: unknown };
+    const body = (await fetchJson(url, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
     items = (Array.isArray(body?.data) ? body.data : []).filter((i): i is Raw => !!i && typeof i === "object");
   } catch {
     return [];
@@ -55,7 +55,7 @@ async function imagePrices(conn: Connection, id: string): Promise<PriceLine[]> {
   if (hit && Date.now() - hit.at < TTL_MS) return hit.lines;
   let lines: PriceLine[] = [];
   try {
-    const body = (await fetchJson(`${conn.baseUrl}/images/models/${id}/endpoints`, conn.apiKey)) as { endpoints?: { pricing?: unknown }[] };
+    const body = (await fetchJson(`${conn.baseUrl}/images/models/${id}/endpoints`, conn.apiKey, 15_000, {}, conn.fetch)) as { endpoints?: { pricing?: unknown }[] };
     // The first endpoint is the one OpenRouter routes to by default.
     const raw = body?.endpoints?.[0]?.pricing;
     const factor = await usdPer(conn.currency);

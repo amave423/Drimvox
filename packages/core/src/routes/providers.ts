@@ -71,7 +71,7 @@ export function providerRoutes(providers: ProviderRepo) {
       const conn = providers.connection(c.req.param("id"));
       if (!conn) return c.json(notFound, 404);
       try {
-        return c.json({ balance: await fetchBalance(conn.preset, conn.baseUrl, conn.apiKey) }, 200);
+        return c.json({ balance: await fetchBalance(conn.preset, conn.baseUrl, conn.apiKey, conn.fetch) }, 200);
       } catch (err) {
         return c.json({ error: describeError(err) }, 502);
       }

@@ -1,6 +1,7 @@
 import { presets, type PresetId, type ProviderCreate, type ProviderUpdate, type ProviderView } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
+import { fetchVia, noProxyFetch, type ProxyStore } from "../proxy";
 import type { Cipher } from "../secrets";
 
 /** Everything needed to call a provider. Lives only inside the core. */
@@ -13,6 +14,11 @@ export interface Connection {
   apiKey: string | null;
   /** Changes whenever the address or key changes, so cached catalogs go stale. */
   cacheKey: string;
+  /** The provider asked for the proxy; `proxy` is its address, null when none is set. */
+  useProxy: boolean;
+  proxy: string | null;
+  /** Every request to the provider goes through this: straight, or through the proxy. */
+  fetch: typeof fetch;
 }
 
 /** A request the API should answer with 400. */
@@ -26,6 +32,7 @@ interface Row {
   secret: string | null;
   created_at: number;
   updated_at: number;
+  use_proxy: number;
 }
 
 /** A custom address that is really a known service gets that service's preset: prices, currency, media. */
@@ -35,6 +42,7 @@ export class ProviderRepo {
   constructor(
     private readonly db: Database,
     private readonly cipher: Cipher,
+    private readonly proxies: ProxyStore,
     /** Tests point fixed presets at a fake server. */
     private readonly presetUrls: Partial<Record<PresetId, string>> = {},
   ) {}
@@ -71,9 +79,13 @@ export class ProviderRepo {
       secret: input.apiKey ? this.cipher.encrypt(input.apiKey) : null,
       created_at: now,
       updated_at: now,
+      use_proxy: 0,
     };
     this.db.sql
-      .prepare("insert into providers values (:id, :preset, :name, :base_url, :secret, :created_at, :updated_at)")
+      .prepare(
+        `insert into providers (id, preset, name, base_url, secret, created_at, updated_at, use_proxy)
+         values (:id, :preset, :name, :base_url, :secret, :created_at, :updated_at, :use_proxy)`,
+      )
       .run({ ...row });
     return toView(row);
   }
@@ -87,11 +99,14 @@ export class ProviderRepo {
       name: patch.name ?? row.name,
       base_url: patch.baseUrl ?? row.base_url,
       secret: patch.apiKey ? this.cipher.encrypt(patch.apiKey) : row.secret,
+      use_proxy: patch.useProxy === undefined ? row.use_proxy : patch.useProxy ? 1 : 0,
       updated_at: Date.now(),
     };
     this.db.sql
-      .prepare("update providers set name = :name, base_url = :base_url, secret = :secret, updated_at = :updated_at where id = :id")
-      .run({ id, name: next.name, base_url: next.base_url, secret: next.secret, updated_at: next.updated_at });
+      .prepare(
+        "update providers set name = :name, base_url = :base_url, secret = :secret, use_proxy = :use_proxy, updated_at = :updated_at where id = :id",
+      )
+      .run({ id, name: next.name, base_url: next.base_url, secret: next.secret, use_proxy: next.use_proxy, updated_at: next.updated_at });
     return toView(next);
   }
 
@@ -113,7 +128,20 @@ export class ProviderRepo {
     }
     // Fixed presets always use their own address, so a test override or a moved endpoint applies at once.
     const baseUrl = presets[row.preset].editableUrl ? row.base_url : this.urlOf(row.preset);
-    return { id, preset: row.preset, currency: presets[row.preset].currency, baseUrl, apiKey, cacheKey: `${id}:${row.updated_at}` };
+    const useProxy = row.use_proxy === 1;
+    const proxy = useProxy ? this.proxies.url() : null;
+    return {
+      id,
+      preset: row.preset,
+      currency: presets[row.preset].currency,
+      baseUrl,
+      apiKey,
+      // A new proxy address makes cached catalogs stale too.
+      cacheKey: `${id}:${row.updated_at}:${proxy ?? ""}`,
+      useProxy,
+      proxy,
+      fetch: !useProxy ? globalThis.fetch : proxy ? fetchVia(proxy) : noProxyFetch,
+    };
   }
 
   private row(id: string): Row | undefined {
@@ -142,6 +170,7 @@ function toView(row: Row): ProviderView {
     hasKey: row.secret !== null,
     billing: presets[row.preset].billing,
     currency: presets[row.preset].currency,
+    useProxy: row.use_proxy === 1,
     createdAt: row.created_at,
   };
 }

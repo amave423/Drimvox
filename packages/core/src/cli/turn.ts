@@ -134,6 +134,8 @@ export async function runCliTurn(i: CliTurnInput): Promise<RunOutcome> {
     schema: answer?.schema ?? null,
     signal: i.signal,
     idleTimeoutMs: i.idleTimeoutMs,
+    useProxy: i.conn.useProxy,
+    proxy: i.conn.proxy,
     onEvent: (e) => {
       if (e.kind === "call") {
         names.set(e.callId, e.name);

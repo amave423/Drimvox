@@ -21,6 +21,8 @@ import { mediaRoutes } from "./routes/media";
 import { skillRoutes } from "./routes/skills";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
+import { proxyRoutes } from "./routes/proxy";
+import { ProxyStore } from "./proxy";
 import { taskRoutes } from "./routes/tasks";
 import { setPriceCatalogUrl } from "./providers/native";
 import type { CliId } from "./cli/kinds";
@@ -57,6 +59,8 @@ export interface AppOptions {
   screenshot?: Screenshotter;
   /** How to start Claude Code, Codex and Gemini CLI instead of finding them on PATH; tests run a fake. */
   cliCommands?: Partial<Record<CliId, string[]>>;
+  /** What "Check the proxy" opens through it; a small page that answers fast by default. */
+  proxyCheckUrl?: string;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
@@ -68,7 +72,8 @@ export function createCore(o: AppOptions) {
   // Prices of vendors' own APIs come from OpenRouter's public catalog (a fake one in tests).
   setPriceCatalogUrl(o.presetUrls?.openrouter);
   const cipher = createCipher(o.secretKey);
-  const providers = new ProviderRepo(o.db, cipher, o.presetUrls);
+  const proxies = new ProxyStore(o.db, cipher);
+  const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
   const mcpRepo = new McpRepo(o.db, cipher);
   const mcp = new McpHub(mcpRepo);
   const approvals = new ChatApprovals();
@@ -115,6 +120,7 @@ export function createCore(o: AppOptions) {
       c.json(writeSettings(o.db, c.req.valid("json"))),
     )
     .route("/providers", providerRoutes(providers))
+    .route("/proxy", proxyRoutes(proxies, o.proxyCheckUrl ?? "https://www.google.com/generate_204"))
     .route("/chats", chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs, join(o.dataDir, "cli-chats")))
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
     .route("/media", mediaRoutes(media))

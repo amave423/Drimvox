@@ -149,6 +149,8 @@ const migrations: string[] = [
   // A command-line agent's own session, continued on the next turn: "<preset>:<model>:<session id>".
   `alter table tasks add column cli_session text;
    alter table chats add column cli_session text;`,
+  // Requests of this provider go through the proxy from the settings.
+  `alter table providers add column use_proxy integer not null default 0;`,
 ];
 
 export interface Database {

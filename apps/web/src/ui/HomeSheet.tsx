@@ -1,6 +1,6 @@
 import { useApp } from "../context";
 
-const milestones = ["home.m2", "home.m3", "home.m4"] as const;
+const steps = ["home.step1", "home.step2", "home.step3"] as const;
 
 export function HomeSheet() {
   const { t, status, providers, navigate, openNewChat } = useApp();
@@ -22,7 +22,7 @@ export function HomeSheet() {
         </div>
         <h2 className="sheet-h">{t("home.next")}</h2>
         <ol className="steps">
-          {milestones.map((key) => (
+          {steps.map((key) => (
             <li key={key}>{t(key)}</li>
           ))}
         </ol>

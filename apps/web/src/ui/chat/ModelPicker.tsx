@@ -4,7 +4,7 @@ import { useApp } from "../../context";
 import { formatPrice, formatTokens } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
 import { loadMediaModels } from "../../lib/media";
-import { loadModels, type ModelsResult } from "../../lib/models";
+import { forgetModels, loadModels, type ModelsResult } from "../../lib/models";
 import { ErrorNote } from "../ErrorNote";
 
 const LIMIT = 200;
@@ -35,6 +35,8 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
     setResult(null);
     setMedia(null);
     let live = true;
+    // A CLI's list shows what its default turned out to be on the last run: always the current one.
+    if (providers.find((p) => p.id === providerId)?.billing === "subscription") forgetModels(providerId);
     if (kind === "text") void loadModels(api, providerId).then((r) => live && setResult(r));
     else void loadMediaModels(api, providerId, kind).then((m) => live && setMedia(m));
     return () => {
@@ -70,7 +72,11 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
   const loading = kind === "text" ? result === null : media === null;
 
   const providerName = providers.find((p) => p.id === value?.providerId)?.name;
-  const label = value && providerName ? `${providerName} / ${value.model}` : t("model.pick");
+  // A CLI's "default" is whatever the program itself is set to.
+  const isCliDefault = (pid: string | undefined, model: string) =>
+    model === "default" && providers.find((p) => p.id === pid)?.billing === "subscription";
+  const label =
+    value && providerName ? `${providerName} / ${isCliDefault(value.providerId, value.model) ? t("model.cliDefault") : value.model}` : t("model.pick");
 
   return (
     <div className="picker" ref={root}>
@@ -121,10 +127,17 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
                     setOpen(false);
                   }}
                 >
-                  <span className="picker-name">
-                    {m.name}
-                    {m.name !== m.id && <small className="mono">{m.id}</small>}
-                  </span>
+                  {isCliDefault(providerId, m.id) ? (
+                    <span className="picker-name">
+                      {t("model.cliDefault")}
+                      <small>{m.info?.resolved ? t("model.cliDefaultNow", { model: m.info.resolved }) : t("model.cliDefaultHint")}</small>
+                    </span>
+                  ) : (
+                    <span className="picker-name">
+                      {m.name}
+                      {m.name !== m.id && <small className="mono">{m.id}</small>}
+                    </span>
+                  )}
                   {m.info && <ModelFacts model={m.info} billing={providers.find((p) => p.id === providerId)?.billing} />}
                 </button>
               </li>

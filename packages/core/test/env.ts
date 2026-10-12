@@ -37,6 +37,8 @@ export interface TestEnv {
   setScreenshot(fn: Screenshotter): void;
   /** Starts this program instead of Claude Code, Codex or Gemini CLI. */
   setCliCommand(id: CliId, argv: string[]): void;
+  /** What checking the proxy opens through it. */
+  setProxyCheckUrl(url: string): void;
   close(): void;
   /** Stops running agents first; use when a test may leave one running. */
   closeAsync(): Promise<void>;
@@ -52,6 +54,7 @@ export function createTestEnv(): TestEnv {
   const presetUrls: Partial<Record<PresetId, string>> = {};
   let screenshot: Screenshotter | undefined;
   const cliCommands: Partial<Record<CliId, string[]>> = {};
+  let proxyCheckUrl = "http://127.0.0.1:9/no-internet-in-tests";
   let web: WebAccess = {
     search: async () => {
       throw new Error("No internet in tests");
@@ -76,6 +79,7 @@ export function createTestEnv(): TestEnv {
       web,
       screenshot,
       cliCommands,
+      proxyCheckUrl,
     };
     if (webDir) return createCore({ ...options, webDir });
     core ??= createCore(options);
@@ -113,6 +117,10 @@ export function createTestEnv(): TestEnv {
     },
     setScreenshot(fn) {
       screenshot = fn;
+      void dropCore();
+    },
+    setProxyCheckUrl(url) {
+      proxyCheckUrl = url;
       void dropCore();
     },
     setCliCommand(id, argv) {

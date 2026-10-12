@@ -2,10 +2,10 @@ import type { Balance, PresetId } from "@artel/shared";
 import { fetchJson } from "./http";
 
 /** Remaining money on the account, where the provider exposes it. Null when it does not. */
-export async function fetchBalance(preset: PresetId, baseUrl: string, apiKey: string | null): Promise<Balance | null> {
+export async function fetchBalance(preset: PresetId, baseUrl: string, apiKey: string | null, fetchFn: typeof fetch = fetch): Promise<Balance | null> {
   if (preset === "openrouter" || preset === "routerai") {
     // RouterAI answers like OpenRouter, in rubles.
-    const body = (await fetchJson(`${baseUrl}/credits`, apiKey)) as {
+    const body = (await fetchJson(`${baseUrl}/credits`, apiKey, 15_000, {}, fetchFn)) as {
       data?: { total_credits?: number; total_usage?: number; credits?: number; balance?: number };
       balance?: number;
     };
@@ -18,7 +18,7 @@ export async function fetchBalance(preset: PresetId, baseUrl: string, apiKey: st
     return typeof left === "number" ? { amount: round(left), currency } : null;
   }
   if (preset === "deepseek") {
-    const body = (await fetchJson(`${new URL(baseUrl).origin}/user/balance`, apiKey)) as {
+    const body = (await fetchJson(`${new URL(baseUrl).origin}/user/balance`, apiKey, 15_000, {}, fetchFn)) as {
       balance_infos?: { currency?: string; total_balance?: string }[];
     };
     const infos = (body.balance_infos ?? [])

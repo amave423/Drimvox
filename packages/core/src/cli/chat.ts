@@ -39,6 +39,8 @@ export async function cliReply(i: ReplyInput, dir: string, formatHint: string): 
     schema: null,
     signal: i.signal,
     idleTimeoutMs: i.idleTimeoutMs,
+    useProxy: i.conn.useProxy,
+    proxy: i.conn.proxy,
     onEvent: (e) => {
       if (e.kind === "text") {
         const piece = text ? `\n\n${e.text}` : e.text;

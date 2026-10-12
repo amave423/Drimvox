@@ -4,6 +4,7 @@ import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
 import { forgetModels, loadModels, type ModelsResult } from "../../lib/models";
 import { ErrorNote } from "../ErrorNote";
+import { Toggle } from "../Toggle";
 import { presetName } from "./presetName";
 
 type Mode = "idle" | "replaceKey" | "confirmRemove";
@@ -17,7 +18,7 @@ function formatBalance(b: Balance, locale: string): string {
   }
 }
 
-export function ProviderRow({ provider }: { provider: ProviderView }) {
+export function ProviderRow({ provider, proxySet }: { provider: ProviderView; proxySet: boolean }) {
   const { api, t, settings, reloadProviders, reloadChats } = useApp();
   const [check, setCheck] = useState<ModelsResult | null>(null);
   const [balance, setBalance] = useState<Balance | null>(null);
@@ -53,6 +54,14 @@ export function ProviderRow({ provider }: { provider: ProviderView }) {
     void runCheck(true);
   }
 
+  async function switchProxy(useProxy: boolean) {
+    const res = await api.providers[":id"].$patch({ param: { id: provider.id }, json: { useProxy } }).catch(() => null);
+    if (!res?.ok) return;
+    forgetModels(provider.id);
+    await reloadProviders();
+    void runCheck(true);
+  }
+
   async function remove() {
     setBusy(true);
     await api.providers[":id"].$delete({ param: { id: provider.id } }).catch(() => null);
@@ -79,6 +88,13 @@ export function ProviderRow({ provider }: { provider: ProviderView }) {
           </span>
         )}
         {check && "error" in check && <ErrorNote error={check.error} />}
+      </div>
+
+      <div className="provider-proxy">
+        <Toggle checked={provider.useProxy} disabled={!proxySet && !provider.useProxy} onChange={(on) => void switchProxy(on)}>
+          {t("providers.useProxy")}
+        </Toggle>
+        {!proxySet && <span className="muted">{t("providers.proxyNotSet")}</span>}
       </div>
 
       {mode === "replaceKey" && (

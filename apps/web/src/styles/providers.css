@@ -6,6 +6,7 @@
 .provider-head h3 { margin: 0; font: 600 18px var(--font-serif); }
 .provider-head .muted { font-size: 13px; }
 .provider-status { margin-top: 4px; font-size: 14px; min-height: 22px; }
+.provider-proxy { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-top: 8px; font-size: 14px; }
 .provider-actions { display: flex; gap: 16px; margin-top: 6px; }
 
 .preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
@@ -24,3 +25,4 @@
 .cli-note { display: grid; gap: 6px; font-size: 14px; }
 .cli-note p { margin: 0; color: var(--muted); }
 .cli-install { display: block; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--sheet); user-select: all; overflow-wrap: anywhere; }
+.proxy-address { overflow-wrap: anywhere; }

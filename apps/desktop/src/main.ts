@@ -191,7 +191,8 @@ async function createWindow() {
     title: "Artel",
     backgroundColor: dark ? "#1b1b19" : "#e4e5e0",
     titleBarStyle: "hidden",
-    titleBarOverlay: { color: dark ? "#222220" : "#eeefea", symbolColor: dark ? "#e9e8e2" : "#22211e", height: 44 },
+    // A little lower than the 44px bar, so its bottom line runs under the window buttons at any display scale.
+    titleBarOverlay: { color: dark ? "#222220" : "#eeefea", symbolColor: dark ? "#e9e8e2" : "#22211e", height: 42 },
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,

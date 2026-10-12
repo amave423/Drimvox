@@ -17,7 +17,7 @@ const stdin = await new Promise((resolve) => {
 const state = join(dir, "state.json");
 const turnNo = existsSync(state) ? JSON.parse(readFileSync(state, "utf8")).next : 0;
 writeFileSync(state, JSON.stringify({ next: turnNo + 1 }));
-appendFileSync(join(dir, "calls.jsonl"), JSON.stringify({ kind, args, prompt: stdin, cwd: process.cwd() }) + "\n");
+appendFileSync(join(dir, "calls.jsonl"), JSON.stringify({ kind, args, prompt: stdin, cwd: process.cwd(), proxy: process.env.HTTPS_PROXY ?? null }) + "\n");
 
 const turn = JSON.parse(readFileSync(join(dir, "script.json"), "utf8"))[turnNo] ?? { text: "Готово." };
 for (const [path, content] of Object.entries(turn.files ?? {})) {
@@ -29,7 +29,7 @@ const session = turn.session ?? "sess-1";
 const text = turn.json ? JSON.stringify(turn.json) : (turn.text ?? "");
 
 if (kind === "claude") {
-  out({ type: "system", subtype: "init", session_id: session, cwd: process.cwd(), tools: ["Read", "Edit", "Bash"] });
+  out({ type: "system", subtype: "init", session_id: session, cwd: process.cwd(), tools: ["Read", "Edit", "Bash"], model: turn.initModel ?? "claude-test-1" });
   for (const [i, t] of (turn.tools ?? []).entries()) {
     out({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: `tu${i}`, name: t.name, input: t.input }] } });
     out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: `tu${i}`, content: t.output ?? "ok", is_error: !!t.error }] } });

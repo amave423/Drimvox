@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { killTree } from "../agent/commands";
 import { CLI_KINDS, longPath, type CliEvent, type CliId, type CliLaunch } from "./kinds";
+import { rememberDefault } from "./models";
 import { resolveCli } from "./resolve";
 
 export interface CliRunInput extends CliLaunch {
@@ -12,6 +13,9 @@ export interface CliRunInput extends CliLaunch {
   signal: AbortSignal;
   /** Give up when the CLI prints nothing for this long. */
   idleTimeoutMs: number;
+  /** The provider wants its traffic through the proxy; `proxy` is the address, null when none is set. */
+  useProxy: boolean;
+  proxy: string | null;
   onEvent(event: CliEvent): void;
 }
 
@@ -29,6 +33,7 @@ export interface CliRunResult {
 export function runCli(i: CliRunInput): Promise<CliRunResult> {
   const argv = resolveCli(i.id);
   if (!argv) return Promise.resolve({ session: null, done: null, stopped: false, error: { code: "cli_missing" } });
+  if (i.useProxy && !i.proxy) return Promise.resolve({ session: null, done: null, stopped: false, error: { code: "no_proxy" } });
   const kind = CLI_KINDS[i.id];
   // The full name, the one the CLI reports paths under.
   const cwd = longPath(i.cwd);
@@ -45,6 +50,10 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
       cwd,
       windowsHide: true,
       detached: process.platform !== "win32",
+      // The CLIs read the usual proxy variables; Node-based ones also need to be told to honour them.
+      env: i.proxy
+        ? { ...process.env, HTTPS_PROXY: i.proxy, HTTP_PROXY: i.proxy, https_proxy: i.proxy, http_proxy: i.proxy, NODE_USE_ENV_PROXY: "1" }
+        : process.env,
       stdio: ["pipe", "pipe", "pipe"],
     });
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -78,6 +87,7 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
       if (!parsed || typeof parsed !== "object") return;
       for (const event of parse(parsed as Record<string, unknown>)) {
         if (event.kind === "session") session = event.id;
+        if (event.kind === "session" && event.model && i.model === "default") rememberDefault(i.id, event.model);
         if (event.kind === "done") done = event;
         i.onEvent(event);
       }
@@ -105,6 +115,8 @@ export function classify(message: string): ProviderError {
   if (/not logged in|\/login|please log ?in|run .*login|authenticat|unauthori[sz]ed|invalid api key|credentials/i.test(message)) {
     return { code: "cli_login", detail };
   }
-  if (/rate.?limit|usage limit|quota/i.test(message)) return { code: "rate_limited", detail };
+  if (/does not support this model|newer is required|claude update|please update|upgrade to the latest/i.test(message)) return { code: "cli_update", detail };
+  if (/out of usage|usage credits|usage limit|limit reached|reached your .*limit|quota/i.test(message)) return { code: "cli_limit", detail };
+  if (/rate.?limit/i.test(message)) return { code: "rate_limited", detail };
   return { code: "provider_error", detail };
 }

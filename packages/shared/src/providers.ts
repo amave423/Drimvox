@@ -197,6 +197,8 @@ export const providerUpdateSchema = z
     name: z.string().trim().min(1).max(60).optional(),
     baseUrl: baseUrlSchema.optional(),
     apiKey: z.string().trim().min(1).max(500).optional(),
+    /** Send this provider's requests through the proxy from the settings. */
+    useProxy: z.boolean().optional(),
   })
   .strict();
 
@@ -212,6 +214,8 @@ export interface ProviderView {
   hasKey: boolean;
   billing: Preset["billing"];
   currency: Preset["currency"];
+  /** Requests go through the proxy from the settings. */
+  useProxy: boolean;
   createdAt: number;
 }
 
@@ -227,6 +231,8 @@ export interface ModelInfo {
   tools: boolean | null;
   /** Understands pictures in the prompt; null when the catalog does not say. */
   vision: boolean | null;
+  /** For a CLI's "default": the model it actually ran last time, when Artel has seen one. */
+  resolved?: string | null;
 }
 
 /** Problems talking to a provider, as codes the UI translates. */
@@ -243,6 +249,12 @@ export const providerErrorCodes = [
   "cli_missing",
   /** A command-line agent is installed but not logged in to its account. */
   "cli_login",
+  /** The CLI is too old for this model and asks to be updated. */
+  "cli_update",
+  /** The subscription's limit for this model is used up. */
+  "cli_limit",
+  /** The provider should go through a proxy, but none is set in the settings. */
+  "no_proxy",
   "unknown",
 ] as const;
 export type ProviderErrorCode = (typeof providerErrorCodes)[number];

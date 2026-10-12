@@ -72,3 +72,21 @@ a { color: var(--ink); }
 .chip:hover { border-color: var(--pencil); color: var(--pencil); }
 .mcp-form { display: grid; gap: 10px; margin: 8px 0; max-width: 640px; }
 .mcp-secret { font-size: 13px; margin: 0; }
+
+/* On/off switch: an ink track when on, a sheet-coloured knob. */
+.toggle { display: inline-flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 14.5px; line-height: 1.45; position: relative; }
+.toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.toggle-track {
+  flex: none; position: relative; width: 34px; height: 20px; margin-top: 1px;
+  border-radius: 999px; background: var(--line); transition: background-color 120ms;
+}
+.toggle-track::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--sheet); transition: transform 120ms;
+}
+.toggle input:checked + .toggle-track { background: var(--ink); }
+.toggle input:checked + .toggle-track::after { transform: translateX(14px); }
+.toggle input:focus-visible + .toggle-track { outline: 2px solid var(--ink); outline-offset: 2px; }
+.toggle:hover input:not(:checked):not(:disabled) + .toggle-track { background: var(--muted); }
+.toggle.is-disabled { cursor: default; color: var(--muted); }
+.toggle.is-disabled .toggle-track { opacity: 0.5; }

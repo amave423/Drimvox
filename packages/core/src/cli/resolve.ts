@@ -2,12 +2,14 @@ import { presets } from "@artel/shared";
 import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
 import { delimiter, dirname, extname, isAbsolute, join } from "node:path";
 import type { CliId } from "./kinds";
+import { forgetDefaults } from "./models";
 
 let overrides: Partial<Record<CliId, string[]>> = {};
 
 /** Tests run a fake CLI instead of the real one. */
 export function setCliCommands(next: Partial<Record<CliId, string[]>> | undefined): void {
   overrides = { ...next };
+  forgetDefaults();
 }
 
 /**

@@ -11,14 +11,17 @@ import type { Connection } from "./repo";
  */
 export function languageModel(conn: Connection, modelId: string): LanguageModel {
   const apiKey = conn.apiKey ?? undefined;
-  if (conn.preset === "anthropic") return createAnthropic({ apiKey, baseURL: conn.baseUrl }).languageModel(modelId);
-  if (conn.preset === "google") return createGoogleGenerativeAI({ apiKey, baseURL: conn.baseUrl }).languageModel(modelId);
-  if (conn.preset === "openai") return createOpenAI({ apiKey, baseURL: conn.baseUrl }).chat(modelId);
+  // Straight or through the provider's proxy.
+  const fetch = conn.fetch;
+  if (conn.preset === "anthropic") return createAnthropic({ apiKey, baseURL: conn.baseUrl, fetch }).languageModel(modelId);
+  if (conn.preset === "google") return createGoogleGenerativeAI({ apiKey, baseURL: conn.baseUrl, fetch }).languageModel(modelId);
+  if (conn.preset === "openai") return createOpenAI({ apiKey, baseURL: conn.baseUrl, fetch }).chat(modelId);
   const provider = createOpenAICompatible({
     name: conn.preset,
     baseURL: conn.baseUrl,
     apiKey,
     includeUsage: true,
+    fetch,
     headers: conn.preset === "openrouter" ? { "X-Title": "Artel" } : undefined,
   });
   return provider.chatModel(modelId);

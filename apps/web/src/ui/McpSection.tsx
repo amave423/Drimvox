@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";
 import { parsePairs, splitCommand } from "../lib/commandLine";
+import { Toggle } from "./Toggle";
 
 /** The user's MCP servers: tools for agents and chats, each new tool asking before its first call. */
 export function McpSection() {
@@ -79,10 +80,9 @@ export function McpSection() {
                 </div>
               )}
               <div className="actions">
-                <label className="stage-switch">
-                  <input type="checkbox" checked={s.enabled} onChange={() => void toggle(s)} />
+                <Toggle checked={s.enabled} onChange={() => void toggle(s)}>
                   {t("mcp.enabled")}
-                </label>
+                </Toggle>
                 {s.enabled && (
                   <button className="link" onClick={() => void check(s.id)}>
                     {t("mcp.recheck")}

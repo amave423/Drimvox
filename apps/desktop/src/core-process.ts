@@ -52,6 +52,9 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     usdRub: process.env.ARTEL_TEST_USD_RUB ? async () => Number(process.env.ARTEL_TEST_USD_RUB) : undefined,
     // Tests run a fake Claude Code, Codex or Gemini CLI: {"claude-code": ["node", "fake-cli.mjs", "claude"]}.
     cliCommands: process.env.ARTEL_TEST_CLI ? JSON.parse(process.env.ARTEL_TEST_CLI) : undefined,
+    // Tests: a fake public model catalog and a fake page to check the proxy against.
+    presetUrls: process.env.ARTEL_TEST_OPENROUTER_URL ? { openrouter: process.env.ARTEL_TEST_OPENROUTER_URL } : undefined,
+    proxyCheckUrl: process.env.ARTEL_TEST_PROXY_CHECK_URL,
   })
     .then((server) => process.parentPort.postMessage({ type: "ready", port: server.port }))
     .catch((err: unknown) => {

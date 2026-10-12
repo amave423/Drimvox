@@ -5,6 +5,8 @@ import { useApp } from "../context";
 import { ModelPicker } from "./chat/ModelPicker";
 import { Segmented } from "./Segmented";
 import { McpSection } from "./McpSection";
+import { ProxySection } from "./ProxySection";
+import { Toggle } from "./Toggle";
 import { SkillsSection } from "./SkillsSection";
 
 const localeNames = { ru: "Русский", en: "English" } as const;
@@ -51,10 +53,9 @@ export function SettingsSheet() {
         />
 
         <h2 className="sheet-h">{t("settings.notifications")}</h2>
-        <label className="stage-switch">
-          <input type="checkbox" checked={settings.notifications} onChange={(e) => void save({ notifications: e.target.checked })} />
+        <Toggle checked={settings.notifications} onChange={(notifications) => void save({ notifications })}>
           {t("settings.notificationsOn")}
-        </label>
+        </Toggle>
 
         <h2 className="sheet-h" id="currency-label">
           {t("settings.currency")}
@@ -126,6 +127,7 @@ export function SettingsSheet() {
         </div>
         <p className="muted">{t("settings.visionModelHint")}</p>
 
+        <ProxySection />
         <McpSection />
         <SkillsSection />
       </div>

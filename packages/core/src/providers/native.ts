@@ -13,10 +13,21 @@ export const NATIVE: PresetId[] = ["anthropic", "openai", "google", "xai"];
 let catalogUrl = "https://openrouter.ai/api/v1";
 const PRICES_TTL = 24 * 60 * 60_000;
 let prices: { at: number; byKey: Map<string, ModelInfo> } | null = null;
+let raw: { at: number; items: Record<string, unknown>[] } | null = null;
 
 export function setPriceCatalogUrl(url: string | undefined): void {
   catalogUrl = url ?? "https://openrouter.ai/api/v1";
   prices = null;
+  raw = null;
+}
+
+/** OpenRouter's public catalog as it is: every vendor's current models with names, dates and prices. Throws when out of reach. */
+export async function catalogItems(fetchFn: typeof fetch = fetch): Promise<Record<string, unknown>[]> {
+  if (raw && Date.now() - raw.at < PRICES_TTL) return raw.items;
+  const body = (await fetchJson(`${catalogUrl}/models`, null, 15_000, {}, fetchFn)) as { data?: unknown[] };
+  const items = (body.data ?? []).filter((i): i is Record<string, unknown> => !!i && typeof i === "object");
+  raw = { at: Date.now(), items };
+  return items;
 }
 
 const VENDOR_PREFIX: Partial<Record<PresetId, string>> = { anthropic: "anthropic", openai: "openai", google: "google", xai: "x-ai" };
@@ -30,12 +41,11 @@ function key(id: string): string {
     .replace(/[._]/g, "-");
 }
 
-async function priceTable(): Promise<Map<string, ModelInfo>> {
+async function priceTable(fetchFn: typeof fetch): Promise<Map<string, ModelInfo>> {
   if (prices && Date.now() - prices.at < PRICES_TTL) return prices.byKey;
   const byKey = new Map<string, ModelInfo>();
   try {
-    const body = (await fetchJson(`${catalogUrl}/models`, null)) as { data?: unknown[] };
-    for (const m of normalizeModels("openrouter", body.data ?? [])) byKey.set(`${m.id.split("/")[0]}|${key(m.id)}`, m);
+    for (const m of normalizeModels("openrouter", await catalogItems(fetchFn))) byKey.set(`${m.id.split("/")[0]}|${key(m.id)}`, m);
     prices = { at: Date.now(), byKey };
   } catch {
     // Without the catalog prices are unknown; the next look tries again.
@@ -52,21 +62,24 @@ interface Listed {
 /** The vendor's model list, without models that do not chat (embeddings, speech, pictures). */
 async function vendorModels(conn: Connection): Promise<Listed[]> {
   if (conn.preset === "anthropic") {
-    const body = (await fetchJson(`${conn.baseUrl}/models?limit=100`, null, 15_000, {
-      "x-api-key": conn.apiKey ?? "",
-      "anthropic-version": "2023-06-01",
-    })) as { data?: { id: string; display_name?: string }[] };
+    const body = (await fetchJson(
+      `${conn.baseUrl}/models?limit=100`,
+      null,
+      15_000,
+      { "x-api-key": conn.apiKey ?? "", "anthropic-version": "2023-06-01" },
+      conn.fetch,
+    )) as { data?: { id: string; display_name?: string }[] };
     return (body.data ?? []).map((m) => ({ id: m.id, name: m.display_name || m.id, contextLength: null }));
   }
   if (conn.preset === "google") {
-    const body = (await fetchJson(`${conn.baseUrl}/models?pageSize=1000`, null, 15_000, { "x-goog-api-key": conn.apiKey ?? "" })) as {
+    const body = (await fetchJson(`${conn.baseUrl}/models?pageSize=1000`, null, 15_000, { "x-goog-api-key": conn.apiKey ?? "" }, conn.fetch)) as {
       models?: { name: string; displayName?: string; inputTokenLimit?: number; supportedGenerationMethods?: string[] }[];
     };
     return (body.models ?? [])
       .filter((m) => m.supportedGenerationMethods?.includes("generateContent") && !/embedding|aqa|imagen|veo|tts/i.test(m.name))
       .map((m) => ({ id: m.name.replace(/^models\//, ""), name: m.displayName || m.name, contextLength: m.inputTokenLimit ?? null }));
   }
-  const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey)) as { data?: { id: string }[] };
+  const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: { id: string }[] };
   const notChat =
     conn.preset === "openai"
       ? /embedding|whisper|tts|dall-e|realtime|transcribe|moderation|audio|image|search|babbage|davinci|sora|computer-use/i
@@ -75,7 +88,7 @@ async function vendorModels(conn: Connection): Promise<Listed[]> {
 }
 
 export async function nativeModels(conn: Connection): Promise<ModelInfo[]> {
-  const [listed, table] = await Promise.all([vendorModels(conn), priceTable()]);
+  const [listed, table] = await Promise.all([vendorModels(conn), priceTable(conn.fetch)]);
   const prefix = VENDOR_PREFIX[conn.preset];
   return listed
     .map((m): ModelInfo => {

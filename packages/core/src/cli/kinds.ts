@@ -18,14 +18,13 @@ export interface CliLaunch {
 
 /** What a CLI's stream means for Artel, whichever CLI it came from. */
 export type CliEvent =
-  | { kind: "session"; id: string }
+  | { kind: "session"; id: string; /** The model the CLI runs, when it says. */ model?: string }
   | { kind: "text"; text: string }
   | { kind: "call"; callId: string; name: string; input: Record<string, unknown> }
   | { kind: "result"; callId: string; ok: boolean; output: string }
   | { kind: "done"; text: string | null; structured: unknown; inputTokens: number; outputTokens: number; error: string | null };
 
 export interface CliKind {
-  models: string[];
   args(l: CliLaunch): string[];
   /** One parser per run: some CLIs spread the answer over several lines. */
   parser(cwd: string): (line: Record<string, unknown>) => CliEvent[];
@@ -123,7 +122,6 @@ function readTools(l: CliLaunch): string[] {
 }
 
 const claude: CliKind = {
-  models: ["default", "haiku", "opus", "sonnet"],
   args: (l) => {
     const perms =
       l.mode === "write"
@@ -157,7 +155,9 @@ const claude: CliKind = {
     const hidden = new Set<string>();
     return (e) => {
       const out: CliEvent[] = [];
-      if (e.type === "system" && e.subtype === "init" && typeof e.session_id === "string") out.push({ kind: "session", id: e.session_id });
+      if (e.type === "system" && e.subtype === "init" && typeof e.session_id === "string") {
+        out.push({ kind: "session", id: e.session_id, ...(typeof e.model === "string" ? { model: e.model } : {}) });
+      }
       const content = (e.message as { content?: unknown[] } | undefined)?.content ?? [];
       for (const c of content as Record<string, unknown>[]) {
         if (e.type === "assistant" && c.type === "text" && typeof c.text === "string" && c.text) out.push({ kind: "text", text: c.text });
@@ -188,7 +188,6 @@ const claude: CliKind = {
 };
 
 const codex: CliKind = {
-  models: ["default"],
   args: (l) => [
     "exec",
     "--json",
@@ -238,7 +237,6 @@ const codex: CliKind = {
 const GEMINI_SAFE = ["npm test", "npm run", "npx vitest", "npx tsc", "node", "pytest", "python -m pytest", "git status", "git diff", "git log"];
 
 const gemini: CliKind = {
-  models: ["default", "flash", "flash-lite", "pro"],
   args: (l) => [
     "--output-format",
     "stream-json",
@@ -254,7 +252,9 @@ const gemini: CliKind = {
     let pending = "";
     return (e) => {
       const out: CliEvent[] = [];
-      if (e.type === "init" && typeof e.session_id === "string") out.push({ kind: "session", id: e.session_id });
+      if (e.type === "init" && typeof e.session_id === "string") {
+        out.push({ kind: "session", id: e.session_id, ...(typeof e.model === "string" ? { model: e.model } : {}) });
+      }
       if (e.type === "message" && e.role === "assistant" && typeof e.content === "string") {
         answer = e.delta ? answer + e.content : e.content;
         pending = e.delta ? pending + e.content : e.content;

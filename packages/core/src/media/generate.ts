@@ -14,7 +14,7 @@ async function request(conn: Connection, url: string, init: RequestInit, timeout
   let res: Response;
   try {
     const signal = init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
-    res = await fetch(url, { ...init, signal });
+    res = await conn.fetch(url, { ...init, signal });
   } catch (err) {
     throw new ProviderFailure(describeError(err));
   }

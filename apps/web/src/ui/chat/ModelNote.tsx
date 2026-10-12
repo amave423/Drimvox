@@ -26,7 +26,10 @@ export function ModelNote({ choice }: { choice: ModelChoice }) {
   const free = model.priceIn === 0 && model.priceOut === 0;
   return (
     <div className="note">
-      <strong>{model.name}</strong>
+      <strong>{model.id === "default" && billing === "subscription" ? t("model.cliDefault") : model.name}</strong>
+      {model.id === "default" && billing === "subscription" && (
+        <p>{model.resolved ? t("model.cliDefaultNow", { model: model.resolved }) : t("model.cliDefaultHint")}</p>
+      )}
       {model.contextLength && <p>{t("model.context", { value: formatTokens(model.contextLength, settings.locale) })}</p>}
       {free && <p>{billing === "subscription" ? t("model.subscriptionNote") : billing === "credits" ? t("model.creditsNote") : t("model.free")}</p>}
       {!free && model.priceIn !== null && model.priceOut !== null && (
