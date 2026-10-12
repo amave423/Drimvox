@@ -2,7 +2,7 @@ import type { ProviderError } from "@artel/shared";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { killTree } from "../agent/commands";
-import { CLI_KINDS, type CliEvent, type CliId, type CliLaunch } from "./kinds";
+import { CLI_KINDS, longPath, type CliEvent, type CliId, type CliLaunch } from "./kinds";
 import { resolveCli } from "./resolve";
 
 export interface CliRunInput extends CliLaunch {
@@ -30,7 +30,9 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
   const argv = resolveCli(i.id);
   if (!argv) return Promise.resolve({ session: null, done: null, stopped: false, error: { code: "cli_missing" } });
   const kind = CLI_KINDS[i.id];
-  const parse = kind.parser(i.cwd);
+  // The full name, the one the CLI reports paths under.
+  const cwd = longPath(i.cwd);
+  const parse = kind.parser(cwd);
 
   return new Promise((resolve) => {
     let session: string | null = null;
@@ -40,7 +42,7 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
     let spawnError: NodeJS.ErrnoException | null = null;
 
     const child = spawn(argv[0]!, [...argv.slice(1), ...kind.args(i)], {
-      cwd: i.cwd,
+      cwd,
       windowsHide: true,
       detached: process.platform !== "win32",
       stdio: ["pipe", "pipe", "pipe"],

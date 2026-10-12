@@ -1,7 +1,7 @@
 import { asSchema, type ModelMessage, type ToolSet } from "ai";
 import type { RunInput, RunOutcome } from "../agent/run";
 import { nowLine } from "../now";
-import type { CliId } from "./kinds";
+import { longPath, type CliId } from "./kinds";
 import { runCli } from "./run";
 
 /** A task's step for a command-line agent, with the CLI's session to continue. */
@@ -113,7 +113,7 @@ export async function runCliTurn(i: CliTurnInput): Promise<RunOutcome> {
   const answer = results.length ? await contract(i.extraTools!, results) : null;
   const last = i.messages.at(-1);
   const prompt = [
-    resume ? "" : brief(i.worktree, i.mode),
+    resume ? "" : brief(longPath(i.worktree), i.mode),
     i.instructions ?? "",
     resume ? "" : transcript(i.messages.slice(0, -1)),
     typeof last?.content === "string" ? last.content : "",

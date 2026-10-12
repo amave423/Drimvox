@@ -142,7 +142,8 @@ describe("tasks", () => {
 
   it("writes the spec as JSON, codes in the copy, passes the checks and lands in review", async () => {
     script([
-      { json: spec, session: "s-task" },
+      // Claude Code hands in its JSON answer through a tool of its own; that is not work to show.
+      { json: spec, session: "s-task", tools: [{ name: "StructuredOutput", input: spec }] },
       {
         session: "s-task",
         files: subtract,

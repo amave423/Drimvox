@@ -1,4 +1,5 @@
-import { isAbsolute, relative, sep } from "node:path";
+import { realpathSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 
 export type CliId = "claude-code" | "codex" | "gemini-cli";
 /** read: look only (interview, spec); write: edit the copy and run safe commands; chat: answer, web at most. */
@@ -91,8 +92,25 @@ function mapTool(name: string, input: Record<string, unknown>, cwd: string): { n
 
 function shorten(p: string, cwd: string): string {
   if (!isAbsolute(p)) return p.split(sep).join("/");
-  const rel = relative(cwd, p);
+  const rel = relative(cwd, longPath(p));
   return rel && !rel.startsWith("..") ? rel.split(sep).join("/") : p;
+}
+
+/**
+ * A path under its full name. Windows temp folders often come as 8.3 short names (C:\Users\12C2~1\…): Claude Code
+ * then counts files of its own folder as outside it, and paths in the feed stop matching the copy.
+ * A file about to be created has no full name yet; its folder does.
+ */
+export function longPath(p: string): string {
+  try {
+    return realpathSync.native(p);
+  } catch {
+    try {
+      return join(realpathSync.native(dirname(p)), basename(p));
+    } catch {
+      return p;
+    }
+  }
 }
 
 const text = (v: unknown): string =>
@@ -134,31 +152,38 @@ const claude: CliKind = {
       ...(l.schema ? ["--json-schema", JSON.stringify(l.schema)] : []),
     ];
   },
-  parser: (cwd) => (e) => {
-    const out: CliEvent[] = [];
-    if (e.type === "system" && e.subtype === "init" && typeof e.session_id === "string") out.push({ kind: "session", id: e.session_id });
-    const content = (e.message as { content?: unknown[] } | undefined)?.content ?? [];
-    for (const c of content as Record<string, unknown>[]) {
-      if (e.type === "assistant" && c.type === "text" && typeof c.text === "string" && c.text) out.push({ kind: "text", text: c.text });
-      if (e.type === "assistant" && c.type === "tool_use") {
-        const t = mapTool(String(c.name), (c.input ?? {}) as Record<string, unknown>, cwd);
-        out.push({ kind: "call", callId: String(c.id), ...t });
+  parser: (cwd) => {
+    // The JSON answer arrives through Claude Code's own StructuredOutput tool: not work to show in the feed.
+    const hidden = new Set<string>();
+    return (e) => {
+      const out: CliEvent[] = [];
+      if (e.type === "system" && e.subtype === "init" && typeof e.session_id === "string") out.push({ kind: "session", id: e.session_id });
+      const content = (e.message as { content?: unknown[] } | undefined)?.content ?? [];
+      for (const c of content as Record<string, unknown>[]) {
+        if (e.type === "assistant" && c.type === "text" && typeof c.text === "string" && c.text) out.push({ kind: "text", text: c.text });
+        if (e.type === "assistant" && c.type === "tool_use" && c.name === "StructuredOutput") hidden.add(String(c.id));
+        else if (e.type === "assistant" && c.type === "tool_use") {
+          const t = mapTool(String(c.name), (c.input ?? {}) as Record<string, unknown>, cwd);
+          out.push({ kind: "call", callId: String(c.id), ...t });
+        }
+        if (e.type === "user" && c.type === "tool_result" && !hidden.has(String(c.tool_use_id))) {
+          out.push({ kind: "result", callId: String(c.tool_use_id), ok: !c.is_error, output: text(c.content) });
+        }
       }
-      if (e.type === "user" && c.type === "tool_result") out.push({ kind: "result", callId: String(c.tool_use_id), ok: !c.is_error, output: text(c.content) });
-    }
-    if (e.type === "result") {
-      const usage = (e.usage ?? {}) as Record<string, number>;
-      const failed = e.is_error === true || (typeof e.subtype === "string" && e.subtype !== "success");
-      out.push({
-        kind: "done",
-        text: failed ? null : text(e.result),
-        structured: e.structured_output ?? null,
-        inputTokens: (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
-        outputTokens: usage.output_tokens ?? 0,
-        error: failed ? text(e.result) || String(e.subtype) : null,
-      });
-    }
-    return out;
+      if (e.type === "result") {
+        const usage = (e.usage ?? {}) as Record<string, number>;
+        const failed = e.is_error === true || (typeof e.subtype === "string" && e.subtype !== "success");
+        out.push({
+          kind: "done",
+          text: failed ? null : text(e.result),
+          structured: e.structured_output ?? null,
+          inputTokens: (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+          outputTokens: usage.output_tokens ?? 0,
+          error: failed ? text(e.result) || String(e.subtype) : null,
+        });
+      }
+      return out;
+    };
   },
 };
 
