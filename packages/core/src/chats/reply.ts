@@ -10,6 +10,11 @@ import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
 import type { ChatRepo } from "./repo";
 
+/** What the chat can show, so models use it instead of ASCII art. */
+const FORMAT_HINT =
+  "Answers are shown as Markdown with tables, LaTeX math ($...$ inline, $$...$$ for blocks) and highlighted code. " +
+  "For diagrams and charts write a ```mermaid block: flowchart, sequenceDiagram, pie, xychart-beta for bar and line charts, gantt, mindmap.";
+
 export interface ReplyInput {
   chats: ChatRepo;
   chatId: string;
@@ -60,7 +65,13 @@ export async function reply(i: ReplyInput): Promise<void> {
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
-      system: i.web === "off" ? nowLine() : `${nowLine()}\n${i.web === "free" ? WEB_HINT : "Use the web search results you are given and name the sources."}`,
+      system: [
+        nowLine(),
+        FORMAT_HINT,
+        i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
       messages: history,
       ...(i.web === "free"
         ? {

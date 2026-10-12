@@ -4,6 +4,7 @@ import { formatTokens, formatUsd } from "../../lib/format";
 import { ErrorNote } from "../ErrorNote";
 import { Markdown } from "./Markdown";
 import { MediaView } from "./MediaView";
+import { Reasoning } from "./Reasoning";
 
 export function UserMessage({ content }: { content: string }) {
   const { t } = useApp();
@@ -56,13 +57,8 @@ export function AssistantMessage({ content, reasoning, model, streaming, message
           ))}
         </ul>
       )}
-      {reasoning && (
-        <details className="reasoning" open={streaming && !content}>
-          <summary>{t("chat.reasoning")}</summary>
-          <p>{reasoning}</p>
-        </details>
-      )}
-      {content && <Markdown text={content} />}
+      {reasoning && <Reasoning text={reasoning} thinking={!!streaming && !content} />}
+      {content && <Markdown text={content} streaming={streaming} />}
       {message?.media.map((item) => <MediaView key={item.id} item={item} />)}
       {(making || rendering) && (
         <p className="msg-making">

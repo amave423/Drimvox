@@ -5,6 +5,7 @@ import "@fontsource/source-serif-4/600.css";
 import "@fontsource/source-serif-4/500-italic.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
+import "katex/dist/katex.min.css";
 import "./styles/tokens.css";
 import "./styles/app.css";
 import "./styles/components.css";

@@ -23,7 +23,14 @@
 
 .reasoning { border-left: 2px solid var(--line); padding-left: 12px; color: var(--muted); font-size: 14px; }
 .reasoning summary { cursor: pointer; font-family: var(--font-serif); font-style: italic; }
-.reasoning p { margin: 6px 0 0; white-space: pre-wrap; }
+.reasoning p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* While the model thinks: a window of fixed height with the latest thoughts, fading at the top. */
+.reasoning.is-live { display: grid; gap: 4px; }
+.reasoning-head { display: flex; align-items: center; gap: 8px; font-family: var(--font-serif); font-style: italic; }
+.reasoning-tail {
+  height: 4.8em; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6;
+  mask-image: linear-gradient(to bottom, transparent, black 45%);
+}
 
 /* Markdown answers */
 .md { overflow-wrap: anywhere; }
@@ -96,4 +103,17 @@
 .web-panel button:hover, .web-panel button.is-on { background: var(--paper); }
 .web-option-name { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .web-panel small { padding-left: 15px; font-size: 12px; line-height: 1.4; }
+.msg-activity li { overflow-wrap: anywhere; }
 .msg-activity { list-style: none; margin: 4px 0 8px; padding: 0 0 0 12px; border-left: 2px solid var(--line); font-size: 13px; display: grid; gap: 2px; }
+
+/* Formulas, diagrams and code colours in answers. */
+.md .katex { overflow-wrap: normal; font-size: 1.05em; }
+.md .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; margin: 0 0 10px; }
+.diagram { margin: 0 0 10px; overflow-x: auto; }
+.diagram svg { display: block; max-width: 100%; max-height: 380px; height: auto; margin: 0 auto; }
+.diagram figcaption { font-size: 13px; }
+.md .hljs-keyword, .md .hljs-title, .md .hljs-section, .md .hljs-selector-tag { color: var(--ink); }
+.md .hljs-string, .md .hljs-regexp, .md .hljs-addition { color: var(--ok); }
+.md .hljs-number, .md .hljs-literal, .md .hljs-attr, .md .hljs-property, .md .hljs-symbol { color: var(--wait); }
+.md .hljs-built_in, .md .hljs-type, .md .hljs-deletion { color: var(--pencil); }
+.md .hljs-comment, .md .hljs-quote, .md .hljs-meta { color: var(--muted); font-style: italic; }

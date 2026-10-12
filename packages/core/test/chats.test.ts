@@ -94,6 +94,8 @@ describe("sending a message", () => {
     expect(messages[0].role).toBe("system");
     expect(messages[0].content).toContain(String(new Date().getFullYear()));
     expect(messages[0].content).toMatch(/\d{2}:\d{2}/);
+    // The chat draws formulas and Mermaid diagrams; the model is told so.
+    expect(messages[0].content).toContain("mermaid");
   });
 
   describe("with the internet", () => {

@@ -75,6 +75,38 @@ test("connects a provider, streams an answer and counts tokens and money", async
   await expect(page.getByText(/Сегодня потрачено/)).toBeVisible();
 });
 
+test("thinks in a small window, then draws formulas, a chart and highlighted code", async () => {
+  const answer =
+    "Энергия: $E = mc^2$, а площадь \\(S = \\pi r^2\\).\n\n" +
+    '```mermaid\npie title Доли\n  "Чай" : 60\n  "Кофе" : 40\n```\n\n' +
+    "```js\nconst total = 1;\n```";
+  fake = await startFakeProvider({
+    key: KEY,
+    models,
+    chunks: [{ reasoning: "Сначала подумаю. ".repeat(30) }, { reasoning: "https://example.org/" + "очень-длинный-путь/".repeat(20) }, { text: answer }],
+    delayMs: 500,
+  });
+  const page = await launch();
+  await connect(page);
+  await startChat(page);
+  await say(page, "Покажи пример");
+
+  // While thinking: the time and a window that does not grow with the thoughts.
+  await expect(page.getByText(/Думает… \d+ с/)).toBeVisible();
+  const tail = page.locator(".reasoning-tail");
+  const first = (await tail.boundingBox())!.height;
+  await page.waitForTimeout(600);
+  expect((await tail.boundingBox())!.height).toBe(first);
+  // A long address wraps instead of widening the page.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await expect(page.locator(".md .katex")).toHaveCount(2);
+  await expect(page.locator(".diagram svg")).toBeVisible();
+  await expect(page.locator(".diagram")).toContainText("Чай");
+  await expect(page.locator(".md .hljs-keyword").first()).toHaveText("const");
+  await expect(page.getByText(/Размышления/)).toBeVisible();
+});
+
 test("stops an answer halfway and keeps what was written", async () => {
   fake = await startFakeProvider({
     key: KEY,

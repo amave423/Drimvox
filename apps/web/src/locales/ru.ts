@@ -395,4 +395,7 @@ export const ru = {
   "web.hint.free": "Бесплатно: ищет в DuckDuckGo и читает страницы. Нужна модель с инструментами",
   "web.hint.provider": "Платно, около 2 ₽ за ответ: поиск на стороне провайдера, обычно точнее",
   "media.estimateRough": "≈ {cost}, может выйти дороже",
+  "chat.thinking": "Думает… {seconds} с",
+  "chat.reasoningTook": "Размышления · {seconds} с",
+  "chat.diagramFailed": "Диаграмму не удалось нарисовать, ниже её код.",
 } as const;

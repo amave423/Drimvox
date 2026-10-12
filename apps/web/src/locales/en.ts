@@ -396,4 +396,7 @@ export const en: Record<keyof typeof ru, string> = {
   "web.hint.free": "Free: searches DuckDuckGo and reads pages. Needs a model with tools",
   "web.hint.provider": "Paid, about 2 ₽ per answer: the provider searches, usually more precise",
   "media.estimateRough": "≈ {cost}, may cost more",
+  "chat.thinking": "Thinking… {seconds} s",
+  "chat.reasoningTook": "Reasoning · {seconds} s",
+  "chat.diagramFailed": "The diagram could not be drawn; its code is below.",
 };

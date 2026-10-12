@@ -89,9 +89,19 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
     if (last && providers.some((p) => p.id === last.providerId)) setChoice(last);
   }, [chatId, choice, providers]);
 
+  // A new message always brings the view down; a growing answer is followed only while the reader is at the
+  // bottom, so scrolling up to read is not undone with every word.
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
-  }, [chat?.messages.length, draft?.text, draft?.reasoning]);
+  }, [chat?.messages.length, draft?.user]);
+  useEffect(() => {
+    const marker = end.current;
+    if (!marker) return;
+    const frame = requestAnimationFrame(() => {
+      if (marker.getBoundingClientRect().top < window.innerHeight + 160) marker.scrollIntoView({ block: "end" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [draft?.text, draft?.reasoning, draft?.activity.length]);
 
   const estimateUsd = mediaModel ? estimateCost(mediaModel, options) : null;
   const preset = providers.find((p) => p.id === choice?.providerId)?.preset;
