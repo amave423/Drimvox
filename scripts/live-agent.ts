@@ -34,7 +34,9 @@ export async function checkAgent(api: Api, providerId: string, model: string, lo
   const repo = makeProject();
   try {
     const project = (await api("POST", "/projects", { path: repo })).body;
-    const started = await api("POST", `/projects/${project.id}/tasks`, { task: TASK, providerId, model });
+    // The whole pipeline: interview, spec, tests first, code, Artel's own checks.
+    const stages = { interview: true, spec: true, approveSpec: true, testsFirst: true };
+    const started = await api("POST", `/projects/${project.id}/tasks`, { task: TASK, providerId, model, stages });
     if (started.status !== 201) {
       log("agent: could not start", started.status, started.body);
       return false;
@@ -42,16 +44,26 @@ export async function checkAgent(api: Api, providerId: string, model: string, lo
     const id = (started.body as TaskView).id;
 
     let task: TaskView = started.body;
-    const until = Date.now() + 5 * 60_000;
+    const until = Date.now() + 8 * 60_000;
     while (Date.now() < until) {
       await new Promise((r) => setTimeout(r, 1000));
       task = (await api("GET", `/tasks/${id}`)).body;
-      // The live check never grants risky commands.
+      if (task.status === "running") continue;
+      // The live check answers like a user who trusts the recommendations, and never grants risky commands.
       if (task.pendingApproval) await api("POST", `/tasks/${id}/approvals/${task.pendingApproval.id}`, { allow: false });
-      else if (task.status !== "running") break;
+      else if (task.status === "waiting" && task.statusReason === "questions") {
+        log("  questions:", task.questions.map((q) => q.question).join(" | "));
+        const answers = task.questions.map((q) => ({ id: q.id, answer: q.options[q.recommended ?? 0]?.label ?? "As you see fit" }));
+        await api("POST", `/tasks/${id}/answers`, { answers });
+      } else if (task.status === "waiting" && task.statusReason === "spec_review") {
+        log("  spec checks:", task.checks, "plan:", task.plan);
+        await api("POST", `/tasks/${id}/spec`, { spec: task.spec, checks: task.checks });
+      } else break;
     }
 
     const events = (await api("GET", `/tasks/${id}/events`)).body as TaskEvent[];
+    const checks = events.filter((e) => e.kind === "check").map((e) => `${e.data.phase}: ${e.data.command} → ${e.data.ok ? "green" : "red"}`);
+    log("  checks run by Artel:", checks.join("; ") || "none");
     const actions = events
       .filter((e) => e.kind === "tool_call")
       .map((e) => `${e.data.name}${e.data.input?.path ? ` ${e.data.input.path}` : e.data.input?.command ? ` "${e.data.input.command}"` : ""}`);
