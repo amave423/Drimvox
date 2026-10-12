@@ -46,6 +46,7 @@ export function createCore(o: AppOptions) {
     providers,
     dataDir: o.dataDir,
     budgetUsd: () => readSettings(o.db).agentBudgetUsd,
+    strongModel: () => readSettings(o.db).strongModel,
     idleTimeoutMs,
   });
 

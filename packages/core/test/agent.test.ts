@@ -36,7 +36,9 @@ async function setup(script: FakeTurn[], models: Record<string, unknown>[] = [{ 
 
 async function startTask(task = "Создай hello.txt") {
   const { provider, project } = await setupResult!;
-  const res = await env.call("POST", `/api/projects/${project.id}/tasks`, { task, providerId: provider.id, model: "coder" });
+  // These tests cover the agent itself; the interview/spec/tests steps have their own suite.
+  const stages = { interview: false, spec: false, approveSpec: false, testsFirst: false };
+  const res = await env.call("POST", `/api/projects/${project.id}/tasks`, { task, providerId: provider.id, model: "coder", stages });
   expect(res.status).toBe(201);
   return (await res.json()) as { id: string };
 }

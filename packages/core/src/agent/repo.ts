@@ -1,4 +1,4 @@
-import type { ProjectView, TaskEvent, TaskEventKind, TaskStatus, TaskView } from "@artel/shared";
+import type { ProjectView, Question, TaskEvent, TaskEventKind, TaskPhase, TaskStatus, TaskStages, TaskView } from "@artel/shared";
 import type { ModelMessage } from "ai";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
@@ -32,6 +32,15 @@ export interface TaskRow {
   messages: string;
   created_at: number;
   updated_at: number;
+  phase: TaskPhase | null;
+  stages: string;
+  spec: string | null;
+  checks: string;
+  plan: string;
+  questions: string;
+  attempts: number;
+  escalated: number;
+  tests_nudged: number;
 }
 
 export class ProjectRepo {
@@ -75,6 +84,16 @@ export type TaskPatch = Partial<
     | "summary"
     | "commit_message"
     | "messages"
+    | "phase"
+    | "spec"
+    | "checks"
+    | "plan"
+    | "questions"
+    | "attempts"
+    | "escalated"
+    | "tests_nudged"
+    | "provider_id"
+    | "model"
   >
 >;
 
@@ -92,10 +111,22 @@ export class TaskRepo {
     return (projectId ? sql.all(projectId) : sql.all()) as unknown as TaskRow[];
   }
 
-  create(row: Omit<TaskRow, "cost_usd" | "input_tokens" | "output_tokens" | "steps" | "summary" | "commit_message" | "messages" | "created_at" | "updated_at" | "status_reason">): TaskRow {
+  create(
+    row: Pick<TaskRow, "id" | "project_id" | "title" | "task" | "provider_id" | "model" | "status" | "branch" | "worktree" | "base_commit" | "budget_usd">,
+    stages: TaskStages,
+  ): TaskRow {
     const now = Date.now();
     const full: TaskRow = {
       ...row,
+      phase: null,
+      stages: JSON.stringify(stages),
+      spec: null,
+      checks: "[]",
+      plan: "[]",
+      questions: "[]",
+      attempts: 0,
+      escalated: 0,
+      tests_nudged: 0,
       status_reason: null,
       cost_usd: 0,
       input_tokens: 0,
@@ -176,6 +207,14 @@ export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingAppro
     summary: row.summary,
     commitMessage: row.commit_message,
     pendingApproval,
+    phase: row.phase,
+    stages: JSON.parse(row.stages) as TaskStages,
+    spec: row.spec,
+    checks: JSON.parse(row.checks) as string[],
+    plan: JSON.parse(row.plan) as string[],
+    questions: JSON.parse(row.questions) as Question[],
+    attempts: row.attempts,
+    escalated: row.escalated === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

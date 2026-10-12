@@ -1,14 +1,22 @@
-import type { PendingApproval, TaskEvent, TaskFeedback, TaskUpdate, TaskView } from "@artel/shared";
-import type { ModelMessage } from "ai";
+import type {
+  PendingApproval,
+  Question,
+  TaskEvent,
+  TaskFeedback,
+  TaskPhase,
+  TaskStages,
+  TaskUpdate,
+  TaskView,
+} from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
 import { addWorktree, headCommit } from "./git";
+import { runPass, startWork, enterPhase, type PassContext } from "./pass";
+import { answersMessage, specMessage } from "./phases";
 import { feedbackMessage } from "./prompt";
 import { toTaskView, type ProjectRepo, type TaskRepo, type TaskRow } from "./repo";
-import { acceptTask, discardTask, hasChanges, snapshot, taskDiff } from "./review";
-import { runAgent, type RunOutcome } from "./run";
+import { acceptTask, discardTask, snapshot, taskDiff } from "./review";
 
 interface Live {
   controller: AbortController;
@@ -25,8 +33,12 @@ export interface RunnerOptions {
   providers: ProviderRepo;
   dataDir: string;
   budgetUsd(): number;
+  strongModel(): { providerId: string; model: string } | null;
   idleTimeoutMs: number;
 }
+
+/** Waiting states that need an answer from the user rather than "Continue". */
+const ANSWER_REASONS = new Set(["questions", "spec_review", "approval"]);
 
 /** Owns every running agent: starts them, relays their events, answers approvals, stops them. */
 export class AgentRunner {
@@ -43,7 +55,7 @@ export class AgentRunner {
     return toTaskView(row, approval ? { id: approval.id, command: approval.command, reason: approval.reason } : null);
   }
 
-  async start(projectId: string, input: { task: string; providerId: string; model: string }): Promise<TaskView> {
+  async start(projectId: string, input: { task: string; providerId: string; model: string; stages: TaskStages }): Promise<TaskView> {
     const project = this.o.projects.get(projectId);
     if (!project) throw new Error("Unknown project");
     const id = randomUUID();
@@ -53,28 +65,63 @@ export class AgentRunner {
     await addWorktree(project.path, worktree, branch, base);
 
     const firstLine = input.task.trim().split("\n")[0]!.trim();
-    this.o.tasks.create({
-      id,
-      project_id: projectId,
-      title: firstLine.length > 80 ? `${firstLine.slice(0, 80)}…` : firstLine,
-      task: input.task,
-      provider_id: input.providerId,
-      model: input.model,
-      status: "running",
-      branch,
-      worktree,
-      base_commit: base,
-      budget_usd: this.o.budgetUsd(),
-    });
+    this.o.tasks.create(
+      {
+        id,
+        project_id: projectId,
+        title: firstLine.length > 80 ? `${firstLine.slice(0, 80)}…` : firstLine,
+        task: input.task,
+        provider_id: input.providerId,
+        model: input.model,
+        status: "running",
+        branch,
+        worktree,
+        base_commit: base,
+        budget_usd: this.o.budgetUsd(),
+      },
+      input.stages,
+    );
+    const first: TaskPhase = input.stages.interview ? "interview" : input.stages.spec ? "spec" : "code";
+    enterPhase(this.context(id, new AbortController()), id, first);
     this.launch(id, input.task);
     return this.view(id)!;
   }
 
-  /** After a budget or step limit, a Stop or a failure: carry on in the same copy. */
+  answerQuestions(id: string, answers: { id: string; answer: string }[], skip: boolean): TaskView {
+    const row = this.requireWaiting(id, "questions");
+    const questions = JSON.parse(row.questions) as Question[];
+    this.event(id, "answers", { answers: skip ? [] : answers, skipped: skip });
+    this.o.tasks.update(id, { questions: "[]" });
+    const stages = JSON.parse(row.stages) as TaskStages;
+    enterPhase(this.context(id, new AbortController()), id, stages.spec ? "spec" : "code");
+    this.launch(id, answersMessage(questions, answers, skip));
+    return this.view(id)!;
+  }
+
+  approveSpec(id: string, spec: string, checks: string[]): TaskView {
+    const row = this.requireWaiting(id, "spec_review");
+    const edited = spec !== row.spec || JSON.stringify(checks) !== row.checks;
+    this.o.tasks.update(id, { spec, checks: JSON.stringify(checks) });
+    if (edited) this.event(id, "spec", { spec, checks, plan: JSON.parse(row.plan), edited: true });
+    const stages = JSON.parse(row.stages) as TaskStages;
+    const message = startWork(this.context(id, new AbortController()), id, stages, specMessage(spec, checks, edited), checks);
+    this.launch(id, message);
+    return this.view(id)!;
+  }
+
+  reviseSpec(id: string, note: string): TaskView {
+    this.requireWaiting(id, "spec_review");
+    this.launch(id, `The user asks to rewrite the spec: ${note}\n\nCall propose_spec again with the new version.`);
+    return this.view(id)!;
+  }
+
+  /** After a limit, a Stop, a failure or getting stuck: carry on in the same copy. */
   continue(id: string, note?: string): TaskView {
     const row = this.require(id, ["waiting", "stopped", "failed"]);
+    if (row.status === "waiting" && ANSWER_REASONS.has(row.status_reason ?? "")) throw new TaskBusy("Task waits for an answer");
     if (row.status_reason === "budget") this.o.tasks.update(id, { budget_usd: row.budget_usd + this.o.budgetUsd() });
-    this.launch(id, note || "Continue the task.");
+    if (row.status_reason === "stuck") this.o.tasks.update(id, { attempts: 0 });
+    this.launch(id, note || (row.status_reason === "stuck" ? "The checks still fail. Try a different approach." : "Continue the task."));
     return this.view(id)!;
   }
 
@@ -107,7 +154,7 @@ export class AgentRunner {
   }
 
   async accept(id: string, message?: string): Promise<string | null> {
-    const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"], true);
+    const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"]);
     const project = this.o.projects.get(row.project_id)!;
     const commit = await acceptTask(project.path, row, message ?? row.commit_message ?? row.title);
     this.setStatus(id, "accepted", null);
@@ -115,7 +162,7 @@ export class AgentRunner {
   }
 
   async discard(id: string): Promise<void> {
-    const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"], true);
+    const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"]);
     const project = this.o.projects.get(row.project_id)!;
     await discardTask(project.path, row);
     this.setStatus(id, "discarded", null);
@@ -138,12 +185,16 @@ export class AgentRunner {
     await Promise.all([...this.live.values()].map((l) => l.done.catch(() => {})));
   }
 
-  private require(id: string, allowed: TaskRow["status"][], idle = false): TaskRow {
+  private require(id: string, allowed: TaskRow["status"][]): TaskRow {
     const row = this.o.tasks.row(id);
     if (!row) throw new Error("Unknown task");
-    if (this.live.has(id) || !allowed.includes(row.status) || (idle && this.live.has(id))) {
-      throw new TaskBusy(`Task is ${row.status}`);
-    }
+    if (this.live.has(id) || !allowed.includes(row.status)) throw new TaskBusy(`Task is ${row.status}`);
+    return row;
+  }
+
+  private requireWaiting(id: string, reason: string): TaskRow {
+    const row = this.require(id, ["waiting"]);
+    if (row.status_reason !== reason) throw new TaskBusy(`Task waits for ${row.status_reason}`);
     return row;
   }
 
@@ -161,64 +212,30 @@ export class AgentRunner {
       });
   }
 
+  /** Passes follow each other until the task waits for the user, finishes or is stopped. */
   private async run(id: string, userText: string, live: Live): Promise<void> {
-    const row = this.o.tasks.row(id)!;
-    const messages: ModelMessage[] = [...this.o.tasks.messages(id), { role: "user", content: userText }];
-    this.o.tasks.update(id, { messages: JSON.stringify(messages) });
-    this.event(id, "user", { text: userText });
-    this.setStatus(id, "running", null);
+    const ctx = this.context(id, live.controller, live);
+    let next: string | null = userText;
+    while (next !== null && !this.closed && !live.controller.signal.aborted) {
+      next = await runPass(ctx, id, next);
+    }
+  }
 
-    const conn = row.provider_id ? this.o.providers.connection(row.provider_id) : null;
-    if (!conn) return this.finish(id, "failed", "no_provider");
-
-    let cost = row.cost_usd;
-    let input = row.input_tokens;
-    let output = row.output_tokens;
-    let steps = row.steps;
-
-    const outcome: RunOutcome = await runAgent({
-      conn,
-      model: row.model,
-      price: await findModel(conn, row.model),
-      worktree: row.worktree,
-      messages,
-      spentUsd: row.cost_usd,
-      budgetUsd: this.o.tasks.row(id)!.budget_usd,
-      signal: live.controller.signal,
+  private context(id: string, controller: AbortController, live?: Live): PassContext {
+    return {
+      tasks: this.o.tasks,
+      projects: this.o.projects,
+      providers: this.o.providers,
       idleTimeoutMs: this.o.idleTimeoutMs,
-      onText: (text) => this.event(id, "text", { text }),
-      onStep: (step) => {
-        if (this.closed) return;
-        messages.push(...step.messages);
-        cost += step.costUsd;
-        input += step.inputTokens;
-        output += step.outputTokens;
-        steps++;
-        this.o.tasks.update(id, { messages: JSON.stringify(messages), cost_usd: cost, input_tokens: input, output_tokens: output, steps });
-        this.o.tasks.addUsage(id, step.inputTokens, step.outputTokens, step.costUsd, step.priced);
-        this.publishTask(id);
-      },
-      hooks: {
-        onCall: (call) => this.event(id, "tool_call", call),
-        onResult: (result) => this.event(id, "tool_result", result),
-        askApproval: (command, reason, signal) => this.askApproval(id, live, command, reason, signal),
-      },
-    });
-    if (this.closed) return;
-
-    if (outcome.kind === "stopped") return this.finish(id, "stopped", "user");
-    if (outcome.kind === "error") return this.finish(id, "failed", outcome.error.code, outcome.error.detail);
-    if (outcome.kind === "budget" || outcome.kind === "steps") return this.finish(id, "waiting", outcome.kind);
-
-    const current = this.o.tasks.row(id)!;
-    await snapshot(current);
-    const project = this.o.projects.get(current.project_id)!;
-    const changed = await hasChanges(project.path, current);
-    this.o.tasks.update(id, {
-      summary: outcome.summary,
-      commit_message: outcome.commitMessage ?? current.commit_message ?? current.title,
-    });
-    this.finish(id, changed ? "review" : "done_empty", null);
+      strongModel: this.o.strongModel,
+      signal: controller.signal,
+      closed: () => this.closed,
+      event: (kind, data) => this.event(id, kind, data),
+      finish: (status, reason, detail) => this.finish(id, status, reason, detail),
+      setStatus: (status, reason) => this.setStatus(id, status, reason),
+      publish: () => this.publishTask(id),
+      askApproval: (command, reason, signal) => (live ? this.askApproval(id, live, command, reason, signal) : Promise.resolve(false)),
+    };
   }
 
   private askApproval(id: string, live: Live, command: string, reason: string, signal?: AbortSignal): Promise<boolean> {

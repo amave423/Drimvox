@@ -13,9 +13,14 @@ export interface ToolHooks {
 
 const OUTPUT_FOR_EVENTS = 4000;
 
-/** The agent's tools, bound to one task's copy of the project. */
-export function buildTools(ws: Workspace, hooks: ToolHooks): ToolSet {
-  function wrap<S extends z.ZodType>(name: string, description: string, inputSchema: S, run: (input: z.infer<S>, signal?: AbortSignal) => Promise<{ ok: boolean; output: string }>) {
+type Run<S extends z.ZodType> = (input: z.infer<S>, signal?: AbortSignal) => Promise<{ ok: boolean; output: string }>;
+
+/**
+ * The agent's tools, bound to one task's copy of the project. "read" mode, for the interview and
+ * the spec, leaves out everything that changes files or runs commands.
+ */
+export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "write" = "write", extra: ToolSet = {}): ToolSet {
+  function wrap<S extends z.ZodType>(name: string, description: string, inputSchema: S, run: Run<S>) {
     return tool({
       description,
       inputSchema,
@@ -35,7 +40,7 @@ export function buildTools(ws: Workspace, hooks: ToolHooks): ToolSet {
 
   const ok = (output: string) => ({ ok: true, output });
 
-  return {
+  const readTools: ToolSet = {
     list_files: wrap(
       "list_files",
       "List files and folders (folders end with /). Skips .git, node_modules and build output.",
@@ -54,6 +59,22 @@ export function buildTools(ws: Workspace, hooks: ToolHooks): ToolSet {
       z.object({ pattern: z.string().min(1), path: z.string().default(".") }),
       async ({ pattern, path }) => ok(ws.search(pattern, path).join("\n") || "No matches."),
     ),
+  };
+
+  // Step tools (ask_questions, propose_spec) show up in the feed like any other call.
+  const stepTools: ToolSet = {};
+  for (const [name, t] of Object.entries(extra)) {
+    const description = typeof t.description === "string" ? t.description : name;
+    stepTools[name] = wrap(name, description, t.inputSchema as z.ZodType, async (input) =>
+      ok(String(await t.execute!(input as never, { toolCallId: "", messages: [] } as never))),
+    );
+  }
+
+  if (mode === "read") return { ...readTools, ...stepTools };
+
+  return {
+    ...readTools,
+    ...stepTools,
     write_file: wrap(
       "write_file",
       "Create or overwrite a file with the full content. Creates missing folders.",

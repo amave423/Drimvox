@@ -1,5 +1,14 @@
 import { zValidator } from "@hono/zod-validator";
-import { approvalAnswerSchema, taskAcceptSchema, taskContinueSchema, taskFeedbackSchema, type TaskUpdate } from "@artel/shared";
+import {
+  approvalAnswerSchema,
+  specApproveSchema,
+  specReviseSchema,
+  taskAcceptSchema,
+  taskAnswersSchema,
+  taskContinueSchema,
+  taskFeedbackSchema,
+  type TaskUpdate,
+} from "@artel/shared";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
@@ -90,6 +99,35 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner) {
       if (!runner.view(id)) return c.json(notFound, 404);
       try {
         return c.json(runner.continue(id, c.req.valid("json").note), 200);
+      } catch (err) {
+        return c.json(refusal(err), 409);
+      }
+    })
+    .post("/:id/answers", zValidator("json", taskAnswersSchema), (c) => {
+      const id = c.req.param("id");
+      if (!runner.view(id)) return c.json(notFound, 404);
+      try {
+        const { answers, skip } = c.req.valid("json");
+        return c.json(runner.answerQuestions(id, answers, skip), 200);
+      } catch (err) {
+        return c.json(refusal(err), 409);
+      }
+    })
+    .post("/:id/spec", zValidator("json", specApproveSchema), (c) => {
+      const id = c.req.param("id");
+      if (!runner.view(id)) return c.json(notFound, 404);
+      try {
+        const { spec, checks } = c.req.valid("json");
+        return c.json(runner.approveSpec(id, spec, checks), 200);
+      } catch (err) {
+        return c.json(refusal(err), 409);
+      }
+    })
+    .post("/:id/spec/revise", zValidator("json", specReviseSchema), (c) => {
+      const id = c.req.param("id");
+      if (!runner.view(id)) return c.json(notFound, 404);
+      try {
+        return c.json(runner.reviseSpec(id, c.req.valid("json").note), 200);
       } catch (err) {
         return c.json(refusal(err), 409);
       }

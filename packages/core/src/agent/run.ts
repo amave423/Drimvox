@@ -16,6 +16,14 @@ export interface RunInput {
   worktree: string;
   /** Conversation so far, ending with the new user message. */
   messages: ModelMessage[];
+  /** "read" for the interview and the spec: no edits, no commands. */
+  mode: "read" | "write";
+  /** Tools of the current step, such as ask_questions or propose_spec. */
+  extraTools?: ToolSet;
+  /** Calling any of these ends the pass, like finish does. */
+  stopTools?: string[];
+  /** The current step's instructions, added to the system prompt. */
+  instructions?: string;
   /** Money already spent on the task and the limit for it. */
   spentUsd: number;
   budgetUsd: number;
@@ -57,8 +65,14 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
     timer = setTimeout(() => silence.abort(), i.idleTimeoutMs);
   };
 
-  const tools = buildTools(new Workspace(i.worktree), {
+  // Calls our own tools reported; the rest are the SDK's rejections.
+  const reported = new Set<string>();
+  const hooks: ToolHooks = {
     ...i.hooks,
+    onCall: (call) => {
+      reported.add(call.callId);
+      i.hooks.onCall(call);
+    },
     // Waiting for the user is not silence from the model.
     askApproval: async (command, reason, signal) => {
       clearTimeout(timer);
@@ -68,17 +82,18 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         resetClock();
       }
     },
-    onFinish: (result) => (finished = result),
-  });
+    onFinish: (result: { summary: string; commitMessage: string }) => (finished = result),
+  };
+  const tools = buildTools(new Workspace(i.worktree), hooks, i.mode, i.extraTools);
 
   resetClock();
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
-      system: systemPrompt(i.worktree),
+      system: i.instructions ? `${systemPrompt(i.worktree)}\n\n${i.instructions}` : systemPrompt(i.worktree),
       messages: i.messages,
       tools,
-      stopWhen: [hasToolCall("finish"), isStepCount(MAX_STEPS), overBudget],
+      stopWhen: [hasToolCall("finish"), ...(i.stopTools ?? []).map((name) => hasToolCall(name)), isStepCount(MAX_STEPS), overBudget],
       maxRetries: 1,
       abortSignal: AbortSignal.any([i.signal, silence.signal]),
       onError: () => {},
@@ -106,6 +121,11 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         i.onText(text.trim());
         lastText = text.trim();
         text = "";
+      } else if (part.type === "tool-error" && !reported.has(part.toolCallId)) {
+        // Calls the SDK rejected before running them (unknown tool, bad arguments) still belong in the feed.
+        const message = part.error instanceof Error ? part.error.message : String(part.error);
+        i.hooks.onCall({ callId: part.toolCallId, name: part.toolName, input: part.input });
+        i.hooks.onResult({ callId: part.toolCallId, name: part.toolName, ok: false, output: `Error: ${message}` });
       } else if (part.type === "error") error = describeError(part.error);
     }
   } catch (err) {

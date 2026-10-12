@@ -86,6 +86,15 @@ const migrations: string[] = [
      created_at integer not null
    ) strict;
    create index agent_usage_by_time on agent_usage (created_at);`,
+  `alter table tasks add column phase text;
+   alter table tasks add column stages text not null default '{"interview":false,"spec":false,"approveSpec":false,"testsFirst":false}';
+   alter table tasks add column spec text;
+   alter table tasks add column checks text not null default '[]';
+   alter table tasks add column plan text not null default '[]';
+   alter table tasks add column questions text not null default '[]';
+   alter table tasks add column attempts integer not null default 0;
+   alter table tasks add column escalated integer not null default 0;
+   alter table tasks add column tests_nudged integer not null default 0;`,
 ];
 
 export interface Database {
@@ -101,7 +110,10 @@ export function openDatabase(file: string): Database {
   // Answers that were streaming when the app died will never finish.
   sql.exec("update messages set status = 'stopped' where status = 'streaming'");
   // Agent tasks live in memory while they run; after a restart they can only be resumed by hand.
-  sql.exec("update tasks set status = 'stopped', status_reason = 'restart' where status in ('running', 'waiting')");
+  // Waiting for answers, a spec review or "Continue" survives a restart; a pending command approval does not.
+  sql.exec(
+    "update tasks set status = 'stopped', status_reason = 'restart' where status = 'running' or (status = 'waiting' and status_reason = 'approval')",
+  );
   return {
     sql,
     schemaVersion: () => readVersion(sql),
