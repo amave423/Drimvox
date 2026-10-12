@@ -57,7 +57,7 @@ export async function askAboutPicture(vision: Vision, png: Buffer, question: str
         role: "user",
         content: [
           { type: "text", text: `This is a screenshot of a page. ${question}\nAnswer briefly and concretely, in the language of the question.` },
-          { type: "image", image: png, mediaType: "image/png" },
+          { type: "file", data: png, mediaType: "image/png" },
         ],
       },
     ],

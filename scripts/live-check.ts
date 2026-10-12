@@ -3,7 +3,8 @@
 // Costs a fraction of a cent. `npm run live-check -- --no-agent` skips the agent part;
 // `--team` gives the task to a team of agents instead of one. `--media` draws one cheap picture through
 // OpenRouter or RouterAI (about a cent); `--video` also makes the cheapest clip. `--web` asks a question that
-// needs the internet. `--only=routerai` checks one provider.
+// needs the internet. `--tools` gives an agent a skill, an MCP tool and a page to look at. `--only=routerai`
+// checks one provider.
 import { startServer } from "@artel/core";
 import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@artel/shared";
 import { randomBytes } from "node:crypto";
@@ -13,6 +14,7 @@ import { join } from "node:path";
 import { checkAgent } from "./live-agent";
 import { checkMedia } from "./live-media";
 import { checkTeam } from "./live-team";
+import { checkTools, weatherCard } from "./live-tools";
 
 interface Target {
   preset: PresetId;
@@ -57,7 +59,7 @@ const log = (...parts: unknown[]) => console.log(redact(parts.map((p) => (typeof
 
 const dataDir = mkdtempSync(join(tmpdir(), "artel-live-"));
 const token = randomBytes(16).toString("hex");
-const server = await startServer({ token, secretKey: randomBytes(32), dataDir, version: "live-check" });
+const server = await startServer({ token, secretKey: randomBytes(32), dataDir, version: "live-check", screenshot: () => weatherCard() });
 const base = `http://127.0.0.1:${server.port}/api`;
 const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 const api = async (method: string, path: string, body?: unknown) => {
@@ -141,6 +143,10 @@ try {
       } else if (!(await (process.argv.includes("--team") ? checkTeam : checkAgent)(api, provider.id, target.agentModel, log))) {
         failures++;
       }
+    }
+
+    if (process.argv.includes("--tools") && !lowFunds && list.some((m) => m.id === target.agentModel)) {
+      if (!(await checkTools(api, provider.id, target.agentModel, log))) failures++;
     }
 
     const wantsMedia = process.argv.includes("--media") || process.argv.includes("--video");
