@@ -1,6 +1,8 @@
 import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
 import type { WebMode } from "@artel/shared";
 import { isStepCount, streamText, type ToolSet } from "ai";
+import { cliReply } from "../cli/chat";
+import { isCli } from "../cli/kinds";
 import { WEB_HINT, webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
@@ -11,7 +13,7 @@ import type { Connection } from "../providers/repo";
 import type { ChatRepo } from "./repo";
 
 /** What the chat can show, so models use it instead of ASCII art. */
-const FORMAT_HINT =
+export const FORMAT_HINT =
   "Answers are shown as Markdown with tables, LaTeX math ($...$ inline, $$...$$ for blocks) and highlighted code. " +
   "For diagrams and charts write a ```mermaid block: flowchart, sequenceDiagram, pie, xychart-beta for bar and line charts, gantt, mindmap.";
 
@@ -29,6 +31,8 @@ export interface ReplyInput {
   webAccess: WebAccess;
   /** Tools besides the internet ones, such as the user's MCP servers. */
   extraTools?: ToolSet;
+  /** Where command-line agents keep a folder per chat. */
+  cliDir?: string;
   emit(event: StreamEvent): Promise<void>;
 }
 
@@ -37,6 +41,7 @@ export interface ReplyInput {
  * with its usage and cost. Provider errors end up on the answer, not as exceptions.
  */
 export async function reply(i: ReplyInput): Promise<void> {
+  if (isCli(i.conn.preset) && i.cliDir) return cliReply(i, i.cliDir, FORMAT_HINT);
   const userMessage = i.chats.addMessage({ chatId: i.chatId, role: "user", content: i.content, status: "done" });
   i.chats.nameIfUntitled(i.chatId, i.content);
   const history = i.chats.history(i.chatId);

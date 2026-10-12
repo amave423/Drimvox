@@ -2,6 +2,9 @@ import { presets, type ModelInfo, type PresetId } from "@artel/shared";
 import { fetchJson } from "./http";
 import { usdPer } from "../rates";
 import { NATIVE, nativeModels } from "./native";
+import { CLI_KINDS, isCli, type CliId } from "../cli/kinds";
+import { resolveCli } from "../cli/resolve";
+import { ProviderFailure } from "./errors";
 import type { Connection } from "./repo";
 
 /**
@@ -80,6 +83,23 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
+/** A CLI's model aliases; it picks the exact version itself. Its subscription pays, so the price is zero. */
+function cliModels(id: CliId): ModelInfo[] {
+  if (!resolveCli(id)) throw new ProviderFailure({ code: "cli_missing", detail: presets[id].cli!.install });
+  const title = (m: string) => (m === "default" ? "Default" : m.split("-").map((w) => w[0]!.toUpperCase() + w.slice(1)).join("-"));
+  return CLI_KINDS[id].models.map((m) => ({
+    id: m,
+    name: title(m),
+    contextLength: null,
+    priceIn: 0,
+    priceOut: 0,
+    priceEstimated: false,
+    tools: true,
+    // Artel cannot hand a CLI its screenshots, so it never looks at pages for the visual checks.
+    vision: false,
+  }));
+}
+
 const TTL_MS = 10 * 60_000;
 const cache = new Map<string, { at: number; models: ModelInfo[] }>();
 
@@ -87,7 +107,8 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
   const hit = cache.get(conn.cacheKey);
   if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.models;
   let models: ModelInfo[];
-  if (NATIVE.includes(conn.preset)) models = await nativeModels(conn);
+  if (isCli(conn.preset)) models = cliModels(conn.preset);
+  else if (NATIVE.includes(conn.preset)) models = await nativeModels(conn);
   else {
     const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey)) as { data?: unknown };
     const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];

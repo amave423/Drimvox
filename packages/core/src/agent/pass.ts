@@ -17,6 +17,8 @@ import {
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
 import { runAgent } from "./run";
+import { isCli } from "../cli/kinds";
+import { runCliTurn } from "../cli/turn";
 import { webTools } from "../internet/tools";
 import type { Vision } from "../visual/look";
 import { runVisualChecks, visualTools, type VisualDeps, type VisualKit } from "../visual/tools";
@@ -145,7 +147,11 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   if (mode === "write") {
     ownTools = { ...ownTools, ...(await ctx.imageTools(row, hooks, spend, () => row.budget_usd - cost)), ...visualTools(visual) };
   }
-  const outcome = await runAgent({
+  // Claude Code, Codex and Gemini CLI work with their own tools; Artel's own (web, skills, MCP, pictures) are for API models.
+  const run = isCli(conn.preset) ? runCliTurn : runAgent;
+  const outcome = await run({
+    session: row.cli_session,
+    onSession: (stored) => ctx.tasks.update(id, { cli_session: stored }),
     conn,
     model: row.model,
     price: await findModel(conn, row.model),
@@ -250,7 +256,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
 
   const checks = JSON.parse(row.checks) as string[];
   if (phase === "tests") return testsGate(ctx, id, row, checks);
-  if (phase === "code" && checks.length > 0) return codeGate(ctx, id, row, checks, visual);
+  if (phase === "code" && checks.length > 0) return codeGate(ctx, id, row, checks, visual, outcome.commitMessage ? outcome : null);
   return done(ctx, id, row, visual, outcome.summary, outcome.commitMessage);
 }
 
@@ -320,10 +326,18 @@ async function testsGate(ctx: PassContext, id: string, row: TaskRow, checks: str
 }
 
 /** Work counts as done only when Artel's own run of the checks is green. */
-async function codeGate(ctx: PassContext, id: string, row: TaskRow, checks: string[], visual: VisualDeps): Promise<string | null> {
+async function codeGate(
+  ctx: PassContext,
+  id: string,
+  row: TaskRow,
+  checks: string[],
+  visual: VisualDeps,
+  /** The pass's own summary and commit message, when it gave them. */
+  ended: { summary: string; commitMessage: string | null } | null,
+): Promise<string | null> {
   const results = await check(ctx, "code", checks, row.worktree);
   if (ctx.signal.aborted) return finish(ctx, "stopped", "user");
-  if (results.every((r) => r.ok)) return done(ctx, id, row, visual, lastSummary(ctx, id), null);
+  if (results.every((r) => r.ok)) return done(ctx, id, row, visual, ended?.summary ?? lastSummary(ctx, id), ended?.commitMessage ?? null);
   const report = failureReport(results);
   const attempts = row.attempts + 1;
   if (attempts < MAX_ATTEMPTS) {

@@ -6,6 +6,7 @@ import type { PresetId } from "@artel/shared";
 import { createCore, openDatabase, type Database } from "../src";
 import type { WebAccess } from "../src/internet/web";
 import type { Screenshotter } from "../src/visual/look";
+import type { CliId } from "../src/cli/kinds";
 
 export const TOKEN = "test-token";
 export const BASE = "http://127.0.0.1";
@@ -34,6 +35,8 @@ export interface TestEnv {
   setWeb(web: WebAccess): void;
   /** Screenshots for agents, instead of the desktop app's hidden window. */
   setScreenshot(fn: Screenshotter): void;
+  /** Starts this program instead of Claude Code, Codex or Gemini CLI. */
+  setCliCommand(id: CliId, argv: string[]): void;
   close(): void;
   /** Stops running agents first; use when a test may leave one running. */
   closeAsync(): Promise<void>;
@@ -48,6 +51,7 @@ export function createTestEnv(): TestEnv {
   let usdRub = 80;
   const presetUrls: Partial<Record<PresetId, string>> = {};
   let screenshot: Screenshotter | undefined;
+  const cliCommands: Partial<Record<CliId, string[]>> = {};
   let web: WebAccess = {
     search: async () => {
       throw new Error("No internet in tests");
@@ -71,6 +75,7 @@ export function createTestEnv(): TestEnv {
       presetUrls,
       web,
       screenshot,
+      cliCommands,
     };
     if (webDir) return createCore({ ...options, webDir });
     core ??= createCore(options);
@@ -108,6 +113,10 @@ export function createTestEnv(): TestEnv {
     },
     setScreenshot(fn) {
       screenshot = fn;
+      void dropCore();
+    },
+    setCliCommand(id, argv) {
+      cliCommands[id] = argv;
       void dropCore();
     },
     call: async (method, path, body) =>

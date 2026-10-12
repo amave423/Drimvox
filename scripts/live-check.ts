@@ -4,7 +4,7 @@
 // `--team` gives the task to a team of agents instead of one. `--media` draws one cheap picture through
 // OpenRouter or RouterAI (about a cent); `--video` also makes the cheapest clip. `--web` asks a question that
 // needs the internet. `--tools` gives an agent a skill, an MCP tool and a page to look at. `--only=routerai`
-// checks one provider.
+// checks one provider. `--cli` checks Claude Code, Codex and Gemini CLI instead of the keys.
 import { startServer } from "@artel/core";
 import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@artel/shared";
 import { randomBytes } from "node:crypto";
@@ -12,6 +12,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkAgent } from "./live-agent";
+import { checkClis } from "./live-cli";
 import { checkMedia } from "./live-media";
 import { checkTeam } from "./live-team";
 import { checkTools, weatherCard } from "./live-tools";
@@ -71,7 +72,8 @@ let failures = 0;
 let checked = 0;
 try {
   const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7);
-  for (const target of targets.filter((t) => !only || t.preset === only)) {
+  if (process.argv.includes("--cli")) [checked, failures] = await checkClis(api, ask, log, only);
+  for (const target of targets.filter((t) => !process.argv.includes("--cli") && (!only || t.preset === only))) {
     const key = env[target.envKey];
     log(`\n=== ${target.preset} ===`);
     if (!key) {

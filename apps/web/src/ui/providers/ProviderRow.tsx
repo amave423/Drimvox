@@ -75,6 +75,7 @@ export function ProviderRow({ provider }: { provider: ProviderView }) {
             {balance && <span>{t("providers.balance", { amount: formatBalance(balance, settings.locale) })}</span>}
             {provider.billing === "credits" && <span>{t("providers.billing.credits")}</span>}
             {provider.billing === "free" && <span>{t("providers.billing.free")}</span>}
+            {provider.billing === "subscription" && <span>{t("providers.billing.subscription")}</span>}
           </span>
         )}
         {check && "error" in check && <ErrorNote error={check.error} />}
@@ -124,7 +125,7 @@ export function ProviderRow({ provider }: { provider: ProviderView }) {
           <button className="link" onClick={() => void runCheck(true)}>
             {t("providers.recheck")}
           </button>
-          {provider.billing !== "free" && (
+          {(provider.billing === "paid" || provider.billing === "credits") && (
             <button className="link" onClick={() => setMode("replaceKey")}>
               {t("providers.replaceKey")}
             </button>

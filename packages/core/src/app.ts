@@ -23,6 +23,8 @@ import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { taskRoutes } from "./routes/tasks";
 import { setPriceCatalogUrl } from "./providers/native";
+import type { CliId } from "./cli/kinds";
+import { setCliCommands } from "./cli/resolve";
 import { setRateSource, usdRub, type RateSource } from "./rates";
 import { Shots, type Screenshotter } from "./visual/look";
 import { createCipher } from "./secrets";
@@ -53,6 +55,8 @@ export interface AppOptions {
   web?: WebAccess;
   /** Takes screenshots of pages; the desktop app gives one, tests a fake. Without it agents cannot look at pages. */
   screenshot?: Screenshotter;
+  /** How to start Claude Code, Codex and Gemini CLI instead of finding them on PATH; tests run a fake. */
+  cliCommands?: Partial<Record<CliId, string[]>>;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
@@ -60,6 +64,7 @@ const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
 /** The API plus a way to stop running agents before the database closes. */
 export function createCore(o: AppOptions) {
   setRateSource(o.usdRub);
+  setCliCommands(o.cliCommands);
   // Prices of vendors' own APIs come from OpenRouter's public catalog (a fake one in tests).
   setPriceCatalogUrl(o.presetUrls?.openrouter);
   const cipher = createCipher(o.secretKey);
@@ -110,7 +115,7 @@ export function createCore(o: AppOptions) {
       c.json(writeSettings(o.db, c.req.valid("json"))),
     )
     .route("/providers", providerRoutes(providers))
-    .route("/chats", chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs))
+    .route("/chats", chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs, join(o.dataDir, "cli-chats")))
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills")))

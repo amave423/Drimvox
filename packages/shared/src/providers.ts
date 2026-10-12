@@ -1,6 +1,21 @@
 import { z } from "zod";
 
-export const presetIds = ["openrouter", "routerai", "anthropic", "openai", "google", "xai", "deepseek", "nvidia", "ollama", "lmstudio", "custom"] as const;
+export const presetIds = [
+  "openrouter",
+  "routerai",
+  "claude-code",
+  "codex",
+  "gemini-cli",
+  "anthropic",
+  "openai",
+  "google",
+  "xai",
+  "deepseek",
+  "nvidia",
+  "ollama",
+  "lmstudio",
+  "custom",
+] as const;
 export type PresetId = (typeof presetIds)[number];
 
 export interface Preset {
@@ -13,8 +28,10 @@ export interface Preset {
   keyUrl?: string;
   /** The user may change the address (local servers and custom endpoints). */
   editableUrl: boolean;
-  /** How usage is billed: real money, provider credits, or nothing (local). */
-  billing: "paid" | "credits" | "free";
+  /** How usage is billed: real money, provider credits, the user's subscription to a CLI, or nothing (local). */
+  billing: "paid" | "credits" | "subscription" | "free";
+  /** A command-line agent Artel runs instead of calling an API: its program and how to install it. */
+  cli?: { command: string; install: string };
   /** What the provider's prices and costs are in. Artel converts rubles to dollars internally. */
   currency: "USD" | "RUB";
 }
@@ -39,6 +56,36 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "RUB",
+  },
+  "claude-code": {
+    id: "claude-code",
+    name: "Claude Code",
+    baseUrl: "",
+    keyRequired: false,
+    editableUrl: false,
+    billing: "subscription",
+    currency: "USD",
+    cli: { command: "claude", install: "npm install -g @anthropic-ai/claude-code" },
+  },
+  codex: {
+    id: "codex",
+    name: "Codex",
+    baseUrl: "",
+    keyRequired: false,
+    editableUrl: false,
+    billing: "subscription",
+    currency: "USD",
+    cli: { command: "codex", install: "npm install -g @openai/codex" },
+  },
+  "gemini-cli": {
+    id: "gemini-cli",
+    name: "Gemini CLI",
+    baseUrl: "",
+    keyRequired: false,
+    editableUrl: false,
+    billing: "subscription",
+    currency: "USD",
+    cli: { command: "gemini", install: "npm install -g @google/gemini-cli" },
   },
   anthropic: {
     id: "anthropic",
@@ -192,6 +239,10 @@ export const providerErrorCodes = [
   "unreachable",
   "timeout",
   "no_key",
+  /** A command-line agent is not installed. */
+  "cli_missing",
+  /** A command-line agent is installed but not logged in to its account. */
+  "cli_login",
   "unknown",
 ] as const;
 export type ProviderErrorCode = (typeof providerErrorCodes)[number];

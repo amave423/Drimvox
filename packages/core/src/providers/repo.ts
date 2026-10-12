@@ -58,7 +58,8 @@ export class ProviderRepo {
     const preset = presets[input.preset];
     if (input.baseUrl && !preset.editableUrl) throw new InvalidInput(`The address of ${preset.name} cannot be changed`);
     const baseUrl = input.baseUrl ?? this.urlOf(input.preset);
-    if (!baseUrl) throw new InvalidInput("An address is required");
+    // Command-line agents run on this computer and have no address.
+    if (!baseUrl && !preset.cli) throw new InvalidInput("An address is required");
     if (preset.keyRequired && !input.apiKey) throw new InvalidInput("A key is required");
 
     const now = Date.now();

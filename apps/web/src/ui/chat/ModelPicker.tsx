@@ -1,4 +1,4 @@
-import type { ChatKind, MediaModel, ModelInfo } from "@artel/shared";
+import type { ChatKind, MediaModel, ModelInfo, ProviderView } from "@artel/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
 import { formatPrice, formatTokens } from "../../lib/format";
@@ -125,7 +125,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
                     {m.name}
                     {m.name !== m.id && <small className="mono">{m.id}</small>}
                   </span>
-                  {m.info && <ModelFacts model={m.info} credits={providers.find((p) => p.id === providerId)?.billing === "credits"} />}
+                  {m.info && <ModelFacts model={m.info} billing={providers.find((p) => p.id === providerId)?.billing} />}
                 </button>
               </li>
             ))}
@@ -136,13 +136,13 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
   );
 }
 
-function ModelFacts({ model, credits }: { model: ModelInfo; credits: boolean }) {
+function ModelFacts({ model, billing }: { model: ModelInfo; billing: ProviderView["billing"] | undefined }) {
   const { t, settings } = useApp();
   const price =
     model.priceIn === null || model.priceOut === null
       ? "—"
       : model.priceIn === 0 && model.priceOut === 0
-        ? t(credits ? "model.freeCredits" : "model.free")
+        ? t(billing === "subscription" ? "model.subscription" : billing === "credits" ? "model.freeCredits" : "model.free")
         : `${model.priceEstimated ? "≈" : ""}${formatPrice(model.priceIn)} / ${formatPrice(model.priceOut)}`;
   return (
     <span className="picker-facts mono">

@@ -65,6 +65,7 @@ export interface TaskRow {
   fixes: number;
   visual: string;
   visual_attempts: number;
+  cli_session: string | null;
 }
 
 export class ProjectRepo {
@@ -127,6 +128,7 @@ export type TaskPatch = Partial<
     | "depends_on"
     | "visual"
     | "visual_attempts"
+    | "cli_session"
   >
 >;
 
@@ -177,6 +179,7 @@ export class TaskRepo {
       fixes: 0,
       visual: "[]",
       visual_attempts: 0,
+      cli_session: null,
       ...extra,
       status_reason: null,
       cost_usd: 0,

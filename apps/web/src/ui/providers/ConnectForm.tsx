@@ -96,26 +96,34 @@ export function ConnectForm() {
               />
             </label>
           )}
-          <label className="field">
-            <span>
-              {p.keyRequired ? t("providers.field.apiKey") : t("providers.field.apiKeyOptional")}
-              {p.keyUrl && (
-                <>
-                  {" "}
-                  <a href={p.keyUrl} target="_blank" rel="noreferrer">
-                    {t("providers.getKey")}
-                  </a>
-                </>
-              )}
-            </span>
-            <input
-              className="field-input mono"
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </label>
+          {p.cli ? (
+            <div className="cli-note">
+              <p>{t("providers.cli.needs", { command: p.cli.command })}</p>
+              <code className="mono cli-install">{p.cli.install}</code>
+              <p>{t("providers.cli.login", { command: p.cli.command })}</p>
+            </div>
+          ) : (
+            <label className="field">
+              <span>
+                {p.keyRequired ? t("providers.field.apiKey") : t("providers.field.apiKeyOptional")}
+                {p.keyUrl && (
+                  <>
+                    {" "}
+                    <a href={p.keyUrl} target="_blank" rel="noreferrer">
+                      {t("providers.getKey")}
+                    </a>
+                  </>
+                )}
+              </span>
+              <input
+                className="field-input mono"
+                type="password"
+                autoComplete="off"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+            </label>
+          )}
           {problem && <ErrorNote error={problem} />}
           <div className="actions">
             <button className="btn is-primary" disabled={busy || !!keyMissing || !!urlMissing}>

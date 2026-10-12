@@ -146,6 +146,9 @@ const migrations: string[] = [
    ) strict;`,
   `alter table tasks add column visual text not null default '[]';
    alter table tasks add column visual_attempts integer not null default 0;`,
+  // A command-line agent's own session, continued on the next turn: "<preset>:<model>:<session id>".
+  `alter table tasks add column cli_session text;
+   alter table chats add column cli_session text;`,
 ];
 
 export interface Database {

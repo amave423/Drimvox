@@ -31,6 +31,7 @@ export function chatRoutes(
   mcp: McpHub,
   approvals: ChatApprovals,
   idleTimeoutMs: number,
+  cliDir: string,
 ) {
   return new Hono()
     .get("/", (c) => c.json(chats.list()))
@@ -107,6 +108,7 @@ export function chatRoutes(
           web: webMode,
           webAccess: web,
           extraTools: mcpTools,
+          cliDir,
           emit,
         });
       });

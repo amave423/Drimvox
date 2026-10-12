@@ -8,7 +8,7 @@ import { loadModels } from "../../lib/models";
 /** Margin note about the chosen model: context size, price and abilities. */
 export function ModelNote({ choice }: { choice: ModelChoice }) {
   const { api, t, settings, providers } = useApp();
-  const credits = providers.find((p) => p.id === choice.providerId)?.billing === "credits";
+  const billing = providers.find((p) => p.id === choice.providerId)?.billing;
   const [model, setModel] = useState<ModelInfo | null>(null);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export function ModelNote({ choice }: { choice: ModelChoice }) {
     <div className="note">
       <strong>{model.name}</strong>
       {model.contextLength && <p>{t("model.context", { value: formatTokens(model.contextLength, settings.locale) })}</p>}
-      {free && <p>{credits ? t("model.creditsNote") : t("model.free")}</p>}
+      {free && <p>{billing === "subscription" ? t("model.subscriptionNote") : billing === "credits" ? t("model.creditsNote") : t("model.free")}</p>}
       {!free && model.priceIn !== null && model.priceOut !== null && (
         <p>{t("model.price", { in: formatPrice(model.priceIn), out: formatPrice(model.priceOut) })}</p>
       )}

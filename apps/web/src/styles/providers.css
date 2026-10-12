@@ -21,3 +21,6 @@
 
 .connect { display: grid; gap: 16px; }
 .connect-form { display: grid; gap: 12px; max-width: 520px; }
+.cli-note { display: grid; gap: 6px; font-size: 14px; }
+.cli-note p { margin: 0; color: var(--muted); }
+.cli-install { display: block; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--sheet); user-select: all; overflow-wrap: anywhere; }

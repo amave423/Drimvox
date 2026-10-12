@@ -61,7 +61,7 @@ OpenRouter, DeepSeek, NVIDIA NIM. Ключ fal.ai больше не нужен (
 Поддерживаемые типы подключений:
 - **OpenAI-совместимый** (одна универсальная форма: base URL + ключ) — покрывает
   OpenRouter, DeepSeek, NVIDIA NIM и любой похожий сервис.
-- **Нативные API:** Anthropic, OpenAI, Google Gemini, xAI — этап M7. До него эти модели доступны через OpenRouter.
+- **Нативные API:** Anthropic, OpenAI, Google Gemini, xAI (сделано в M7).
 - **Локальные:** Ollama / LM Studio — только подключение к уже запущенному серверу.
   Скачивания и запуска моделей внутри приложения нет.
 - **CLI-подписки:** Claude Code, Codex CLI, Gemini CLI как исполнители-агенты
@@ -159,7 +159,7 @@ packages/shared — типы и схемы (zod), общие для UI и core
 | M4 ✓ | Оркестратор: план → ОК → параллельные агенты → слияние | Сделано 2026-10-12, спека в `docs/specs/orchestrator.md`. Проверено вживую на DeepSeek и NVIDIA (`npm run live-check -- --team`) |
 | M5 | Картинки и видео через OpenRouter: в чате, галерея, картинки-ассеты у агентов | Сделано 2026-10-12 по тестам, спека в `docs/specs/media.md`. Живая проверка (`npm run live-check -- --media`) ждёт пополнения баланса OpenRouter |
 | M6 ✓ | MCP, скиллы, веб-поиск, визуальная проверка, уведомления | Сделано 2026-10-12, спека в `docs/specs/tools.md`. Проверено вживую на RouterAI (`npm run live-check -- --tools`) |
-| M7 | CLI-агенты (Claude Code / Codex / Gemini CLI), прямые API Anthropic/OpenAI/Gemini/xAI | — |
+| M7 | CLI-агенты (Claude Code / Codex / Gemini CLI), прямые API Anthropic/OpenAI/Gemini/xAI | Сделано 2026-10-13 по тестам, спека в `docs/specs/cli-agents.md`. Живая проверка Claude Code ждёт входа в аккаунт (`claude` → `/login`); Codex и Gemini CLI не установлены |
 | M8 | Серверный режим Ubuntu + Tailscale + вход по паролю | Тот же UI по IP, данные на сервере |
 
 ## 11. Открытые вопросы

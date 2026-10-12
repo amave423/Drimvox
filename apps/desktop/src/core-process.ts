@@ -50,6 +50,8 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     screenshot,
     // Tests pin the dollar rate instead of asking the Central Bank.
     usdRub: process.env.ARTEL_TEST_USD_RUB ? async () => Number(process.env.ARTEL_TEST_USD_RUB) : undefined,
+    // Tests run a fake Claude Code, Codex or Gemini CLI: {"claude-code": ["node", "fake-cli.mjs", "claude"]}.
+    cliCommands: process.env.ARTEL_TEST_CLI ? JSON.parse(process.env.ARTEL_TEST_CLI) : undefined,
   })
     .then((server) => process.parentPort.postMessage({ type: "ready", port: server.port }))
     .catch((err: unknown) => {

@@ -207,6 +207,16 @@ export class ChatRepo {
     return row ? toMessage(row, this.media.forMessages([id]).get(id) ?? []) : null;
   }
 
+  /** The command-line agent's session this chat continues, as `storeSession` wrote it. */
+  cliSession(chatId: string): string | null {
+    const row = this.db.sql.prepare("select cli_session from chats where id = ?").get(chatId) as { cli_session: string | null } | undefined;
+    return row?.cli_session ?? null;
+  }
+
+  setCliSession(chatId: string, session: string): void {
+    this.db.sql.prepare("update chats set cli_session = ? where id = ?").run(session, chatId);
+  }
+
   /** What the model sees: finished turns only. Failed and empty answers are left out. */
   history(chatId: string): { role: "user" | "assistant"; content: string }[] {
     const rows = this.db.sql
