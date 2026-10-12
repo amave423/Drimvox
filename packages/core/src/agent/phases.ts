@@ -27,6 +27,8 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[]): st
     case "tests":
       return [
         "Current step: tests first. Do not implement the feature yet.",
+        "In this step create or edit only test files and test configuration. Do not touch the source code the tests cover,",
+        "and do not create scratch files: Artel checks that the tests fail before any code exists.",
         "Write automated tests for the behaviour in the approved spec; set up the test runner first if the plan says so.",
         "Run the checks yourself: the new tests must fail now, because the feature does not exist yet.",
         `Checks:\n${checkList}`,

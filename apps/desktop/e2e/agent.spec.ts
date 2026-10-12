@@ -9,6 +9,13 @@ import { git, makeRepo } from "../../../packages/core/test/git-repo";
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
 const models = [{ id: "coder", name: "Coder", supported_parameters: ["tools"] }];
+const MATH = "export function add(a, b) {\n  return a + b;\n}\n";
+const TEST_ADD =
+  'import { test } from "node:test";\nimport assert from "node:assert/strict";\nimport { add } from "./math.js";\n\ntest("add", () => assert.equal(add(2, 3), 5));\n';
+const TEST_BOTH =
+  TEST_ADD.replace('import { add } from "./math.js";', 'import { add, subtract } from "./math.js";') +
+  'test("subtract", () => assert.equal(subtract(5, 3), 2));\n';
+const MATH_BOTH = MATH + "export function subtract(a, b) {\n  return a - b;\n}\n";
 
 let userData: string;
 let repo: string;
@@ -17,7 +24,12 @@ let fake: FakeProvider | undefined;
 
 test.beforeEach(() => {
   userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
-  repo = makeRepo({ "src/app.ts": "export const greeting = 'hi';\n" });
+  repo = makeRepo({
+    "src/app.ts": "export const greeting = 'hi';\n",
+    "package.json": '{ "type": "module" }\n',
+    "math.js": MATH,
+    "math.test.js": TEST_ADD,
+  });
 });
 
 test.afterEach(async () => {
@@ -44,12 +56,17 @@ async function launch(script: FakeTurn[]): Promise<Page> {
   return page;
 }
 
-async function startTask(page: Page, task: string) {
+/** Direct mode unless asked otherwise: these tests cover the agent, the pipeline has its own test. */
+async function startTask(page: Page, task: string, pipeline = false) {
   await page.getByRole("button", { name: "+ Проект" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/artel-repo-/);
   await page.getByLabel("Новая задача").fill(task);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Coder/ }).click();
+  if (!pipeline) {
+    await page.getByLabel("Сначала задать мне вопросы").uncheck();
+    await page.getByLabel("Написать спеку и план").uncheck();
+  }
   await page.getByRole("button", { name: "Запустить агента" }).click();
 }
 
@@ -110,4 +127,59 @@ test("discarding removes the copy and leaves the project alone", async () => {
   await expect(page.getByText("Правки отменены, копия удалена.")).toBeVisible();
   expect(existsSync(join(repo, "extra.txt"))).toBe(false);
   expect(git(repo, "branch", "--list", "artel/*")).toBe("");
+});
+
+test("the pipeline: interview, spec with an edited check, red tests, green code, review", async () => {
+  const page = await launch([
+    {
+      toolCalls: [
+        {
+          name: "ask_questions",
+          args: {
+            questions: [
+              {
+                id: "name",
+                question: "Как назвать функцию?",
+                options: [{ label: "subtract", description: "Как в задаче" }, { label: "minus" }],
+                recommended: 0,
+              },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      toolCalls: [
+        {
+          name: "propose_spec",
+          args: { spec: "# Вычитание\n\nДобавить **subtract(a, b)**.", checks: ["node --test math.test.js"], plan: ["Тест", "Функция"] },
+        },
+      ],
+    },
+    { toolCalls: [{ name: "write_file", args: { path: "math.test.js", content: TEST_BOTH } }] },
+    { toolCalls: [{ name: "finish", args: { summary: "Тест написан", commit_message: "Test subtract" } }] },
+    { toolCalls: [{ name: "write_file", args: { path: "math.js", content: MATH_BOTH } }] },
+    { toolCalls: [{ name: "finish", args: { summary: "subtract готова, тесты зелёные", commit_message: "Add subtract" } }] },
+  ]);
+  await startTask(page, "Добавь subtract(a, b)", true);
+
+  await expect(page.getByText("Пара вопросов перед работой")).toBeVisible();
+  await expect(page.getByText("Рекомендую")).toBeVisible();
+  await expect(page.getByRole("radio", { name: /subtract/ })).toBeChecked();
+  await page.getByRole("button", { name: "Ответить" }).click();
+
+  await expect(page.getByRole("heading", { name: "Спека и план" })).toBeVisible();
+  await expect(page.getByText("subtract(a, b)").first()).toBeVisible();
+  await page.getByLabel("Команда проверки 1").fill("node --test");
+  await page.getByRole("button", { name: "Начать работу" }).click();
+
+  await expect(page.getByText("Агент закончил. Посмотри правки")).toBeVisible();
+  await expect(page.getByText("Artel сам запустил проверки — все прошли.")).toBeVisible();
+  await page.getByText("Как агент работал").click();
+  await expect(page.getByText("код 1")).toBeVisible();
+  await expect(page.getByText("прошла")).toBeVisible();
+
+  await page.getByRole("button", { name: "Принять", exact: true }).click();
+  await expect(page.getByText(/Принято: коммит/)).toBeVisible();
+  expect(git(repo, "log", "--format=%s", "-1")).toBe("Add subtract");
 });

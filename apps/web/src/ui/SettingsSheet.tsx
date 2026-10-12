@@ -1,6 +1,7 @@
 import { locales, themes, type SettingsPatch } from "@artel/shared";
 import { useState } from "react";
 import { useApp } from "../context";
+import { ModelPicker } from "./chat/ModelPicker";
 import { Segmented } from "./Segmented";
 
 const localeNames = { ru: "Русский", en: "English" } as const;
@@ -63,6 +64,17 @@ export function SettingsSheet() {
           </button>
         </form>
         <p className="muted">{t("settings.agentBudgetHint")}</p>
+
+        <h2 className="sheet-h">{t("settings.strongModel")}</h2>
+        <div className="actions">
+          <ModelPicker value={settings.strongModel} onChange={(strongModel) => void save({ strongModel })} />
+          {settings.strongModel && (
+            <button className="link" onClick={() => void save({ strongModel: null })}>
+              {t("settings.clear")}
+            </button>
+          )}
+        </div>
+        <p className="muted">{t("settings.strongModelHint")}</p>
       </div>
       <aside className="margin" aria-live="polite">
         {state === "saved" && <p className="note is-ok">{t("settings.saved")}</p>}

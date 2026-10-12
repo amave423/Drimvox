@@ -7,6 +7,7 @@ import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/la
 import { loadModels } from "../../lib/models";
 import { ModelPicker } from "../chat/ModelPicker";
 import { ModelNote } from "../chat/ModelNote";
+import { StageSwitches, readStages } from "../tasks/Stages";
 import { StatusChip } from "../tasks/StatusDot";
 
 type GitProblem = "no_identity" | "no_git" | null;
@@ -20,6 +21,7 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
     return last && providers.some((p) => p.id === last.providerId) ? last : null;
   });
   const [model, setModel] = useState<ModelInfo | null>(null);
+  const [stages, setStages] = useState(readStages);
   const [gitProblem, setGitProblem] = useState<GitProblem>(null);
   const [startFailed, setStartFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -58,7 +60,7 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
     setBusy(true);
     setStartFailed(false);
     const task = await api.projects[":id"].tasks
-      .$post({ param: { id: projectId }, json: { task: text.trim(), providerId: choice.providerId, model: choice.model } })
+      .$post({ param: { id: projectId }, json: { task: text.trim(), providerId: choice.providerId, model: choice.model, stages } })
       .then((r) => ok<TaskView>(r))
       .catch(() => null);
     setBusy(false);
@@ -109,6 +111,7 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
                 aria-label={t("project.newTask")}
                 onChange={(e) => setText(e.target.value)}
               />
+              <StageSwitches value={stages} onChange={setStages} />
               <div className="actions">
                 <ModelPicker value={choice} onChange={setChoice} />
                 <button className="btn is-primary" disabled={busy || !choice || !text.trim() || noTools}>

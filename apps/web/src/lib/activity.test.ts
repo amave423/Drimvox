@@ -39,6 +39,22 @@ describe("buildFeed", () => {
   });
 });
 
+describe("pipeline events", () => {
+  it("turns steps, questions, answers, specs, checks and escalations into lines", () => {
+    const feed = buildFeed([
+      ev(1, "phase", { phase: "interview" }),
+      ev(2, "tool_call", { callId: "q", name: "ask_questions", input: {} }),
+      ev(3, "questions", { questions: [{ id: "a", question: "Как назвать?" }] }),
+      ev(4, "answers", { answers: [{ id: "a", answer: "subtract" }], skipped: false }),
+      ev(5, "spec", { spec: "# Спека", checks: ["npm test"], plan: [] }),
+      ev(6, "check", { phase: "code", command: "npm test", exitCode: 1, ok: false, output: "FAIL" }),
+      ev(7, "escalation", { from: "small", to: "strong" }),
+    ]);
+    expect(feed.map((i) => i.kind)).toEqual(["phase", "questions", "answers", "spec", "check", "escalation"]);
+    expect(feed[4]).toMatchObject({ command: "npm test", exitCode: 1, ok: false });
+  });
+});
+
 describe("exitCodeOf", () => {
   it("reads the exit code from command output", () => {
     expect(exitCodeOf("Exit code: 1\nFAIL")).toBe(1);

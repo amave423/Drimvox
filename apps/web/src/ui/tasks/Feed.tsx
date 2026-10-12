@@ -1,6 +1,7 @@
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { exitCodeOf, type FeedItem } from "../../lib/activity";
+import { Markdown } from "../chat/Markdown";
 
 interface Props {
   items: FeedItem[];
@@ -27,6 +28,56 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
   if (item.kind === "user") return <p className="feed-bubble">{item.text}</p>;
   if (item.kind === "note") return <p>{item.text}</p>;
   if (item.kind === "status") return <p className="muted">{t(`task.status.${item.status}` as MessageKey)}</p>;
+  if (item.kind === "phase") return <p className="feed-step">{t(`feed.phase.${item.phase}` as MessageKey)}</p>;
+  if (item.kind === "questions") return <p className="muted">{t("feed.questions", { count: item.questions.length })}</p>;
+  if (item.kind === "escalation") return <p className="feed-escalation">{t("feed.escalation", { from: item.from, to: item.to })}</p>;
+
+  if (item.kind === "answers") {
+    if (item.skipped) return <p className="muted">{t("feed.answersSkipped")}</p>;
+    return (
+      <div className="feed-bubble feed-answers">
+        <strong>{t("feed.answers")}</strong>
+        <ul>
+          {item.answers.map((a) => (
+            <li key={a.id}>{a.answer}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  if (item.kind === "spec") {
+    return (
+      <details className="action feed-spec">
+        <summary>
+          <span className="action-label">{t(item.edited ? "feed.specEdited" : "feed.spec")}</span>
+        </summary>
+        <div className="feed-spec-body">
+          <Markdown text={item.spec} />
+          {item.checks.length > 0 && (
+            <ul className="feed-checks mono muted">
+              {item.checks.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
+    );
+  }
+
+  if (item.kind === "check") {
+    const outcome = item.ok ? t("feed.checkOk") : item.exitCode === null ? t("feed.checkTimeout") : t("feed.checkFail", { code: item.exitCode });
+    return (
+      <details className="action feed-check">
+        <summary>
+          <span className="action-label mono">{t("feed.check", { command: item.command })}</span>
+          <span className={item.ok ? "action-ok" : "action-bad"}>{outcome}</span>
+        </summary>
+        <pre className="action-output mono">{item.output || "—"}</pre>
+      </details>
+    );
+  }
 
   if (item.kind === "approval") {
     return (

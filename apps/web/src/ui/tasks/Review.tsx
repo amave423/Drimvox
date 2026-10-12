@@ -27,7 +27,8 @@ export function Review({ task, comments, setComments }: Props) {
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [commit, setCommit] = useState<string | null | undefined>(undefined);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const open = task.status === "review" || task.status === "done_empty";
+  const stuck = task.status === "waiting" && task.statusReason === "stuck";
+  const open = task.status === "review" || task.status === "done_empty" || stuck;
 
   useEffect(() => {
     setMessage(task.commitMessage ?? task.title);
@@ -86,8 +87,13 @@ export function Review({ task, comments, setComments }: Props) {
   const empty = diff !== null && diff.length === 0;
   return (
     <section className="review">
-      <h2 className="sheet-h">{empty ? t("review.empty") : t("review.title")}</h2>
-      {task.summary && <p className="review-summary">{task.summary}</p>}
+      <h2 className="sheet-h">{stuck ? t("review.titleStuck") : empty ? t("review.empty") : t("review.title")}</h2>
+      {task.summary && !stuck && <p className="review-summary">{task.summary}</p>}
+      {!stuck && task.phase !== null && (
+        <p className={task.checks.length ? "note is-ok checks-note" : "muted checks-note"}>
+          {task.checks.length ? t("review.checksGreen") : t("review.noChecks")}
+        </p>
+      )}
 
       {diff && diff.length > 0 && (
         <>
@@ -97,10 +103,12 @@ export function Review({ task, comments, setComments }: Props) {
       )}
 
       <div className="review-bar">
+        {!stuck && (
         <label className="field">
           <span>{t("review.note")}</span>
           <textarea className="field-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
+        )}
         {!empty && (
           <label className="field">
             <span>{t("review.commitMessage")}</span>
@@ -126,9 +134,11 @@ export function Review({ task, comments, setComments }: Props) {
         )}
 
         <div className="actions">
-          <button className="btn is-pencil" disabled={busy || (!note.trim() && comments.length === 0)} onClick={() => void sendBack()}>
-            {t("review.return")}
-          </button>
+          {!stuck && (
+            <button className="btn is-pencil" disabled={busy || (!note.trim() && comments.length === 0)} onClick={() => void sendBack()}>
+              {t("review.return")}
+            </button>
+          )}
           {!empty && (
             <button className="btn is-primary" disabled={busy || !message.trim()} onClick={() => void accept()}>
               {t("review.accept")}

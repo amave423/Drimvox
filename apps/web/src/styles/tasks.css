@@ -100,3 +100,49 @@
 .margin-comment em { font: italic 500 14.5px var(--font-serif); color: var(--pencil); }
 .margin-comment .link { justify-self: start; font-size: 12px; }
 .note.is-pencil strong { color: var(--pencil); }
+
+/* Pipeline: stage switches, step strip, interview cards, the spec sheet */
+.stages { border: 0; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
+.stages legend { padding: 0; margin-bottom: 4px; color: var(--muted); font-size: 13px; }
+.stage-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.stage-switch input { accent-color: var(--ink); }
+.stage-switch.is-disabled { color: var(--muted); cursor: default; }
+
+.phase-steps { list-style: none; counter-reset: step; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 2px 0 0; padding: 0; font-size: 13px; color: var(--muted); }
+.phase-steps li { counter-increment: step; display: inline-flex; align-items: baseline; gap: 6px; }
+.phase-steps li::before { content: counter(step); font: italic 500 14px var(--font-serif); }
+.phase-steps li.is-done { color: var(--ok); }
+.phase-steps li.is-now { color: var(--ink); font-weight: 600; }
+
+.interview { margin: 8px 0 18px; padding-top: 4px; }
+.question { border: 0; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; }
+.question legend { padding: 0; margin-bottom: 6px; font: 600 17px/1.35 var(--font-serif); }
+.option { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.option:hover { border-color: var(--muted); }
+.option.is-on { border-color: var(--ink); background: var(--ink-soft); }
+.option input { margin-top: 4px; accent-color: var(--ink); }
+.option-text { display: grid; gap: 2px; min-width: 0; }
+.option-text small { color: var(--muted); font-size: 13px; }
+.option-text .field-input { margin-top: 6px; }
+.option-rec { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--wait-soft); color: var(--wait); white-space: nowrap; }
+
+.spec-review { margin: 8px 0 18px; padding-top: 4px; }
+.spec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.spec-doc { margin: 10px 0; padding: 18px 20px; border: 1px solid var(--line); border-left: 3px solid var(--ink); background: var(--sheet); }
+.spec-doc .md { font-size: 15px; }
+.spec-editor { resize: vertical; line-height: 1.55; font-size: 13px; }
+.spec-sub { margin: 16px 0 6px; font: 600 16px var(--font-serif); }
+.spec-hint { font-size: 13px; margin: 0 0 8px; }
+.check-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
+.check-list li { display: flex; gap: 10px; align-items: center; }
+.check-list .field-input { max-width: 460px; }
+.spec-revise { margin-top: 12px; }
+.spec-actions { margin-top: 14px; }
+
+.feed-step { margin: 10px 0 2px !important; font: italic 500 15px var(--font-serif); color: var(--muted); }
+.feed-escalation { color: var(--wait); }
+.feed-answers ul { margin: 4px 0 0; padding-left: 18px; }
+.feed-spec-body { margin: 4px 0 10px 18px; padding: 10px 14px; border-left: 2px solid var(--ink); }
+.feed-checks { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12.5px; }
+.checks-note { margin: 0 0 10px !important; }
+.stuck-report { width: 100%; margin: 4px 0 0; max-height: 220px; }

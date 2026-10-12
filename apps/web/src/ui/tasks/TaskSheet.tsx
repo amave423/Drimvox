@@ -4,10 +4,14 @@ import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { buildFeed, type FeedItem } from "../../lib/activity";
 import { formatBudget, formatTokens, formatUsd } from "../../lib/format";
+import { dictionaries } from "../../i18n";
 import { ErrorNote } from "../ErrorNote";
 import type { LineComment } from "./DiffView";
 import { Feed } from "./Feed";
+import { Interview } from "./Interview";
 import { Review } from "./Review";
+import { SpecReview } from "./SpecReview";
+import { PhaseSteps } from "./Stages";
 import { StatusChip } from "./StatusDot";
 import { useTaskStream } from "./useTaskStream";
 
@@ -20,7 +24,9 @@ export function TaskSheet({ taskId }: { taskId: string }) {
 
   if (!task) return <article className="sheet" aria-busy />;
   const feed = buildFeed(events);
-  const reviewing = REVIEW_STATES.has(task.status);
+  const stuck = task.status === "waiting" && task.statusReason === "stuck";
+  const reviewing = REVIEW_STATES.has(task.status) || stuck;
+  const waitingFor = task.status === "waiting" ? task.statusReason : null;
 
   const answer = (approvalId: string, allow: boolean) =>
     void api.tasks[":id"].approvals[":approvalId"].$post({ param: { id: task.id, approvalId }, json: { allow } }).catch(() => null);
@@ -34,9 +40,12 @@ export function TaskSheet({ taskId }: { taskId: string }) {
             <StatusChip status={task.status} />
             <span className="mono muted">{task.model}</span>
           </div>
+          <PhaseSteps task={task} />
         </header>
 
         <TaskNotice task={task} feed={feed} />
+        {waitingFor === "questions" && <Interview key={task.updatedAt} task={task} />}
+        {waitingFor === "spec_review" && <SpecReview key={task.spec ?? ""} task={task} />}
 
         {reviewing ? (
           <>
@@ -108,24 +117,36 @@ function TaskNotice({ task, feed }: { task: TaskView; feed: FeedItem[] }) {
     );
   }
 
+  // Interview answers and spec approval have their own controls below the notice.
+  if (task.status === "waiting" && (task.statusReason === "questions" || task.statusReason === "spec_review")) {
+    return (
+      <div className="task-notice is-wait">
+        <p>{t(`task.reason.${task.statusReason}` as MessageKey)}</p>
+      </div>
+    );
+  }
+
   if (task.status === "waiting" || task.status === "stopped") {
     const key = `task.reason.${task.statusReason ?? "user"}` as MessageKey;
+    const detail = task.statusReason === "stuck" ? lastStatusDetail(feed) : null;
     return (
       <div className="task-notice is-wait">
         <p>{t(key, { budget: formatBudget(settings.agentBudgetUsd) })}</p>
         <button className="btn is-primary" onClick={carryOn}>
           {t("task.continue")}
         </button>
+        {detail && <pre className="action-output mono stuck-report">{detail}</pre>}
       </div>
     );
   }
 
   if (task.status === "failed") {
-    const detail = [...feed].reverse().find((i): i is Extract<FeedItem, { kind: "status" }> => i.kind === "status")?.detail;
+    const detail = lastStatusDetail(feed);
+    const own = `task.reason.${task.statusReason}`;
     return (
       <div className="task-notice is-failed">
-        {task.statusReason === "no_provider" ? (
-          <p className="error-note">{t("task.reason.no_provider")}</p>
+        {own in dictionaries.ru ? (
+          <p className="error-note">{t(own as MessageKey)}</p>
         ) : (
           <ErrorNote error={{ code: task.statusReason ?? "unknown", detail: detail ?? undefined }} />
         )}
@@ -136,4 +157,8 @@ function TaskNotice({ task, feed }: { task: TaskView; feed: FeedItem[] }) {
     );
   }
   return null;
+}
+
+function lastStatusDetail(feed: FeedItem[]): string | null {
+  return [...feed].reverse().find((i): i is Extract<FeedItem, { kind: "status" }> => i.kind === "status")?.detail ?? null;
 }
