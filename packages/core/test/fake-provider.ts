@@ -32,6 +32,8 @@ export interface FakeProviderOptions {
   /** Answer chat requests with this status and an OpenAI-style error body. */
   failWith?: { status: number; message: string };
   routes?: Record<string, unknown>;
+  /** Decides whether a request carries the right key; Bearer <key> when absent. */
+  authorized?: (headers: IncomingMessage["headers"], url: URL) => boolean;
   /** Answers any authorized request before the built-in endpoints; undefined falls through to them. */
   handle?: (method: string, path: string, body: any) => FakeReply | undefined;
 }
@@ -46,7 +48,7 @@ export interface FakeReply {
 export interface FakeProvider {
   baseUrl: string;
   origin: string;
-  requests: { path: string; auth: string | undefined; body: any }[];
+  requests: { path: string; auth: string | undefined; body: any; headers: IncomingMessage["headers"]; query: string }[];
   /** Resolves when a streaming response was cut off by the client. */
   aborted: Promise<void>;
   close(): Promise<void>;
@@ -62,8 +64,9 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
 
   const server: Server = createServer(async (req, res) => {
     const body = await readBody(req);
-    const path = new URL(req.url ?? "/", "http://x").pathname;
-    requests.push({ path, auth: req.headers.authorization, body: body ? JSON.parse(body) : null });
+    const url = new URL(req.url ?? "/", "http://x");
+    const path = url.pathname;
+    requests.push({ path, auth: req.headers.authorization, body: body ? JSON.parse(body) : null, headers: req.headers, query: url.search });
 
     const json = (status: number, data: unknown) => {
       res.writeHead(status, { "content-type": "application/json" });
@@ -71,7 +74,8 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
     };
 
     if (o.routes && path in o.routes) return json(200, o.routes[path]);
-    if (req.headers.authorization !== `Bearer ${key}`) return json(401, { error: { message: "Invalid API key" } });
+    const ok = o.authorized ? o.authorized(req.headers, url) : req.headers.authorization === `Bearer ${key}`;
+    if (!ok) return json(401, { error: { message: "Invalid API key" } });
 
     const handled = o.handle?.(req.method ?? "GET", path, body ? JSON.parse(body) : null);
     if (handled) {

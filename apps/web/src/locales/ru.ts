@@ -468,4 +468,8 @@ export const ru = {
   "action.read_background": "Смотрит вывод процесса {target}",
   "action.stop_background": "Останавливает процесс {target}",
   "action.look_at_page": "Смотрит на страницу {target}",
+  "providers.hint.anthropic": "Claude напрямую по ключу Anthropic",
+  "providers.hint.openai": "GPT и o-модели напрямую по ключу OpenAI",
+  "providers.hint.google": "Gemini напрямую по ключу Google AI Studio",
+  "providers.hint.xai": "Grok напрямую по ключу xAI",
 } as const;

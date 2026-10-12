@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const presetIds = ["openrouter", "routerai", "deepseek", "nvidia", "ollama", "lmstudio", "custom"] as const;
+export const presetIds = ["openrouter", "routerai", "anthropic", "openai", "google", "xai", "deepseek", "nvidia", "ollama", "lmstudio", "custom"] as const;
 export type PresetId = (typeof presetIds)[number];
 
 export interface Preset {
@@ -39,6 +39,46 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "RUB",
+  },
+  anthropic: {
+    id: "anthropic",
+    name: "Anthropic",
+    baseUrl: "https://api.anthropic.com/v1",
+    keyRequired: true,
+    keyUrl: "https://console.anthropic.com/settings/keys",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
+  },
+  openai: {
+    id: "openai",
+    name: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    keyRequired: true,
+    keyUrl: "https://platform.openai.com/api-keys",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
+  },
+  google: {
+    id: "google",
+    name: "Google Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    keyRequired: true,
+    keyUrl: "https://aistudio.google.com/apikey",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
+  },
+  xai: {
+    id: "xai",
+    name: "xAI",
+    baseUrl: "https://api.x.ai/v1",
+    keyRequired: true,
+    keyUrl: "https://console.x.ai/",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
   },
   deepseek: {
     id: "deepseek",

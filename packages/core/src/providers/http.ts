@@ -1,11 +1,11 @@
 import { codeForStatus, detailFromBody, describeError, ProviderFailure } from "./errors";
 
 /** GET a provider endpoint as JSON. Failures become ProviderFailure with a UI code. */
-export async function fetchJson(url: string, apiKey: string | null, timeoutMs = 15_000): Promise<unknown> {
+export async function fetchJson(url: string, apiKey: string | null, timeoutMs = 15_000, headers: Record<string, string> = {}): Promise<unknown> {
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { Accept: "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+      headers: { Accept: "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}), ...headers },
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {

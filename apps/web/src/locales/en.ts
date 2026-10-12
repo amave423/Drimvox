@@ -469,4 +469,8 @@ export const en: Record<keyof typeof ru, string> = {
   "action.read_background": "Reads the output of process {target}",
   "action.stop_background": "Stops process {target}",
   "action.look_at_page": "Looks at page {target}",
+  "providers.hint.anthropic": "Claude directly with an Anthropic key",
+  "providers.hint.openai": "GPT and o-models directly with an OpenAI key",
+  "providers.hint.google": "Gemini directly with a Google AI Studio key",
+  "providers.hint.xai": "Grok directly with an xAI key",
 };

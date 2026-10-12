@@ -1,6 +1,7 @@
 import { presets, type ModelInfo, type PresetId } from "@artel/shared";
 import { fetchJson } from "./http";
 import { usdPer } from "../rates";
+import { NATIVE, nativeModels } from "./native";
 import type { Connection } from "./repo";
 
 /**
@@ -85,9 +86,13 @@ const cache = new Map<string, { at: number; models: ModelInfo[] }>();
 export async function listModels(conn: Connection, fresh = false): Promise<ModelInfo[]> {
   const hit = cache.get(conn.cacheKey);
   if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.models;
-  const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey)) as { data?: unknown };
-  const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
-  const models = normalizeModels(conn.preset, items, await usdPer(conn.currency));
+  let models: ModelInfo[];
+  if (NATIVE.includes(conn.preset)) models = await nativeModels(conn);
+  else {
+    const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey)) as { data?: unknown };
+    const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+    models = normalizeModels(conn.preset, items, await usdPer(conn.currency));
+  }
   cache.set(conn.cacheKey, { at: Date.now(), models });
   return models;
 }

@@ -22,6 +22,7 @@ import { skillRoutes } from "./routes/skills";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { taskRoutes } from "./routes/tasks";
+import { setPriceCatalogUrl } from "./providers/native";
 import { setRateSource, usdRub, type RateSource } from "./rates";
 import { Shots, type Screenshotter } from "./visual/look";
 import { createCipher } from "./secrets";
@@ -59,6 +60,8 @@ const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
 /** The API plus a way to stop running agents before the database closes. */
 export function createCore(o: AppOptions) {
   setRateSource(o.usdRub);
+  // Prices of vendors' own APIs come from OpenRouter's public catalog (a fake one in tests).
+  setPriceCatalogUrl(o.presetUrls?.openrouter);
   const cipher = createCipher(o.secretKey);
   const providers = new ProviderRepo(o.db, cipher, o.presetUrls);
   const mcpRepo = new McpRepo(o.db, cipher);
