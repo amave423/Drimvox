@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { providerCreateSchema, providerUpdateSchema } from "@artel/shared";
+import { presets, providerCreateSchema, providerUpdateSchema } from "@artel/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { listMediaModels, mediaModel } from "../media/catalog";
@@ -40,7 +40,19 @@ export function providerRoutes(providers: ProviderRepo) {
       try {
         return c.json(await listModels(conn, c.req.valid("query").fresh === "1"), 200);
       } catch (err) {
-        return c.json({ error: describeError(err) }, 502);
+        const error = describeError(err);
+        // A pasted address often lacks the /v1 that OpenAI-style APIs live under: try it once and keep it if it works.
+        if (error.code === "model_not_found" && presets[conn.preset].editableUrl && !/\/v\d+\/?$/.test(conn.baseUrl)) {
+          const withV1 = `${conn.baseUrl.replace(/\/+$/, "")}/v1`;
+          try {
+            const models = await listModels({ ...conn, baseUrl: withV1, cacheKey: `${conn.cacheKey}:v1` }, true);
+            providers.update(conn.id, { baseUrl: withV1 });
+            return c.json(models, 200);
+          } catch {
+            return c.json({ error: { ...error, detail: `${conn.baseUrl}/models: 404. ${error.detail ?? ""}`.trim() } }, 502);
+          }
+        }
+        return c.json({ error }, 502);
       }
     })
     .get("/:id/media-models", zValidator("query", z.object({ kind: z.enum(["image", "video"]) })), async (c) => {

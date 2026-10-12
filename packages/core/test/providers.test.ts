@@ -116,6 +116,15 @@ describe("models", () => {
     expect(await res.json()).toMatchObject({ error: { code: "unreachable" } });
   });
 
+  it("adds a missing /v1 to a custom address and keeps it", async () => {
+    const created = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.origin, apiKey: KEY })).json();
+    const res = await env.call("GET", `/api/providers/${created.id}/models`);
+    expect(res.status).toBe(200);
+    expect((await res.json()).map((m: any) => m.id)).toEqual(["fake-large", "fake-small"]);
+    const saved = (await (await env.call("GET", "/api/providers")).json()).find((p: any) => p.id === created.id);
+    expect(saved.baseUrl).toBe(`${fake.origin}/v1`);
+  });
+
   it("answers 404 for an unknown provider", async () => {
     expect((await env.call("GET", "/api/providers/nope/models")).status).toBe(404);
   });
