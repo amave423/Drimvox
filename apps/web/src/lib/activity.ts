@@ -37,9 +37,6 @@ export function buildFeed(events: TaskEvent[]): FeedItem[] {
       case "text":
         items.push({ kind: "note", seq: e.seq, text: String(d.text ?? "") });
         break;
-      case "answer":
-        items.push({ kind: "note", seq: e.seq, text: String(d.text ?? "") });
-        break;
       case "tool_call": {
         // finish is shown as the task summary; questions and the spec have lines of their own.
         if (["finish", "ask_questions", "propose_spec", "propose_plan", "answer"].includes(d.name)) break;

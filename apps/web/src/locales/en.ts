@@ -383,4 +383,13 @@ export const en: Record<keyof typeof ru, string> = {
   "settings.currencyHint": "Central Bank rate today: {rate} ₽ per dollar. Dollar prices are converted at it.",
   "settings.agentBudgetRub": "Agent budget per task, ₽",
   "providers.hint.routerai": "Hundreds of models paid in rubles: text, pictures, video",
+
+  "web.label": "Internet",
+  "web.off": "No internet",
+  "web.free": "Internet: Artel search",
+  "web.provider": "Internet: provider search (paid)",
+  "web.searching": "Searching: “{query}”",
+  "web.reading": "Reading {url}",
+  "action.web_search": "Searches the web: {target}",
+  "action.open_page": "Reads {target}",
 };

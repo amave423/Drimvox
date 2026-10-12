@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PresetId } from "@artel/shared";
 import { createCore, openDatabase, type Database } from "../src";
+import type { WebAccess } from "../src/internet/web";
 
 export const TOKEN = "test-token";
 export const BASE = "http://127.0.0.1";
@@ -28,6 +29,8 @@ export interface TestEnv {
   setUsdRub(rate: number): void;
   /** Points a fixed preset, such as RouterAI, at a fake server. */
   setPresetUrl(preset: PresetId, url: string): void;
+  /** Replaces the internet for models. */
+  setWeb(web: WebAccess): void;
   close(): void;
   /** Stops running agents first; use when a test may leave one running. */
   closeAsync(): Promise<void>;
@@ -41,6 +44,14 @@ export function createTestEnv(): TestEnv {
   // Never the network in tests.
   let usdRub = 80;
   const presetUrls: Partial<Record<PresetId, string>> = {};
+  let web: WebAccess = {
+    search: async () => {
+      throw new Error("No internet in tests");
+    },
+    open: async () => {
+      throw new Error("No internet in tests");
+    },
+  };
   // One core per open database: running agents and pending approvals live in it between requests.
   let core: ReturnType<typeof createCore> | undefined;
   const coreFor = (webDir?: string) => {
@@ -54,6 +65,7 @@ export function createTestEnv(): TestEnv {
       mediaPollMs,
       usdRub: async () => usdRub,
       presetUrls,
+      web,
     };
     if (webDir) return createCore({ ...options, webDir });
     core ??= createCore(options);
@@ -83,6 +95,10 @@ export function createTestEnv(): TestEnv {
     },
     setPresetUrl(preset, url) {
       presetUrls[preset] = url;
+      void dropCore();
+    },
+    setWeb(next) {
+      web = next;
       void dropCore();
     },
     call: async (method, path, body) =>

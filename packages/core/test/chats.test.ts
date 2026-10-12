@@ -96,6 +96,47 @@ describe("sending a message", () => {
     expect(messages[0].content).toMatch(/\d{2}:\d{2}/);
   });
 
+  describe("with the internet", () => {
+    const searched: string[] = [];
+    const fakeWeb = {
+      search: async (q: string) => {
+        searched.push(q);
+        return [{ title: "Погода в Москве", url: "https://weather.example/moscow", snippet: "Сейчас +5 °C, облачно" }];
+      },
+      open: async (url: string) => ({ url, title: "Москва", text: "Подробный прогноз" }),
+    };
+
+    it("searches with Artel's own tools and answers from the results", async () => {
+      env.setWeb(fakeWeb);
+      const { chat } = await setup({
+        script: [{ toolCalls: [{ name: "web_search", args: { query: "погода Москва" } }] }, { text: "Сейчас в Москве +5 °C." }],
+      });
+      const events = await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Какая погода?", web: "free" }));
+      expect(events.filter((e) => e.type === "tool")).toEqual([{ type: "tool", name: "web_search", input: "погода Москва" }]);
+      expect(events.find((e) => e.type === "done").message).toMatchObject({ status: "done", content: "Сейчас в Москве +5 °C." });
+      expect(searched).toEqual(["погода Москва"]);
+      const requests = fake.requests.filter((r) => r.path === "/v1/chat/completions");
+      expect(requests[0]!.body.tools.map((t: any) => t.function.name)).toEqual(["web_search", "open_page"]);
+      expect(JSON.stringify(requests[1]!.body.messages)).toContain("Сейчас +5 °C, облачно");
+    });
+
+    it("asks the provider to search when the user picks the provider's search", async () => {
+      const { chat } = await setup();
+      await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Новости?", web: "provider" }));
+      const body = fake.requests.find((r) => r.path === "/v1/chat/completions")!.body;
+      expect(body.plugins).toEqual([{ id: "web", max_results: 5 }]);
+      expect(body.tools).toBeUndefined();
+    });
+
+    it("sends no tools when the internet is off", async () => {
+      const { chat } = await setup();
+      await readEvents(await send(chat.id, "Привет"));
+      const body = fake.requests.find((r) => r.path === "/v1/chat/completions")!.body;
+      expect(body.tools).toBeUndefined();
+      expect(body.plugins).toBeUndefined();
+    });
+  });
+
   it("names the chat after the first message", async () => {
     const { chat } = await setup();
     await readEvents(await send(chat.id, "Как настроить Vite с прокси для API?\nПодробнее ниже"));

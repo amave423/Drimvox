@@ -17,6 +17,8 @@ import {
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
 import { runAgent } from "./run";
+import { webTools } from "../internet/tools";
+import type { WebAccess } from "../internet/web";
 import type { ToolHooks } from "./tools";
 
 const SPEC_REMINDER = "You must call propose_spec with the spec, the checks and the plan.";
@@ -41,6 +43,8 @@ export interface PassContext {
   askApproval: ToolHooks["askApproval"];
   /** A goal's plan is settled: hand the subtasks to the team. */
   startTeam(): void;
+  /** Search and page reading for every step: documentation, versions, current facts. */
+  web: WebAccess;
   /** The picture tool when the settings name an image model; none otherwise. */
   imageTools(
     row: TaskRow,
@@ -107,6 +111,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     askApproval: ctx.askApproval,
   };
   const mode = phase === "interview" || phase === "spec" ? "read" : "write";
+  extraTools = { ...extraTools, ...webTools(ctx.web, hooks) };
   if (mode === "write") {
     // Pictures cost money outside the model's own usage: they go into the task's spending at once.
     const spend = (usd: number) => {

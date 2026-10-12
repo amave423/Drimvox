@@ -13,6 +13,7 @@ import type {
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { imageToolsFor } from "../media/agent-tool";
+import type { WebAccess } from "../internet/web";
 import type { MediaRepo } from "../media/repo";
 import type { ProviderRepo } from "../providers/repo";
 import { addWorktree, headCommit, removeWorktree, showFile } from "./git";
@@ -42,6 +43,7 @@ export interface RunnerOptions {
   /** The model agents draw pictures with; null leaves them without the picture tool. */
   imageModel(): { providerId: string; model: string } | null;
   media: MediaRepo;
+  web: WebAccess;
   idleTimeoutMs: number;
 }
 
@@ -342,6 +344,7 @@ export class AgentRunner {
       publish: () => this.publishTask(id),
       askApproval: (command, reason, signal) => (live ? this.askApproval(id, live, command, reason, signal) : Promise.resolve(false)),
       startTeam: () => this.team.start(id),
+      web: this.o.web,
       imageTools: (row, hooks, onSpend, budgetLeft) =>
         imageToolsFor(this.o.imageModel(), this.o.providers, { worktree: row.worktree, taskId: id, media: this.o.media, hooks, budgetLeft, onSpend }),
     };

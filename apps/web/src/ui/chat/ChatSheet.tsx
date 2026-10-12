@@ -20,6 +20,7 @@ import { MediaOptions } from "./MediaOptions";
 import { AssistantMessage, UserMessage } from "./Messages";
 import { ModelNote } from "./ModelNote";
 import { ModelPicker } from "./ModelPicker";
+import { readWebMode, WebSwitch } from "./WebSwitch";
 
 interface Draft {
   user: string;
@@ -28,6 +29,8 @@ interface Draft {
   model: string;
   /** A picture or a clip is being made rather than text streamed. */
   media: boolean;
+  /** Searches and pages the model looked at while answering. */
+  activity: string[];
 }
 
 /** Answers still being made on the provider's side, such as clips, are checked this often. */
@@ -42,6 +45,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [mediaModel, setMediaModel] = useState<MediaModel | null>(null);
   const [options, setOptions] = useState<Options>({});
+  const [web, setWeb] = useState(readWebMode);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const kind = choice?.kind ?? "text";
@@ -89,6 +93,9 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   }, [chat?.messages.length, draft?.text, draft?.reasoning]);
 
   const estimateUsd = mediaModel ? estimateCost(mediaModel, options) : null;
+  const preset = providers.find((p) => p.id === choice?.providerId)?.preset;
+  const providerSearch = preset === "openrouter" || preset === "routerai";
+  const webMode = web === "provider" && !providerSearch ? "free" : web;
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
 
   async function send(content: string) {
@@ -113,16 +120,20 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
 
     const controller = new AbortController();
     abort.current = controller;
-    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text" });
+    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text", activity: [] });
     try {
       await postStream<StreamEvent>(
         `/api/chats/${id}/messages`,
         token,
         // The price was on the button the user pressed; that is the confirmation.
-        kind === "text" ? { content } : { content, options, confirm },
+        kind === "text" ? { content, web: webMode } : { content, options, confirm },
         (e) => {
           if (e.type === "text") setDraft((d) => d && { ...d, text: d.text + e.text });
           if (e.type === "reasoning") setDraft((d) => d && { ...d, reasoning: d.reasoning + e.text });
+          if (e.type === "tool") {
+            const line = e.name === "web_search" ? t("web.searching", { query: e.input }) : t("web.reading", { url: e.input });
+            setDraft((d) => d && { ...d, activity: [...d.activity, line] });
+          }
         },
         controller.signal,
       );
@@ -192,6 +203,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
                 model={draft.model}
                 streaming
                 making={draft.media ? kind : undefined}
+                activity={draft.activity}
               />
             </>
           )}
@@ -204,7 +216,12 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           streaming={!!draft}
           onSend={(text) => void send(text)}
           onStop={() => abort.current?.abort()}
-          tools={<ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />}
+          tools={
+            <>
+              <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />
+              {kind === "text" && choice && <WebSwitch value={web} onChange={setWeb} providerSearch={providerSearch} />}
+            </>
+          }
           extra={mediaModel && <MediaOptions model={mediaModel} value={options} onChange={setOptions} estimateUsd={estimateUsd} />}
           placeholder={kind === "text" ? undefined : t(kind === "image" ? "media.placeholderImage" : "media.placeholderVideo")}
           sendLabel={

@@ -1,5 +1,8 @@
 import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
-import { streamText } from "ai";
+import type { WebMode } from "@artel/shared";
+import { isStepCount, streamText } from "ai";
+import { WEB_HINT, webTools } from "../internet/tools";
+import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
 import { describeError } from "../providers/errors";
 import { nowLine } from "../now";
@@ -17,6 +20,8 @@ export interface ReplyInput {
   signal: AbortSignal;
   /** Give up when the model sends nothing for this long. */
   idleTimeoutMs: number;
+  web: WebMode;
+  webAccess: WebAccess;
   emit(event: StreamEvent): Promise<void>;
 }
 
@@ -55,8 +60,17 @@ export async function reply(i: ReplyInput): Promise<void> {
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
-      system: nowLine(),
+      system: i.web === "off" ? nowLine() : `${nowLine()}\n${i.web === "free" ? WEB_HINT : "Use the web search results you are given and name the sources."}`,
       messages: history,
+      ...(i.web === "free"
+        ? {
+            tools: webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }),
+            // Search, read a page or two, answer.
+            stopWhen: isStepCount(8),
+          }
+        : {}),
+      // OpenRouter and RouterAI search on their side for a fee; the plugin goes into the request body.
+      ...(i.web === "provider" ? { providerOptions: { [i.conn.preset]: { plugins: [{ id: "web", max_results: 5 }] } } } : {}),
       maxRetries: 1,
       abortSignal: AbortSignal.any([i.signal, silence.signal]),
       onError: () => {},

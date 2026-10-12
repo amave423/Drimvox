@@ -114,6 +114,26 @@ test("the agent asks before git push and respects a refusal", async () => {
   await expect(page.getByText("Пуш не разрешили, ничего не менял.")).toBeVisible();
 });
 
+test("a question about the project gets an answer, not a spec", async () => {
+  const page = await launch([
+    { toolCalls: [{ name: "read_file", args: { path: "math.js" } }] },
+    { toolCalls: [{ name: "answer", args: { answer: "Это маленький проект: **math.js** с функцией `add` и тест к ней." } }] },
+    { toolCalls: [{ name: "answer", args: { answer: "Тест один: проверяет, что add(2, 3) = 5." } }] },
+  ]);
+  // With the interview and the spec on, as a new user has them.
+  await startTask(page, "что это за проект?", true);
+
+  await expect(page.getByRole("heading", { name: "Ответ" })).toBeVisible();
+  await expect(page.getByText("Это маленький проект:")).toBeVisible();
+  await expect(page.getByText("Спека и план")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Принять", exact: true })).toHaveCount(0);
+
+  await page.getByLabel("Спросить ещё про проект…").fill("Сколько там тестов?");
+  await page.getByRole("button", { name: "Спросить", exact: true }).click();
+  await expect(page.getByText("Тест один: проверяет, что add(2, 3) = 5.")).toBeVisible();
+  expect(git(repo, "branch", "--list", "artel/*")).not.toBe("");
+});
+
 test("discarding removes the copy and leaves the project alone", async () => {
   const page = await launch([
     { toolCalls: [{ name: "write_file", args: { path: "extra.txt", content: "x" } }] },

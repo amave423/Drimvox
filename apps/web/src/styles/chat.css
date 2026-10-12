@@ -86,3 +86,5 @@
 .chat-margin { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 140px); overflow-y: auto; }
 .margin-action { justify-self: start; font-size: 13.5px; }
 .delete-confirm .actions { margin-top: 8px; }
+.web-switch { width: auto; max-width: 260px; padding: 6px 10px; font-size: 13px; border-radius: 999px; }
+.msg-activity { list-style: none; margin: 4px 0 8px; padding: 0 0 0 12px; border-left: 2px solid var(--line); font-size: 13px; display: grid; gap: 2px; }

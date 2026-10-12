@@ -23,9 +23,11 @@ interface AssistantProps {
   message?: MessageView;
   /** Shown while a picture or a clip is being made. */
   making?: ChatKind;
+  /** What the model searched and read while answering. */
+  activity?: string[];
 }
 
-export function AssistantMessage({ content, reasoning, model, streaming, message, making }: AssistantProps) {
+export function AssistantMessage({ content, reasoning, model, streaming, message, making, activity = [] }: AssistantProps) {
   const { t, settings } = useApp();
   const tokens = (n: number) => formatTokens(n, settings.locale);
 
@@ -47,6 +49,13 @@ export function AssistantMessage({ content, reasoning, model, streaming, message
   return (
     <div className={`msg msg-assistant${streaming ? " is-streaming" : ""}`} aria-busy={streaming}>
       {model && <div className="msg-who mono">{model}</div>}
+      {activity.length > 0 && (
+        <ul className="msg-activity muted">
+          {activity.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      )}
       {reasoning && (
         <details className="reasoning" open={streaming && !content}>
           <summary>{t("chat.reasoning")}</summary>

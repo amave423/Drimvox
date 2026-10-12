@@ -382,4 +382,13 @@ export const ru = {
   "settings.currencyHint": "Курс ЦБ на сегодня: {rate} ₽ за доллар. Цены в долларах пересчитываются по нему.",
   "settings.agentBudgetRub": "Бюджет агента на задачу, ₽",
   "providers.hint.routerai": "Сотни моделей с оплатой в рублях: текст, картинки, видео",
+
+  "web.label": "Интернет",
+  "web.off": "Без интернета",
+  "web.free": "Интернет: поиск Artel",
+  "web.provider": "Интернет: поиск провайдера (платно)",
+  "web.searching": "Ищет: «{query}»",
+  "web.reading": "Читает {url}",
+  "action.web_search": "Ищет в интернете: {target}",
+  "action.open_page": "Читает {target}",
 } as const;

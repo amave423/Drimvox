@@ -6,6 +6,7 @@ import { AgentRunner } from "./agent/runner";
 import { ChatRepo } from "./chats/repo";
 import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
+import { duckDuckGo, type WebAccess } from "./internet/web";
 import { MediaRepo } from "./media/repo";
 import { Studio } from "./media/studio";
 import { ProviderRepo } from "./providers/repo";
@@ -39,6 +40,8 @@ export interface AppOptions {
   usdRub?: RateSource;
   /** Addresses of fixed presets, for tests against a fake server. */
   presetUrls?: Partial<Record<PresetId, string>>;
+  /** How models reach the internet; DuckDuckGo and plain page fetching by default. */
+  web?: WebAccess;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
@@ -52,6 +55,7 @@ export function createCore(o: AppOptions) {
   const projects = new ProjectRepo(o.db);
   const tasks = new TaskRepo(o.db);
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
+  const web = o.web ?? duckDuckGo;
   const runner = new AgentRunner({
     tasks,
     projects,
@@ -61,6 +65,7 @@ export function createCore(o: AppOptions) {
     strongModel: () => readSettings(o.db).strongModel,
     imageModel: () => readSettings(o.db).imageModel,
     media,
+    web,
     idleTimeoutMs,
   });
   const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });
@@ -82,7 +87,7 @@ export function createCore(o: AppOptions) {
       c.json(writeSettings(o.db, c.req.valid("json"))),
     )
     .route("/providers", providerRoutes(providers))
-    .route("/chats", chatRoutes(chats, providers, studio, idleTimeoutMs))
+    .route("/chats", chatRoutes(chats, providers, studio, web, idleTimeoutMs))
     .route("/media", mediaRoutes(media))
     .route("/usage", usageRoutes(chats))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))

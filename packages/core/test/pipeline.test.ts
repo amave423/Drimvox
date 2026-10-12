@@ -159,6 +159,7 @@ describe("a question instead of a task", () => {
     const tools = chatRequests()[0]!.body.tools.map((t: any) => t.function.name);
     expect(tools).toContain("answer");
     expect(tools).not.toContain("write_file");
+    expect(tools).toEqual(expect.arrayContaining(["web_search", "open_page"]));
   });
 
   it("answers in the spec step when there is no interview", async () => {

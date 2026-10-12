@@ -6,6 +6,9 @@ import type { ProviderError } from "./providers";
 export const chatKinds = ["text", "image", "video"] as const;
 export type ChatKind = (typeof chatKinds)[number];
 
+export const webModes = ["off", "free", "provider"] as const;
+export type WebMode = (typeof webModes)[number];
+
 export const chatCreateSchema = z
   .object({
     providerId: z.string().min(1),
@@ -30,6 +33,8 @@ export const messageSendSchema = z
     options: mediaOptionsSchema.default({}),
     /** The user saw the price and pressed "Start"; needed for video and dear pictures. */
     confirm: z.boolean().default(false),
+    /** Internet for this answer: none, Artel's free search tools, or the provider's paid web search. */
+    web: z.enum(webModes).default("off"),
   })
   .strict();
 
@@ -84,4 +89,6 @@ export type StreamEvent =
   | { type: "start"; userMessage: MessageView; assistantMessageId: string }
   | { type: "reasoning"; text: string }
   | { type: "text"; text: string }
+  /** The model searched or opened a page with Artel's internet tools. */
+  | { type: "tool"; name: "web_search" | "open_page"; input: string }
   | { type: "done"; message: MessageView };

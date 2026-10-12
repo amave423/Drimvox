@@ -6,12 +6,13 @@ import { z } from "zod";
 import { reply } from "../chats/reply";
 import type { ChatRepo } from "../chats/repo";
 import { mediaModel } from "../media/catalog";
+import type { WebAccess } from "../internet/web";
 import type { Studio } from "../media/studio";
 import type { ProviderRepo } from "../providers/repo";
 
 const notFound = { error: { code: "not_found" } } as const;
 
-export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, studio: Studio, idleTimeoutMs: number) {
+export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, studio: Studio, web: WebAccess, idleTimeoutMs: number) {
   return new Hono()
     .get("/", (c) => c.json(chats.list()))
     .post("/", zValidator("json", chatCreateSchema), (c) => {
@@ -38,7 +39,7 @@ export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, studio: Stu
       const conn = chat.providerId ? providers.connection(chat.providerId) : null;
       if (!conn || !chat.model) return c.json({ error: { code: "invalid", detail: "Choose a model first" } }, 400);
       if (!conn.apiKey && presets[conn.preset].keyRequired) return c.json({ error: { code: "no_key" } }, 400);
-      const { content, options, confirm } = c.req.valid("json");
+      const { content, options, confirm, web: webMode } = c.req.valid("json");
 
       if (chat.kind !== "text") {
         const model = await mediaModel(conn, chat.kind, chat.model);
@@ -71,6 +72,8 @@ export function chatRoutes(chats: ChatRepo, providers: ProviderRepo, studio: Stu
           content,
           signal: controller.signal,
           idleTimeoutMs,
+          web: webMode,
+          webAccess: web,
           emit: async (event) => {
             if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
           },
