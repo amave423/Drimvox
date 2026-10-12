@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { PresetId } from "@artel/shared";
 import { createCore, openDatabase, type Database } from "../src";
 import type { WebAccess } from "../src/internet/web";
+import type { Screenshotter } from "../src/visual/look";
 
 export const TOKEN = "test-token";
 export const BASE = "http://127.0.0.1";
@@ -31,6 +32,8 @@ export interface TestEnv {
   setPresetUrl(preset: PresetId, url: string): void;
   /** Replaces the internet for models. */
   setWeb(web: WebAccess): void;
+  /** Screenshots for agents, instead of the desktop app's hidden window. */
+  setScreenshot(fn: Screenshotter): void;
   close(): void;
   /** Stops running agents first; use when a test may leave one running. */
   closeAsync(): Promise<void>;
@@ -44,6 +47,7 @@ export function createTestEnv(): TestEnv {
   // Never the network in tests.
   let usdRub = 80;
   const presetUrls: Partial<Record<PresetId, string>> = {};
+  let screenshot: Screenshotter | undefined;
   let web: WebAccess = {
     search: async () => {
       throw new Error("No internet in tests");
@@ -66,6 +70,7 @@ export function createTestEnv(): TestEnv {
       usdRub: async () => usdRub,
       presetUrls,
       web,
+      screenshot,
     };
     if (webDir) return createCore({ ...options, webDir });
     core ??= createCore(options);
@@ -99,6 +104,10 @@ export function createTestEnv(): TestEnv {
     },
     setWeb(next) {
       web = next;
+      void dropCore();
+    },
+    setScreenshot(fn) {
+      screenshot = fn;
       void dropCore();
     },
     call: async (method, path, body) =>

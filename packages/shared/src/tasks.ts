@@ -63,8 +63,21 @@ export const taskAnswersSchema = z
   .strict();
 
 const checkCommand = z.string().trim().min(1).max(500);
+/** A look at a page after the code is green: start the app (optional), open the address, expect what is described. */
+export const visualCheckSchema = z.object({
+  start: z.string().trim().min(1).max(500).optional(),
+  url: z.string().trim().url().max(2000),
+  expect: z.string().trim().min(1).max(2000),
+});
+export type VisualCheck = z.infer<typeof visualCheckSchema>;
+
 export const specApproveSchema = z
-  .object({ spec: z.string().trim().min(1).max(100_000), checks: z.array(checkCommand).max(20) })
+  .object({
+    spec: z.string().trim().min(1).max(100_000),
+    checks: z.array(checkCommand).max(20),
+    /** Left out, the proposed ones stay. */
+    visualChecks: z.array(visualCheckSchema).max(10).optional(),
+  })
   .strict();
 export const specReviseSchema = z.object({ note: z.string().trim().min(1).max(20_000) }).strict();
 
@@ -186,6 +199,8 @@ export interface TaskView {
   team: ModelRef | null;
   /** For a goal: the subtasks as planned (and as the user edited them). */
   plannedSubtasks: PlannedSubtask[];
+  /** Pages Artel looks at, through a model that sees pictures, once the checks are green. */
+  visualChecks: VisualCheck[];
   /** For a goal: the subtasks at work. */
   subtasks: SubtaskCard[];
   createdAt: number;
@@ -194,6 +209,7 @@ export interface TaskView {
 
 export type TaskEventKind =
   | "answer"
+  | "screenshot"
   | "user"
   | "text"
   | "tool_call"

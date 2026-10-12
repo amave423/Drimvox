@@ -9,6 +9,7 @@ import { ChatRepo } from "./chats/repo";
 import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
 import { duckDuckGo, type WebAccess } from "./internet/web";
+import { Background } from "./agent/background";
 import { McpHub } from "./mcp/hub";
 import { McpRepo } from "./mcp/repo";
 import { MediaRepo } from "./media/repo";
@@ -22,6 +23,7 @@ import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { taskRoutes } from "./routes/tasks";
 import { setRateSource, usdRub, type RateSource } from "./rates";
+import { Shots, type Screenshotter } from "./visual/look";
 import { createCipher } from "./secrets";
 import { readSettings, writeSettings } from "./settings";
 import { webHandler } from "./web";
@@ -48,6 +50,8 @@ export interface AppOptions {
   presetUrls?: Partial<Record<PresetId, string>>;
   /** How models reach the internet; DuckDuckGo and plain page fetching by default. */
   web?: WebAccess;
+  /** Takes screenshots of pages; the desktop app gives one, tests a fake. Without it agents cannot look at pages. */
+  screenshot?: Screenshotter;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
@@ -60,6 +64,8 @@ export function createCore(o: AppOptions) {
   const mcpRepo = new McpRepo(o.db, cipher);
   const mcp = new McpHub(mcpRepo);
   const approvals = new ChatApprovals();
+  const shots = new Shots(join(o.dataDir, "screenshots"));
+  const visualKit = { background: new Background(), screenshot: o.screenshot ?? null, shots };
   const media = new MediaRepo(o.db, o.dataDir);
   const chats = new ChatRepo(o.db, media);
   const projects = new ProjectRepo(o.db);
@@ -77,6 +83,8 @@ export function createCore(o: AppOptions) {
     media,
     web,
     mcp,
+    visualKit,
+    visionModel: () => readSettings(o.db).visionModel,
     skillsDir: join(o.dataDir, "skills"),
     idleTimeoutMs,
   });
@@ -105,7 +113,7 @@ export function createCore(o: AppOptions) {
     .route("/skills", skillRoutes(join(o.dataDir, "skills")))
     .route("/usage", usageRoutes(chats))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
-    .route("/tasks", taskRoutes(tasks, runner));
+    .route("/tasks", taskRoutes(tasks, runner, shots));
 
   const app = new Hono()
     .use("*", hostGuard(new Set(o.allowedHosts ?? defaultHosts)))
@@ -119,6 +127,7 @@ export function createCore(o: AppOptions) {
     shutdown: async () => {
       studio.shutdown();
       await runner.shutdown();
+      visualKit.background.shutdown();
       await mcp.shutdown();
     },
   };

@@ -22,7 +22,7 @@ const REVIEW_STATES = new Set(["review", "done_empty", "accepted", "discarded"])
 /** Waiting states with their own controls below the notice. */
 const ANSWERED_BELOW = new Set(["questions", "spec_review", "plan_review"]);
 /** Waiting states whose last status line explains what went wrong. */
-const WITH_DETAIL = new Set(["stuck", "integration_red", "subtask_stuck"]);
+const WITH_DETAIL = new Set(["stuck", "integration_red", "subtask_stuck", "visual_failed"]);
 
 export function TaskSheet({ taskId }: { taskId: string }) {
   const { api, t, settings } = useApp();
@@ -34,7 +34,8 @@ export function TaskSheet({ taskId }: { taskId: string }) {
   const feed = buildFeed(events).map((item) =>
     task.kind === "subtask" && item.kind === "user" && item.text.includes("Subtask id: ") ? { ...item, text: task.task } : item,
   );
-  const stuck = task.status === "waiting" && task.statusReason === "stuck";
+  // Stuck on checks or on the visual check: the work so far can still be reviewed and accepted.
+  const stuck = task.status === "waiting" && (task.statusReason === "stuck" || task.statusReason === "visual_failed");
   // A subtask is never reviewed on its own: the goal merges it and the user reviews the goal.
   const answered = task.status === "done_empty" && task.statusReason === "answered";
   const reviewing = task.kind !== "subtask" && !answered && (REVIEW_STATES.has(task.status) || stuck);
@@ -67,20 +68,20 @@ export function TaskSheet({ taskId }: { taskId: string }) {
         {answered ? (
           <details className="worked">
             <summary>{t("answer.howFound")}</summary>
-            <Feed items={feed} />
+            <Feed items={feed} taskId={task.id} />
           </details>
         ) : reviewing ? (
           <>
             <Review task={task} comments={comments} setComments={setComments} />
             <details className="worked">
               <summary>{t("review.howWorked")}</summary>
-              <Feed items={feed} />
+              <Feed items={feed} taskId={task.id} />
             </details>
           </>
         ) : (
           <>
             <h2 className="sheet-h">{t("task.feed")}</h2>
-            <Feed items={feed} onAnswer={task.pendingApproval ? answer : undefined} />
+            <Feed items={feed} taskId={task.id} onAnswer={task.pendingApproval ? answer : undefined} />
           </>
         )}
       </div>

@@ -9,6 +9,7 @@ export function SpecReview({ task }: { task: TaskView }) {
   const { api, t } = useApp();
   const [spec, setSpec] = useState(task.spec ?? "");
   const [checks, setChecks] = useState<string[]>(task.checks);
+  const [visual, setVisual] = useState(task.visualChecks);
   const [editing, setEditing] = useState(false);
   const [revising, setRevising] = useState(false);
   const [note, setNote] = useState("");
@@ -17,7 +18,7 @@ export function SpecReview({ task }: { task: TaskView }) {
   async function start() {
     setBusy(true);
     const cleaned = checks.map((c) => c.trim()).filter(Boolean);
-    await api.tasks[":id"].spec.$post({ param: { id: task.id }, json: { spec: spec.trim(), checks: cleaned } }).catch(() => null);
+    await api.tasks[":id"].spec.$post({ param: { id: task.id }, json: { spec: spec.trim(), checks: cleaned, visualChecks: visual } }).catch(() => null);
     setBusy(false);
   }
 
@@ -57,6 +58,24 @@ export function SpecReview({ task }: { task: TaskView }) {
       )}
 
       <ChecksEditor checks={checks} onChange={setChecks} />
+      {visual.length > 0 && (
+        <>
+          <h3 className="spec-sub">{t("spec.visual")}</h3>
+          <p className="muted spec-hint">{t("spec.visualHint")}</p>
+          <ul className="visual-list">
+            {visual.map((v, i) => (
+              <li key={i}>
+                <span className="mono">{v.url}</span>
+                <span>{v.expect}</span>
+                {v.start && <span className="mono muted">{t("spec.visualStart", { command: v.start })}</span>}
+                <button className="link is-pencil" onClick={() => setVisual(visual.filter((_, j) => j !== i))}>
+                  {t("spec.removeCheck")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       {revising && (
         <label className="field spec-revise">

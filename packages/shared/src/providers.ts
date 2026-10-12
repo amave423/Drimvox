@@ -138,6 +138,8 @@ export interface ModelInfo {
   /** True when prices come from a table built into Artel rather than from the provider. */
   priceEstimated: boolean;
   tools: boolean | null;
+  /** Understands pictures in the prompt; null when the catalog does not say. */
+  vision: boolean | null;
 }
 
 /** Problems talking to a provider, as codes the UI translates. */

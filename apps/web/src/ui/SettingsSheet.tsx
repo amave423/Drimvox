@@ -115,6 +115,17 @@ export function SettingsSheet() {
         </div>
         <p className="muted">{t("settings.imageModelHint", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>
 
+        <h2 className="sheet-h">{t("settings.visionModel")}</h2>
+        <div className="actions">
+          <ModelPicker value={settings.visionModel} onChange={({ providerId, model }) => void save({ visionModel: { providerId, model } })} />
+          {settings.visionModel && (
+            <button className="link" onClick={() => void save({ visionModel: null })}>
+              {t("settings.clear")}
+            </button>
+          )}
+        </div>
+        <p className="muted">{t("settings.visionModelHint")}</p>
+
         <McpSection />
         <SkillsSection />
       </div>

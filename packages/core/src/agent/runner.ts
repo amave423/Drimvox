@@ -8,13 +8,10 @@ import type {
   TaskStages,
   TaskUpdate,
   TaskView,
+  VisualCheck,
 } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { imageToolsFor } from "../media/agent-tool";
-import type { WebAccess } from "../internet/web";
-import type { McpHub } from "../mcp/hub";
-import type { MediaRepo } from "../media/repo";
 import type { ProviderRepo } from "../providers/repo";
 import { addWorktree, headCommit, removeWorktree, showFile } from "./git";
 import { runPass, startWork, enterPhase, type PassContext } from "./pass";
@@ -23,6 +20,7 @@ import { feedbackMessage } from "./prompt";
 import { toTaskView, type ProjectRepo, type TaskRepo, type TaskRow } from "./repo";
 import { acceptTask, discardTask, snapshot, taskDiff } from "./review";
 import { Team, cleanPlan } from "./team";
+import { taskExtras, type ExtrasOptions } from "./extras";
 import { waitForApproval, type ApprovalAnswer, type ApprovalSlot } from "./approvals";
 
 interface Live extends ApprovalSlot {
@@ -33,20 +31,13 @@ interface Live extends ApprovalSlot {
 /** A request the API answers with 409: the task is not in a state that allows it. */
 export class TaskBusy extends Error {}
 
-export interface RunnerOptions {
+export interface RunnerOptions extends ExtrasOptions {
   tasks: TaskRepo;
   projects: ProjectRepo;
   providers: ProviderRepo;
   dataDir: string;
   budgetUsd(): number;
   strongModel(): { providerId: string; model: string } | null;
-  /** The model agents draw pictures with; null leaves them without the picture tool. */
-  imageModel(): { providerId: string; model: string } | null;
-  media: MediaRepo;
-  web: WebAccess;
-  mcp: McpHub;
-  /** Shared skills; project skills are read from each task's copy. */
-  skillsDir: string;
   idleTimeoutMs: number;
 }
 
@@ -131,10 +122,10 @@ export class AgentRunner {
     return this.view(id)!;
   }
 
-  approveSpec(id: string, spec: string, checks: string[]): TaskView {
+  approveSpec(id: string, spec: string, checks: string[], visualChecks?: VisualCheck[]): TaskView {
     const row = this.requireWaiting(id, "spec_review");
     const edited = spec !== row.spec || JSON.stringify(checks) !== row.checks;
-    this.o.tasks.update(id, { spec, checks: JSON.stringify(checks) });
+    this.o.tasks.update(id, { spec, checks: JSON.stringify(checks), ...(visualChecks ? { visual: JSON.stringify(visualChecks) } : {}) });
     if (edited) this.event(id, "spec", { spec, checks, plan: JSON.parse(row.plan), edited: true });
     const stages = JSON.parse(row.stages) as TaskStages;
     const message = startWork(this.context(id, new AbortController()), id, stages, specMessage(spec, checks, edited), checks);
@@ -188,7 +179,14 @@ export class AgentRunner {
     }
     if (row.status_reason === "budget") this.o.tasks.update(id, { budget_usd: row.budget_usd + this.o.budgetUsd() });
     if (row.status_reason === "stuck") this.o.tasks.update(id, { attempts: 0 });
-    this.launch(id, note || (row.status_reason === "stuck" ? "The checks still fail. Try a different approach." : "Continue the task."));
+    if (row.status_reason === "visual_failed") this.o.tasks.update(id, { visual_attempts: 0 });
+    const again =
+      row.status_reason === "stuck"
+        ? "The checks still fail. Try a different approach."
+        : row.status_reason === "visual_failed"
+          ? "The page still does not look as the spec says. Look at it yourself with look_at_page and fix it."
+          : "Continue the task.";
+    this.launch(id, note || again);
     return this.view(id)!;
   }
 
@@ -314,6 +312,8 @@ export class AgentRunner {
       })
       .finally(() => {
         this.live.delete(id);
+        // A dev server started for this turn does not outlive it.
+        this.o.visualKit.background.stopAll(id);
         if (this.closed) return;
         this.publishTask(id);
         const parent = this.o.tasks.row(id)?.parent_id;
@@ -345,15 +345,7 @@ export class AgentRunner {
       publish: () => this.publishTask(id),
       askApproval: (command, reason, signal) => (live ? this.askApproval(id, live, command, reason, signal) : Promise.resolve(false)),
       startTeam: () => this.team.start(id),
-      web: this.o.web,
-      skillsDir: this.o.skillsDir,
-      mcpTools: (hooks) =>
-        this.o.mcp.toolsFor(
-          (call) => (live ? this.askApproval(id, live, `${call.server}: ${call.tool} ${JSON.stringify(call.input).slice(0, 500)}`, "mcp", call.signal) : Promise.resolve(false)),
-          hooks,
-        ),
-      imageTools: (row, hooks, onSpend, budgetLeft) =>
-        imageToolsFor(this.o.imageModel(), this.o.providers, { worktree: row.worktree, taskId: id, media: this.o.media, hooks, budgetLeft, onSpend }),
+      ...taskExtras(this.o, id, (command, signal) => (live ? this.askApproval(id, live, command, "mcp", signal) : Promise.resolve(false))),
     };
   }
 

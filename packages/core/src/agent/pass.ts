@@ -1,4 +1,4 @@
-import type { Question, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
+import type { Question, TaskEvent, TaskPhase, TaskStages, VisualCheck } from "@artel/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
@@ -18,6 +18,8 @@ import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
 import { runAgent } from "./run";
 import { webTools } from "../internet/tools";
+import type { Vision } from "../visual/look";
+import { runVisualChecks, visualTools, type VisualDeps, type VisualKit } from "../visual/tools";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 import type { WebAccess } from "../internet/web";
 import type { ToolHooks } from "./tools";
@@ -50,6 +52,10 @@ export interface PassContext {
   skillsDir: string;
   /** Tools of the user's MCP servers; the first call of each asks the user. */
   mcpTools(hooks: Omit<ToolHooks, "onFinish" | "askApproval">): Promise<ToolSet>;
+  /** Background processes, screenshots and where they are kept. */
+  visualKit: VisualKit;
+  /** The model that looks at screenshots for this task, if there is one. */
+  vision(row: TaskRow): Promise<Vision | null>;
   /** The picture tool when the settings name an image model; none otherwise. */
   imageTools(
     row: TaskRow,
@@ -116,18 +122,28 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     askApproval: ctx.askApproval,
   };
   const mode = phase === "interview" || phase === "spec" ? "read" : "write";
+  // Pictures and screenshots cost money outside the model's own usage: they go into the task's spending at once.
+  const spend = (usd: number) => {
+    if (usd <= 0) return;
+    cost += usd;
+    ctx.tasks.update(id, { cost_usd: cost });
+    ctx.tasks.addUsage(id, 0, 0, usd, true);
+    ctx.publish();
+  };
+  const visual: VisualDeps = {
+    kit: ctx.visualKit,
+    taskId: id,
+    worktree: row.worktree,
+    vision: await ctx.vision(row),
+    hooks,
+    onSpend: spend,
+    event: (kind, data) => ctx.event(kind, data),
+  };
   // The project's skills first: they win over shared ones of the same name.
   const skills = findSkills([...projectSkillRoots(row.worktree), { dir: ctx.skillsDir, scope: "shared" }]);
   let ownTools: ToolSet = { ...webTools(ctx.web, hooks), ...skillTools(skills, row.worktree, hooks), ...(await ctx.mcpTools(hooks)) };
   if (mode === "write") {
-    // Pictures cost money outside the model's own usage: they go into the task's spending at once.
-    const spend = (usd: number) => {
-      cost += usd;
-      ctx.tasks.update(id, { cost_usd: cost });
-      ctx.tasks.addUsage(id, 0, 0, usd, true);
-      ctx.publish();
-    };
-    ownTools = { ...ownTools, ...(await ctx.imageTools(row, hooks, spend, () => row.budget_usd - cost)) };
+    ownTools = { ...ownTools, ...(await ctx.imageTools(row, hooks, spend, () => row.budget_usd - cost)), ...visualTools(visual) };
   }
   const outcome = await runAgent({
     conn,
@@ -218,7 +234,12 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       if (messages.some((m) => m.role === "user" && m.content === SPEC_REMINDER)) return finish(ctx, "failed", "no_spec");
       return SPEC_REMINDER;
     }
-    ctx.tasks.update(id, { spec: proposed.spec, checks: JSON.stringify(proposed.checks), plan: JSON.stringify(proposed.plan) });
+    ctx.tasks.update(id, {
+      spec: proposed.spec,
+      checks: JSON.stringify(proposed.checks),
+      plan: JSON.stringify(proposed.plan),
+      visual: JSON.stringify(proposed.visualChecks ?? []),
+    });
     ctx.event("spec", proposed);
     if (stages.approveSpec) return finish(ctx, "waiting", "spec_review");
     const { kept, dropped } = safeChecks(proposed.checks, row.worktree);
@@ -229,8 +250,40 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
 
   const checks = JSON.parse(row.checks) as string[];
   if (phase === "tests") return testsGate(ctx, id, row, checks);
-  if (phase === "code" && checks.length > 0) return codeGate(ctx, id, row, checks);
-  await complete(ctx, id, outcome.summary, outcome.commitMessage);
+  if (phase === "code" && checks.length > 0) return codeGate(ctx, id, row, checks, visual);
+  return done(ctx, id, row, visual, outcome.summary, outcome.commitMessage);
+}
+
+/** Visual checks this many times in a row fail before the task waits for the user. */
+export const MAX_VISUAL_ATTEMPTS = 2;
+
+/** Green checks: Artel looks at the pages from the spec, then the work goes to review. */
+async function done(
+  ctx: PassContext,
+  id: string,
+  row: TaskRow,
+  visual: VisualDeps,
+  summary: string | null,
+  commitMessage: string | null,
+): Promise<string | null> {
+  const pages = JSON.parse(row.visual) as VisualCheck[];
+  if (pages.length > 0 && (!visual.vision || !visual.kit.screenshot)) {
+    ctx.event("text", {
+      text: "Artel skipped the visual checks: there is no model that sees pictures (pick one in the settings) or no way to take screenshots here.",
+    });
+  } else if (pages.length > 0) {
+    const results = await runVisualChecks(visual, pages, ctx.signal);
+    if (ctx.signal.aborted) return finish(ctx, "stopped", "user");
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length > 0) {
+      const attempts = row.visual_attempts + 1;
+      ctx.tasks.update(id, { visual_attempts: attempts });
+      const report = failed.map((f) => `${f.check.url}\nExpected: ${f.check.expect}\nSeen: ${f.answer}`).join("\n\n");
+      if (attempts >= MAX_VISUAL_ATTEMPTS) return finish(ctx, "waiting", "visual_failed", report.slice(0, 4000));
+      return `Artel looked at the page and it does not match the spec yet:\n\n${report}\n\nFix it, run the checks, then call finish.`;
+    }
+  }
+  await complete(ctx, id, summary, commitMessage);
   return null;
 }
 
@@ -267,13 +320,10 @@ async function testsGate(ctx: PassContext, id: string, row: TaskRow, checks: str
 }
 
 /** Work counts as done only when Artel's own run of the checks is green. */
-async function codeGate(ctx: PassContext, id: string, row: TaskRow, checks: string[]): Promise<string | null> {
+async function codeGate(ctx: PassContext, id: string, row: TaskRow, checks: string[], visual: VisualDeps): Promise<string | null> {
   const results = await check(ctx, "code", checks, row.worktree);
   if (ctx.signal.aborted) return finish(ctx, "stopped", "user");
-  if (results.every((r) => r.ok)) {
-    await complete(ctx, id, lastSummary(ctx, id), null);
-    return null;
-  }
+  if (results.every((r) => r.ok)) return done(ctx, id, row, visual, lastSummary(ctx, id), null);
   const report = failureReport(results);
   const attempts = row.attempts + 1;
   if (attempts < MAX_ATTEMPTS) {

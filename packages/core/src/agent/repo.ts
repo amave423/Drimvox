@@ -11,6 +11,7 @@ import type {
   TaskStatus,
   TaskStages,
   TaskView,
+  VisualCheck,
 } from "@artel/shared";
 import type { ModelMessage } from "ai";
 import { randomUUID } from "node:crypto";
@@ -62,6 +63,8 @@ export interface TaskRow {
   planned: string;
   requeues: number;
   fixes: number;
+  visual: string;
+  visual_attempts: number;
 }
 
 export class ProjectRepo {
@@ -122,6 +125,8 @@ export type TaskPatch = Partial<
     | "requeues"
     | "fixes"
     | "depends_on"
+    | "visual"
+    | "visual_attempts"
   >
 >;
 
@@ -170,6 +175,8 @@ export class TaskRepo {
       planned: "[]",
       requeues: 0,
       fixes: 0,
+      visual: "[]",
+      visual_attempts: 0,
       ...extra,
       status_reason: null,
       cost_usd: 0,
@@ -278,6 +285,7 @@ export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingAppro
     parentId: row.parent_id,
     team: row.team ? (JSON.parse(row.team) as ModelRef) : null,
     plannedSubtasks: JSON.parse(row.planned) as PlannedSubtask[],
+    visualChecks: JSON.parse(row.visual) as VisualCheck[],
     subtasks: children.map(toSubtaskCard),
     createdAt: row.created_at,
     updatedAt: row.updated_at,

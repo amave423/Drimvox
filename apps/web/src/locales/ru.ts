@@ -455,4 +455,17 @@ export const ru = {
   "approval.allowedAlways": "Разрешено всегда",
   "action.mcp": "Вызывает {target}",
   "chat.mcpCall": "Вызывает {name}",
+
+  "settings.visionModel": "Модель для проверки по скриншотам",
+  "settings.visionModelHint": "Она смотрит на скриншоты страниц, которые сделал агент. Нужна модель, которая понимает картинки. Если не выбрать, агент использует свою модель, когда она понимает картинки.",
+  "model.vision": "Понимает картинки",
+  "feed.screenshot": "Скриншот {url}",
+  "spec.visual": "Визуальные проверки",
+  "spec.visualHint": "После зелёных проверок Artel откроет эти страницы и спросит модель со зрением, видно ли нужное. Не больше 2 попыток.",
+  "spec.visualStart": "запуск: {command}",
+  "task.reason.visual_failed": "Страница дважды не прошла визуальную проверку. Ниже — что увидела модель. Можно дать агенту ещё попытку, принять правки как есть или отказаться.",
+  "action.start_background": "Запускает в фоне: {target}",
+  "action.read_background": "Смотрит вывод процесса {target}",
+  "action.stop_background": "Останавливает процесс {target}",
+  "action.look_at_page": "Смотрит на страницу {target}",
 } as const;

@@ -17,6 +17,8 @@ import { GitError } from "../agent/git";
 import type { TaskRepo } from "../agent/repo";
 import { AcceptRefused } from "../agent/review";
 import { TaskBusy, type AgentRunner } from "../agent/runner";
+import type { Shots } from "../visual/look";
+import { readFile } from "node:fs/promises";
 
 const notFound = { error: { code: "not_found" } } as const;
 
@@ -28,7 +30,7 @@ function refusal(err: unknown) {
   throw err;
 }
 
-export function taskRoutes(tasks: TaskRepo, runner: AgentRunner) {
+export function taskRoutes(tasks: TaskRepo, runner: AgentRunner, shots: Shots) {
   return new Hono()
     .get("/", (c) => c.json(tasks.list().map((t) => runner.view(t.id)!)))
     .get("/:id", (c) => {
@@ -119,8 +121,8 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner) {
       const id = c.req.param("id");
       if (!runner.view(id)) return c.json(notFound, 404);
       try {
-        const { spec, checks } = c.req.valid("json");
-        return c.json(runner.approveSpec(id, spec, checks), 200);
+        const { spec, checks, visualChecks } = c.req.valid("json");
+        return c.json(runner.approveSpec(id, spec, checks, visualChecks), 200);
       } catch (err) {
         return c.json(refusal(err), 409);
       }
@@ -168,6 +170,15 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner) {
       const bytes = await runner.file(c.req.param("id"), path);
       if (!bytes) return c.json(notFound, 404);
       return c.body(new Uint8Array(bytes), 200, { "Content-Type": mimeFor(path) });
+    })
+    .get("/:id/screenshots/:shot", async (c) => {
+      const path = shots.path(c.req.param("shot"));
+      if (!path || !runner.view(c.req.param("id"))) return c.json(notFound, 404);
+      try {
+        return c.body(new Uint8Array(await readFile(path)), 200, { "Content-Type": "image/png" });
+      } catch {
+        return c.json(notFound, 404);
+      }
     })
     .get("/:id/diff", async (c) => {
       const diff = await runner.diff(c.req.param("id"));

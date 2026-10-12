@@ -27,7 +27,7 @@ export function Review({ task, comments, setComments }: Props) {
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [commit, setCommit] = useState<string | null | undefined>(undefined);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const stuck = task.status === "waiting" && task.statusReason === "stuck";
+  const stuck = task.status === "waiting" && (task.statusReason === "stuck" || task.statusReason === "visual_failed");
   const open = task.status === "review" || task.status === "done_empty" || stuck;
 
   useEffect(() => {

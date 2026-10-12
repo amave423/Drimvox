@@ -144,6 +144,8 @@ const migrations: string[] = [
      tool text not null,
      primary key (server_id, tool)
    ) strict;`,
+  `alter table tasks add column visual text not null default '[]';
+   alter table tasks add column visual_attempts integer not null default 0;`,
 ];
 
 export interface Database {

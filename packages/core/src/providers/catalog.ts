@@ -53,6 +53,7 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     }
 
     const params = raw.supported_parameters;
+    const inputs = (raw.architecture as { input_modalities?: unknown } | undefined)?.input_modalities;
     models.push({
       id: raw.id,
       name: typeof raw.name === "string" && raw.name ? raw.name : raw.id,
@@ -61,6 +62,7 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
       priceOut,
       priceEstimated,
       tools: Array.isArray(params) ? params.includes("tools") : null,
+      vision: Array.isArray(inputs) ? inputs.includes("image") : null,
     });
   }
   return models.sort((a, b) => a.name.localeCompare(b.name));

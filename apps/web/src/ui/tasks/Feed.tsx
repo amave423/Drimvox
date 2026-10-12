@@ -3,29 +3,33 @@ import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { exitCodeOf, type FeedItem } from "../../lib/activity";
 import { formatUsd } from "../../lib/format";
+import { useAuthorizedUrl } from "../../lib/media";
 import { Markdown } from "../chat/Markdown";
 
 interface Props {
   items: FeedItem[];
+  /** For the screenshots the agent took. */
+  taskId: string;
   /** Present while the task waits for an answer. */
   onAnswer?(approvalId: string, allow: boolean, always?: boolean): void;
 }
 
 /** The agent's work as one line per action; details open on click. */
-export function Feed({ items, onAnswer }: Props) {
+export function Feed({ items, onAnswer, taskId }: Props) {
   return (
     <ol className="feed">
       {items.map((item) => (
         <li key={item.seq} className={`feed-${item.kind}`}>
-          <FeedLine item={item} onAnswer={onAnswer} />
+          <FeedLine item={item} onAnswer={onAnswer} taskId={taskId} />
         </li>
       ))}
     </ol>
   );
 }
 
-function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnswer"] }) {
+function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props["onAnswer"]; taskId: string }) {
   const { t } = useApp();
+  if (item.kind === "screenshot") return <Screenshot taskId={taskId} id={item.id} url={item.url} />;
 
   if (item.kind === "user") return <p className="feed-bubble">{item.text}</p>;
   if (item.kind === "note") return <p>{item.text}</p>;
@@ -135,15 +139,19 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
           ? (input.path ?? ".")
           : item.name === "web_search"
             ? input.query
-            : item.name === "open_page"
+            : item.name === "open_page" || item.name === "look_at_page"
               ? input.url
+              : item.name === "start_background"
+                ? input.command
+                : item.name === "read_background" || item.name === "stop_background"
+                  ? String((item.input as { id?: unknown }).id ?? "")
               : item.name === "use_skill"
                 ? input.name
                 : item.name === "read_skill_file"
                   ? `${input.name}/${input.path}`
                   : input.path;
   const mcp = item.name.includes("/");
-  const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image", "web_search", "open_page", "use_skill", "read_skill_file"].includes(
+  const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image", "web_search", "open_page", "use_skill", "read_skill_file", "start_background", "read_background", "stop_background", "look_at_page"].includes(
     item.name,
   );
   const label = mcp
@@ -169,5 +177,23 @@ function FeedLine({ item, onAnswer }: { item: FeedItem; onAnswer?: Props["onAnsw
       </summary>
       {item.result && <pre className="action-output mono">{item.result.output}</pre>}
     </details>
+  );
+}
+
+/** What the agent saw: a screenshot of a page, opened full size on click. */
+function Screenshot({ taskId, id, url }: { taskId: string; id: string; url: string }) {
+  const { t, token } = useApp();
+  const src = useAuthorizedUrl(`/api/tasks/${taskId}/screenshots/${id}`, token);
+  return (
+    <figure className="feed-shot">
+      <figcaption className="muted">{t("feed.screenshot", { url })}</figcaption>
+      {src ? (
+        <a href={src} target="_blank" rel="noreferrer">
+          <img src={src} alt={t("feed.screenshot", { url })} />
+        </a>
+      ) : (
+        <div className="media-wait" aria-busy />
+      )}
+    </figure>
   );
 }

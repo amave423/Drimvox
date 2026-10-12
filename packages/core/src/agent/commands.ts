@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" };
@@ -68,16 +68,30 @@ export interface CommandResult {
 
 const OUTPUT_LIMIT = 12_000;
 
+/** Starts a command in the user's shell: PowerShell on Windows, sh elsewhere (in its own process group). */
+export function spawnShell(command: string, cwd: string): ChildProcessWithoutNullStreams {
+  return process.platform === "win32"
+    ? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], { cwd, windowsHide: true })
+    : spawn("/bin/sh", ["-c", command], { cwd, detached: true });
+}
+
+/** Stops a command and everything it started, such as a dev server's workers. */
+export function killTree(child: ChildProcess): void {
+  if (child.exitCode !== null || !child.pid) return;
+  if (process.platform === "win32") spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true });
+  else {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      child.kill("SIGKILL");
+    }
+  }
+}
+
 /** Runs a shell command in `cwd`; keeps the tail of the output and kills the whole tree on timeout. */
 export function runCommand(command: string, cwd: string, timeoutMs: number, signal?: AbortSignal): Promise<CommandResult> {
   return new Promise((done) => {
-    const windows = process.platform === "win32";
-    const child = windows
-      ? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], {
-          cwd,
-          windowsHide: true,
-        })
-      : spawn("/bin/sh", ["-c", command], { cwd, detached: true });
+    const child = spawnShell(command, cwd);
 
     let output = "";
     const append = (chunk: Buffer) => {
@@ -88,17 +102,7 @@ export function runCommand(command: string, cwd: string, timeoutMs: number, sign
     child.stderr.on("data", append);
 
     let timedOut = false;
-    const kill = () => {
-      if (child.exitCode !== null || !child.pid) return;
-      if (windows) spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true });
-      else {
-        try {
-          process.kill(-child.pid, "SIGKILL");
-        } catch {
-          child.kill("SIGKILL");
-        }
-      }
-    };
+    const kill = () => killTree(child);
     const timer = setTimeout(() => {
       timedOut = true;
       kill();

@@ -19,6 +19,7 @@ export type FeedItem =
   | { kind: "spec"; seq: number; spec: string; checks: string[]; edited: boolean }
   | { kind: "check"; seq: number; phase: string; command: string; exitCode: number | null; ok: boolean; output: string }
   | { kind: "escalation"; seq: number; from: string; to: string }
+  | { kind: "screenshot"; seq: number; id: string; url: string }
   | { kind: "plan"; seq: number; spec: string; checks: string[]; subtasks: { id: string; title: string }[]; edited: boolean }
   | { kind: "subtask"; seq: number; id: string; taskId: string | null; title: string; action: string; files: string[] };
 
@@ -79,6 +80,9 @@ export function buildFeed(events: TaskEvent[]): FeedItem[] {
         break;
       case "check":
         items.push({ kind: "check", seq: e.seq, phase: d.phase, command: d.command, exitCode: d.exitCode ?? null, ok: !!d.ok, output: d.output ?? "" });
+        break;
+      case "screenshot":
+        items.push({ kind: "screenshot", seq: e.seq, id: String(d.id), url: String(d.url ?? "") });
         break;
       case "escalation":
         items.push({ kind: "escalation", seq: e.seq, from: d.from, to: d.to });

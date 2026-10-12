@@ -8,7 +8,7 @@ export interface Notice {
   kind: NoticeKind;
 }
 
-const STUCK = new Set(["stuck", "subtask_stuck", "integration_red"]);
+const STUCK = new Set(["stuck", "subtask_stuck", "integration_red", "visual_failed"]);
 
 function kindOf(t: TaskView): NoticeKind | null {
   if (t.status === "review" || (t.status === "done_empty" && t.statusReason !== "answered")) return "review";

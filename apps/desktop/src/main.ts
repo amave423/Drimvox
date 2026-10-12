@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell, utilityProcess, type UtilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -69,12 +69,52 @@ function startCore(): Promise<number> {
       if (msg.type === "ready" && msg.port) resolve(msg.port);
       else reject(new Error(msg.error ?? "Ядро ответило непонятным сообщением"));
     });
+    child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number }) => {
+      if (msg.type !== "screenshot" || typeof msg.id !== "number" || typeof msg.url !== "string") return;
+      const id = msg.id;
+      photograph(msg.url, msg.width ?? 1280, msg.height ?? 800).then(
+        (png) => child.postMessage({ type: "screenshot-done", id, png: png.toString("base64") }),
+        (err: unknown) => child.postMessage({ type: "screenshot-done", id, error: err instanceof Error ? err.message : String(err) }),
+      );
+    });
     child.once("exit", (code) => {
       core = null;
       reject(new Error(`Ядро завершилось с кодом ${code}`));
     });
     core = child;
   });
+}
+
+/**
+ * A page an agent wants to see, in a hidden window of its own session: no preload, no access to Artel's
+ * token or storage, no pop-ups, downloads or navigation away from http(s).
+ */
+async function photograph(url: string, width: number, height: number): Promise<Buffer> {
+  if (!/^https?:\/\//.test(url)) throw new Error("Only http and https pages");
+  const preview = session.fromPartition("artel-preview");
+  preview.removeAllListeners("will-download");
+  preview.on("will-download", (_event, item) => item.cancel());
+  const shot = new BrowserWindow({
+    show: false,
+    width,
+    height,
+    webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, session: preview },
+  });
+  shot.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  shot.webContents.on("will-navigate", (event, next) => {
+    if (!/^https?:\/\//.test(next)) event.preventDefault();
+  });
+  try {
+    await Promise.race([
+      shot.loadURL(url),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("The page did not load in 30 seconds")), 30_000)),
+    ]);
+    // Scripts of single-page apps draw after the load event.
+    await new Promise((r) => setTimeout(r, 1000));
+    return (await shot.webContents.capturePage()).toPNG();
+  } finally {
+    shot.destroy();
+  }
 }
 
 function fromOurPage(url: string | undefined): boolean {

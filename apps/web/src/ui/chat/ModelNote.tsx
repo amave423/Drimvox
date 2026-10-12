@@ -35,6 +35,7 @@ export function ModelNote({ choice }: { choice: ModelChoice }) {
       {model.priceIn === null && <p>{t("model.priceUnknown")}</p>}
       {model.priceEstimated && <p className="muted">{t("model.priceEstimated")}</p>}
       {model.tools && <p>{t("model.tools")}</p>}
+      {model.vision && <p>{t("model.vision")}</p>}
     </div>
   );
 }

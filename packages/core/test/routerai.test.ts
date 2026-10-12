@@ -96,7 +96,7 @@ describe("RouterAI", () => {
     const models = await (await env.call("GET", `/api/providers/${id}/models`)).json();
     // Nano Banana answers with text as well as pictures, so it is a chat model too.
     expect(models.map((m: any) => m.id)).toEqual(["deepseek/deepseek-v3.2", "google/gemini-2.5-flash-image"]);
-    expect(models[0]).toEqual({ id: "deepseek/deepseek-v3.2", name: "DeepSeek V3.2", contextLength: 163840, priceIn: 1, priceOut: 2, priceEstimated: false, tools: true });
+    expect(models[0]).toEqual({ id: "deepseek/deepseek-v3.2", name: "DeepSeek V3.2", contextLength: 163840, priceIn: 1, priceOut: 2, priceEstimated: false, tools: true, vision: null });
   });
 
   it("shows the balance in rubles", async () => {

@@ -174,3 +174,11 @@
 .subtask-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; }
 .goal-link { justify-self: start; font-size: 13px; }
 .answer-more { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; margin: 12px 0 18px; }
+
+/* Screenshots in the feed and visual checks in the spec. */
+.feed-shot { margin: 6px 0; display: grid; gap: 4px; }
+.feed-shot figcaption { font-size: 13px; overflow-wrap: anywhere; }
+.feed-shot img { display: block; max-width: min(100%, 520px); border: 1px solid var(--line); border-radius: 6px; }
+.visual-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
+.visual-list li { display: grid; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.visual-list .link { justify-self: start; }

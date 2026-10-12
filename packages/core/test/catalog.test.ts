@@ -20,6 +20,7 @@ describe("normalizeModels", () => {
         context_length: 163840,
         pricing: { prompt: "0.0000003", completion: "0.00000088" },
         supported_parameters: ["tools", "temperature"],
+        architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] },
       },
     ]);
     expect(model).toEqual({
@@ -30,6 +31,7 @@ describe("normalizeModels", () => {
       priceOut: 0.88,
       priceEstimated: false,
       tools: true,
+      vision: true,
     });
   });
 

@@ -1,4 +1,4 @@
-import type { Question, TaskPhase } from "@artel/shared";
+import type { Question, TaskPhase, VisualCheck } from "@artel/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
@@ -42,6 +42,8 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[]): st
         "Every check must run from the project root and exit 0 when everything works.",
         "If the project has no tests yet, plan to add the smallest fitting test runner first (node --test for plain Node,",
         "vitest for Vite projects, pytest for Python) and include its command in the checks.",
+        "If the work has a visible interface (a page, a screen), add visual_checks: how to start it, the address and what",
+        "must be visible. Artel looks at the page with a model that sees pictures after the checks pass.",
         "Then call propose_spec with the spec, the checks and a plan of 2-8 short steps.",
         ANSWER_HINT,
       ].join("\n");
@@ -99,6 +101,7 @@ export interface SpecProposal {
   spec: string;
   checks: string[];
   plan: string[];
+  visualChecks?: VisualCheck[];
 }
 
 export function specTools(onSpec: (proposal: SpecProposal) => void): ToolSet {
@@ -109,9 +112,24 @@ export function specTools(onSpec: (proposal: SpecProposal) => void): ToolSet {
         spec: z.string().min(1).max(100_000),
         checks: z.array(z.string().min(1).max(500)).max(20),
         plan: z.array(z.string().min(1).max(500)).max(20).default([]),
+        visual_checks: z
+          .array(
+            z.object({
+              start: z.string().min(1).max(500).optional().describe("Command that starts the app, such as npm run dev; omit for a running one"),
+              url: z.string().min(1).max(2000).describe("Address to open, such as http://localhost:5173/"),
+              expect: z.string().min(1).max(2000).describe("What must be visible on the page"),
+            }),
+          )
+          .max(5)
+          .default([]),
       }),
       execute: async (proposal) => {
-        onSpec({ spec: proposal.spec, checks: proposal.checks.map((c) => c.trim()), plan: proposal.plan });
+        onSpec({
+          spec: proposal.spec,
+          checks: proposal.checks.map((c) => c.trim()),
+          plan: proposal.plan,
+          visualChecks: proposal.visual_checks.flatMap((v) => (/^https?:\/\//.test(v.url) ? [{ ...v, start: v.start?.trim() || undefined }] : [])),
+        });
         return "Spec proposed.";
       },
     }),

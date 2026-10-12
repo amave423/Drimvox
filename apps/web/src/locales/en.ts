@@ -456,4 +456,17 @@ export const en: Record<keyof typeof ru, string> = {
   "approval.allowedAlways": "Always allowed",
   "action.mcp": "Calls {target}",
   "chat.mcpCall": "Calls {name}",
+
+  "settings.visionModel": "Model for checking screenshots",
+  "settings.visionModelHint": "It looks at the page screenshots an agent takes. It must understand pictures. Unset, an agent uses its own model when that model understands pictures.",
+  "model.vision": "Understands pictures",
+  "feed.screenshot": "Screenshot of {url}",
+  "spec.visual": "Visual checks",
+  "spec.visualHint": "Once the checks are green, Artel opens these pages and asks a model that sees pictures whether the expected is there. At most 2 tries.",
+  "spec.visualStart": "start: {command}",
+  "task.reason.visual_failed": "The page failed the visual check twice. Below is what the model saw. Give the agent another try, accept the changes as they are or drop them.",
+  "action.start_background": "Starts in the background: {target}",
+  "action.read_background": "Reads the output of process {target}",
+  "action.stop_background": "Stops process {target}",
+  "action.look_at_page": "Looks at page {target}",
 };
