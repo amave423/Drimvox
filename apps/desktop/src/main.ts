@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell, utilityProcess, type UtilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell, utilityProcess, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import type { InitMessage } from "./core-process";
@@ -15,6 +15,8 @@ const token = randomBytes(32).toString("hex");
 // ARTEL_USER_DATA lets tests isolate theirs.
 app.setName(devServerUrl ? "Artel Dev" : "Artel");
 app.setPath("userData", process.env.ARTEL_USER_DATA ?? join(app.getPath("appData"), app.getName()));
+// Windows shows toasts only for apps with an identity.
+app.setAppUserModelId(devServerUrl ? "Artel Dev" : "Artel");
 
 let core: UtilityProcess | null = null;
 let win: BrowserWindow | null = null;
@@ -94,6 +96,30 @@ function registerIpc() {
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
+  ipcMain.on("artel:notify", (event, notice: { title?: unknown; body?: unknown; taskId?: unknown }) => {
+    if (!fromOurPage(event.senderFrame?.url)) return;
+    const { title, body, taskId } = notice ?? {};
+    if (typeof title !== "string" || typeof body !== "string" || typeof taskId !== "string") return;
+    // Tests cannot take the focus away from the window; they say it is elsewhere.
+    const away = process.env.ARTEL_TEST_UNFOCUSED === "1" || !win?.isFocused();
+    if (!away || !Notification.isSupported()) return;
+    const toast = new Notification({ title: title.slice(0, 120), body: body.slice(0, 300), silent: false });
+    toast.on("click", () => {
+      if (!win) return;
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      win.webContents.send("artel:open-task", taskId);
+    });
+    if (process.env.ARTEL_TEST_UNFOCUSED === "1") {
+      // Tests read and click notifications here instead of on the desktop.
+      const shown = ((globalThis as { artelNotices?: unknown[] }).artelNotices ??= []);
+      shown.push({ title, body, taskId, click: () => toast.emit("click") });
+      return;
+    }
+    toast.show();
+  });
+
   const hex = /^#[0-9a-f]{6}$/i;
   ipcMain.on("artel:titlebar", (event, colors: { background?: unknown; symbols?: unknown }) => {
     const { background, symbols } = colors ?? {};
@@ -122,6 +148,8 @@ async function createWindow() {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      // Task updates keep coming while the window is in the background; notifications depend on them.
+      backgroundThrottling: false,
     },
   });
 

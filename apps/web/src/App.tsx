@@ -1,9 +1,10 @@
 import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@artel/shared";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ok, type Api } from "./api";
 import { AppContext, type AppContextValue, type CoreStatus, type View } from "./context";
 import { translate } from "./i18n";
 import { formatUsd, setDisplayCurrency, startOfToday } from "./lib/format";
+import { noticesFor } from "./lib/notices";
 import { applyTheme, resolveTheme } from "./theme";
 import { ChatSheet } from "./ui/chat/ChatSheet";
 import { HomeSheet } from "./ui/HomeSheet";
@@ -74,9 +75,26 @@ export function App({ api, token, initialSettings, status }: Props) {
   const reloadProjects = useCallback(async () => {
     setProjects(await api.projects.$get().then((r) => ok<ProjectView[]>(r)).catch(() => []));
   }, [api]);
+  const tasksLoaded = useRef(false);
   const reloadTasks = useCallback(async () => {
-    setTasks(await api.tasks.$get().then((r) => ok<TaskView[]>(r)).catch(() => []));
+    const next = await api.tasks.$get().then((r) => ok<TaskView[]>(r)).catch(() => null);
+    if (!next) return;
+    tasksLoaded.current = true;
+    setTasks(next);
   }, [api]);
+
+  // A task that now needs the user becomes a Windows notification (shown only while the window is elsewhere).
+  const seenTasks = useRef<TaskView[] | null>(null);
+  useEffect(() => {
+    if (!tasksLoaded.current) return;
+    const notices = noticesFor(seenTasks.current, tasks);
+    seenTasks.current = tasks;
+    if (!settings.notifications || !window.artel?.notify) return;
+    for (const n of notices) {
+      window.artel.notify({ title: translate(settings.locale, `notice.${n.kind}`), body: n.title, taskId: n.taskId });
+    }
+  }, [tasks]);
+  useEffect(() => window.artel?.onOpenTask?.((taskId) => setView({ kind: "task", taskId })), []);
 
   useEffect(() => {
     void reloadProviders();

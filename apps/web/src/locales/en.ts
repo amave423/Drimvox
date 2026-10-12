@@ -399,4 +399,12 @@ export const en: Record<keyof typeof ru, string> = {
   "chat.thinking": "Thinking… {seconds} s",
   "chat.reasoningTook": "Reasoning · {seconds} s",
   "chat.diagramFailed": "The diagram could not be drawn; its code is below.",
+
+  "notice.review": "Done, the changes are ready",
+  "notice.answered": "The agent answered the question",
+  "notice.waiting": "The agent is waiting for you",
+  "notice.stuck": "The task is stuck",
+  "notice.failed": "The task stopped with an error",
+  "settings.notifications": "Notifications",
+  "settings.notificationsOn": "Notify in Windows when a task is done, waits for an answer, gets stuck or fails (when the Artel window is not in front)",
 };

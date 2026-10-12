@@ -398,4 +398,12 @@ export const ru = {
   "chat.thinking": "Думает… {seconds} с",
   "chat.reasoningTook": "Размышления · {seconds} с",
   "chat.diagramFailed": "Диаграмму не удалось нарисовать, ниже её код.",
+
+  "notice.review": "Готово, можно смотреть правки",
+  "notice.answered": "Агент ответил на вопрос",
+  "notice.waiting": "Агент ждёт тебя",
+  "notice.stuck": "Задача застряла",
+  "notice.failed": "Задача остановилась с ошибкой",
+  "settings.notifications": "Уведомления",
+  "settings.notificationsOn": "Уведомлять в Windows, когда задача готова, ждёт ответа, застряла или упала (если окно Artel не впереди)",
 } as const;

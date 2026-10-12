@@ -41,9 +41,9 @@ test.afterEach(async () => {
   rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 
-async function launch(script: FakeTurn[]): Promise<Page> {
+async function launch(script: FakeTurn[], env: Record<string, string> = {}): Promise<Page> {
   fake = await startFakeProvider({ key: KEY, models, script });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo, ...env } });
   const page = await app.firstWindow();
   await expect(page.getByText("Ядро запущено")).toBeVisible();
 
@@ -132,6 +132,28 @@ test("a question about the project gets an answer, not a spec", async () => {
   await page.getByRole("button", { name: "Спросить", exact: true }).click();
   await expect(page.getByText("Тест один: проверяет, что add(2, 3) = 5.")).toBeVisible();
   expect(git(repo, "branch", "--list", "artel/*")).not.toBe("");
+});
+
+test("a Windows notification says the task is ready, and a click opens it", async () => {
+  const page = await launch(
+    [
+      { toolCalls: [{ name: "write_file", args: { path: "notes.txt", content: "x" } }] },
+      { toolCalls: [{ name: "finish", args: { summary: "Добавил notes.txt.", commit_message: "Add notes" } }] },
+    ],
+    // The window counts as being in the background.
+    { ARTEL_TEST_UNFOCUSED: "1" },
+  );
+  await startTask(page, "Добавь notes.txt");
+  await expect(page.getByText("Добавил notes.txt.")).toBeVisible();
+
+  const notices = async () =>
+    app!.evaluate(() => ((globalThis as any).artelNotices ?? []).map((n: any) => ({ title: n.title, body: n.body })));
+  await expect.poll(notices, { timeout: 10_000 }).toEqual([{ title: "Готово, можно смотреть правки", body: "Добавь notes.txt" }]);
+
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
+  await app!.evaluate(() => (globalThis as any).artelNotices[0].click());
+  await expect(page.getByRole("heading", { level: 1, name: "Добавь notes.txt" })).toBeVisible();
 });
 
 test("discarding removes the copy and leaves the project alone", async () => {

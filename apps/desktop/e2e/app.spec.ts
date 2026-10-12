@@ -69,5 +69,5 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { artel?: object }).artel ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["getToken", "pickFolder", "setTitleBar"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["getToken", "notify", "onOpenTask", "pickFolder", "setTitleBar"] });
 });

@@ -48,6 +48,12 @@ export function SettingsSheet() {
           onChange={(locale) => save({ locale })}
         />
 
+        <h2 className="sheet-h">{t("settings.notifications")}</h2>
+        <label className="stage-switch">
+          <input type="checkbox" checked={settings.notifications} onChange={(e) => void save({ notifications: e.target.checked })} />
+          {t("settings.notificationsOn")}
+        </label>
+
         <h2 className="sheet-h" id="currency-label">
           {t("settings.currency")}
         </h2>

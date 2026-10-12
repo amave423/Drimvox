@@ -4,6 +4,10 @@ interface ArtelBridge {
   setTitleBar(colors: { background: string; symbols: string }): void;
   /** Native folder picker; null when the user cancels. */
   pickFolder(): Promise<string | null>;
+  /** A Windows notification; shown only while the window is not in front. */
+  notify(notice: { title: string; body: string; taskId: string }): void;
+  /** Called when the user clicks a notification; returns a function that stops listening. */
+  onOpenTask(listener: (taskId: string) => void): () => void;
 }
 
 interface Window {

@@ -158,7 +158,7 @@ packages/shared — типы и схемы (zod), общие для UI и core
 | M3 ✓ | Пайплайн: опрос-карточки → спека → тесты → код → гейты проверки | Сделано 2026-10-12, спека в `docs/specs/pipeline.md`. Проверено вживую на OpenRouter, DeepSeek и NVIDIA |
 | M4 ✓ | Оркестратор: план → ОК → параллельные агенты → слияние | Сделано 2026-10-12, спека в `docs/specs/orchestrator.md`. Проверено вживую на DeepSeek и NVIDIA (`npm run live-check -- --team`) |
 | M5 | Картинки и видео через OpenRouter: в чате, галерея, картинки-ассеты у агентов | Сделано 2026-10-12 по тестам, спека в `docs/specs/media.md`. Живая проверка (`npm run live-check -- --media`) ждёт пополнения баланса OpenRouter |
-| M6 | MCP, скиллы, веб-поиск, Playwright-визуальная проверка, уведомления | — |
+| M6 | MCP, скиллы, веб-поиск, Playwright-визуальная проверка, уведомления | Веб-поиск сделан 2026-10-12. Остальное — спека в `docs/specs/tools.md` |
 | M7 | CLI-агенты (Claude Code / Codex / Gemini CLI), прямые API Anthropic/OpenAI/Gemini/xAI | — |
 | M8 | Серверный режим Ubuntu + Tailscale + вход по паролю | Тот же UI по IP, данные на сервере |
 
