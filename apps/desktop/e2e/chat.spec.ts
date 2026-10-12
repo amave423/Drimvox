@@ -115,3 +115,26 @@ test("keeps keys and chats after a restart", async () => {
   await expect(page.getByText("Ответ", { exact: true })).toHaveCount(2);
   expect(fake.requests.at(-1)?.auth).toBe(`Bearer ${KEY}`);
 });
+
+test("keeps the model picker and chat actions within reach in a long chat", async () => {
+  fake = await startFakeProvider({
+    key: KEY,
+    models: [...models, { id: "other-model", name: "Other Model" }],
+    chunks: [{ text: "Длинный ответ. ".repeat(120) }],
+  });
+  const page = await launch();
+  await connect(page);
+  await startChat(page);
+  for (const n of [1, 2, 3]) {
+    await say(page, `Вопрос ${n}`);
+    await expect(page.getByText(/^Токены:/)).toHaveCount(n);
+  }
+
+  const picker = page.getByRole("button", { name: /Тестовый \/ fake-model/ });
+  await expect(picker).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Удалить чат" })).toBeInViewport();
+
+  await picker.click();
+  await page.getByRole("option", { name: /Other Model/ }).click();
+  await expect(page.getByRole("button", { name: /Тестовый \/ other-model/ })).toBeInViewport();
+});

@@ -8,7 +8,14 @@ import { ErrorNote } from "../ErrorNote";
 
 const LIMIT = 200;
 
-export function ModelPicker({ value, onChange }: { value: ModelChoice | null; onChange(choice: ModelChoice): void }) {
+interface PickerProps {
+  value: ModelChoice | null;
+  onChange(choice: ModelChoice): void;
+  /** "above" opens the list upwards, for a picker at the bottom of the screen. */
+  placement?: "below" | "above";
+}
+
+export function ModelPicker({ value, onChange, placement = "below" }: PickerProps) {
   const { api, t, providers } = useApp();
   const [open, setOpen] = useState(false);
   const [providerId, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
@@ -57,7 +64,7 @@ export function ModelPicker({ value, onChange }: { value: ModelChoice | null; on
         <span aria-hidden>▾</span>
       </button>
       {open && (
-        <div className="picker-panel">
+        <div className={`picker-panel${placement === "above" ? " is-above" : ""}`}>
           {providers.length > 1 && (
             <div className="picker-providers">
               {providers.map((p) => (

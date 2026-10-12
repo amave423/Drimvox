@@ -127,25 +127,6 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
       <div className="sheet-body chat-body">
         <header className="chat-head">
           <h1>{chat?.title ?? t("chat.emptyTitle")}</h1>
-          <div className="chat-tools">
-            <ModelPicker value={choice} onChange={setChoice} />
-            {chat && !confirmDelete && (
-              <button className="link is-pencil" onClick={() => setConfirmDelete(true)}>
-                {t("chat.delete")}
-              </button>
-            )}
-          </div>
-          {confirmDelete && (
-            <div className="inline-form">
-              <span>{t("chat.deleteConfirm")}</span>
-              <button className="btn is-pencil" onClick={() => void remove()}>
-                {t("chat.delete")}
-              </button>
-              <button className="btn" onClick={() => setConfirmDelete(false)}>
-                {t("providers.cancel")}
-              </button>
-            </div>
-          )}
         </header>
 
         {empty && <p className="lede">{t("chat.emptyLede")}</p>}
@@ -168,10 +149,17 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         </div>
 
         {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
-        <Composer disabled={!choice} streaming={!!draft} onSend={(text) => void send(text)} onStop={() => abort.current?.abort()} />
+        <Composer
+          disabled={!choice}
+          streaming={!!draft}
+          onSend={(text) => void send(text)}
+          onStop={() => abort.current?.abort()}
+          tools={<ModelPicker value={choice} onChange={setChoice} placement="above" />}
+        />
       </div>
 
-      <aside className="margin">
+      {/* Sticks to the top while the conversation scrolls, so these stay within reach. */}
+      <aside className="margin chat-margin">
         {choice && <ModelNote choice={choice} />}
         {answers.length > 0 && (
           <p className="note">
@@ -184,6 +172,24 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
             )}
           </p>
         )}
+        {chat &&
+          (confirmDelete ? (
+            <div className="note is-pencil delete-confirm">
+              <p>{t("chat.deleteConfirm")}</p>
+              <div className="actions">
+                <button className="btn is-pencil" onClick={() => void remove()}>
+                  {t("chat.delete")}
+                </button>
+                <button className="btn" onClick={() => setConfirmDelete(false)}>
+                  {t("providers.cancel")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button className="link is-pencil margin-action" onClick={() => setConfirmDelete(true)}>
+              {t("chat.delete")}
+            </button>
+          ))}
       </aside>
     </article>
   );

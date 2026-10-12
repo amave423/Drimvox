@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useApp } from "../../context";
 
 interface Props {
@@ -6,9 +6,11 @@ interface Props {
   streaming: boolean;
   onSend(text: string): void;
   onStop(): void;
+  /** Controls shown under the text field, e.g. the model picker. */
+  tools?: ReactNode;
 }
 
-export function Composer({ disabled, streaming, onSend, onStop }: Props) {
+export function Composer({ disabled, streaming, onSend, onStop, tools }: Props) {
   const { t } = useApp();
   const [text, setText] = useState("");
   const area = useRef<HTMLTextAreaElement>(null);
@@ -57,15 +59,19 @@ export function Composer({ disabled, streaming, onSend, onStop }: Props) {
         onKeyDown={onKeyDown}
         disabled={disabled}
       />
-      {streaming ? (
-        <button type="button" className="btn is-pencil" onClick={onStop}>
-          {t("chat.stop")}
-        </button>
-      ) : (
-        <button className="btn is-primary" disabled={disabled || !text.trim()}>
-          {t("chat.send")}
-        </button>
-      )}
+      <div className="composer-bar">
+        {tools}
+        <span className="spacer" />
+        {streaming ? (
+          <button type="button" className="btn is-pencil" onClick={onStop}>
+            {t("chat.stop")}
+          </button>
+        ) : (
+          <button className="btn is-primary" disabled={disabled || !text.trim()}>
+            {t("chat.send")}
+          </button>
+        )}
+      </div>
     </form>
   );
 }

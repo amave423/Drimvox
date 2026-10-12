@@ -3,7 +3,6 @@
 .chat-body { display: flex; flex-direction: column; min-height: 100%; }
 .chat-head { display: grid; gap: 12px; margin-bottom: 18px; }
 .chat-head h1 { overflow-wrap: anywhere; }
-.chat-tools { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 
 .messages { flex: 1; display: grid; gap: 22px; align-content: start; padding-bottom: 20px; }
 .msg-user {
@@ -43,12 +42,14 @@
 /* Composer */
 .composer {
   position: sticky; bottom: 0;
-  display: flex; gap: 10px; align-items: flex-end;
-  padding: 12px 0 18px; background: var(--sheet);
+  display: grid; gap: 8px;
+  padding: 12px 0 16px; background: var(--sheet);
   border-top: 1px solid var(--line);
 }
+.composer-bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.composer-bar .picker { min-width: 0; }
 .composer textarea {
-  flex: 1; resize: none; min-height: 48px;
+  resize: none; min-height: 48px;
   padding: 11px 14px; border-radius: 12px;
   border: 1px solid var(--line); background: var(--sheet); color: var(--fg);
   font: inherit; line-height: 1.5; overflow-y: hidden;
@@ -79,3 +80,9 @@
 .picker-name { display: grid; font-size: 14px; min-width: 0; }
 .picker-name small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
 .picker-facts { display: flex; gap: 12px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.picker-panel.is-above { top: auto; bottom: calc(100% + 6px); }
+
+/* The margin follows the reader down a long conversation. */
+.chat-margin { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 140px); overflow-y: auto; }
+.margin-action { justify-self: start; font-size: 13.5px; }
+.delete-confirm .actions { margin-top: 8px; }
