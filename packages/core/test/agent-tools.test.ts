@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, runCommand } from "../src/agent/commands";
@@ -96,6 +96,16 @@ describe("classifyCommand", () => {
     expect(classifyCommand(cmd, root)).toEqual({ action: "allow" });
     expect(classifyCommand(`node -e "require('assert').equal(url, '/api/cards/1')"`, root)).toEqual({ action: "allow" });
     expect(classifyCommand("Remove-Item -Recurse /Windows", root)).toEqual({ action: "ask", reason: "outside" });
+  });
+
+  // Seen live: with a Cyrillic user name Windows gives short 8.3 paths (C:\Users\12C2~1\…), and the agent's
+  // `cd` into its own copy by the long name was taken for a step outside.
+  it("knows the copy under its short and its long name", () => {
+    const long = realpathSync.native(root);
+    expect(classifyCommand(`cd '${long}'; node --test`, root)).toEqual({ action: "allow" });
+    expect(classifyCommand(`type ${join(root, "README.md")}`, long)).toEqual({ action: "allow" });
+    expect(classifyCommand(`New-Item ${join(long, "new", "a.txt")}`, root)).toEqual({ action: "allow" });
+    expect(classifyCommand(`type ${join(long, "..", "other.txt")}`, root)).toEqual({ action: "ask", reason: "outside" });
   });
 });
 

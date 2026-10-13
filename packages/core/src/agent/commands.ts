@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" };
 
@@ -23,11 +23,30 @@ const rules: [RegExp, Exclude<CommandVerdict, { action: "allow" }>["reason"]][] 
 export function classifyCommand(command: string, root: string): CommandVerdict {
   for (const [pattern, reason] of rules) if (pattern.test(command)) return { action: "ask", reason };
   if (/(^|[\s;&|(])(cd|chdir|set-location|pushd|sl)\s+["']?\.\.(?=[\\/\s"']|$)/i.test(command)) return { action: "ask", reason: "outside" };
+  const home = realName(root);
   for (const path of absolutePaths(command)) {
-    const rel = relative(root, resolve(path));
+    const rel = relative(home, realName(path));
     if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { action: "ask", reason: "outside" };
   }
   return { action: "allow" };
+}
+
+/**
+ * The full name of a path, so that a short 8.3 name (C:\Users\12C2~1, given for Cyrillic user names) and the long one
+ * compare equal. A path that does not exist yet keeps its missing tail on top of the real name of what exists.
+ */
+function realName(path: string): string {
+  const full = resolve(path);
+  for (let dir = full; ; dir = dirname(dir)) {
+    if (existsSync(dir)) {
+      try {
+        return join(realpathSync.native(dir), relative(dir, full));
+      } catch {
+        return full;
+      }
+    }
+    if (dirname(dir) === dir) return full;
+  }
 }
 
 /** Windows drive paths, UNC paths, home paths and bare unix roots mentioned in a command. */
