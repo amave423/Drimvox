@@ -49,6 +49,19 @@ describe("compactHistory", () => {
     expect(JSON.stringify(b.slice(0, a.length))).toBe(JSON.stringify(a));
   });
 
+  // Seen live: DeepSeek's thinking, sent back on every step, was two thirds of what a long task re-read each time.
+  it("cuts the model's old reasoning too, keeping the latest whole", () => {
+    const long = history(20, 2_000).map((m) =>
+      m.role === "assistant" ? { ...m, content: [{ type: "reasoning" as const, text: "r".repeat(30_000) }, ...(m.content as any[])] } : m,
+    ) as ModelMessage[];
+    const compacted = compactHistory(long);
+    const reasoning = (m: ModelMessage) => ((m.content as any[])[0].text as string);
+    expect(size(compacted)).toBeLessThan(size(long) / 2);
+    expect(reasoning(compacted[1]!)).toMatch(/cut by Artel/);
+    expect(reasoning(compacted[1]!).length).toBeLessThan(200);
+    expect(reasoning(compacted.at(-2)!)).toBe(reasoning(long.at(-2)!));
+  });
+
   it("changes nothing when given its own result again", () => {
     const once = compactHistory(history(20));
     expect(JSON.stringify(compactHistory(once))).toBe(JSON.stringify(once));

@@ -1,8 +1,8 @@
 import type { ModelMessage } from "ai";
 
 /**
- * Every step sends the whole conversation again, and old file reads and command outputs make most of it. Once the
- * conversation is big, the older ones are cut to their beginning. The cut moves in steps of CHUNK results, so the start
+ * Every step sends the whole conversation again, and old file reads, command outputs and the model's own thinking make
+ * most of it. Once the conversation is big, the older ones are cut to their beginning (thinking to a note). The cut moves in steps of CHUNK results, so the start
  * of the conversation stays the same for many steps in a row and providers keep serving it from their cache.
  */
 const THRESHOLD_CHARS = 120_000;
@@ -43,6 +43,8 @@ function cutMessage(m: ModelMessage): ModelMessage {
     return {
       ...m,
       content: m.content.map((part) => {
+        // Old thinking is spent: the part stays (DeepSeek wants it back) but only as a note.
+        if (part.type === "reasoning") return part.text.length <= HEAD || part.text.includes(MARK) ? part : { ...part, text: `[earlier reasoning ${MARK}]` };
         if (part.type !== "tool-call" || !part.input || typeof part.input !== "object") return part;
         const input = part.input as Record<string, unknown>;
         const long = Object.entries(input).filter(([, v]) => typeof v === "string" && v.length > HEAD * 2 && !v.includes(MARK));
