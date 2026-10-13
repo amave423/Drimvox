@@ -283,6 +283,23 @@ describe("review", () => {
 });
 
 describe("recovery", () => {
+  // Seen live: Dellmar answers 429 "too many concurrent requests" while another agent's request is in flight.
+  it("waits out a provider that is briefly busy instead of failing the task", async () => {
+    let busy = 2;
+    fake = await startFakeProvider({
+      key: KEY,
+      script: [{ toolCalls: [{ name: "write_file", args: { path: "hello.txt", content: "Привет\n" } }, finish()] }],
+      models: [{ id: "coder" }],
+      handle: (_method, path) =>
+        path === "/v1/chat/completions" && busy-- > 0 ? { status: 429, json: { error: { message: "Too many concurrent requests" } } } : undefined,
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
+    setupResult = Promise.resolve({ provider, project });
+    const { id } = await startTask();
+    expect(await waitFor(id, ["review", "failed"], 30_000)).toMatchObject({ status: "review" });
+  }, 40_000);
+
   it("marks tasks cut off by a restart as stopped", async () => {
     setupResult = setup([{ delayMs: 5000, toolCalls: [finish()] }]);
     const { id } = await startTask();

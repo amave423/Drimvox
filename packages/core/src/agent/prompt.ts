@@ -2,7 +2,9 @@ import { WEB_HINT } from "../internet/tools";
 import { nowLine } from "../now";
 /** System prompt of the Solo agent. English for the model; it answers the user in their language. */
 export function systemPrompt(root: string, platform = process.platform): string {
-  const shell = platform === "win32" ? "Windows PowerShell" : "sh on a Unix-like system";
+  // Models default to bash habits; Windows PowerShell 5.1 cannot even parse `&&`.
+  const shell =
+    platform === "win32" ? "Windows PowerShell 5.1 (no && or ||: separate commands with ; or use if ($?) { ... })" : "sh on a Unix-like system";
   return [
     "You are a careful software engineer working inside Artel, a desktop app for coding with AI agents.",
     `You work in a private copy of the user's project at: ${root}`,

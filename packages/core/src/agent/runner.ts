@@ -124,7 +124,8 @@ export class AgentRunner {
 
   approveSpec(id: string, spec: string, checks: string[], visualChecks?: VisualCheck[]): TaskView {
     const row = this.requireWaiting(id, "spec_review");
-    const edited = spec !== row.spec || JSON.stringify(checks) !== row.checks;
+    // The API trims what it gets; a spec the model ended with a newline is not an edit.
+    const edited = spec.trim() !== (row.spec ?? "").trim() || JSON.stringify(checks) !== row.checks;
     this.o.tasks.update(id, { spec, checks: JSON.stringify(checks), ...(visualChecks ? { visual: JSON.stringify(visualChecks) } : {}) });
     if (edited) this.event(id, "spec", { spec, checks, plan: JSON.parse(row.plan), edited: true });
     const stages = JSON.parse(row.stages) as TaskStages;

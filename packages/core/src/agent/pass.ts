@@ -225,6 +225,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       checks: JSON.stringify(planned.checks),
       plan: JSON.stringify(planned.plan),
       planned: JSON.stringify(planned.subtasks),
+      ...(planned.commitMessage ? { commit_message: planned.commitMessage } : {}),
     });
     ctx.event("plan", { spec: planned.spec, checks: planned.checks, subtasks: planned.subtasks });
     if (stages.approveSpec) return finish(ctx, "waiting", "plan_review");

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, runCommand } from "../src/agent/commands";
 import { parseDiff } from "../src/agent/diff";
-import { feedbackMessage } from "../src/agent/prompt";
+import { feedbackMessage, systemPrompt } from "../src/agent/prompt";
 import { Workspace } from "../src/agent/workspace";
 import { makeRepo } from "./git-repo";
 
@@ -89,6 +89,14 @@ describe("classifyCommand", () => {
   it("allows absolute paths inside the copy", () => {
     expect(classifyCommand(`type ${join(root, "README.md")}`, root)).toEqual({ action: "allow" });
   });
+
+  // Seen live: a check script that requests '/api/boards' was taken for a folder at the root of the drive.
+  it.runIf(process.platform === "win32")("takes URL paths in code for what they are on Windows", () => {
+    const cmd = `node -e "fetch('http://127.0.0.1:3000/api/boards').then(r => console.log(r.status))"`;
+    expect(classifyCommand(cmd, root)).toEqual({ action: "allow" });
+    expect(classifyCommand(`node -e "require('assert').equal(url, '/api/cards/1')"`, root)).toEqual({ action: "allow" });
+    expect(classifyCommand("Remove-Item -Recurse /Windows", root)).toEqual({ action: "ask", reason: "outside" });
+  });
 });
 
 describe("runCommand", () => {
@@ -109,6 +117,15 @@ describe("runCommand", () => {
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain("does-not-exist.txt");
     expect(result.output).not.toContain("CLIXML");
+  });
+
+  // Seen live: models write `a && b`, which Windows PowerShell 5.1 cannot even parse; the agent got CLIXML and mojibake.
+  it.runIf(process.platform === "win32")("explains a command PowerShell cannot parse, in plain text", async () => {
+    const result = await runCommand("node -e \"console.log(1)\" && node -e \"console.log(2)\"", root, 30_000);
+    expect(result.exitCode).toBe(1);
+    expect(result.output).not.toContain("CLIXML");
+    expect(result.output).toContain("&&");
+    expect(result.output).toMatch(/PowerShell 5\.1/);
   });
 
   it("keeps only the end of long output", async () => {
@@ -173,5 +190,12 @@ describe("parseDiff", () => {
   it("marks binary files", () => {
     const [file] = parseDiff("diff --git a/logo.png b/logo.png\nnew file mode 100644\nBinary files /dev/null and b/logo.png differ\n");
     expect(file).toMatchObject({ path: "logo.png", status: "added", binary: true, hunks: [] });
+  });
+});
+
+describe("systemPrompt", () => {
+  it("warns about Windows PowerShell 5.1 and its missing &&", () => {
+    expect(systemPrompt("C:\repo", "win32")).toContain("Windows PowerShell 5.1 (no && or ||");
+    expect(systemPrompt("/repo", "linux")).toContain("sh on a Unix-like system");
   });
 });

@@ -109,6 +109,20 @@ describe("the full path", () => {
     expect(JSON.stringify(chatRequests().at(-1)!.body.messages)).toContain("Правка владельца");
   });
 
+  // Seen live: a spec the model ended with a newline came back trimmed, and the agent was told the user had edited it.
+  it("does not call a spec edited when the user approved it as it was", async () => {
+    const { id } = await start([call("propose_spec", { spec: "# Вычитание\n\nДобавить subtract.\n\n", checks: ["node --test"], plan: [] }), finish()], {
+      interview: false,
+      testsFirst: false,
+    });
+    const proposed = await waitFor(id, waiting("spec_review"));
+    await env.call("POST", `/api/tasks/${id}/spec`, { spec: proposed.spec, checks: proposed.checks });
+    await waitFor(id, (t) => t.phase === "code" && t.status !== "running");
+    const told = JSON.stringify(chatRequests().at(-1)!.body.messages);
+    expect(told).toContain("The spec is approved:");
+    expect(told).not.toContain("with their edits");
+  });
+
   it("does not let the agent edit files while interviewing or writing the spec", async () => {
     const { id } = await start([call("write_file", { path: "hack.txt", content: "x" }), call("ask_questions", { questions: [] }), spec()]);
     await waitFor(id, waiting("spec_review"));

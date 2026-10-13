@@ -96,7 +96,9 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       messages: i.messages,
       tools,
       stopWhen: [hasToolCall("finish"), ...(i.stopTools ?? []).map((name) => hasToolCall(name)), isStepCount(MAX_STEPS), overBudget],
-      maxRetries: 1,
+      // Busy providers (429, 5xx) are tried again after 2, 4, 8 and 16 seconds: an agent is in no hurry,
+      // and some keys allow one request at a time, which a team of agents runs into.
+      maxRetries: 4,
       abortSignal: AbortSignal.any([i.signal, silence.signal]),
       onError: () => {},
       onStepEnd: (step) => {

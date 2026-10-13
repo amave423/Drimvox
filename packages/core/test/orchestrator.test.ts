@@ -47,6 +47,7 @@ const plan = (subtasks: Planned[], checks = ["node --test"]) =>
   call("propose_plan", {
     spec: "# Цель\n\nНесколько модулей.",
     checks,
+    commit_message: "Add the modules",
     subtasks: subtasks.map((s) => ({ title: `Модуль ${s.id}`, description: `Сделай ${s.id}.js и тест`, dependsOn: [], ...s })),
   });
 
@@ -136,6 +137,8 @@ describe("the team at work", { timeout: 30_000 }, () => {
     const subtaskModels = fake!.requests.filter((r) => /Subtask id:/.test(JSON.stringify(r.body?.messages))).map((r) => r.body.model);
     expect(new Set(subtaskModels)).toEqual(new Set(["coder"]));
 
+    // Seen live: the goal offered the whole task text as its commit message; the lead now writes one with the plan.
+    expect(done.commitMessage).toBe("Add the modules");
     const accepted = await env.call("POST", `/api/tasks/${id}/accept`, { message: "Add sub and mul" });
     expect(accepted.status).toBe(200);
     expect(git(repo, "log", "--format=%s", "-1")).toBe("Add sub and mul");

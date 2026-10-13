@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { existsSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" };
@@ -37,6 +38,10 @@ function absolutePaths(command: string): string[] {
     const path = m[1]!;
     // Command switches like /s or /T are not paths; a lone "/" or "/etc/..." is.
     if (/^\/[a-zA-Z?]{1,2}$/.test(path)) continue;
+    // On Windows "/x" means the root of the drive, where code rarely points; '/api/boards' in a script is a URL path.
+    // Only a folder that really sits at the root counts.
+    const top = path.split("/")[1];
+    if (process.platform === "win32" && path.startsWith("/") && top && !existsSync(resolve("/", top))) continue;
     found.push(path.startsWith("~") ? path.replace(/^~/, process.env.USERPROFILE ?? process.env.HOME ?? "/") : path);
   }
   return found;
@@ -49,12 +54,21 @@ function absolutePaths(command: string): string[] {
 function encodePowerShell(command: string): string {
   // With output redirected, PowerShell serialises progress bars and errors as CLIXML; the agent
   // needs them as plain text. Native programs set LASTEXITCODE; failed cmdlets only fill $Error.
+  // The command is parsed here rather than as part of this script: a syntax error, such as `&&` that
+  // Windows PowerShell 5.1 does not know, then becomes a readable message instead of CLIXML.
+  const source = Buffer.from(command, "utf8").toString("base64");
   const script = [
     "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
     "$ProgressPreference = 'SilentlyContinue'",
     "$global:LASTEXITCODE = $null",
     "$Error.Clear()",
-    `& {\n${command}\n} 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { $_ } } | Out-String -Stream -Width 4096`,
+    `$source = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${source}'))`,
+    "try { $block = [ScriptBlock]::Create($source) } catch {",
+    "  Write-Output $_.Exception.InnerException.Message",
+    "  if ($source -match '&&|\\|\\|') { Write-Output 'Windows PowerShell 5.1 has no && or ||: separate commands with ; or use if ($?) { ... }.' }",
+    "  exit 1",
+    "}",
+    "& $block 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { $_ } } | Out-String -Stream -Width 4096",
     "if ($global:LASTEXITCODE -ne $null) { exit $global:LASTEXITCODE } elseif ($Error.Count -gt 0) { exit 1 }",
   ].join("\n");
   return Buffer.from(script, "utf16le").toString("base64");

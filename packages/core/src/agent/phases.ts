@@ -169,13 +169,15 @@ export function planInstructions(): string {
     "Plan subtasks that touch different files, shared files such as package.json included.",
     "If two must edit the same file, make one depend on the other.",
     "If the project has no tests yet, the first subtask sets up the test runner and the others depend on it.",
-    "Call propose_plan with the spec, the goal's checks and the subtasks.",
+    "Call propose_plan with the spec, the goal's checks, the subtasks and a short English commit message for the whole goal.",
     ANSWER_HINT,
   ].join("\n");
 }
 
 export interface PlanProposal extends SpecProposal {
   subtasks: { id: string; title: string; description: string; dependsOn: string[]; checks: string[] }[];
+  /** What the goal's single commit is called; the task's own words otherwise. */
+  commitMessage: string | null;
 }
 
 export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
@@ -197,11 +199,18 @@ export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
           )
           .min(1)
           .max(8),
+        commit_message: z.string().max(200).optional().describe("Short English commit message in the imperative mood for the whole goal"),
       }),
       execute: async (p) => {
         const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "task";
         const subtasks = p.subtasks.map((s) => ({ ...s, id: slug(s.id), dependsOn: s.dependsOn.map(slug), checks: s.checks.map((c) => c.trim()) }));
-        onPlan({ spec: p.spec, checks: p.checks.map((c) => c.trim()), plan: subtasks.map((s) => s.title), subtasks });
+        onPlan({
+          spec: p.spec,
+          checks: p.checks.map((c) => c.trim()),
+          plan: subtasks.map((s) => s.title),
+          subtasks,
+          commitMessage: p.commit_message?.split("\n")[0]?.trim() || null,
+        });
         return "Plan proposed.";
       },
     }),
