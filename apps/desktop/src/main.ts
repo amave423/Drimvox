@@ -89,6 +89,9 @@ function startCore(): Promise<number> {
  * A page an agent wants to see, in a hidden window of its own session: no preload, no access to Artel's
  * token or storage, no pop-ups, downloads or navigation away from http(s).
  */
+/** Very long pages are cut here; a picture taller than this tells a model little more. */
+const MAX_SHOT_HEIGHT = 8000;
+
 async function photograph(url: string, width: number, height: number): Promise<Buffer> {
   if (!/^https?:\/\//.test(url)) throw new Error("Only http and https pages");
   const preview = session.fromPartition("artel-preview");
@@ -111,6 +114,14 @@ async function photograph(url: string, width: number, height: number): Promise<B
     ]);
     // Scripts of single-page apps draw after the load event.
     await new Promise((r) => setTimeout(r, 1000));
+    // The whole page, not only its first screen: a check of a long page needs what is further down too.
+    const full = Number(
+      await shot.webContents.executeJavaScript("Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)"),
+    );
+    if (full > height) {
+      shot.setContentSize(width, Math.min(full, MAX_SHOT_HEIGHT));
+      await new Promise((r) => setTimeout(r, 500));
+    }
     return (await shot.webContents.capturePage()).toPNG();
   } finally {
     shot.destroy();

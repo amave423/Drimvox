@@ -20,7 +20,8 @@ export async function screenshot(url: string, size: { width: number; height: num
     await page.goto(url, { waitUntil: "load", timeout: 60_000 });
     // Let fonts and the first animation frame settle.
     await page.waitForTimeout(500);
-    return await page.screenshot({ type: "png" });
+    // The whole page, as on the desktop: a check of a long page needs what is further down too.
+    return await page.screenshot({ type: "png", fullPage: true });
   } finally {
     await page.close();
   }

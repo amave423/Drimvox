@@ -36,7 +36,11 @@ test.afterEach(async () => {
 async function serveSite(): Promise<string> {
   site = createServer((_req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end('<body style="margin:0;background:#c0392b"><h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Artel</h1></body>');
+    // A long page: what is below the first screen must be in the picture too.
+    res.end(
+      '<body style="margin:0;background:#c0392b"><h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Artel</h1>' +
+        '<div style="height:2200px"></div><footer style="color:white;font:32px sans-serif">Контакты внизу</footer></body>',
+    );
   });
   await new Promise<void>((r) => site!.listen(0, "127.0.0.1", r));
   const address = site.address();
@@ -90,4 +94,6 @@ test("an agent looks at its page: a real screenshot goes to the model and into t
   const png = Buffer.from(dataUrl, "base64");
   expect(png.subarray(1, 4).toString()).toBe("PNG");
   expect(png.length).toBeGreaterThan(5000);
+  // The whole page, not only its first screen (PNG height sits at byte 20).
+  expect(png.readUInt32BE(20)).toBeGreaterThan(2000);
 });
