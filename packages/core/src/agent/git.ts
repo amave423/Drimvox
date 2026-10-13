@@ -16,8 +16,27 @@ export class GitError extends Error {
   }
 }
 
+/**
+ * Another git touching the same repository holds a lock for a moment: an agent of the team merging, a worktree being
+ * added, git rewriting its config (on Windows a file being replaced cannot be read). Such a command is tried again.
+ */
+const BUSY = /index\.lock': File exists|could not lock config file|unable to access '[^']*config': Permission denied|Unable to create '[^']*\.lock'/i;
+const RETRY_MS = [150, 400, 900, 1800];
+
 /** Runs git and resolves even on a non-zero exit; only a missing git binary rejects. */
-export function runGit(cwd: string, args: string[], allowFail = false): Promise<GitResult> {
+export async function runGit(cwd: string, args: string[], allowFail = false): Promise<GitResult> {
+  for (let attempt = 0; ; attempt++) {
+    const result = await runOnce(cwd, args);
+    if (result.code !== 0 && BUSY.test(result.stderr) && attempt < RETRY_MS.length) {
+      await new Promise((r) => setTimeout(r, RETRY_MS[attempt]));
+      continue;
+    }
+    if (result.code !== 0 && !allowFail) throw new GitError("failed", `git ${args[0]}: ${result.stderr.trim() || result.stdout.trim()}`);
+    return result;
+  }
+}
+
+function runOnce(cwd: string, args: string[]): Promise<GitResult> {
   // Deep folders (a dependency's cache, say) pass Windows' 260-character limit; git handles them only when told to.
   const full = process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args;
   return new Promise((resolve, reject) => {
@@ -27,9 +46,7 @@ export function runGit(cwd: string, args: string[], allowFail = false): Promise<
         reject(new GitError("no_git", "Git is not installed"));
         return;
       }
-      const result = { code, stdout: stdout.toString(), stderr: stderr.toString() };
-      if (code !== 0 && !allowFail) reject(new GitError("failed", `git ${args[0]}: ${result.stderr.trim() || result.stdout.trim()}`));
-      else resolve(result);
+      resolve({ code, stdout: stdout.toString(), stderr: stderr.toString() });
     });
   });
 }

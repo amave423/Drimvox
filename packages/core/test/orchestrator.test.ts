@@ -89,7 +89,10 @@ async function waitFor(id: string, check: (task: any) => boolean, timeoutMs = 20
     const task = await (await env.call("GET", `/api/tasks/${id}`)).json();
     if (check(task)) return task;
     if (Date.now() > until) {
-      throw new Error(`stuck: ${task.status}/${task.statusReason} ${JSON.stringify(task.subtasks?.map((s: any) => [s.id, s.status, s.statusReason]))}`);
+      // A failed subtask says why in its last status event.
+      const failed = task.subtasks?.find((s: any) => s.status === "failed");
+      const why = failed ? (await events(failed.taskId)).filter((e) => e.kind === "status").at(-1)?.data?.detail : "";
+      throw new Error(`stuck: ${task.status}/${task.statusReason} ${JSON.stringify(task.subtasks?.map((s: any) => [s.id, s.status, s.statusReason]))} ${why ?? ""}`);
     }
     await new Promise((r) => setTimeout(r, 40));
   }

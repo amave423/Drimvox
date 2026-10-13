@@ -54,6 +54,20 @@ describe("commitAll", () => {
   });
 });
 
+describe("git under a busy repository", () => {
+  // Seen in the team tests: a subtask failed on "unable to access .git/config: Permission denied" while another
+  // agent's git rewrote it. Such a moment passes; the command is tried again.
+  it("waits out another git holding the repository for a moment", async () => {
+    repo = makeRepo({ "README.md": "# Demo\n" });
+    put("src/app.js");
+    const lock = join(repo, ".git", "index.lock");
+    writeFileSync(lock, "");
+    setTimeout(() => rmSync(lock, { force: true }), 200);
+    expect(await commitAll(repo, "Work")).toBe(true);
+    expect(committed()).toEqual(["src/app.js"]);
+  });
+});
+
 describe("discardChanges", () => {
   // Seen live: after acceptance threw away its leftovers, node_modules went with them and the dev server would not start.
   it("throws away leftovers but keeps installed dependencies", async () => {
