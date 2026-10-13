@@ -1,8 +1,9 @@
-import type { Milestone, ModelRef, PlannedSubtask, Question, Requirement, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@artel/shared";
+import type { Milestone, ModelRef, PlannedSubtask, Question, Requirement, StyleReference, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ProviderRepo } from "../providers/repo";
 import { addWorktree, headCommit } from "./git";
+import { describeReference } from "./design-check";
 import { acceptGoal, finishEarly, nextStageMessage } from "./landing";
 import { runPass, startWork, enterPhase, type PassContext } from "./pass";
 import { answersMessage, specMessage, MAX_INTERVIEW_ROUNDS } from "./phases";
@@ -108,18 +109,21 @@ export class AgentRunner {
    * The user's answers to one interview round. Another round follows unless the user said "Enough" (or skipped)
    * or the rounds ran out; then the spec, with the agent deciding whatever is still open.
    */
-  answerQuestions(id: string, answers: { id: string; answer: string }[], enough: boolean): TaskView {
+  answerQuestions(id: string, answers: { id: string; answer: string }[], enough: boolean, reference?: StyleReference): TaskView {
     const row = this.requireWaiting(id, "questions");
     const questions = JSON.parse(row.questions) as Question[];
     this.event(id, "answers", { answers, skipped: enough && answers.length === 0, enough });
     this.o.tasks.update(id, { questions: "[]" });
     const stages = JSON.parse(row.stages) as TaskStages;
-    if (!enough && row.interview_round < MAX_INTERVIEW_ROUNDS) {
-      this.launch(id, answersMessage(questions, answers, { kind: "round", round: row.interview_round + 1 }));
-      return this.view(id)!;
-    }
-    enterPhase(this.context(id, new AbortController()), id, stages.spec ? "spec" : "code");
-    this.launch(id, answersMessage(questions, answers, { kind: "spec", why: enough ? "enough" : "rounds" }));
+    const more = !enough && row.interview_round < MAX_INTERVIEW_ROUNDS;
+    if (!more) enterPhase(this.context(id, new AbortController()), id, stages.spec ? "spec" : "code");
+    const message = answersMessage(
+      questions,
+      answers,
+      more ? { kind: "round", round: row.interview_round + 1 } : { kind: "spec", why: enough ? "enough" : "rounds" },
+    );
+    // A style sample is looked at first, inside the task's turn: it can be stopped like the rest.
+    this.launch(id, reference ? async (ctx) => `${await describeReference(ctx, id, reference)}\n\n${message}` : message);
     return this.view(id)!;
   }
 
@@ -306,7 +310,7 @@ export class AgentRunner {
     return row;
   }
 
-  private launch(id: string, userText: string): void {
+  private launch(id: string, userText: string | ((ctx: PassContext) => Promise<string>)): void {
     const controller = new AbortController();
     const live: Live = { controller, approval: null, done: Promise.resolve() };
     this.live.set(id, live);
@@ -326,9 +330,10 @@ export class AgentRunner {
   }
 
   /** Passes follow each other until the task waits for the user, finishes or is stopped. */
-  private async run(id: string, userText: string, live: Live): Promise<void> {
+  private async run(id: string, userText: string | ((ctx: PassContext) => Promise<string>), live: Live): Promise<void> {
     const ctx = this.context(id, live.controller, live);
-    let next: string | null = userText;
+    if (typeof userText !== "string") ctx.setStatus("running", null);
+    let next: string | null = typeof userText === "string" ? userText : await userText(ctx);
     while (next !== null && !this.closed && !live.controller.signal.aborted) {
       next = await runPass(ctx, id, next);
     }

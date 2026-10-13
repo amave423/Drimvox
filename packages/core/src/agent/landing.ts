@@ -2,6 +2,7 @@ import type { AcceptanceReport, Milestone, Requirement, TaskStages, VisualCheck 
 import { findModel } from "../providers/catalog";
 import { runVisualChecks, visualTools, type VisualDeps } from "../visual/tools";
 import { accepted, MAX_ACCEPTANCE_ROUNDS, reworkMessage, runAcceptance } from "./acceptance";
+import { designRound } from "./design-check";
 import { discardChanges } from "./git";
 import type { PassContext } from "./pass";
 import { requirementsUpTo, stageNote } from "./phases";
@@ -10,6 +11,12 @@ import { hasChanges, snapshot } from "./review";
 
 /** Visual checks this many times in a row fail before the task waits for the user. */
 export const MAX_VISUAL_ATTEMPTS = 2;
+
+/** Work to redo after acceptance: unmet requirements, or the design review's round of polish. */
+export interface Rework {
+  message: string;
+  design: boolean;
+}
 
 /**
  * Green checks: Artel looks at the pages from the spec, then the acceptance agent checks every requirement,
@@ -49,7 +56,7 @@ export async function done(
   if (requirements.length > 0) {
     const verdict = await acceptWork(ctx, id, row, visual, requirements);
     if (verdict === null) return null;
-    if (typeof verdict === "string") return verdict;
+    if ("message" in verdict) return verdict.message;
     if (!accepted(verdict)) reason = "acceptance_partial";
     else if (more) return nextStage(ctx, id, row, milestones, verdict.summary);
   } else if (more) return nextStage(ctx, id, row, milestones, null);
@@ -64,7 +71,7 @@ export async function done(
 async function nextStage(ctx: PassContext, id: string, row: TaskRow, milestones: Milestone[], summary: string | null): Promise<string | null> {
   await snapshot(row);
   ctx.event("milestone", { stage: row.milestone, title: milestones[row.milestone - 1]?.title ?? "", total: milestones.length, summary });
-  ctx.tasks.update(id, { milestone: row.milestone + 1, acceptance_rounds: 0, attempts: 0, visual_attempts: 0 });
+  ctx.tasks.update(id, { milestone: row.milestone + 1, acceptance_rounds: 0, attempts: 0, visual_attempts: 0, design_reviewed: 0 });
   const stages = JSON.parse(row.stages) as TaskStages;
   if (stages.approveSpec) return stop(ctx, "waiting", "milestone_review");
   return nextStageMessage(ctx.tasks.row(id)!);
@@ -86,8 +93,8 @@ export async function finishEarly(ctx: PassContext, id: string): Promise<void> {
 }
 
 /**
- * One acceptance round. Returns the report when the work goes to the user, the rework message when the coder
- * has another round, or null when the task stopped or waits.
+ * One acceptance round, then the stage's design review once every requirement is accepted. Returns the report when
+ * the work goes to the user, the rework when the coder has another round, or null when the task stopped or waits.
  */
 async function acceptWork(
   ctx: PassContext,
@@ -95,7 +102,7 @@ async function acceptWork(
   row: TaskRow,
   visual: VisualDeps,
   requirements: Requirement[],
-): Promise<AcceptanceReport | string | null> {
+): Promise<AcceptanceReport | Rework | null> {
   const round = row.acceptance_rounds + 1;
   // The acceptance model, then the strong one, then the task's own: an agent that gives no verdict hands over to the next.
   const refs = [ctx.acceptanceModel(), ctx.strongModel(), row.provider_id ? { providerId: row.provider_id, model: row.model } : null];
@@ -111,7 +118,16 @@ async function acceptWork(
   for (const [n, { conn, model }] of candidates.entries()) {
     if (n > 0) ctx.event("text", { text: `${candidates[n - 1]!.model} gave no verdict; ${model} accepts the work instead.` });
     const verdict = await acceptOnce(ctx, id, row, visual, requirements, conn, model, round);
-    if (verdict !== "no_verdict") return verdict;
+    if (verdict === "no_verdict") continue;
+    if (verdict && "results" in verdict && accepted(verdict)) {
+      const look = await designRound(ctx, id, visual);
+      if (look.kind === "stopped") return stop(ctx, "stopped", "user");
+      if (look.kind === "polish") {
+        ctx.tasks.update(id, { attempts: 0 });
+        return { message: look.message, design: true };
+      }
+    }
+    return verdict;
   }
   return stop(ctx, "waiting", "acceptance_error", "No acceptance model gave a verdict.");
 }
@@ -126,7 +142,7 @@ async function acceptOnce(
   conn: NonNullable<ReturnType<PassContext["providers"]["connection"]>>,
   model: string,
   round: number,
-): Promise<AcceptanceReport | string | null | "no_verdict"> {
+): Promise<AcceptanceReport | Rework | null | "no_verdict"> {
   let cost = row.cost_usd;
   const outcome = await runAcceptance({
     conn,
@@ -172,14 +188,14 @@ async function acceptOnce(
   ctx.event("acceptance", report);
   if (accepted(report) || round >= MAX_ACCEPTANCE_ROUNDS) return report;
   ctx.tasks.update(id, { attempts: 0 });
-  return reworkMessage(report, requirements);
+  return { message: reworkMessage(report, requirements), design: false };
 }
 
 /**
  * Acceptance of a goal once every subtask is merged and the goal's checks are green: the report when the goal
  * goes to the user, the rework for a fix subtask, or null when the goal stopped or waits.
  */
-export async function acceptGoal(ctx: PassContext, id: string): Promise<AcceptanceReport | string | null> {
+export async function acceptGoal(ctx: PassContext, id: string): Promise<AcceptanceReport | Rework | null> {
   const row = ctx.tasks.row(id)!;
   const hooks = {
     onCall: (call: { callId: string; name: string; input: unknown }) => ctx.event("tool_call", call),

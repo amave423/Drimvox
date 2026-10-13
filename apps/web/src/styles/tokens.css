@@ -20,6 +20,8 @@
   --font-ui: "Onest", system-ui, sans-serif;
   --font-serif: "Source Serif 4", Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Only for samples of an agent's design direction: the nearest handwritten font the system has. */
+  --font-hand: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
   --topbar-h: 44px;
 }
 

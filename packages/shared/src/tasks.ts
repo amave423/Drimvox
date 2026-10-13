@@ -1,3 +1,4 @@
+import { styleReferenceSchema, type DesignBrief, type DesignReview, type Look } from "./design";
 import { requirementSchema, type AcceptanceReport, type Milestone, type Requirement } from "./quality";
 import { z } from "zod";
 
@@ -64,6 +65,8 @@ export const taskAnswersSchema = z
     skip: z.boolean().default(false),
     /** "Enough, start": the answers so far are all there will be; the agent decides the rest. */
     enough: z.boolean().default(false),
+    /** A site or a picture whose style the user likes, given with the question about the look. */
+    reference: styleReferenceSchema.optional(),
   })
   .strict();
 
@@ -99,6 +102,8 @@ export interface InterviewState {
 export interface QuestionOption {
   label: string;
   description: string;
+  /** For a question about the look: the direction's colours and fonts, drawn as samples. */
+  look?: Look;
 }
 
 export interface Question {
@@ -231,6 +236,10 @@ export interface TaskView {
   milestones: Milestone[];
   /** The stage at work now (1-based); for a subtask, the stage it belongs to. */
   milestone: number;
+  /** The look the coders follow, when the result has an interface. */
+  design: DesignBrief | null;
+  /** Artel's latest look at the finished screens against the brief. */
+  designReview: DesignReview | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -253,7 +262,9 @@ export type TaskEventKind =
   | "plan"
   | "subtask"
   | "acceptance"
-  | "milestone";
+  | "milestone"
+  | "reference"
+  | "design_review";
 
 export interface TaskEvent {
   seq: number;

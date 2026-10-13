@@ -168,6 +168,10 @@ const migrations: string[] = [
   // A big task in stages: their titles and the stage at work (for a subtask, the stage it belongs to).
   `alter table tasks add column milestones text not null default '[]';
    alter table tasks add column milestone integer not null default 1;`,
+  // The look: the brief the coders follow, Artel's latest design review and whether the current stage had its review.
+  `alter table tasks add column design text;
+   alter table tasks add column design_review text;
+   alter table tasks add column design_reviewed integer not null default 0;`,
 ];
 
 export interface Database {

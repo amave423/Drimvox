@@ -101,6 +101,8 @@ async function photograph(url: string, width: number, height: number): Promise<B
     show: false,
     width,
     height,
+    // The page gets exactly this width: 390 is a phone, not a phone minus the window frame.
+    useContentSize: true,
     webPreferences: { offscreen: true, sandbox: true, contextIsolation: true, nodeIntegration: false, session: preview },
   });
   shot.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

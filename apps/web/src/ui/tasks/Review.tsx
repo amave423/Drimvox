@@ -5,6 +5,7 @@ import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { IdentityHelp } from "../projects/ProjectSheet";
 import { AcceptanceReport } from "./AcceptanceReport";
+import { DesignReviewView } from "./Design";
 import { DiffView, type LineComment } from "./DiffView";
 
 interface Props {
@@ -102,6 +103,7 @@ export function Review({ task, comments, setComments }: Props) {
         </p>
       )}
       {task.acceptance && !stuck && <AcceptanceReport report={task.acceptance} requirements={task.requirements} />}
+      {task.designReview && !stuck && <DesignReviewView review={task.designReview} taskId={task.id} />}
       {!stuck && task.phase !== null && (
         <p className={task.checks.length ? "note is-ok checks-note" : "muted checks-note"}>
           {task.checks.length ? t("review.checksGreen") : t("review.noChecks")}

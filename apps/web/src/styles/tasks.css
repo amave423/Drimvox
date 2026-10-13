@@ -211,3 +211,24 @@
 .stages-mode { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 4px; }
 .stages-mode-hint { font-size: 13px; flex: 1 1 260px; }
 .stage-now { margin: 6px 0 0; font-size: 13.5px; }
+
+/* Design: samples of a direction, the brief, the review */
+.font-serif { font-family: var(--font-serif); }
+.font-sans { font-family: var(--font-ui); }
+.font-mono { font-family: var(--font-mono); }
+.font-hand { font-family: var(--font-hand); }
+.swatches { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; vertical-align: middle; }
+.swatch { width: 22px; height: 16px; }
+.look-sample { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
+.look-fonts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; }
+.look-reference { display: grid; gap: 8px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.look-reference-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.look-reference-row .field-input { flex: 1 1 220px; min-width: 0; }
+.design-brief, .design-review { display: grid; gap: 8px; }
+.design-palette { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+.design-rules { margin: 0; padding-left: 20px; }
+.design-shots { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.design-shots img { display: block; max-width: 220px; max-height: 260px; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 6px; }
+.design-brief .swatches { justify-self: start; }
+.design-note .swatches { display: flex; width: max-content; margin-top: 6px; }
+.feed-reference { display: grid; gap: 4px; }

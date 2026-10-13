@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useApp } from "../../context";
 import { Markdown } from "../chat/Markdown";
 import { RequirementsList } from "./AcceptanceReport";
+import { DesignBriefView } from "./Design";
 import { ChecksEditor } from "./ChecksEditor";
 
 /** The agent's spec on a sheet: read it, edit text and check commands, start or send back. */
@@ -48,6 +49,7 @@ export function SpecReview({ task }: { task: TaskView }) {
       )}
 
       <RequirementsList requirements={task.requirements} decisions={task.decisions} milestones={task.milestones} />
+      {task.design && <DesignBriefView brief={task.design} />}
 
       {task.plan.length > 0 && (
         <>

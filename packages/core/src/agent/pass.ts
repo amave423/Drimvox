@@ -1,4 +1,4 @@
-import type { TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
+import type { DesignBrief, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
@@ -7,14 +7,13 @@ import {
   answerTools,
   interviewTools,
   phaseInstructions,
-  planInstructions,
-  planTools,
   specMessage,
   specTools,
   type InterviewRound,
-  type PlanProposal,
   type SpecProposal,
 } from "./phases";
+import { briefInstructions, designInstructions, lookInstructions } from "./design";
+import { planInstructions, planTools, type PlanProposal } from "./plan";
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { done, lastSummary } from "./landing";
 import { runAgent } from "./run";
@@ -152,6 +151,10 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   if (mode === "write") {
     ownTools = { ...ownTools, ...(await ctx.imageTools(row, hooks, spend, () => row.budget_usd - cost)), ...visualTools(visual) };
   }
+  // The look: asked about in the interview, written down with the spec, followed while coding.
+  const brief = row.design ? (JSON.parse(row.design) as DesignBrief) : null;
+  const designNote =
+    phase === "interview" ? lookInstructions() : phase === "spec" && !planning ? briefInstructions() : phase === "code" && brief ? designInstructions(brief) : "";
   // Claude Code, Codex and Gemini CLI work with their own tools; Artel's own (web, skills, MCP, pictures) are for API models.
   const run = isCli(conn.preset) ? runCliTurn : runAgent;
   const outcome = await run({
@@ -168,6 +171,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     stopTools,
     instructions: [
       planning ? planInstructions() : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),
+      designNote,
       skillsInstructions(skills),
     ]
       .filter(Boolean)
@@ -241,6 +245,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       decisions: JSON.stringify(planned.decisions),
       milestones: JSON.stringify(planned.milestones),
       milestone: 1,
+      design: planned.design ? JSON.stringify(planned.design) : null,
+      visual: JSON.stringify(planned.visualChecks ?? []),
     });
     ctx.event("plan", { spec: planned.spec, checks: planned.checks, subtasks: planned.subtasks });
     if (stages.approveSpec) return finish(ctx, "waiting", "plan_review");
@@ -265,6 +271,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       decisions: JSON.stringify(proposed.decisions ?? []),
       milestones: JSON.stringify(proposed.milestones ?? []),
       milestone: 1,
+      design: proposed.design ? JSON.stringify(proposed.design) : null,
     });
     ctx.event("spec", proposed);
     if (stages.approveSpec) return finish(ctx, "waiting", "spec_review");

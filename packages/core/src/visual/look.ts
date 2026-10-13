@@ -44,8 +44,24 @@ export class Shots {
   }
 }
 
+/** A picture for the vision model. */
+export interface Picture {
+  data: Buffer;
+  mediaType: string;
+}
+
 /** Shows a screenshot to a model that sees pictures and returns its answer and what it cost. */
-export async function askAboutPicture(vision: Vision, png: Buffer, question: string, signal?: AbortSignal): Promise<{ text: string; costUsd: number }> {
+export function askAboutPicture(vision: Vision, png: Buffer, question: string, signal?: AbortSignal): Promise<{ text: string; costUsd: number }> {
+  return askAboutPictures(
+    vision,
+    [{ data: png, mediaType: "image/png" }],
+    `This is a screenshot of a page. ${question}\nAnswer briefly and concretely, in the language of the question.`,
+    signal,
+  );
+}
+
+/** Shows several pictures at once (a page on a desktop and a phone, say) with one question. */
+export async function askAboutPictures(vision: Vision, pictures: Picture[], prompt: string, signal?: AbortSignal): Promise<{ text: string; costUsd: number }> {
   // Streamed like every other answer in Artel; the text is collected.
   const result = streamText({
     model: languageModel(vision.conn, vision.model),
@@ -55,10 +71,7 @@ export async function askAboutPicture(vision: Vision, png: Buffer, question: str
     messages: [
       {
         role: "user",
-        content: [
-          { type: "text", text: `This is a screenshot of a page. ${question}\nAnswer briefly and concretely, in the language of the question.` },
-          { type: "file", data: png, mediaType: "image/png" },
-        ],
+        content: [{ type: "text", text: prompt }, ...pictures.map((p) => ({ type: "file" as const, data: p.data, mediaType: p.mediaType }))],
       },
     ],
   });

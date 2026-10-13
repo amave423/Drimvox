@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useApp } from "../../context";
 import { Markdown } from "../chat/Markdown";
 import { RequirementsList } from "./AcceptanceReport";
+import { DesignBriefView } from "./Design";
 import { ChecksEditor } from "./ChecksEditor";
 
 /** The lead agent's plan for a team: the spec, the subtasks and the checks. Edit, start or send back. */
@@ -60,6 +61,7 @@ export function PlanReview({ task }: { task: TaskView }) {
       )}
 
       <RequirementsList requirements={task.requirements} decisions={task.decisions} milestones={task.milestones} />
+      {task.design && <DesignBriefView brief={task.design} />}
 
       <h3 className="spec-sub">{t("plan.subtasks", { count: subtasks.length })}</h3>
       <p className="muted spec-hint">{t("plan.subtasksHint")}</p>

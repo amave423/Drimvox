@@ -1,11 +1,12 @@
 import type { AcceptanceReport, Milestone, Requirement } from "@artel/shared";
 import { accepted } from "./acceptance";
+import type { Rework } from "./landing";
 import type { ModelRef, PlannedSubtask, TaskEvent, TaskStages } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { failureReport, runChecks } from "./checks";
 import { addWorktree, headCommit, mergeBranch, removeWorktree } from "./git";
-import { subtaskBrief } from "./phases";
+import { subtaskBrief } from "./plan";
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
 
@@ -18,8 +19,11 @@ export const MAX_FIXES = 2;
 
 const FIX_TITLE = "Fix the checks after a merge";
 const ACCEPTANCE_FIX_TITLE = "Finish what the acceptance found missing";
+const DESIGN_FIX_TITLE = "Polish the design after the review";
 /** Goal states in which subtasks keep going; any other waiting reason needs the user first. */
 const DRIVEN = new Set(["running", "waiting:subtask_stuck", "waiting:subtask_waiting"]);
+
+const fixTitle = (rework: Rework) => (rework.design ? DESIGN_FIX_TITLE : ACCEPTANCE_FIX_TITLE);
 
 /** The user's plan, checked: ids must not repeat, and dependencies on removed subtasks are dropped. Null on repeats. */
 export function cleanPlan(subtasks: PlannedSubtask[]): PlannedSubtask[] | null {
@@ -40,7 +44,7 @@ export interface TeamHost {
   finish(id: string, status: TaskRow["status"], reason: string | null, detail?: string): void;
   setStatus(id: string, status: TaskRow["status"], reason: string | null): void;
   /** The acceptance agent's verdict on the merged goal: a report, rework for a fix subtask, or null when it stopped. */
-  accept(goalId: string): Promise<AcceptanceReport | string | null>;
+  accept(goalId: string): Promise<AcceptanceReport | Rework | null>;
 }
 
 /**
@@ -183,6 +187,8 @@ export class Team {
         checks: checks ? JSON.stringify(checks) : goal.checks,
         spec: goal.spec,
         milestone: stage,
+        // Every subtask builds to the same look.
+        design: goal.design,
       },
     );
   }
@@ -329,10 +335,10 @@ export class Team {
     if ((JSON.parse(goal.requirements) as Requirement[]).some((r) => (r.stage ?? 1) <= goal.milestone)) {
       const verdict = await this.h.accept(goalId);
       if (verdict === null) return;
-      if (typeof verdict === "string") {
+      if ("message" in verdict) {
         // Fixes of an early stage are held to that stage's own checks: the goal's need every stage.
         const merged = this.h.tasks.children(goalId).filter((s) => s.status === "merged");
-        this.addFix(this.h.tasks.row(goalId)!, verdict, [...new Set(merged.flatMap((s) => JSON.parse(s.checks) as string[]))], ACCEPTANCE_FIX_TITLE);
+        this.addFix(this.h.tasks.row(goalId)!, verdict.message, [...new Set(merged.flatMap((s) => JSON.parse(s.checks) as string[]))], fixTitle(verdict));
         return void this.drive(goalId);
       }
       if (!accepted(verdict)) return this.land(goalId, repo, "acceptance_partial");
@@ -340,7 +346,7 @@ export class Team {
     }
     const milestones = JSON.parse(goal.milestones) as Milestone[];
     this.h.event(goalId, "milestone", { stage: goal.milestone, title: milestones[goal.milestone - 1]?.title ?? "", total: milestones.length, summary });
-    this.h.tasks.update(goalId, { milestone: goal.milestone + 1, acceptance_rounds: 0 });
+    this.h.tasks.update(goalId, { milestone: goal.milestone + 1, acceptance_rounds: 0, design_reviewed: 0 });
     if ((JSON.parse(goal.stages) as TaskStages).approveSpec) return this.h.finish(goalId, "waiting", "milestone_review");
     return void this.drive(goalId);
   }
@@ -369,8 +375,8 @@ export class Team {
     if ((JSON.parse(this.h.tasks.row(goalId)!.requirements) as unknown[]).length > 0) {
       const verdict = await this.h.accept(goalId);
       if (verdict === null) return;
-      if (typeof verdict === "string") {
-        this.addFix(this.h.tasks.row(goalId)!, verdict, JSON.parse(this.h.tasks.row(goalId)!.checks) as string[], ACCEPTANCE_FIX_TITLE);
+      if ("message" in verdict) {
+        this.addFix(this.h.tasks.row(goalId)!, verdict.message, JSON.parse(this.h.tasks.row(goalId)!.checks) as string[], fixTitle(verdict));
         return void this.drive(goalId);
       }
       if (!accepted(verdict)) reason = "acceptance_partial";

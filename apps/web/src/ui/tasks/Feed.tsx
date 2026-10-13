@@ -38,6 +38,22 @@ function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props
   if (item.kind === "milestone") {
     return <p className="feed-step is-ok">{t("feed.milestone", { stage: item.stage, total: item.total, title: item.title })}</p>;
   }
+  if (item.kind === "design") {
+    return (
+      <p className={item.verdict === "good" ? "feed-step is-ok" : "feed-step is-pencil-text"}>
+        {item.verdict === "good" ? t("feed.designGood") : t("feed.designPolish", { count: item.issues })}
+      </p>
+    );
+  }
+  if (item.kind === "reference") {
+    return (
+      <div className="feed-bubble feed-reference">
+        <strong>{item.url ? t("feed.referenceSite", { url: item.url }) : t("feed.referencePicture")}</strong>
+        {item.shot && <Screenshot taskId={taskId} id={item.shot} url={item.url ?? t("feed.referencePicture")} />}
+        {item.description ? <p>{item.description}</p> : <p className="muted">{t("feed.referenceUnseen")}</p>}
+      </div>
+    );
+  }
   if (item.kind === "acceptance") {
     return (
       <p className={item.done === item.total ? "feed-step is-ok" : "feed-step is-pencil-text"}>

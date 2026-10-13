@@ -10,6 +10,7 @@ import type { LineComment } from "./DiffView";
 import { Feed } from "./Feed";
 import { Answer } from "./Answer";
 import { Interview } from "./Interview";
+import { DesignNote } from "./Design";
 import { PlanReview } from "./PlanReview";
 import { Review } from "./Review";
 import { SpecReview } from "./SpecReview";
@@ -100,6 +101,7 @@ export function TaskSheet({ taskId }: { taskId: string }) {
           <br />
           {t("task.tokens", { tokens: formatTokens(task.inputTokens + task.outputTokens, settings.locale), steps: task.steps })}
         </p>
+        {task.design && <DesignNote brief={task.design} />}
         {task.status !== "merged" && task.status !== "queued" && (
           <p className="note">
             {t("task.branch")}

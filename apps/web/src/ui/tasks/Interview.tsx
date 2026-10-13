@@ -1,8 +1,28 @@
-import type { TaskView } from "@artel/shared";
+import { referenceImageTypes, type StyleReference, type TaskView } from "@artel/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
+import { LookSample } from "./Design";
 
 type Choice = { kind: "option"; index: number } | { kind: "custom"; text: string };
+
+/** A picture for a style sample: up to 5 MB. */
+const MAX_REFERENCE_BYTES = 5 * 1024 * 1024;
+
+const isWebAddress = (text: string) => {
+  try {
+    return /^https?:$/.test(new URL(text).protocol);
+  } catch {
+    return false;
+  }
+};
+
+const readAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 
 /**
  * One round of the agent's questions: open ones get a text field, the rest are options with a recommended one
@@ -18,8 +38,13 @@ export function Interview({ task }: { task: TaskView }) {
     );
   const [choices, setChoices] = useState<Record<string, Choice>>(initial);
   const [busy, setBusy] = useState(false);
+  // A site or a picture whose style the user likes, given with the question about the look.
+  const [link, setLink] = useState("");
+  const [picture, setPicture] = useState<{ name: string; data: string } | null>(null);
+  const [pictureError, setPictureError] = useState<string | null>(null);
   // A new round brings new questions.
   useEffect(() => setChoices(initial()), [task.interview?.round, task.questions.map((q) => q.id).join()]);
+  const lookQuestion = task.questions.find((q) => q.options.some((o) => o.look));
 
   const answerOf = (id: string): string | null => {
     const c = choices[id];
@@ -34,10 +59,21 @@ export function Interview({ task }: { task: TaskView }) {
     return answer ? [{ id: q.id, answer }] : [];
   });
   const complete = answered.length === task.questions.length;
+  const badLink = link.trim() !== "" && !isWebAddress(link.trim());
+  const reference: StyleReference | undefined =
+    lookQuestion && (picture || (link.trim() && !badLink)) ? { ...(link.trim() ? { url: link.trim() } : {}), ...(picture ? { image: picture.data } : {}) } : undefined;
+
+  async function pick(file: File | undefined) {
+    setPictureError(null);
+    if (!file) return setPicture(null);
+    if (!(referenceImageTypes as readonly string[]).includes(file.type)) return setPictureError(t("interview.pictureType"));
+    if (file.size > MAX_REFERENCE_BYTES) return setPictureError(t("interview.pictureSize"));
+    setPicture({ name: file.name, data: await readAsDataUrl(file) });
+  }
 
   async function send(enough: boolean) {
     setBusy(true);
-    await api.tasks[":id"].answers.$post({ param: { id: task.id }, json: { answers: answered, enough } }).catch(() => null);
+    await api.tasks[":id"].answers.$post({ param: { id: task.id }, json: { answers: answered, enough, reference } }).catch(() => null);
     setBusy(false);
   }
 
@@ -100,6 +136,7 @@ export function Interview({ task }: { task: TaskView }) {
                 <span className="option-text">
                   <span>{o.label}</span>
                   {o.description && <small>{o.description}</small>}
+                  {o.look && <LookSample look={o.look} />}
                 </span>
                 {q.recommended === i && <span className="option-rec">{t("interview.recommended")}</span>}
               </label>
@@ -125,11 +162,47 @@ export function Interview({ task }: { task: TaskView }) {
                 )}
               </span>
             </label>
+            {q === lookQuestion && (
+              <div className="look-reference">
+                <span>{t("interview.reference")}</span>
+                <small className="muted">{t("interview.referenceHint")}</small>
+                <div className="look-reference-row">
+                  <input
+                    className="field-input"
+                    type="url"
+                    placeholder="https://"
+                    aria-label={t("interview.referenceLink")}
+                    value={link}
+                    onChange={(e) => setLink(e.target.value)}
+                  />
+                  <label className="btn">
+                    {t("interview.referencePicture")}
+                    <input
+                      type="file"
+                      hidden
+                      accept={referenceImageTypes.join(",")}
+                      aria-label={t("interview.referencePicture")}
+                      onChange={(e) => void pick(e.target.files?.[0])}
+                    />
+                  </label>
+                </div>
+                {badLink && <small className="is-pencil-text">{t("interview.referenceBadLink")}</small>}
+                {pictureError && <small className="is-pencil-text">{pictureError}</small>}
+                {picture && (
+                  <div className="look-reference-row">
+                    <span className="muted">{picture.name}</span>
+                    <button type="button" className="link" onClick={() => setPicture(null)}>
+                      {t("interview.referenceRemove")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </fieldset>
         );
       })}
       <div className="actions">
-        <button className="btn is-primary" disabled={busy || !complete} onClick={() => void send(false)}>
+        <button className="btn is-primary" disabled={busy || !complete || badLink} onClick={() => void send(false)}>
           {t("interview.send")}
         </button>
         <button className="btn" disabled={busy} onClick={() => void send(true)} title={t("interview.enoughHint")}>

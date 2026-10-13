@@ -1,4 +1,4 @@
-import type { AcceptanceReport, Milestone, Requirement } from "@artel/shared";
+import type { AcceptanceReport, DesignBrief, DesignReview, Milestone, Requirement } from "@artel/shared";
 import { MAX_INTERVIEW_ROUNDS } from "./phases";
 import type {
   ModelRef,
@@ -76,6 +76,9 @@ export interface TaskRow {
   interview_notes: string | null;
   milestones: string;
   milestone: number;
+  design: string | null;
+  design_review: string | null;
+  design_reviewed: number;
 }
 
 export class ProjectRepo {
@@ -147,6 +150,9 @@ export type TaskPatch = Partial<
     | "interview_notes"
     | "milestones"
     | "milestone"
+    | "design"
+    | "design_review"
+    | "design_reviewed"
   >
 >;
 
@@ -173,7 +179,7 @@ export class TaskRepo {
   create(
     row: Pick<TaskRow, "id" | "project_id" | "title" | "task" | "provider_id" | "model" | "status" | "branch" | "worktree" | "base_commit" | "budget_usd">,
     stages: TaskStages,
-    extra: Partial<Pick<TaskRow, "kind" | "parent_id" | "plan_id" | "depends_on" | "team" | "checks" | "spec" | "milestone">> = {},
+    extra: Partial<Pick<TaskRow, "kind" | "parent_id" | "plan_id" | "depends_on" | "team" | "checks" | "spec" | "milestone" | "design" | "visual">> = {},
   ): TaskRow {
     const now = Date.now();
     const full: TaskRow = {
@@ -206,6 +212,9 @@ export class TaskRepo {
       interview_notes: null,
       milestones: "[]",
       milestone: 1,
+      design: null,
+      design_review: null,
+      design_reviewed: 0,
       ...extra,
       status_reason: null,
       cost_usd: 0,
@@ -321,6 +330,8 @@ export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingAppro
     acceptance: row.acceptance ? (JSON.parse(row.acceptance) as AcceptanceReport) : null,
     milestones: JSON.parse(row.milestones) as Milestone[],
     milestone: row.milestone,
+    design: row.design ? (JSON.parse(row.design) as DesignBrief) : null,
+    designReview: row.design_review ? (JSON.parse(row.design_review) as DesignReview) : null,
     interview: row.interview_round > 0 ? { round: row.interview_round, maxRounds: MAX_INTERVIEW_ROUNDS, ...notesOf(row) } : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -138,7 +138,7 @@ export async function runVisualChecks(d: VisualDeps, checks: VisualCheck[], sign
 }
 
 /** A freshly started dev server takes a while; any answer from the address counts. */
-async function reachable(url: string, signal?: AbortSignal): Promise<boolean> {
+export async function reachable(url: string, signal?: AbortSignal): Promise<boolean> {
   for (let i = 0; i < 60 && !signal?.aborted; i++) {
     try {
       await fetch(url, { signal: AbortSignal.timeout(3000) });
