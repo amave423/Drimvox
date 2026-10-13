@@ -35,9 +35,21 @@ describe("recommend", () => {
     expect(recommend(variants)?.quant).toBe("Q6_K");
   });
 
-  it("takes the smallest when none is fast", () => {
+  it("takes the smallest four-bit variant when none is fast", () => {
     const variants = [v("Q4_K_M", 16), v("Q3_K_M", 13), v("Q6_K", 22)];
-    expect(recommend(variants)?.quant).toBe("Q3_K_M");
+    expect(recommend(variants)?.quant).toBe("Q4_K_M");
+  });
+
+  // Seen live: for a 27B model on a 10 GB card the advice was a two-bit variant, fast but much worse.
+  it("prefers a slower four-bit variant to a fast one squeezed below it", () => {
+    const variants = [v("UD-IQ1_S", 5.8), v("UD-IQ2_XXS", 6.8), v("UD-Q3_K_XL", 12.2), v("UD-IQ4_XS", 13.3), v("UD-Q4_K_M", 15.3), v("Q8_0", 27.1)];
+    expect(recommend(variants)?.quant).toBe("UD-IQ4_XS");
+  });
+
+  it("settles for three bits fast when nothing four-bit runs at all", () => {
+    const small: LocalHardware = { ramBytes: 8 * GB, gpu: { name: "GTX", vramBytes: 6 * GB }, unified: false };
+    const w = (quant: string, gb: number) => ({ quant, sizeBytes: gb * GB, fit: fitOf(gb * GB, small)! });
+    expect(recommend([w("IQ2_XXS", 2.5), w("Q3_K_M", 4)])?.quant).toBe("Q3_K_M");
   });
 
   it("knows Unsloth's dynamic variants by their base quantization", () => {

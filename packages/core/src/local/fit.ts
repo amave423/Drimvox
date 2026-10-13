@@ -39,11 +39,24 @@ export function quantRank(quant: string): number {
 
 /** The highest quality that never needs more than this: beyond Q8 a model is slower and hardly better. */
 const BEST_WORTH = 8.5;
+/** Four bits (IQ4_XS included): below it a model loses noticeably; slow and good beats fast and squeezed. */
+const GOOD = 3.8;
+/** Three bits: the least worth running when nothing four-bit runs at all. */
+const FAIR = 3;
 
-/** The best variant that runs fast (Q8 at most); when none is fast, the smallest that runs. */
+/**
+ * The advised variant: the best fast one of four bits or more (Q8 at most); else the smallest four-bit one, even if
+ * slow; else the best fast one of three bits or more; else the smallest that runs.
+ */
 export function recommend<T extends { quant: string; sizeBytes: number; fit: LocalFit }>(variants: T[]): T | null {
-  const fast = variants.filter((v) => v.fit === "fast" && quantRank(v.quant) <= BEST_WORTH);
-  if (fast.length) return fast.reduce((a, b) => (quantRank(b.quant) > quantRank(a.quant) ? b : a));
-  if (variants.length === 0) return null;
-  return variants.reduce((a, b) => (b.sizeBytes < a.sizeBytes ? b : a));
+  const rank = (v: T) => quantRank(v.quant);
+  const best = (list: T[]) => (list.length ? list.reduce((a, b) => (rank(b) > rank(a) ? b : a)) : null);
+  const smallest = (list: T[]) => (list.length ? list.reduce((a, b) => (b.sizeBytes < a.sizeBytes ? b : a)) : null);
+  const worth = variants.filter((v) => rank(v) <= BEST_WORTH);
+  return (
+    best(worth.filter((v) => v.fit === "fast" && rank(v) >= GOOD)) ??
+    smallest(worth.filter((v) => rank(v) >= GOOD)) ??
+    best(worth.filter((v) => v.fit === "fast" && rank(v) >= FAIR)) ??
+    smallest(variants)
+  );
 }
