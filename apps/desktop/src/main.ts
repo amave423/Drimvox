@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { InitMessage } from "./core-process";
 import { loadSecretKey } from "./keyring";
@@ -17,7 +17,25 @@ const token = randomBytes(32).toString("hex");
 app.setName(devServerUrl ? "Artel Dev" : "Artel");
 app.setPath("userData", process.env.ARTEL_USER_DATA ?? join(app.getPath("appData"), app.getName()));
 // Windows shows toasts only for apps with an identity.
-app.setAppUserModelId(devServerUrl ? "Artel Dev" : "Artel");
+const appId = devServerUrl ? "Artel Dev" : "Artel";
+app.setAppUserModelId(appId);
+
+/**
+ * Windows 10 shows an app's notifications only when a Start menu shortcut carries its AppUserModelID. An installer makes
+ * one; `npm start` does not, and then every notification vanishes without an error. Artel keeps its own shortcut.
+ */
+function ensureShortcut(): void {
+  if (process.platform !== "win32" || process.env.ARTEL_USER_DATA) return;
+  const link = join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", `${appId}.lnk`);
+  const wanted = { target: process.execPath, args: app.isPackaged ? "" : `"${app.getAppPath()}"`, appUserModelId: appId, description: appId };
+  try {
+    const now = existsSync(link) ? shell.readShortcutLink(link) : null;
+    if (now && now.target === wanted.target && now.args === wanted.args && now.appUserModelId === appId) return;
+    shell.writeShortcutLink(link, now ? "replace" : "create", wanted);
+  } catch {
+    // Without the shortcut Artel still works; only the notifications stay away.
+  }
+}
 
 let core: UtilityProcess | null = null;
 let win: BrowserWindow | null = null;
@@ -31,7 +49,10 @@ if (!app.requestSingleInstanceLock()) {
     if (win.isMinimized()) win.restore();
     win.focus();
   });
-  app.whenReady().then(launch);
+  app.whenReady().then(() => {
+    ensureShortcut();
+    return launch();
+  });
 }
 
 async function launch() {
@@ -180,6 +201,16 @@ function registerIpc() {
       return;
     }
     toast.show();
+    // The taskbar button blinks too, until the window is in front again: it works even when Focus Assist hides toasts.
+    win?.flashFrame(true);
+  });
+
+  // Settings: one notification now, whatever window is in front, to see that they reach the desktop.
+  ipcMain.on("artel:notify-test", (event, notice: { title?: unknown; body?: unknown }) => {
+    if (!fromOurPage(event.senderFrame?.url) || !Notification.isSupported()) return;
+    const { title, body } = notice ?? {};
+    if (typeof title !== "string" || typeof body !== "string") return;
+    new Notification({ title: title.slice(0, 120), body: body.slice(0, 300), silent: false }).show();
   });
 
   const hex = /^#[0-9a-f]{6}$/i;
@@ -218,6 +249,7 @@ async function createWindow() {
 
   win.once("ready-to-show", () => win?.show());
   win.on("closed", () => (win = null));
+  win.on("focus", () => win?.flashFrame(false));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
     return { action: "deny" };

@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("artel", {
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke("artel:pick-folder"),
   openSkillsFolder: () => ipcRenderer.send("artel:open-skills"),
   notify: (notice: { title: string; body: string; taskId: string }) => ipcRenderer.send("artel:notify", notice),
+  testNotify: (notice: { title: string; body: string }) => ipcRenderer.send("artel:notify-test", notice),
   onOpenTask: (listener: (taskId: string) => void) => {
     const handler = (_event: unknown, taskId: unknown) => typeof taskId === "string" && listener(taskId);
     ipcRenderer.on("artel:open-task", handler);
