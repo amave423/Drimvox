@@ -65,9 +65,12 @@ function team(lead: FakeTurn[], subs: Record<string, FakeTurn[]>, acceptor: Fake
   };
 }
 
-async function startGoal(respond: (body: any) => FakeTurn, approvePlan = true) {
+async function startGoal(respond: (body: any) => FakeTurn, approvePlan = true, preset: "custom" | "deepseek" = "custom") {
   fake = await startFakeProvider({ key: KEY, respond, models: [{ id: "lead" }, { id: "coder" }] });
-  const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+  if (preset === "deepseek") env.setPresetUrl("deepseek", fake.baseUrl);
+  const provider = await (
+    await env.call("POST", "/api/providers", preset === "custom" ? { preset, baseUrl: fake.baseUrl, apiKey: KEY } : { preset, apiKey: KEY })
+  ).json();
   const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
   const res = await env.call("POST", `/api/projects/${project.id}/tasks`, {
     task: "Добавь модули",
@@ -161,6 +164,18 @@ describe("the team at work", { timeout: 30_000 }, () => {
     const readBase = (await events((await waitFor(id, () => true)).subtasks[1].taskId)).find((e) => e.kind === "tool_result");
     expect(readBase.data).toMatchObject({ ok: true });
     expect(readBase.data.output).toContain("export const base = true");
+  });
+
+  // Thinking is paid as output and, with tools, comes back as input on every later step: workers do without it.
+  it("lets team workers on DeepSeek work without thinking, while the lead keeps it", async () => {
+    const id = await startGoal(team([plan([{ id: "sub" }])], { sub: addModule("sub") }), false, "deepseek");
+    await waitFor(id, goalIs("review"));
+    const chats = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
+    const workers = chats.filter((r) => r.body.model === "coder");
+    const lead = chats.filter((r) => r.body.model === "lead");
+    expect(workers.length).toBeGreaterThan(0);
+    expect(workers.every((r) => r.body.thinking?.type === "disabled")).toBe(true);
+    expect(lead.every((r) => r.body.thinking === undefined)).toBe(true);
   });
 
   it("never runs more than three subtasks at once", async () => {

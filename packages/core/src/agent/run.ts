@@ -30,6 +30,8 @@ export interface RunInput {
   instructions?: string;
   /** A system prompt of its own instead of the coding agent's, for agents that do not code (acceptance). */
   system?: string;
+  /** false: the model answers without thinking where the provider lets us turn it off (DeepSeek). */
+  thinking?: boolean;
   /** Money already spent on the task and the limit for it. */
   spentUsd: number;
   budgetUsd: number;
@@ -95,6 +97,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       system: i.system ?? (i.instructions ? `${systemPrompt(i.worktree)}\n\n${i.instructions}` : systemPrompt(i.worktree)),
       messages: i.messages,
       tools,
+      // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
+      providerOptions: i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : undefined,
       // Old file reads and command outputs are cut once the conversation is big; see compact.ts.
       prepareStep: ({ messages }) => {
         const compacted = compactHistory(messages);

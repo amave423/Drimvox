@@ -172,6 +172,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     ]
       .filter(Boolean)
       .join("\n\n"),
+    // Team workers follow a settled plan: the lead and the acceptance agent do the thinking.
+    thinking: row.kind !== "subtask",
     spentUsd: row.cost_usd,
     budgetUsd: row.budget_usd,
     signal: ctx.signal,
