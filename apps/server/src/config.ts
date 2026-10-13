@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export interface ServerConfig {
@@ -55,4 +55,29 @@ export function loadSecretKey(dataDir: string): Buffer {
 /** The code that lets the first browser set the password; written to the server's log. */
 export function setupCode(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+/**
+ * The same setup code after every restart until the password is set, so the one the installer printed keeps working
+ * after a reboot. Kept next to the key, readable only by the server's user.
+ */
+export function loadSetupCode(dataDir: string): string {
+  const file = join(dataDir, "setup-code");
+  if (existsSync(file)) {
+    const kept = readFileSync(file, "utf8").trim();
+    if (/^\d{6}$/.test(kept)) return kept;
+  }
+  mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+  const code = setupCode();
+  writeFileSync(file, code, { mode: 0o600 });
+  return code;
+}
+
+/** Once the password is set the code opens nothing; its file goes. */
+export function forgetSetupCode(dataDir: string): void {
+  try {
+    unlinkSync(join(dataDir, "setup-code"));
+  } catch {
+    // Already gone.
+  }
 }

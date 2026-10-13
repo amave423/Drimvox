@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadSecretKey, readConfig, setupCode, tailscaleName } from "./config";
+import { forgetSetupCode, loadSecretKey, loadSetupCode, readConfig, tailscaleName } from "./config";
 import { closeBrowser, screenshot } from "./screenshot";
 
 /** Injected by build.mjs. */
@@ -24,13 +24,14 @@ async function main() {
   if (!existsSync(join(webDir, "index.html"))) throw new Error(`The UI is not built: ${webDir}. Run "npm run server" from the Artel folder.`);
 
   const name = await tailscale();
-  const code = setupCode();
+  const secretKey = loadSecretKey(config.dataDir);
+  const code = loadSetupCode(config.dataDir);
   const server = await startServer({
     host: "127.0.0.1",
     port: config.port,
     dataDir: config.dataDir,
     webDir,
-    secretKey: loadSecretKey(config.dataDir),
+    secretKey,
     version: __ARTEL_VERSION__,
     allowedHosts: ["127.0.0.1", "localhost", "[::1]", ...(name ? [name] : []), ...config.hosts],
     password: { setupCode: code },
@@ -40,6 +41,7 @@ async function main() {
   console.log(`Artel ${__ARTEL_VERSION__} listens on http://127.0.0.1:${server.port}, data in ${config.dataDir}`);
   console.log(name ? `Open https://${name} (after "tailscale serve --bg ${server.port}")` : "Tailscale is not running: only this machine can open Artel.");
   if (server.needsPassword()) console.log(`No password yet. The code to set it in the browser: ${code}`);
+  else forgetSetupCode(config.dataDir);
 
   const stop = async () => {
     await server.close();

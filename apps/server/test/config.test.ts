@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadSecretKey, readConfig, setupCode, tailscaleName } from "../src/config";
+import { forgetSetupCode, loadSecretKey, loadSetupCode, readConfig, setupCode, tailscaleName } from "../src/config";
 
 describe("server settings", () => {
   it("keeps data in ~/.local/share/artel on port 4317 unless told otherwise", () => {
@@ -29,6 +29,17 @@ describe("server settings", () => {
     expect(loadSecretKey(dir).equals(key)).toBe(true);
     expect(readFileSync(join(dir, "secret.key"))).toHaveLength(32);
     if (process.platform !== "win32") expect(statSync(join(dir, "secret.key")).mode & 0o777).toBe(0o600);
+  });
+
+  // Seen in WSL: the server restarted before the first sign-in and the code the installer printed no longer worked.
+  it("keeps the setup code across restarts until the password is set", () => {
+    const dir = mkdtempSync(join(tmpdir(), "artel-server-"));
+    const code = loadSetupCode(dir);
+    expect(code).toMatch(/^\d{6}$/);
+    expect(loadSetupCode(dir)).toBe(code);
+    if (process.platform !== "win32") expect(statSync(join(dir, "setup-code")).mode & 0o777).toBe(0o600);
+    forgetSetupCode(dir);
+    expect(existsSync(join(dir, "setup-code"))).toBe(false);
   });
 
   it("makes six-digit setup codes", () => {
