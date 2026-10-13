@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPublicAddress, pageText, parseSearch } from "../src/internet/web";
+import { isPublicAddress, makeDuckDuckGo, pageText, parseSearch } from "../src/internet/web";
 
 const DDG = `
 <div class="result results_links results_links_deep web-result">
@@ -18,6 +18,45 @@ describe("search results", () => {
       { title: "Weather in Moscow", url: "https://wttr.in/Moscow", snippet: "Forecast: +5 °C, cloudy & windy" },
       { title: "Direct link", url: "https://example.org/direct", snippet: "Second result" },
     ]);
+  });
+});
+
+// Seen live: searches in a row got DuckDuckGo's bot check (HTTP 202), and the agent was told to "try other words".
+describe("search pacing", () => {
+  const page = (status: number, body: string) => new Response(body, { status, headers: { "content-type": "text/html" } });
+  const fakeClock = () => {
+    let now = 0;
+    const waits: number[] = [];
+    return { now: () => now, sleep: async (ms: number) => void (waits.push(ms), (now += ms)), waits };
+  };
+
+  it("slows down and tries again when DuckDuckGo asks for a pause", async () => {
+    const answers = [page(202, "challenge"), page(202, "challenge"), page(200, DDG)];
+    const clock = fakeClock();
+    const search = makeDuckDuckGo({ fetch: async () => answers.shift()!, ...clock });
+    expect(await search.search("кофейня меню")).toHaveLength(2);
+    expect(clock.waits).toEqual([5_000, 15_000]);
+  });
+
+  it("keeps searches apart instead of firing them in a burst", async () => {
+    const clock = fakeClock();
+    const search = makeDuckDuckGo({ fetch: async () => page(200, DDG), ...clock });
+    await search.search("one");
+    await search.search("two");
+    expect(clock.waits).toEqual([1_500]);
+  });
+
+  it("says the search is limited, not that nothing exists, and stops knocking for a while", async () => {
+    const clock = fakeClock();
+    let asked = 0;
+    const search = makeDuckDuckGo({ fetch: async () => (asked++, page(202, "challenge")), ...clock });
+    await expect(search.search("погода")).rejects.toThrow(/temporarily limited/);
+    expect(asked).toBe(3);
+    await expect(search.search("ещё")).rejects.toThrow(/temporarily limited/);
+    expect(asked).toBe(3);
+    await clock.sleep(120_000);
+    await expect(search.search("позже")).rejects.toThrow(/temporarily limited/);
+    expect(asked).toBe(6);
   });
 });
 

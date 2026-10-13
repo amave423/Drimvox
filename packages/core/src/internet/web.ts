@@ -25,44 +25,99 @@ const MAX_PAGE_BYTES = 3_000_000;
 const MAX_PAGE_CHARS = 20_000;
 const MAX_REDIRECTS = 5;
 
-/** DuckDuckGo's HTML results: free, no key. */
-export const duckDuckGo: WebAccess = {
-  async search(query, signal) {
-    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
-      headers: { "User-Agent": UA, "Accept-Language": "ru,en;q=0.8" },
-      signal: anySignal(signal, 20_000),
-    });
-    if (!res.ok) throw new Error(`Search answered ${res.status}`);
-    const results = parseSearch(await res.text());
-    if (results.length === 0) throw new Error("The search returned no results; try other words.");
-    return results;
-  },
+/** Searches this far apart at least: DuckDuckGo answers a burst with a bot check. */
+const SEARCH_GAP_MS = 1_500;
+/** Pauses after DuckDuckGo asked for one (HTTP 202 with a bot check), before trying again. */
+const BACKOFF_MS = [5_000, 15_000];
+/** After the pauses did not help, how long searches answer "limited" without asking DuckDuckGo at all. */
+const COOLDOWN_MS = 120_000;
+const LIMITED = "Web search is temporarily limited by DuckDuckGo. Wait a minute before searching again, or go on with what you know.";
 
-  async open(url, signal) {
-    let target = url;
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      await assertPublic(target);
-      const res = await fetch(target, {
-        headers: { "User-Agent": UA, Accept: "text/html,text/plain,application/json;q=0.9,*/*;q=0.5" },
-        redirect: "manual",
+export interface SearchClock {
+  fetch: typeof fetch;
+  now(): number;
+  sleep(ms: number): Promise<void>;
+}
+
+/**
+ * DuckDuckGo's HTML results: free, no key. One search at a time for the whole app, kept apart; when DuckDuckGo
+ * asks for a pause Artel waits and tries again, and never tries to get past its check.
+ */
+export function makeDuckDuckGo(clock: SearchClock): WebAccess {
+  let queue: Promise<unknown> = Promise.resolve();
+  let last = -Infinity;
+  let limitedUntil = -Infinity;
+
+  async function once(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
+    if (clock.now() < limitedUntil) throw new Error(LIMITED);
+    for (let attempt = 0; ; attempt++) {
+      const wait = last + SEARCH_GAP_MS - clock.now();
+      if (wait > 0) await clock.sleep(wait);
+      last = clock.now();
+      const res = await clock.fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+        headers: { "User-Agent": UA, "Accept-Language": "ru,en;q=0.8" },
         signal: anySignal(signal, 20_000),
       });
-      const next = res.headers.get("location");
-      if (res.status >= 300 && res.status < 400 && next) {
-        // Every hop is checked: a public page must not bounce the model onto this computer's network.
-        target = new URL(next, target).toString();
+      const html = await res.text();
+      if (res.status === 202) {
+        const pause = BACKOFF_MS[attempt];
+        if (pause === undefined) {
+          limitedUntil = clock.now() + COOLDOWN_MS;
+          throw new Error(LIMITED);
+        }
+        await clock.sleep(pause);
+        // The pause already keeps this try apart from the last one.
+        last = clock.now() - SEARCH_GAP_MS;
         continue;
       }
-      if (!res.ok) throw new Error(`The page answered ${res.status}`);
-      const type = res.headers.get("content-type") ?? "";
-      if (!/text\/|json|xml/.test(type)) throw new Error(`Not a text page (${type || "unknown type"})`);
-      const body = await readLimited(res, MAX_PAGE_BYTES);
-      if (/html/.test(type)) return { url: target, ...pageText(body) };
-      return { url: target, title: "", text: clip(body.trim()) };
+      if (!res.ok) throw new Error(`Search answered ${res.status}`);
+      const results = parseSearch(html);
+      if (results.length === 0) throw new Error("The search returned no results; try other words.");
+      return results;
     }
-    throw new Error("Too many redirects");
-  },
-};
+  }
+
+  return {
+    search(query, signal) {
+      const run = queue.then(() => once(query, signal));
+      queue = run.catch(() => undefined);
+      return run;
+    },
+    open: openPage,
+  };
+}
+
+export const duckDuckGo: WebAccess = makeDuckDuckGo({
+  fetch: (...args) => fetch(...args),
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+});
+
+/** One page as text: public addresses only, every redirect checked too. */
+async function openPage(url: string, signal?: AbortSignal): Promise<Page> {
+  let target = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    await assertPublic(target);
+    const res = await fetch(target, {
+      headers: { "User-Agent": UA, Accept: "text/html,text/plain,application/json;q=0.9,*/*;q=0.5" },
+      redirect: "manual",
+      signal: anySignal(signal, 20_000),
+    });
+    const next = res.headers.get("location");
+    if (res.status >= 300 && res.status < 400 && next) {
+      // Every hop is checked: a public page must not bounce the model onto this computer's network.
+      target = new URL(next, target).toString();
+      continue;
+    }
+    if (!res.ok) throw new Error(`The page answered ${res.status}`);
+    const type = res.headers.get("content-type") ?? "";
+    if (!/text\/|json|xml/.test(type)) throw new Error(`Not a text page (${type || "unknown type"})`);
+    const body = await readLimited(res, MAX_PAGE_BYTES);
+    if (/html/.test(type)) return { url: target, ...pageText(body) };
+    return { url: target, title: "", text: clip(body.trim()) };
+  }
+  throw new Error("Too many redirects");
+}
 
 /** Results of DuckDuckGo's HTML page; ads and results without an address are skipped. */
 export function parseSearch(html: string): SearchResult[] {
