@@ -54,7 +54,8 @@ export async function isRepoRoot(dir: string): Promise<boolean> {
 /** Throws away uncommitted changes and new files (ignored ones stay), back to the last commit. */
 export async function discardChanges(dir: string): Promise<void> {
   await runGit(dir, ["reset", "--hard", "-q"]);
-  await runGit(dir, ["clean", "-fdq"]);
+  // Installed dependencies are not committed (see commitAll), so they would go too: the app could not start again.
+  await runGit(dir, ["clean", "-fdq", ...NEVER_ADDED.flatMap((name) => ["-e", `${name}/`])]);
 }
 
 export async function ensureIdentity(dir: string): Promise<void> {

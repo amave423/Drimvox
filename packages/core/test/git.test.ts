@@ -1,7 +1,7 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { commitAll } from "../src/agent/git";
+import { commitAll, discardChanges } from "../src/agent/git";
 import { git, makeRepo } from "./git-repo";
 
 let repo: string | undefined;
@@ -51,5 +51,21 @@ describe("commitAll", () => {
     put(deep);
     expect(await commitAll(repo, "Work")).toBe(true);
     expect(committed()).toEqual([deep]);
+  });
+});
+
+describe("discardChanges", () => {
+  // Seen live: after acceptance threw away its leftovers, node_modules went with them and the dev server would not start.
+  it("throws away leftovers but keeps installed dependencies", async () => {
+    repo = makeRepo({ "README.md": "# Demo\n" });
+    put("node_modules/vite/index.js");
+    put(".venv/bin/python");
+    put("scratch.txt");
+    put("README.md", "changed\n");
+    await discardChanges(repo);
+    expect(existsSync(join(repo, "node_modules/vite/index.js"))).toBe(true);
+    expect(existsSync(join(repo, ".venv/bin/python"))).toBe(true);
+    expect(existsSync(join(repo, "scratch.txt"))).toBe(false);
+    expect(git(repo, "status", "--porcelain", "--untracked-files=no")).toBe("");
   });
 });
