@@ -17,6 +17,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
     "- Make focused changes that do exactly what was asked. Prefer edit_file for existing files; use write_file for new files.",
     "- If the project has tests, a linter or a build, run them with run_command and fix what you broke.",
     "- Never commit, push or change git settings: Artel handles git. Stay inside the project folder.",
+    "- A project without a .gitignore gets one when you install dependencies or build: node_modules, dist and the like stay out of git.",
     "- Some commands need the user's permission; if one is denied, find another way or explain in finish.",
     "- Keep your messages between tool calls short: one sentence about what you are doing next.",
     "",

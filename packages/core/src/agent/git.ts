@@ -18,8 +18,10 @@ export class GitError extends Error {
 
 /** Runs git and resolves even on a non-zero exit; only a missing git binary rejects. */
 export function runGit(cwd: string, args: string[], allowFail = false): Promise<GitResult> {
+  // Deep folders (a dependency's cache, say) pass Windows' 260-character limit; git handles them only when told to.
+  const full = process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args;
   return new Promise((resolve, reject) => {
-    execFile("git", args, { cwd, maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+    execFile("git", full, { cwd, maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       const code = err ? (typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : -1) : 0;
       if (err && (err as { code?: unknown }).code === "ENOENT") {
         reject(new GitError("no_git", "Git is not installed"));
@@ -87,8 +89,17 @@ export async function removeWorktree(repo: string, path: string, branch: string)
 }
 
 /** Records everything in the copy as a commit on the task branch. Returns false when nothing changed. */
+/**
+ * Installed dependencies and tool caches: never part of an agent's work, even in a project without a .gitignore.
+ * A project that keeps one of them in git keeps getting its changes.
+ */
+const NEVER_ADDED = ["node_modules", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".next", ".nuxt", ".turbo", ".parcel-cache"];
+const anywhere = (name: string) => `:(glob)**/${name}/**`;
+
 export async function commitAll(worktree: string, message: string): Promise<boolean> {
-  await runGit(worktree, ["add", "-A"]);
+  const tracked = lines(await out(worktree, ["ls-files", "--", ...NEVER_ADDED.map(anywhere)])).map((p) => p.split("/"));
+  const skipped = NEVER_ADDED.filter((name) => !tracked.some((parts) => parts.includes(name)));
+  await runGit(worktree, ["add", "-A", "--", ".", ...skipped.map((name) => `:(exclude,glob)**/${name}/**`)]);
   const staged = await runGit(worktree, ["diff", "--cached", "--quiet"], true);
   if (staged.code === 0) return false;
   await runGit(worktree, [...artelIdentity, "commit", "-q", "--no-verify", "-m", message]);
