@@ -67,6 +67,12 @@ export function SettingsSheet() {
           {window.artel ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
         </Toggle>
 
+        <h2 className="sheet-h">{t("settings.developerTitle")}</h2>
+        <Toggle checked={settings.developer} onChange={(developer) => void save({ developer })}>
+          {t("settings.developer")}
+        </Toggle>
+        <p className="muted">{t("settings.developerHint")}</p>
+
         <h2 className="sheet-h" id="currency-label">
           {t("settings.currency")}
         </h2>

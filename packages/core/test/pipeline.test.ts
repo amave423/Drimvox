@@ -75,6 +75,7 @@ describe("the full path", () => {
           { id: "name", question: "Как назвать функцию?", options: [{ label: "subtract", description: "Как в задаче" }, { label: "minus" }], recommended: 0 },
         ],
       }),
+      call("ask_questions", { questions: [] }),
       spec(),
       call("write_file", { path: "math.test.js", content: TEST_BOTH }),
       finish("Тест на subtract написан"),
@@ -145,7 +146,7 @@ describe("the full path", () => {
     expect(done.spec).toContain("# Вычитание");
   });
 
-  it("lets the user skip the interview", async () => {
+  it("lets the user stop the interview and have the agent decide the rest", async () => {
     const { id } = await start([call("ask_questions", { questions: [{ id: "a", question: "?", options: [{ label: "x" }, { label: "y" }] }] }), spec()]);
     await waitFor(id, waiting("questions"));
     await env.call("POST", `/api/tasks/${id}/answers`, { skip: true });
@@ -159,6 +160,69 @@ describe("the full path", () => {
     const revised = await waitFor(id, (t) => t.status === "waiting" && t.spec === "# Вторая версия");
     expect(revised.statusReason).toBe("spec_review");
     expect(JSON.stringify(chatRequests().at(-1)!.body.messages)).toContain("Добавь раздел про ошибки");
+  });
+});
+
+describe("interview rounds", () => {
+  const ask = (round: number, questions: unknown[]) =>
+    call("ask_questions", { understood: `Понял после круга ${round}`, unknown: [`Открыто ${round}`], questions });
+  const open = (id: string) => ({ id, question: `Вопрос ${id}?`, options: [] });
+
+  it("asks round after round until the agent has the full picture", async () => {
+    const { id } = await start([
+      ask(1, [open("what")]),
+      ask(2, [{ id: "menu", question: "Меню на сайте?", options: [{ label: "Да" }, { label: "Нет" }], recommended: 0 }]),
+      call("ask_questions", { understood: "Всё ясно", unknown: [], questions: [] }),
+      spec(),
+    ]);
+    const first = await waitFor(id, waiting("questions"));
+    expect(first.questions[0]).toMatchObject({ id: "what", options: [] });
+    expect(first.interview).toEqual({ round: 1, maxRounds: 5, understood: "Понял после круга 1", unknown: ["Открыто 1"] });
+
+    await env.call("POST", `/api/tasks/${id}/answers`, { answers: [{ id: "what", answer: "Меню и адрес" }] });
+    const second = await waitFor(id, (t) => waiting("questions")(t) && t.interview?.round === 2);
+    expect(second.phase).toBe("interview");
+    const told = JSON.stringify(chatRequests().at(-1)!.body.messages);
+    expect(told).toContain("Меню и адрес");
+    expect(told).toContain("round 2");
+
+    await env.call("POST", `/api/tasks/${id}/answers`, { answers: [{ id: "menu", answer: "Да" }] });
+    const proposed = await waitFor(id, waiting("spec_review"));
+    expect(proposed.interview).toMatchObject({ round: 2, understood: "Всё ясно", unknown: [] });
+  });
+
+  it("stops asking after five rounds", async () => {
+    const { id } = await start([1, 2, 3, 4, 5].map((n) => ask(n, [open(`q${n}`)])).concat([spec()]));
+    for (let n = 1; n <= 5; n++) {
+      await waitFor(id, (t) => waiting("questions")(t) && t.interview?.round === n);
+      await env.call("POST", `/api/tasks/${id}/answers`, { answers: [{ id: `q${n}`, answer: `ответ ${n}` }] });
+    }
+    await waitFor(id, waiting("spec_review"));
+    expect(JSON.stringify(chatRequests().at(-1)!.body.messages)).toMatch(/last interview round.*write the spec now/);
+  });
+
+  it("starts work on «Enough» with what is answered, the agent deciding the rest", async () => {
+    const { id } = await start([ask(1, [open("what"), open("who")]), spec()]);
+    await waitFor(id, waiting("questions"));
+    await env.call("POST", `/api/tasks/${id}/answers`, { answers: [{ id: "what", answer: "Лендинг" }], enough: true });
+    await waitFor(id, waiting("spec_review"));
+    const told = JSON.stringify(chatRequests().at(-1)!.body.messages);
+    expect(told).toContain("Лендинг");
+    expect(told).toContain("under decisions");
+  });
+
+  it("asks a developer about technology and everyone else only about the result", async () => {
+    const interviewPrompt = () => String(chatRequests()[0]!.body.messages[0].content);
+    const first = await start([ask(1, [open("what")])]);
+    await waitFor(first.id, waiting("questions"));
+    expect(interviewPrompt()).toContain("The user is not a programmer");
+    await fake!.close();
+
+    await env.call("PATCH", "/api/settings", { developer: true });
+    fake = undefined;
+    const second = await start([ask(1, [open("what")])]);
+    await waitFor(second.id, waiting("questions"));
+    expect(interviewPrompt()).toContain("The user is a developer");
   });
 });
 

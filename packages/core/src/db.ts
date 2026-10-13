@@ -162,6 +162,9 @@ const migrations: string[] = [
    alter table tasks add column decisions text not null default '[]';
    alter table tasks add column acceptance text;
    alter table tasks add column acceptance_rounds integer not null default 0;`,
+  // The interview in rounds: how many were asked, what the agent understood and what it still does not know.
+  `alter table tasks add column interview_round integer not null default 0;
+   alter table tasks add column interview_notes text;`,
 ];
 
 export interface Database {

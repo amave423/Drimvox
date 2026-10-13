@@ -202,3 +202,9 @@
 .acceptance-item.is-missing .acceptance-mark { color: var(--pencil); background: var(--pencil-soft); }
 .acceptance-problem { color: var(--pencil); margin-top: 4px !important; }
 .acceptance-body { min-width: 0; }
+
+/* The interview between rounds: what the agent understood and what it still does not know. */
+.interview-notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; margin: 10px 0 14px; padding: 12px 14px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); }
+.interview-notes p, .interview-notes ul { margin: 4px 0 0; }
+.interview-notes ul { padding-left: 18px; }
+.interview-hint { font-size: 13px; }

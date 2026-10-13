@@ -254,6 +254,50 @@ test("requirements in the spec, an acceptance round that sends work back, and th
   await expect(page.getByText("Приёмка: сделано 1 из 2")).toBeVisible();
 });
 
+test("the interview goes in rounds with open questions until «Enough, start»", async () => {
+  const page = await launch([
+    {
+      toolCalls: [
+        {
+          name: "ask_questions",
+          args: {
+            understood: "Нужна функция для вычитания чисел.",
+            unknown: ["Где она будет использоваться"],
+            questions: [{ id: "where", question: "Где будет использоваться функция?", options: [] }],
+          },
+        },
+      ],
+    },
+    {
+      toolCalls: [
+        {
+          name: "ask_questions",
+          args: {
+            understood: "Функция нужна для калькулятора.",
+            unknown: ["Нужна ли проверка типов"],
+            questions: [{ id: "types", question: "Проверять, что пришли числа?", options: [{ label: "Да" }, { label: "Нет" }], recommended: 0 }],
+          },
+        },
+      ],
+    },
+    { toolCalls: [{ name: "propose_spec", args: { spec: "# Вычитание для калькулятора", checks: ["node --test"], plan: ["Функция"] } }] },
+  ]);
+  await startTask(page, "Добавь subtract", true);
+
+  await expect(page.getByText("Круг 1 из 5", { exact: false })).toBeVisible();
+  await expect(page.getByText("Нужна функция для вычитания чисел.")).toBeVisible();
+  await expect(page.getByText("Где она будет использоваться")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ответить" })).toBeDisabled();
+  await page.getByLabel("Где будет использоваться функция?").fill("В калькуляторе на сайте");
+  await page.getByRole("button", { name: "Ответить" }).click();
+
+  await expect(page.getByText("Круг 2 из 5", { exact: false })).toBeVisible();
+  await expect(page.getByText("Функция нужна для калькулятора.")).toBeVisible();
+  await page.getByRole("button", { name: "Хватит, начинай" }).click();
+  await expect(page.getByRole("heading", { name: "Спека и план" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Вычитание для калькулятора" })).toBeVisible();
+});
+
 test("the pipeline: interview, spec with an edited check, red tests, green code, review", async () => {
   const page = await launch([
     {
@@ -273,6 +317,7 @@ test("the pipeline: interview, spec with an edited check, red tests, green code,
         },
       ],
     },
+    { toolCalls: [{ name: "ask_questions", args: { questions: [], understood: "Нужна функция subtract", unknown: [] } }] },
     {
       toolCalls: [
         {

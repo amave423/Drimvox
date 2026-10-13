@@ -5,7 +5,7 @@ import type { ProviderRepo } from "../providers/repo";
 import { addWorktree, headCommit, removeWorktree, showFile } from "./git";
 import { acceptGoal } from "./landing";
 import { runPass, startWork, enterPhase, type PassContext } from "./pass";
-import { answersMessage, specMessage } from "./phases";
+import { answersMessage, specMessage, MAX_INTERVIEW_ROUNDS } from "./phases";
 import { feedbackMessage } from "./prompt";
 import { toTaskView, type ProjectRepo, type TaskRepo, type TaskRow } from "./repo";
 import { acceptTask, discardTask, snapshot, taskDiff } from "./review";
@@ -29,6 +29,7 @@ export interface RunnerOptions extends ExtrasOptions {
   budgetUsd(): number;
   strongModel(): { providerId: string; model: string } | null;
   acceptanceModel(): { providerId: string; model: string } | null;
+  developer(): boolean;
   idleTimeoutMs: number;
 }
 
@@ -103,14 +104,22 @@ export class AgentRunner {
     return this.view(id)!;
   }
 
-  answerQuestions(id: string, answers: { id: string; answer: string }[], skip: boolean): TaskView {
+  /**
+   * The user's answers to one interview round. Another round follows unless the user said "Enough" (or skipped)
+   * or the rounds ran out; then the spec, with the agent deciding whatever is still open.
+   */
+  answerQuestions(id: string, answers: { id: string; answer: string }[], enough: boolean): TaskView {
     const row = this.requireWaiting(id, "questions");
     const questions = JSON.parse(row.questions) as Question[];
-    this.event(id, "answers", { answers: skip ? [] : answers, skipped: skip });
+    this.event(id, "answers", { answers, skipped: enough && answers.length === 0, enough });
     this.o.tasks.update(id, { questions: "[]" });
     const stages = JSON.parse(row.stages) as TaskStages;
+    if (!enough && row.interview_round < MAX_INTERVIEW_ROUNDS) {
+      this.launch(id, answersMessage(questions, answers, { kind: "round", round: row.interview_round + 1 }));
+      return this.view(id)!;
+    }
     enterPhase(this.context(id, new AbortController()), id, stages.spec ? "spec" : "code");
-    this.launch(id, answersMessage(questions, answers, skip));
+    this.launch(id, answersMessage(questions, answers, { kind: "spec", why: enough ? "enough" : "rounds" }));
     return this.view(id)!;
   }
 
@@ -338,6 +347,7 @@ export class AgentRunner {
       idleTimeoutMs: this.o.idleTimeoutMs,
       strongModel: this.o.strongModel,
       acceptanceModel: () => this.o.acceptanceModel() ?? this.o.strongModel(),
+      developer: this.o.developer,
       signal: controller.signal,
       closed: () => this.closed,
       event: (kind, data) => this.event(id, kind, data),

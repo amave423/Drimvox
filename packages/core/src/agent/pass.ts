@@ -1,4 +1,4 @@
-import type { Question, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
+import type { TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
@@ -11,6 +11,7 @@ import {
   planTools,
   specMessage,
   specTools,
+  type InterviewRound,
   type PlanProposal,
   type SpecProposal,
 } from "./phases";
@@ -39,6 +40,8 @@ export interface PassContext {
   providers: ProviderRepo;
   idleTimeoutMs: number;
   strongModel(): { providerId: string; model: string } | null;
+  /** The user writes code: the interview may ask about technology. */
+  developer(): boolean;
   /** Who accepts the work: the acceptance model from the settings, else the strong one; null means the task's own. */
   acceptanceModel(): { providerId: string; model: string } | null;
   signal: AbortSignal;
@@ -94,7 +97,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   const conn = row.provider_id ? ctx.providers.connection(row.provider_id) : null;
   if (!conn) return finish(ctx, "failed", "no_provider");
 
-  let questions: Question[] | null = null;
+  let round: InterviewRound | null = null;
   let proposal: SpecProposal | null = null;
   let teamPlan: PlanProposal | null = null;
   let answered: string | null = null;
@@ -102,7 +105,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   let extraTools: ToolSet | undefined;
   let stopTools: string[] | undefined;
   if (phase === "interview") {
-    extraTools = interviewTools((q) => (questions = q));
+    extraTools = interviewTools((r) => (round = r));
     stopTools = ["ask_questions"];
   } else if (planning) {
     extraTools = planTools((p) => (teamPlan = p));
@@ -163,7 +166,10 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     extraTools,
     ownTools,
     stopTools,
-    instructions: [planning ? planInstructions() : phaseInstructions(phase, JSON.parse(row.checks) as string[]), skillsInstructions(skills)]
+    instructions: [
+      planning ? planInstructions() : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),
+      skillsInstructions(skills),
+    ]
       .filter(Boolean)
       .join("\n\n"),
     spentUsd: row.cost_usd,
@@ -199,13 +205,14 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   }
 
   const stages = JSON.parse(row.stages) as TaskStages;
-  const asked = questions as Question[] | null;
+  const asked = round as InterviewRound | null;
   const proposed = proposal as SpecProposal | null;
 
   if (phase === "interview") {
-    if (asked && asked.length > 0) {
-      ctx.tasks.update(id, { questions: JSON.stringify(asked) });
-      ctx.event("questions", { questions: asked });
+    if (asked) ctx.tasks.update(id, { interview_notes: JSON.stringify({ understood: asked.understood, unknown: asked.unknown }) });
+    if (asked && asked.questions.length > 0) {
+      ctx.tasks.update(id, { questions: JSON.stringify(asked.questions), interview_round: row.interview_round + 1 });
+      ctx.event("questions", { questions: asked.questions, understood: asked.understood, unknown: asked.unknown, round: row.interview_round + 1 });
       return finish(ctx, "waiting", "questions");
     }
     if (stages.spec) {

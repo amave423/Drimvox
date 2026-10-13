@@ -21,22 +21,46 @@ export function answerTools(onAnswer: (answer: string) => void): ToolSet {
   };
 }
 
+/** Interview rounds before the agent has to write the spec with what it knows. */
+export const MAX_INTERVIEW_ROUNDS = 5;
+
+/** Who the agent talks to: a developer is also asked about technology, everyone else only about the result. */
+function audience(developer: boolean): string {
+  return developer
+    ? "The user is a developer: besides the result, ask about technology, architecture, data storage, integrations and deployment where they matter."
+    : "The user is not a programmer: ask only about the result in plain words (what, for whom, how it behaves and looks, what it keeps), " +
+        "never about technologies, libraries or architecture. Choose those yourself and list them under decisions in the spec.";
+}
+
+export interface PhaseOptions {
+  developer: boolean;
+  /** The interview round about to be asked. */
+  round: number;
+}
+
 /** What the model is told on top of the base system prompt in each step. */
-export function phaseInstructions(phase: TaskPhase | null, checks: string[]): string {
+export function phaseInstructions(phase: TaskPhase | null, checks: string[], o: PhaseOptions = { developer: true, round: 1 }): string {
   const checkList = checks.length ? checks.map((c) => `- ${c}`).join("\n") : "- (none)";
   switch (phase) {
     case "interview":
       return [
-        "Current step: interview. You may only read the project.",
-        "Explore enough to understand the task, then call ask_questions once with up to 6 questions about decisions",
-        "only the user can make: scope, behaviour, user interface, technology choices. Skip what the code already answers.",
-        "Each question has 2-4 options with a one-line description; mark the recommended option. Write in the user's language.",
-        "If the task is already clear, call ask_questions with an empty list.",
+        `Current step: interview, round ${o.round} of at most ${MAX_INTERVIEW_ROUNDS}. You may only read the project.`,
+        "The goal is a complete picture of what the user wants before any work starts: whatever stays unclear now ends up guessed.",
+        "Explore the project first and never ask what the code already answers.",
+        "Cover what the task leaves open, most important first: what exactly should come out and for whom; the main scenarios step by step;",
+        "what data it keeps; how it looks and how people use it; what is out of scope.",
+        audience(o.developer),
+        "Ask about the essence openly: a question with no options lets the user describe it in their own words (use it for things like",
+        "\"what exactly should the bot do?\"). Give 2-4 options with a one-line description when there are typical choices, and mark the recommended one.",
+        "Call ask_questions with up to 6 questions; in understood say in 2-4 sentences what you understood so far, in unknown list what is",
+        "still open. Later rounds build on the answers: ask what they opened up, not the same things again.",
+        "When nothing essential is unknown any more, call ask_questions with an empty list. Write in the user's language.",
         ANSWER_HINT,
       ].join("\n");
     case "spec":
       return [
         "Current step: spec. You may only read the project.",
+        o.developer ? "" : "The user is not a programmer: write the spec and the requirements in plain words; technical choices go under decisions.",
         "Write a short spec in Markdown in the user's language with sections: goal, what changes, out of scope, how we check it.",
         "Find the commands that verify this project (tests, build, type check, lint) in package.json, pyproject.toml, Makefile and similar.",
         "Every check must run from the project root and exit 0 when everything works.",
@@ -50,7 +74,9 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[]): st
         "made on your own (technologies, defaults, anything the user did not specify).",
         "Then call propose_spec with the spec, the checks, a plan of 2-8 short steps, the requirements and the decisions.",
         ANSWER_HINT,
-      ].join("\n");
+      ]
+        .filter(Boolean)
+        .join("\n");
     case "tests":
       return [
         "Current step: tests first. Do not implement the feature yet.",
@@ -77,24 +103,36 @@ const optionSchema = z.object({ label: z.string().min(1).max(200), description: 
 const questionSchema = z.object({
   id: z.string().min(1).max(60),
   question: z.string().min(1).max(1000),
-  options: z.array(optionSchema).min(2).max(4),
+  options: z.array(optionSchema).max(4).default([]).describe("2-4 typical choices, or none for an open question answered in the user's own words"),
   recommended: z.number().int().min(0).max(3).nullable().optional(),
 });
 
-export function interviewTools(onQuestions: (questions: Question[]) => void): ToolSet {
+export interface InterviewRound {
+  questions: Question[];
+  understood: string;
+  unknown: string[];
+}
+
+export function interviewTools(onRound: (round: InterviewRound) => void): ToolSet {
   return {
     ask_questions: tool({
-      description: "Ask the user up to 6 clarifying questions, each with 2-4 options. Pass an empty list if nothing is unclear.",
-      inputSchema: z.object({ questions: z.array(questionSchema).max(6) }),
-      execute: async ({ questions }) => {
-        onQuestions(
-          questions.map((q) => ({
+      description: "Ask the user the next round of up to 6 questions (open or with options). Pass an empty list once nothing essential is unclear.",
+      inputSchema: z.object({
+        questions: z.array(questionSchema).max(6),
+        understood: z.string().max(4000).default("").describe("What you understood so far, 2-4 sentences in the user's language"),
+        unknown: z.array(z.string().min(1).max(500)).max(20).default([]).describe("What is still open"),
+      }),
+      execute: async ({ questions, understood, unknown }) => {
+        onRound({
+          understood: understood.trim(),
+          unknown,
+          questions: questions.map((q) => ({
             id: q.id,
             question: q.question,
             options: q.options.map((o) => ({ label: o.label, description: o.description ?? "" })),
             recommended: q.recommended != null && q.recommended < q.options.length ? q.recommended : null,
           })),
-        );
+        });
         return questions.length ? "Questions sent; wait for the answers." : "No questions; move on to the spec.";
       },
     }),
@@ -168,13 +206,31 @@ export function specTools(onSpec: (proposal: SpecProposal) => void): ToolSet {
   };
 }
 
-/** The user's answers as a message for the next step. */
-export function answersMessage(questions: Question[], answers: { id: string; answer: string }[], skipped: boolean): string {
-  if (skipped || answers.length === 0) {
-    return "The user skipped the interview. Make reasonable choices, note them in the spec, and write the spec now.";
-  }
+/**
+ * The user's answers as a message for what comes next: another round, or the spec, when the rounds ran out or the user
+ * said "Enough" (then the agent decides the rest and lists it under decisions).
+ */
+export function answersMessage(
+  questions: Question[],
+  answers: { id: string; answer: string }[],
+  next: { kind: "round"; round: number } | { kind: "spec"; why: "complete" | "enough" | "rounds" },
+): string {
   const lines = answers.map((a) => `- ${questions.find((q) => q.id === a.id)?.question ?? a.id} → ${a.answer}`);
-  return ["The user answered your questions:", ...lines, "", "Now write the spec and call propose_spec."].join("\n");
+  const head = lines.length ? ["The user answered your questions:", ...lines, ""] : [];
+  if (next.kind === "round") {
+    return [
+      ...head,
+      `Now interview round ${next.round}: if anything essential is still unknown, call ask_questions with the next questions, building on`,
+      "these answers. If you have the full picture, call ask_questions with an empty list.",
+    ].join("\n");
+  }
+  const tail =
+    next.why === "enough"
+      ? "The user does not want more questions. Make reasonable choices for everything still open, list them under decisions, and write the spec now."
+      : next.why === "rounds"
+        ? "That was the last interview round. Make reasonable choices for anything still open, list them under decisions, and write the spec now."
+        : "Write the spec now and call propose_spec.";
+  return [...head, tail].join("\n");
 }
 
 export function specMessage(spec: string, checks: string[], edited: boolean, requirements: Requirement[] = []): string {

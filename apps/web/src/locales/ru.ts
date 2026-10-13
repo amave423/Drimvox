@@ -250,7 +250,6 @@ export const ru = {
   "interview.custom": "Свой ответ",
   "interview.customPlaceholder": "Напиши свой вариант",
   "interview.send": "Ответить",
-  "interview.skip": "Пропустить опрос",
 
   "spec.title": "Спека и план",
   "spec.lede": "Проверь, что агент понял задачу. Текст и команды проверки можно поправить.",
@@ -542,4 +541,13 @@ export const ru = {
   "feed.acceptance": "Приёмка: сделано {done} из {total}",
   "settings.acceptanceModel": "Модель приёмки",
   "settings.acceptanceModelHint": "Отдельный агент на этой модели проверяет каждое требование, прежде чем работа попадёт к тебе. Лучше, чтобы это была не та модель, что пишет код. Если не выбрать — сильная модель, а без неё — модель задачи.",
+  "interview.round": "Круг {round} из {max}",
+  "interview.understood": "Что я понял",
+  "interview.unknown": "Чего ещё не знаю",
+  "interview.openPlaceholder": "Опиши своими словами",
+  "interview.enough": "Хватит, начинай",
+  "interview.enoughHint": "Агент начнёт с тем, что уже известно, остальное решит сам и покажет в спеке как свои решения.",
+  "settings.developerTitle": "Кто ставит задачи",
+  "settings.developer": "Я разработчик",
+  "settings.developerHint": "Включено — агент спрашивает и про технологии, архитектуру, хранение данных. Выключено — только про то, что должно получиться, простыми словами; технологии выбирает сам.",
 } as const;

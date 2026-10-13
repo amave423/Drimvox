@@ -60,6 +60,8 @@ export const taskAnswersSchema = z
   .object({
     answers: z.array(z.object({ id: z.string().min(1), answer: z.string().trim().min(1).max(5000) })).max(20).default([]),
     skip: z.boolean().default(false),
+    /** "Enough, start": the answers so far are all there will be; the agent decides the rest. */
+    enough: z.boolean().default(false),
   })
   .strict();
 
@@ -84,6 +86,14 @@ export const specApproveSchema = z
   .strict();
 export const specReviseSchema = z.object({ note: z.string().trim().min(1).max(20_000) }).strict();
 
+/** The interview between rounds. */
+export interface InterviewState {
+  round: number;
+  maxRounds: number;
+  understood: string;
+  unknown: string[];
+}
+
 export interface QuestionOption {
   label: string;
   description: string;
@@ -92,6 +102,7 @@ export interface QuestionOption {
 export interface Question {
   id: string;
   question: string;
+  /** Empty for an open question the user answers in their own words. */
   options: QuestionOption[];
   /** Index of the recommended option, if the agent has one. */
   recommended: number | null;
@@ -212,6 +223,8 @@ export interface TaskView {
   decisions: string[];
   /** The latest acceptance verdict, once the work has been accepted at least once. */
   acceptance: AcceptanceReport | null;
+  /** Where the interview stands: its round, what the agent understood and what it still does not know. */
+  interview: InterviewState | null;
   createdAt: number;
   updatedAt: number;
 }

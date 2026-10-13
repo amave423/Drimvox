@@ -251,7 +251,6 @@ export const en: Record<keyof typeof ru, string> = {
   "interview.custom": "My own answer",
   "interview.customPlaceholder": "Write your option",
   "interview.send": "Answer",
-  "interview.skip": "Skip the interview",
 
   "spec.title": "Spec and plan",
   "spec.lede": "Check that the agent understood the task. You can edit the text and the check commands.",
@@ -543,4 +542,13 @@ export const en: Record<keyof typeof ru, string> = {
   "feed.acceptance": "Acceptance: {done} of {total} done",
   "settings.acceptanceModel": "Acceptance model",
   "settings.acceptanceModelHint": "A separate agent on this model checks every requirement before the work reaches you. Better not the model that writes the code. Left empty: the strong model, else the task's own.",
+  "interview.round": "Round {round} of {max}",
+  "interview.understood": "What I understood",
+  "interview.unknown": "What I still do not know",
+  "interview.openPlaceholder": "Describe it in your own words",
+  "interview.enough": "Enough, start",
+  "interview.enoughHint": "The agent starts with what it knows, decides the rest itself and shows those choices in the spec.",
+  "settings.developerTitle": "Who sets the tasks",
+  "settings.developer": "I am a developer",
+  "settings.developerHint": "On: agents also ask about technology, architecture and data storage. Off: only about the result, in plain words; agents choose the technology.",
 };

@@ -1,4 +1,5 @@
 import type { AcceptanceReport, Requirement } from "@artel/shared";
+import { MAX_INTERVIEW_ROUNDS } from "./phases";
 import type {
   ModelRef,
   PlannedSubtask,
@@ -71,6 +72,8 @@ export interface TaskRow {
   decisions: string;
   acceptance: string | null;
   acceptance_rounds: number;
+  interview_round: number;
+  interview_notes: string | null;
 }
 
 export class ProjectRepo {
@@ -138,6 +141,8 @@ export type TaskPatch = Partial<
     | "decisions"
     | "acceptance"
     | "acceptance_rounds"
+    | "interview_round"
+    | "interview_notes"
   >
 >;
 
@@ -193,6 +198,8 @@ export class TaskRepo {
       decisions: "[]",
       acceptance: null,
       acceptance_rounds: 0,
+      interview_round: 0,
+      interview_notes: null,
       ...extra,
       status_reason: null,
       cost_usd: 0,
@@ -306,7 +313,13 @@ export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingAppro
     requirements: JSON.parse(row.requirements) as Requirement[],
     decisions: JSON.parse(row.decisions) as string[],
     acceptance: row.acceptance ? (JSON.parse(row.acceptance) as AcceptanceReport) : null,
+    interview: row.interview_round > 0 ? { round: row.interview_round, maxRounds: MAX_INTERVIEW_ROUNDS, ...notesOf(row) } : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function notesOf(row: TaskRow): { understood: string; unknown: string[] } {
+  const notes = row.interview_notes ? (JSON.parse(row.interview_notes) as { understood?: string; unknown?: string[] }) : {};
+  return { understood: notes.understood ?? "", unknown: notes.unknown ?? [] };
 }
