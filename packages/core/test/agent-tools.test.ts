@@ -98,6 +98,21 @@ describe("classifyCommand", () => {
     expect(classifyCommand("Remove-Item -Recurse /Windows", root)).toEqual({ action: "ask", reason: "outside" });
   });
 
+  // Seen live: an agent's checks with regular expressions and '/' in their code each asked for permission.
+  it.runIf(process.platform === "win32")("takes slashes and regular expressions in code for code on Windows", () => {
+    const js = `node --input-type=module -e "const base = process.cwd().replace(/\\\\/g, '/'); console.log(base.split('/'), 6 / 2)"`;
+    expect(classifyCommand(js, root)).toEqual({ action: "allow" });
+    expect(classifyCommand("$test = @'\n// draws the sky on a canvas\nimport { it } from 'vitest'\n'@\nSet-Content tests/a.spec.ts $test", root)).toEqual({ action: "allow" });
+    expect(classifyCommand("rm -rf /", root)).toEqual({ action: "ask", reason: "outside" });
+  });
+
+  it("lets an installed program run, but not be deleted", () => {
+    const edge = '& "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe" --headless=new --dump-dom http://localhost:5173/ | Out-File dom.html';
+    expect(classifyCommand(edge, root)).toEqual({ action: "allow" });
+    expect(classifyCommand('Remove-Item "C:\\Program Files\\Some App\\app.exe"', root)).toEqual({ action: "ask", reason: "outside" });
+    expect(classifyCommand('Copy-Item dist\\app.exe "C:\\Program Files\\Some App\\app.exe"', root)).toEqual({ action: "ask", reason: "outside" });
+  });
+
   // Seen live: with a Cyrillic user name Windows gives short 8.3 paths (C:\Users\12C2~1\…), and the agent's
   // `cd` into its own copy by the long name was taken for a step outside.
   it("knows the copy under its short and its long name", () => {

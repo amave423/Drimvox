@@ -24,7 +24,12 @@ export function classifyCommand(command: string, root: string): CommandVerdict {
   for (const [pattern, reason] of rules) if (pattern.test(command)) return { action: "ask", reason };
   if (/(^|[\s;&|(])(cd|chdir|set-location|pushd|sl)\s+["']?\.\.(?=[\\/\s"']|$)/i.test(command)) return { action: "ask", reason: "outside" };
   const home = realName(root);
+  // Running an installed program (a browser for a headless look, say) touches nothing outside; moving or deleting it does.
+  const movesFiles = MOVES_FILES.test(command);
   for (const path of absolutePaths(command)) {
+    if (!movesFiles && PROGRAM.test(path)) continue;
+    // Bare slashes in code (a string, a division, a // comment) are not the drive's root on Windows, unless something is deleted.
+    if (process.platform === "win32" && /^\/+$/.test(path) && !movesFiles) continue;
     const rel = relative(home, realName(path));
     if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { action: "ask", reason: "outside" };
   }
@@ -49,18 +54,25 @@ function realName(path: string): string {
   }
 }
 
+const PROGRAM = /\.(exe|com|cmd|bat)$/i;
+const MOVES_FILES = /(^|[\s;&|(])(remove-item|rm|rmdir|rd|del|erase|move-item|mv|move|copy-item|cp|copy|rename-item|ren)(?=[\s;]|$)/i;
+
 /** Windows drive paths, UNC paths, home paths and bare unix roots mentioned in a command. */
 function absolutePaths(command: string): string[] {
   const found: string[] = [];
-  for (const m of command.matchAll(/(?:^|[\s"'=(])([a-zA-Z]:[\\/][^\s"'`;|&)]*)/g)) found.push(m[1]!);
+  // Quoted Windows paths may hold spaces ("C:\Program Files\..."); unquoted ones end at the first space.
+  for (const m of command.matchAll(/"([a-zA-Z]:[\\/][^"]*)"|'([a-zA-Z]:[\\/][^']*)'|(?:^|[\s=(])([a-zA-Z]:[\\/][^\s"'`;|&)]*)/g)) {
+    found.push((m[1] ?? m[2] ?? m[3])!);
+  }
   for (const m of command.matchAll(/(?:^|[\s"'=(])((?:~|\/)[^\s"'`;|&)]*)/g)) {
     const path = m[1]!;
     // Command switches like /s or /T are not paths; a lone "/" or "/etc/..." is.
     if (/^\/[a-zA-Z?]{1,2}$/.test(path)) continue;
     // On Windows "/x" means the root of the drive, where code rarely points; '/api/boards' in a script is a URL path.
     // Only a folder that really sits at the root counts.
+    // A regular expression such as /\\/g in code is not a folder either: only a plain name at the root counts.
     const top = path.split("/")[1];
-    if (process.platform === "win32" && path.startsWith("/") && top && !existsSync(resolve("/", top))) continue;
+    if (process.platform === "win32" && path.startsWith("/") && top && (!/^[\w .-]+$/.test(top) || !existsSync(resolve("/", top)))) continue;
     found.push(path.startsWith("~") ? path.replace(/^~/, process.env.USERPROFILE ?? process.env.HOME ?? "/") : path);
   }
   return found;
