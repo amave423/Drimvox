@@ -131,3 +131,6 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .signin { display: grid; gap: 14px; max-width: 440px; }
 .signin h1, .signin .lede { margin-bottom: 0; }
 .account-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; max-width: 640px; }
+
+.update-note { margin-left: auto; margin-right: 18px; }
+.update-note + span { margin-left: 0; }

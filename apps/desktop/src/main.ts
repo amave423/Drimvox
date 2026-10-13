@@ -4,6 +4,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { InitMessage } from "./core-process";
 import { loadSecretKey } from "./keyring";
+import { startUpdates } from "./updates";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
@@ -16,8 +17,9 @@ const token = randomBytes(32).toString("hex");
 // ARTEL_USER_DATA lets tests isolate theirs.
 app.setName(devServerUrl ? "Artel Dev" : "Artel");
 app.setPath("userData", process.env.ARTEL_USER_DATA ?? join(app.getPath("appData"), app.getName()));
-// Windows shows toasts only for apps with an identity.
-const appId = devServerUrl ? "Artel Dev" : "Artel";
+// Windows shows toasts only for apps with an identity. The installed app has the installer's (electron-builder.yml),
+// a run from the sources its own, so their Start menu shortcuts do not overwrite each other.
+const appId = app.isPackaged ? "com.artel.app" : devServerUrl ? "Artel Dev" : "Artel";
 app.setAppUserModelId(appId);
 
 /**
@@ -25,8 +27,8 @@ app.setAppUserModelId(appId);
  * one; `npm start` does not, and then every notification vanishes without an error. Artel keeps its own shortcut.
  */
 function ensureShortcut(): void {
-  if (process.platform !== "win32" || process.env.ARTEL_USER_DATA) return;
-  const link = join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", `${appId}.lnk`);
+  if (process.platform !== "win32" || app.isPackaged || process.env.ARTEL_USER_DATA) return;
+  const link = join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", `${appId} (npm start).lnk`);
   const wanted = { target: process.execPath, args: app.isPackaged ? "" : `"${app.getAppPath()}"`, appUserModelId: appId, description: appId };
   try {
     const now = existsSync(link) ? shell.readShortcutLink(link) : null;
@@ -51,6 +53,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(() => {
     ensureShortcut();
+    startUpdates(() => win, (event) => fromOurPage(event.senderFrame?.url));
     return launch();
   });
 }

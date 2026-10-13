@@ -663,4 +663,9 @@ export const en: Record<keyof typeof ru, string> = {
   "settings.notificationsTest": "Test a notification",
   "notice.test": "Notifications work",
   "notice.testBody": "This is how Artel tells you a task needs you.",
+  "update.downloading": "Downloading version {version}… {percent}%",
+  "update.ready": "Version {version} is ready",
+  "update.restart": "Restart to update",
+  "update.manual": "Version {version} is out",
+  "update.get": "Download",
 };

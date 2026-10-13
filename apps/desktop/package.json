@@ -8,13 +8,16 @@
   "scripts": {
     "build": "node build.mjs",
     "start": "electron .",
-    "typecheck": "tsc -p tsconfig.json"
-  },
-  "dependencies": {
-    "@artel/core": "^0.1.0"
+    "typecheck": "tsc -p tsconfig.json",
+    "dist": "electron-builder --publish never"
   },
   "devDependencies": {
+    "@artel/core": "^0.1.0",
     "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "electron-updater": "6.8.9",
     "esbuild": "^0.28.2"
-  }
+  },
+  "author": "amave423 <artem123antropov@mail.ru>",
+  "homepage": "https://github.com/amave423/artel"
 }

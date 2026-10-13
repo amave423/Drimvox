@@ -10,6 +10,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run build -w @artel/web && npm run build -w @artel/desktop && npm run build -w @artel/server",
     "start": "npm run build && npm run start -w @artel/desktop",
+    "dist": "npm run build -w @artel/web && npm run build -w @artel/desktop && npm run dist -w @artel/desktop",
+    "release": "node scripts/release.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "e2e": "npm run build && playwright test",

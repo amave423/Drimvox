@@ -69,7 +69,7 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { artel?: object }).artel ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["getToken", "notify", "onOpenTask", "openSkillsFolder", "pickFolder", "setTitleBar", "testNotify"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["getToken", "installUpdate", "notify", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "setTitleBar", "testNotify", "updateState"] });
 });
 
 test("creates and deletes a shared skill in the settings", async () => {

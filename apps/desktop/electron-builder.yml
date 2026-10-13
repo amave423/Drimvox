@@ -1,0 +1,51 @@
+# Installers: Windows (NSIS, per user), Linux (AppImage and .deb). Releases go to GitHub, where the app looks for updates.
+# Build with `npm run dist` (this computer's system) or let .github/workflows/release.yml build both on a version tag.
+appId: com.artel.app
+productName: Artel
+copyright: Copyright © 2026 amave423
+directories:
+  output: release
+  buildResources: build
+# Main, preload and the core are bundled by esbuild: no node_modules goes into the app.
+files:
+  - dist/**/*
+  - "!dist/**/*.map"
+  - package.json
+extraResources:
+  - from: ../web/dist
+    to: web
+asar: true
+npmRebuild: false
+nodeGypRebuild: false
+
+win:
+  target: nsis
+  artifactName: Artel-Setup-${version}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Artel
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  maintainer: amave423 <artem123antropov@mail.ru>
+  synopsis: A team of AI agents writes code under your review
+  artifactName: Artel-${version}-${arch}.${ext}
+deb:
+  depends:
+    - libnotify4
+    - libxss1
+    - libnss3
+
+publish:
+  provider: github
+  owner: amave423
+  repo: artel
+  releaseType: release

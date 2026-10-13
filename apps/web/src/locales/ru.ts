@@ -662,4 +662,9 @@ export const ru = {
   "settings.notificationsTest": "Проверить уведомление",
   "notice.test": "Уведомления работают",
   "notice.testBody": "Так Artel сообщит, когда задаче нужен ты.",
+  "update.downloading": "Скачивается версия {version}… {percent}%",
+  "update.ready": "Версия {version} готова",
+  "update.restart": "Перезапустить и обновить",
+  "update.manual": "Вышла версия {version}",
+  "update.get": "Скачать",
 } as const;
