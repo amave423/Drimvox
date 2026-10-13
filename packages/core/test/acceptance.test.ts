@@ -58,17 +58,22 @@ const verdict = (r2: "done" | "missing"): FakeTurn =>
   });
 
 /** The coder and the acceptance agent answer from their own scripts: the acceptance agent is told it accepts work. */
-async function start(coder: FakeTurn[], acceptor: FakeTurn[], acceptanceModel?: string) {
+/** `silent` models, as the acceptance agent, only talk and never give a verdict. */
+async function start(coder: FakeTurn[], acceptor: FakeTurn[], acceptanceModel?: string, o: { silent?: string[]; strongModel?: string } = {}) {
   const coderQueue = [...coder];
   const acceptorQueue = [...acceptor];
   fake = await startFakeProvider({
     key: KEY,
-    models: [{ id: "coder" }, { id: "judge" }],
-    respond: (body) =>
-      (/acceptance agent/i.test(JSON.stringify(body.messages?.[0]?.content ?? "")) ? acceptorQueue.shift() : coderQueue.shift()) ?? { text: "Done." },
+    models: [{ id: "coder" }, { id: "judge" }, { id: "strong" }],
+    respond: (body) => {
+      if (!/acceptance agent/i.test(JSON.stringify(body.messages?.[0]?.content ?? ""))) return coderQueue.shift() ?? { text: "Done." };
+      if (o.silent?.includes(body.model)) return { text: "Смотрю файлы." };
+      return acceptorQueue.shift() ?? { text: "Done." };
+    },
   });
   const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
   if (acceptanceModel) await env.call("PATCH", "/api/settings", { acceptanceModel: { providerId: provider.id, model: acceptanceModel } });
+  if (o.strongModel) await env.call("PATCH", "/api/settings", { strongModel: { providerId: provider.id, model: o.strongModel } });
   const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
   const res = await env.call("POST", `/api/projects/${project.id}/tasks`, {
     task: "Добавь subtract(a, b) и опиши её в README",
@@ -152,6 +157,25 @@ describe("acceptance", () => {
     await start([spec, code("# Math\n\nsubtract\n")], [verdict("done")], "judge");
     await waitFor((await (await env.call("GET", "/api/tasks")).json())[0].id, settled);
     expect(new Set(acceptorRequests().map((r) => r.body.model))).toEqual(new Set(["judge"]));
+  });
+
+  // Seen live: the acceptance model stopped after a few reads without a verdict, and every requirement was sent back as missing.
+  it("does not take a silent acceptance agent for unmet requirements: another model accepts instead", async () => {
+    const id = await start([spec, code("# Math\n\nsubtract\n")], [verdict("done")], "judge", { silent: ["judge"], strongModel: "strong" });
+    const task = await waitFor(id, settled);
+    expect(task).toMatchObject({ status: "review", statusReason: null });
+    expect(task.acceptance).toMatchObject({ round: 1, model: "strong" });
+    expect(coderRequests()).toHaveLength(2);
+    const feed = await events(id);
+    expect(feed.some((e) => e.kind === "text" && e.data.text === "Смотрю файлы.")).toBe(true);
+  });
+
+  it("waits for the user when no model gives a verdict, without sending the coder after phantoms", async () => {
+    const id = await start([spec, code("# Math\n\nsubtract\n")], [], "judge", { silent: ["judge", "coder"] });
+    const task = await waitFor(id, settled);
+    expect(task).toMatchObject({ status: "waiting", statusReason: "acceptance_error" });
+    expect(task.acceptance).toBeNull();
+    expect(coderRequests()).toHaveLength(2);
   });
 
   it("drops whatever the acceptance agent left in the copy", async () => {

@@ -100,10 +100,14 @@ export interface AcceptanceInput {
   idleTimeoutMs: number;
   hooks: RunInput["hooks"];
   onStep: RunInput["onStep"];
+  /** What the acceptance agent says between its checks, for the feed. */
+  onText(text: string): void;
 }
 
 export type AcceptanceOutcome =
   | { kind: "report"; report: AcceptanceReport }
+  /** The agent ended without a verdict even after a reminder: says nothing about the work, only about the agent. */
+  | { kind: "no_verdict" }
   | { kind: "stopped" }
   | { kind: "budget" }
   | { kind: "error"; error: ProviderError };
@@ -130,7 +134,7 @@ export async function runAcceptance(i: AcceptanceInput): Promise<AcceptanceOutco
       signal: i.signal,
       idleTimeoutMs: i.idleTimeoutMs,
       hooks: i.hooks,
-      onText: () => {},
+      onText: i.onText,
       onStep: (step) => {
         messages.push(...step.messages);
         i.onStep(step);
@@ -142,10 +146,8 @@ export async function runAcceptance(i: AcceptanceInput): Promise<AcceptanceOutco
     if (outcome.kind === "budget") return { kind: "budget" };
   }
   const given = verdict as { results: AcceptanceResult[]; summary: string } | null;
-  const results =
-    given?.results ??
-    i.requirements.map((r): AcceptanceResult => ({ id: r.id, status: "missing", evidence: "", problem: "The acceptance agent gave no verdict." }));
-  return { kind: "report", report: { round: i.round, results, summary: given?.summary ?? "—", model: i.model } };
+  if (!given) return { kind: "no_verdict" };
+  return { kind: "report", report: { round: i.round, results: given.results, summary: given.summary, model: i.model } };
 }
 
 export function accepted(report: AcceptanceReport): boolean {

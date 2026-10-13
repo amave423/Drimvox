@@ -17,6 +17,7 @@ export const MAX_REBUILDS = 2;
 export const MAX_FIXES = 2;
 
 const FIX_TITLE = "Fix the checks after a merge";
+const ACCEPTANCE_FIX_TITLE = "Finish what the acceptance found missing";
 /** Goal states in which subtasks keep going; any other waiting reason needs the user first. */
 const DRIVEN = new Set(["running", "waiting:subtask_stuck", "waiting:subtask_waiting"]);
 
@@ -139,12 +140,12 @@ export class Team {
     return next;
   }
 
-  private addFix(goal: TaskRow, description: string, checks: string[] | null = null): void {
+  private addFix(goal: TaskRow, description: string, checks: string[] | null = null, title = FIX_TITLE): void {
     const n = goal.fixes + 1;
     this.h.tasks.update(goal.id, { fixes: n });
     const team = JSON.parse(goal.team ?? "null") as ModelRef | null;
-    this.addSubtask(goal, team, `fix-${n}`, FIX_TITLE, description, [], checks, goal.milestone);
-    this.h.event(goal.id, "subtask", { id: `fix-${n}`, title: FIX_TITLE, action: "fix_added" });
+    this.addSubtask(goal, team, `fix-${n}`, title, description, [], checks, goal.milestone);
+    this.h.event(goal.id, "subtask", { id: `fix-${n}`, title, action: "fix_added" });
   }
 
   private addSubtask(
@@ -331,7 +332,7 @@ export class Team {
       if (typeof verdict === "string") {
         // Fixes of an early stage are held to that stage's own checks: the goal's need every stage.
         const merged = this.h.tasks.children(goalId).filter((s) => s.status === "merged");
-        this.addFix(this.h.tasks.row(goalId)!, verdict, [...new Set(merged.flatMap((s) => JSON.parse(s.checks) as string[]))]);
+        this.addFix(this.h.tasks.row(goalId)!, verdict, [...new Set(merged.flatMap((s) => JSON.parse(s.checks) as string[]))], ACCEPTANCE_FIX_TITLE);
         return void this.drive(goalId);
       }
       if (!accepted(verdict)) return this.land(goalId, repo, "acceptance_partial");
@@ -369,7 +370,7 @@ export class Team {
       const verdict = await this.h.accept(goalId);
       if (verdict === null) return;
       if (typeof verdict === "string") {
-        this.addFix(this.h.tasks.row(goalId)!, verdict, JSON.parse(this.h.tasks.row(goalId)!.checks) as string[]);
+        this.addFix(this.h.tasks.row(goalId)!, verdict, JSON.parse(this.h.tasks.row(goalId)!.checks) as string[], ACCEPTANCE_FIX_TITLE);
         return void this.drive(goalId);
       }
       if (!accepted(verdict)) reason = "acceptance_partial";

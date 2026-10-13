@@ -96,20 +96,42 @@ async function acceptWork(
   visual: VisualDeps,
   requirements: Requirement[],
 ): Promise<AcceptanceReport | string | null> {
-  const ref = ctx.acceptanceModel();
-  const own = row.provider_id ? ctx.providers.connection(row.provider_id) : null;
-  const chosen = ref ? ctx.providers.connection(ref.providerId) : null;
-  const conn = chosen ?? own!;
-  const model = chosen ? ref!.model : row.model;
   const round = row.acceptance_rounds + 1;
+  // The acceptance model, then the strong one, then the task's own: an agent that gives no verdict hands over to the next.
+  const refs = [ctx.acceptanceModel(), ctx.strongModel(), row.provider_id ? { providerId: row.provider_id, model: row.model } : null];
+  const candidates: { conn: NonNullable<ReturnType<PassContext["providers"]["connection"]>>; model: string }[] = [];
+  for (const ref of refs) {
+    const conn = ref ? ctx.providers.connection(ref.providerId) : null;
+    if (conn && !candidates.some((c) => c.conn.id === conn.id && c.model === ref!.model)) candidates.push({ conn, model: ref!.model });
+  }
 
   // The coder's work is saved first: whatever the acceptance agent leaves behind is thrown away afterwards.
   await snapshot(row);
   ctx.event("phase", { phase: "acceptance", round });
+  for (const [n, { conn, model }] of candidates.entries()) {
+    if (n > 0) ctx.event("text", { text: `${candidates[n - 1]!.model} gave no verdict; ${model} accepts the work instead.` });
+    const verdict = await acceptOnce(ctx, id, row, visual, requirements, conn, model, round);
+    if (verdict !== "no_verdict") return verdict;
+  }
+  return stop(ctx, "waiting", "acceptance_error", "No acceptance model gave a verdict.");
+}
+
+/** One acceptance agent's attempt. "no_verdict" lets the next model try. */
+async function acceptOnce(
+  ctx: PassContext,
+  id: string,
+  row: TaskRow,
+  visual: VisualDeps,
+  requirements: Requirement[],
+  conn: NonNullable<ReturnType<PassContext["providers"]["connection"]>>,
+  model: string,
+  round: number,
+): Promise<AcceptanceReport | string | null | "no_verdict"> {
   let cost = row.cost_usd;
   const outcome = await runAcceptance({
     conn,
     model,
+    onText: (text) => ctx.event("text", { text }),
     price: await findModel(conn, model),
     worktree: row.worktree,
     task: row.task,
@@ -140,6 +162,7 @@ async function acceptWork(
   visual.kit.background.stopAll(id);
   await discardChanges(row.worktree);
 
+  if (outcome.kind === "no_verdict") return "no_verdict";
   if (outcome.kind === "stopped") return stop(ctx, "stopped", "user");
   if (outcome.kind === "budget") return stop(ctx, "waiting", "budget");
   if (outcome.kind === "error") return stop(ctx, "failed", outcome.error.code, outcome.error.detail);

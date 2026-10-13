@@ -168,14 +168,17 @@ describe("the team at work", { timeout: 30_000 }, () => {
     const id = await startGoal(team([plan(ids.map((x) => ({ id: x })))], Object.fromEntries(ids.map((x) => [x, addModule(x, 300)]))));
     await approve(id);
     let most = 0;
+    let task: any;
     for (;;) {
-      const task = await (await env.call("GET", `/api/tasks/${id}`)).json();
+      task = await (await env.call("GET", `/api/tasks/${id}`)).json();
       most = Math.max(most, task.subtasks.filter((s: any) => s.status === "running").length);
-      if (task.status === "review") break;
+      // Any stop ends the watch; a goal that stopped short shows up in the expectation below, not as a hang.
+      if (task.status !== "running") break;
       await new Promise((r) => setTimeout(r, 25));
     }
+    expect(task.status).toBe("review");
     expect(most).toBe(3);
-  });
+  }, 60_000);
 
   it("rebuilds a subtask on top of the goal when its merge conflicts", async () => {
     const id = await startGoal(

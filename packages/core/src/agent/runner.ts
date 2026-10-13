@@ -198,7 +198,9 @@ export class AgentRunner {
         ? "The checks still fail. Try a different approach."
         : row.status_reason === "visual_failed"
           ? "The page still does not look as the spec says. Look at it yourself with look_at_page and fix it."
-          : "Continue the task.";
+          : row.status_reason === "acceptance_error"
+            ? "The work could not be accepted yet. Run the checks once more, then call finish so it is accepted again."
+            : "Continue the task.";
     this.launch(id, note || again);
     return this.view(id)!;
   }
