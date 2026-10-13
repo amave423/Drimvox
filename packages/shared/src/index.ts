@@ -7,3 +7,4 @@ export * from "./tasks";
 export * from "./media";
 export * from "./proxy";
 export * from "./auth";
+export * from "./quality";

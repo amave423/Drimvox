@@ -196,6 +196,64 @@ test("discarding removes the copy and leaves the project alone", async () => {
   expect(git(repo, "branch", "--list", "artel/*")).toBe("");
 });
 
+test("requirements in the spec, an acceptance round that sends work back, and the report in review", async () => {
+  const verdict = (readme: "done" | "missing") => ({
+    toolCalls: [
+      {
+        name: "report_acceptance",
+        args: {
+          results: [
+            { id: "R1", status: "done", evidence: "node --test: 2 passed", problem: "" },
+            { id: "R2", status: readme, evidence: "README.md", problem: readme === "done" ? "" : "В README нет ни слова о subtract" },
+          ],
+          summary: readme === "done" ? "Все требования выполнены" : "Не хватает описания в README",
+        },
+      },
+    ],
+  });
+  const page = await launch([
+    { toolCalls: [{ name: "ask_questions", args: { questions: [] } }] },
+    {
+      toolCalls: [
+        {
+          name: "propose_spec",
+          args: {
+            spec: "# Вычитание",
+            checks: ["node --test"],
+            plan: ["Тест", "Функция", "README"],
+            requirements: [
+              { id: "R1", text: "subtract(a, b) возвращает разность", verify: "check", how: "node --test" },
+              { id: "R2", text: "README описывает subtract", verify: "review", how: "прочитать README.md" },
+            ],
+            decisions: ["Без зависимостей из npm"],
+          },
+        },
+      ],
+    },
+    { toolCalls: [{ name: "write_file", args: { path: "math.test.js", content: TEST_BOTH } }, { name: "finish", args: { summary: "Тест", commit_message: "Test" } }] },
+    { toolCalls: [{ name: "write_file", args: { path: "math.js", content: MATH_BOTH } }, { name: "finish", args: { summary: "Код", commit_message: "Add subtract" } }] },
+    verdict("missing"),
+    { toolCalls: [{ name: "write_file", args: { path: "README.md", content: "# Math\n\nsubtract(a, b)\n" } }, { name: "finish", args: { summary: "subtract и README", commit_message: "Add subtract" } }] },
+    verdict("done"),
+  ]);
+  await startTask(page, "Добавь subtract(a, b) и опиши в README", true);
+
+  await expect(page.getByRole("heading", { name: "Спека и план" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Требования" })).toBeVisible();
+  await expect(page.getByText("README описывает subtract")).toBeVisible();
+  await expect(page.getByText("Без зависимостей из npm")).toBeVisible();
+  await page.getByRole("button", { name: "Начать работу" }).click();
+
+  await expect(page.getByText("Агент закончил. Посмотри правки")).toBeVisible();
+  const report = page.locator(".acceptance");
+  await expect(report.getByRole("heading", { name: /Приёмка/ })).toBeVisible();
+  await expect(report.getByText("Все требования выполнены")).toBeVisible();
+  await expect(report.getByText("2 из 2 сделано · круг 2")).toBeVisible();
+  await page.getByText("Как агент работал").click();
+  await expect(page.getByText("Приёмщик проверяет работу по требованиям").first()).toBeVisible();
+  await expect(page.getByText("Приёмка: сделано 1 из 2")).toBeVisible();
+});
+
 test("the pipeline: interview, spec with an edited check, red tests, green code, review", async () => {
   const page = await launch([
     {

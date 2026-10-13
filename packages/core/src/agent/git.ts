@@ -49,6 +49,12 @@ export async function isRepoRoot(dir: string): Promise<boolean> {
   return inside?.trim() === "true" && prefix.trim() === "";
 }
 
+/** Throws away uncommitted changes and new files (ignored ones stay), back to the last commit. */
+export async function discardChanges(dir: string): Promise<void> {
+  await runGit(dir, ["reset", "--hard", "-q"]);
+  await runGit(dir, ["clean", "-fdq"]);
+}
+
 export async function ensureIdentity(dir: string): Promise<void> {
   const res = await runGit(dir, ["var", "GIT_AUTHOR_IDENT"], true);
   if (res.code !== 0) throw new GitError("no_identity", "git user.name and user.email are not set");

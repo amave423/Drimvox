@@ -16,8 +16,8 @@ export interface RunInput {
   worktree: string;
   /** Conversation so far, ending with the new user message. */
   messages: ModelMessage[];
-  /** "read" for the interview and the spec: no edits, no commands. */
-  mode: "read" | "write";
+  /** "read" for the interview and the spec: no edits, no commands; "review" for the acceptance agent: commands, no edits. */
+  mode: "read" | "review" | "write";
   /** Tools of the current step, such as ask_questions or propose_spec. */
   extraTools?: ToolSet;
   /** Tools that report their calls to the feed themselves (internet, skills, pictures); passed as they are. */
@@ -26,6 +26,8 @@ export interface RunInput {
   stopTools?: string[];
   /** The current step's instructions, added to the system prompt. */
   instructions?: string;
+  /** A system prompt of its own instead of the coding agent's, for agents that do not code (acceptance). */
+  system?: string;
   /** Money already spent on the task and the limit for it. */
   spentUsd: number;
   budgetUsd: number;
@@ -92,7 +94,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
-      system: i.instructions ? `${systemPrompt(i.worktree)}\n\n${i.instructions}` : systemPrompt(i.worktree),
+      system: i.system ?? (i.instructions ? `${systemPrompt(i.worktree)}\n\n${i.instructions}` : systemPrompt(i.worktree)),
       messages: i.messages,
       tools,
       stopWhen: [hasToolCall("finish"), ...(i.stopTools ?? []).map((name) => hasToolCall(name)), isStepCount(MAX_STEPS), overBudget],

@@ -1,3 +1,4 @@
+import type { AcceptanceReport, Requirement } from "@artel/shared";
 import type {
   ModelRef,
   PlannedSubtask,
@@ -66,6 +67,10 @@ export interface TaskRow {
   visual: string;
   visual_attempts: number;
   cli_session: string | null;
+  requirements: string;
+  decisions: string;
+  acceptance: string | null;
+  acceptance_rounds: number;
 }
 
 export class ProjectRepo {
@@ -129,6 +134,10 @@ export type TaskPatch = Partial<
     | "visual"
     | "visual_attempts"
     | "cli_session"
+    | "requirements"
+    | "decisions"
+    | "acceptance"
+    | "acceptance_rounds"
   >
 >;
 
@@ -180,6 +189,10 @@ export class TaskRepo {
       visual: "[]",
       visual_attempts: 0,
       cli_session: null,
+      requirements: "[]",
+      decisions: "[]",
+      acceptance: null,
+      acceptance_rounds: 0,
       ...extra,
       status_reason: null,
       cost_usd: 0,
@@ -290,6 +303,9 @@ export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingAppro
     plannedSubtasks: JSON.parse(row.planned) as PlannedSubtask[],
     visualChecks: JSON.parse(row.visual) as VisualCheck[],
     subtasks: children.map(toSubtaskCard),
+    requirements: JSON.parse(row.requirements) as Requirement[],
+    decisions: JSON.parse(row.decisions) as string[],
+    acceptance: row.acceptance ? (JSON.parse(row.acceptance) as AcceptanceReport) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

@@ -1,3 +1,4 @@
+import { requirementSchema, type AcceptanceReport, type Requirement } from "./quality";
 import { z } from "zod";
 
 export const projectCreateSchema = z.object({ path: z.string().trim().min(1).max(1000) }).strict();
@@ -77,6 +78,8 @@ export const specApproveSchema = z
     checks: z.array(checkCommand).max(20),
     /** Left out, the proposed ones stay. */
     visualChecks: z.array(visualCheckSchema).max(10).optional(),
+    /** Left out, the proposed ones stay. */
+    requirements: z.array(requirementSchema).min(1).max(60).optional(),
   })
   .strict();
 export const specReviseSchema = z.object({ note: z.string().trim().min(1).max(20_000) }).strict();
@@ -203,6 +206,12 @@ export interface TaskView {
   visualChecks: VisualCheck[];
   /** For a goal: the subtasks at work. */
   subtasks: SubtaskCard[];
+  /** What must be true of the result, numbered; the acceptance agent checks each one. */
+  requirements: Requirement[];
+  /** Choices the agent made on its own, so the user can see them. */
+  decisions: string[];
+  /** The latest acceptance verdict, once the work has been accepted at least once. */
+  acceptance: AcceptanceReport | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -223,7 +232,8 @@ export type TaskEventKind =
   | "check"
   | "escalation"
   | "plan"
-  | "subtask";
+  | "subtask"
+  | "acceptance";
 
 export interface TaskEvent {
   seq: number;

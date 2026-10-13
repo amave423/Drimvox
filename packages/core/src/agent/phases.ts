@@ -1,4 +1,4 @@
-import type { Question, TaskPhase, VisualCheck } from "@artel/shared";
+import type { Question, Requirement, TaskPhase, VisualCheck } from "@artel/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
@@ -44,7 +44,11 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[]): st
         "vitest for Vite projects, pytest for Python) and include its command in the checks.",
         "If the work has a visible interface (a page, a screen), add visual_checks: how to start it, the address and what",
         "must be visible. Artel looks at the page with a model that sees pictures after the checks pass.",
-        "Then call propose_spec with the spec, the checks and a plan of 2-8 short steps.",
+        "List the requirements: numbered, checkable statements about the result (R1, R2…), covering everything the user asked for",
+        "and nothing they did not. For each say how it is verified: a check command, a visual check, or review by hand.",
+        "A separate reviewer checks every requirement before the work reaches the user. Under decisions list the choices you",
+        "made on your own (technologies, defaults, anything the user did not specify).",
+        "Then call propose_spec with the spec, the checks, a plan of 2-8 short steps, the requirements and the decisions.",
         ANSWER_HINT,
       ].join("\n");
     case "tests":
@@ -102,6 +106,30 @@ export interface SpecProposal {
   checks: string[];
   plan: string[];
   visualChecks?: VisualCheck[];
+  requirements?: Requirement[];
+  decisions?: string[];
+}
+
+const requirementsInput = z
+  .array(
+    z.object({
+      id: z.string().max(10).optional().describe("R1, R2…; numbered in order when left out"),
+      text: z.string().min(1).max(2000).describe("One checkable statement about the result, as the user would put it"),
+      verify: z.enum(["check", "visual", "review"]).describe("check: a command or test proves it; visual: a look at a page; review: a reviewer checks it by hand"),
+      how: z.string().max(2000).default("").describe("The command, the page and what must be on it, or what to do to see it"),
+    }),
+  )
+  .max(60)
+  .default([]);
+
+/** R1, R2… for requirements the model left unnumbered. */
+function numbered(items: z.infer<typeof requirementsInput>): Requirement[] {
+  return items.map((r, i) => ({ id: r.id?.trim() || `R${i + 1}`, text: r.text.trim(), verify: r.verify, how: r.how.trim() }));
+}
+
+/** The requirements as the coder and the reviewer read them. */
+export function requirementsText(requirements: Requirement[]): string {
+  return requirements.map((r) => `${r.id}. ${r.text}${r.how ? ` (${r.verify}: ${r.how})` : ` (${r.verify})`}`).join("\n");
 }
 
 export function specTools(onSpec: (proposal: SpecProposal) => void): ToolSet {
@@ -122,12 +150,16 @@ export function specTools(onSpec: (proposal: SpecProposal) => void): ToolSet {
           )
           .max(5)
           .default([]),
+        requirements: requirementsInput,
+        decisions: z.array(z.string().min(1).max(1000)).max(30).default([]).describe("Choices you made on your own that the user did not ask for"),
       }),
       execute: async (proposal) => {
         onSpec({
           spec: proposal.spec,
           checks: proposal.checks.map((c) => c.trim()),
           plan: proposal.plan,
+          requirements: numbered(proposal.requirements),
+          decisions: proposal.decisions.map((d) => d.trim()),
           visualChecks: proposal.visual_checks.flatMap((v) => (/^https?:\/\//.test(v.url) ? [{ ...v, start: v.start?.trim() || undefined }] : [])),
         });
         return "Spec proposed.";
@@ -145,12 +177,15 @@ export function answersMessage(questions: Question[], answers: { id: string; ans
   return ["The user answered your questions:", ...lines, "", "Now write the spec and call propose_spec."].join("\n");
 }
 
-export function specMessage(spec: string, checks: string[], edited: boolean): string {
+export function specMessage(spec: string, checks: string[], edited: boolean, requirements: Requirement[] = []): string {
   return [
     edited ? "The user approved the spec with their edits. The approved spec:" : "The spec is approved:",
     "",
     spec,
     "",
+    ...(requirements.length
+      ? ["Requirements (a reviewer checks each one before the user sees the work):", requirementsText(requirements), ""]
+      : []),
     `Checks: ${checks.length ? checks.join(" ; ") : "none"}`,
   ].join("\n");
 }
@@ -169,7 +204,9 @@ export function planInstructions(): string {
     "Plan subtasks that touch different files, shared files such as package.json included.",
     "If two must edit the same file, make one depend on the other.",
     "If the project has no tests yet, the first subtask sets up the test runner and the others depend on it.",
-    "Call propose_plan with the spec, the goal's checks, the subtasks and a short English commit message for the whole goal.",
+    "List the goal's requirements: numbered, checkable statements about the result (R1, R2…), covering everything the user asked for;",
+    "a separate reviewer checks each one once every subtask is merged. Under decisions list the choices you made on your own.",
+    "Call propose_plan with the spec, the goal's checks, the subtasks, the requirements, the decisions and a short English commit message for the whole goal.",
     ANSWER_HINT,
   ].join("\n");
 }
@@ -178,6 +215,8 @@ export interface PlanProposal extends SpecProposal {
   subtasks: { id: string; title: string; description: string; dependsOn: string[]; checks: string[] }[];
   /** What the goal's single commit is called; the task's own words otherwise. */
   commitMessage: string | null;
+  requirements: Requirement[];
+  decisions: string[];
 }
 
 export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
@@ -200,6 +239,8 @@ export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
           .min(1)
           .max(8),
         commit_message: z.string().max(200).optional().describe("Short English commit message in the imperative mood for the whole goal"),
+        requirements: requirementsInput,
+        decisions: z.array(z.string().min(1).max(1000)).max(30).default([]).describe("Choices you made on your own that the user did not ask for"),
       }),
       execute: async (p) => {
         const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "task";
@@ -210,6 +251,8 @@ export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
           plan: subtasks.map((s) => s.title),
           subtasks,
           commitMessage: p.commit_message?.split("\n")[0]?.trim() || null,
+          requirements: numbered(p.requirements),
+          decisions: p.decisions.map((d) => d.trim()),
         });
         return "Plan proposed.";
       },

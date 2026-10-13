@@ -121,8 +121,8 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner, shots: Shots) {
       const id = c.req.param("id");
       if (!runner.view(id)) return c.json(notFound, 404);
       try {
-        const { spec, checks, visualChecks } = c.req.valid("json");
-        return c.json(runner.approveSpec(id, spec, checks, visualChecks), 200);
+        const { spec, checks, visualChecks, requirements } = c.req.valid("json");
+        return c.json(runner.approveSpec(id, spec, checks, visualChecks, requirements), 200);
       } catch (err) {
         return c.json(refusal(err), 409);
       }

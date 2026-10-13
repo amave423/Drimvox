@@ -34,7 +34,14 @@ function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props
   if (item.kind === "user") return <p className="feed-bubble">{item.text}</p>;
   if (item.kind === "note") return <p>{item.text}</p>;
   if (item.kind === "status") return <p className="muted">{t(`task.status.${item.status}` as MessageKey)}</p>;
-  if (item.kind === "phase") return <p className="feed-step">{t(`feed.phase.${item.phase}` as MessageKey)}</p>;
+  if (item.kind === "phase") return <p className="feed-step">{t(`feed.phase.${item.phase}` as MessageKey, { round: item.round ?? 1 })}</p>;
+  if (item.kind === "acceptance") {
+    return (
+      <p className={item.done === item.total ? "feed-step is-ok" : "feed-step is-pencil-text"}>
+        {t("feed.acceptance", { done: item.done, total: item.total })} — {item.summary}
+      </p>
+    );
+  }
   if (item.kind === "questions") return <p className="muted">{t("feed.questions", { count: item.questions.length })}</p>;
   if (item.kind === "escalation") return <p className="feed-escalation">{t("feed.escalation", { from: item.from, to: item.to })}</p>;
 

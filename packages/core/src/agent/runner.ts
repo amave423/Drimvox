@@ -1,19 +1,9 @@
-import type {
-  ModelRef,
-  PlannedSubtask,
-  Question,
-  TaskEvent,
-  TaskFeedback,
-  TaskPhase,
-  TaskStages,
-  TaskUpdate,
-  TaskView,
-  VisualCheck,
-} from "@artel/shared";
+import type { ModelRef, PlannedSubtask, Question, Requirement, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ProviderRepo } from "../providers/repo";
 import { addWorktree, headCommit, removeWorktree, showFile } from "./git";
+import { acceptGoal } from "./landing";
 import { runPass, startWork, enterPhase, type PassContext } from "./pass";
 import { answersMessage, specMessage } from "./phases";
 import { feedbackMessage } from "./prompt";
@@ -38,6 +28,7 @@ export interface RunnerOptions extends ExtrasOptions {
   dataDir: string;
   budgetUsd(): number;
   strongModel(): { providerId: string; model: string } | null;
+  acceptanceModel(): { providerId: string; model: string } | null;
   idleTimeoutMs: number;
 }
 
@@ -58,6 +49,7 @@ export class AgentRunner {
       dataDir: o.dataDir,
       closed: () => this.closed,
       isRunning: (id) => this.live.has(id),
+      accept: (goalId) => acceptGoal(this.context(goalId, this.live.get(goalId)?.controller ?? new AbortController()), goalId),
       launch: (id, message) => this.launch(id, message),
       event: (id, kind, data) => this.event(id, kind, data),
       finish: (id, status, reason, detail) => this.finish(id, status, reason, detail),
@@ -122,14 +114,21 @@ export class AgentRunner {
     return this.view(id)!;
   }
 
-  approveSpec(id: string, spec: string, checks: string[], visualChecks?: VisualCheck[]): TaskView {
+  approveSpec(id: string, spec: string, checks: string[], visualChecks?: VisualCheck[], requirements?: Requirement[]): TaskView {
     const row = this.requireWaiting(id, "spec_review");
     // The API trims what it gets; a spec the model ended with a newline is not an edit.
-    const edited = spec.trim() !== (row.spec ?? "").trim() || JSON.stringify(checks) !== row.checks;
-    this.o.tasks.update(id, { spec, checks: JSON.stringify(checks), ...(visualChecks ? { visual: JSON.stringify(visualChecks) } : {}) });
+    const edited =
+      spec.trim() !== (row.spec ?? "").trim() || JSON.stringify(checks) !== row.checks || (!!requirements && JSON.stringify(requirements) !== row.requirements);
+    const kept = requirements ?? (JSON.parse(row.requirements) as Requirement[]);
+    this.o.tasks.update(id, {
+      spec,
+      checks: JSON.stringify(checks),
+      requirements: JSON.stringify(kept),
+      ...(visualChecks ? { visual: JSON.stringify(visualChecks) } : {}),
+    });
     if (edited) this.event(id, "spec", { spec, checks, plan: JSON.parse(row.plan), edited: true });
     const stages = JSON.parse(row.stages) as TaskStages;
-    const message = startWork(this.context(id, new AbortController()), id, stages, specMessage(spec, checks, edited), checks);
+    const message = startWork(this.context(id, new AbortController()), id, stages, specMessage(spec, checks, edited, kept), checks);
     this.launch(id, message);
     return this.view(id)!;
   }
@@ -338,6 +337,7 @@ export class AgentRunner {
       providers: this.o.providers,
       idleTimeoutMs: this.o.idleTimeoutMs,
       strongModel: this.o.strongModel,
+      acceptanceModel: () => this.o.acceptanceModel() ?? this.o.strongModel(),
       signal: controller.signal,
       closed: () => this.closed,
       event: (kind, data) => this.event(id, kind, data),

@@ -1,3 +1,5 @@
+import type { AcceptanceReport } from "@artel/shared";
+import { accepted } from "./acceptance";
 import type { ModelRef, PlannedSubtask, TaskEvent, TaskStages } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -36,6 +38,8 @@ export interface TeamHost {
   event(id: string, kind: TaskEvent["kind"], data: unknown): void;
   finish(id: string, status: TaskRow["status"], reason: string | null, detail?: string): void;
   setStatus(id: string, status: TaskRow["status"], reason: string | null): void;
+  /** The acceptance agent's verdict on the merged goal: a report, rework for a fix subtask, or null when it stopped. */
+  accept(goalId: string): Promise<AcceptanceReport | string | null>;
 }
 
 /**
@@ -313,10 +317,20 @@ export class Team {
     if (await this.integrate(goalId, JSON.parse(this.h.tasks.row(goalId)!.checks) as string[])) return;
     // Red checks added a fix subtask: the next round starts it.
     if (this.h.tasks.children(goalId).some((s) => s.status === "queued")) return void this.drive(goalId);
+    let reason: string | null = null;
+    if ((JSON.parse(this.h.tasks.row(goalId)!.requirements) as unknown[]).length > 0) {
+      const verdict = await this.h.accept(goalId);
+      if (verdict === null) return;
+      if (typeof verdict === "string") {
+        this.addFix(this.h.tasks.row(goalId)!, verdict, JSON.parse(this.h.tasks.row(goalId)!.checks) as string[]);
+        return void this.drive(goalId);
+      }
+      if (!accepted(verdict)) reason = "acceptance_partial";
+    }
     const goal = this.h.tasks.row(goalId)!;
     const changed = await hasChanges(repo, goal);
     const summary = subs.map((s) => `${s.title}: ${s.summary ?? "—"}`).join("\n");
     this.h.tasks.update(goalId, { summary, commit_message: goal.commit_message ?? goal.title });
-    this.h.finish(goalId, changed ? "review" : "done_empty", null);
+    this.h.finish(goalId, changed ? "review" : "done_empty", changed ? reason : null);
   }
 }

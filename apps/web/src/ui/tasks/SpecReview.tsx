@@ -2,6 +2,7 @@ import type { TaskView } from "@artel/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import { Markdown } from "../chat/Markdown";
+import { RequirementsList } from "./AcceptanceReport";
 import { ChecksEditor } from "./ChecksEditor";
 
 /** The agent's spec on a sheet: read it, edit text and check commands, start or send back. */
@@ -45,6 +46,8 @@ export function SpecReview({ task }: { task: TaskView }) {
           <Markdown text={spec} />
         </div>
       )}
+
+      <RequirementsList requirements={task.requirements} decisions={task.decisions} />
 
       {task.plan.length > 0 && (
         <>

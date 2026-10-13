@@ -111,6 +111,17 @@ export function SettingsSheet() {
         </div>
         <p className="muted">{t("settings.strongModelHint")}</p>
 
+        <h2 className="sheet-h">{t("settings.acceptanceModel")}</h2>
+        <div className="actions">
+          <ModelPicker value={settings.acceptanceModel} onChange={({ providerId, model }) => void save({ acceptanceModel: { providerId, model } })} />
+          {settings.acceptanceModel && (
+            <button className="link" onClick={() => void save({ acceptanceModel: null })}>
+              {t("settings.clear")}
+            </button>
+          )}
+        </div>
+        <p className="muted">{t("settings.acceptanceModelHint")}</p>
+
         <h2 className="sheet-h">{t("settings.imageModel")}</h2>
         <div className="actions">
           <ModelPicker

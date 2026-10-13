@@ -157,6 +157,11 @@ const migrations: string[] = [
      created_at integer not null,
      expires_at integer not null
    ) strict;`,
+  // Numbered requirements of the spec, the agent's own decisions, the acceptance agent's latest verdict.
+  `alter table tasks add column requirements text not null default '[]';
+   alter table tasks add column decisions text not null default '[]';
+   alter table tasks add column acceptance text;
+   alter table tasks add column acceptance_rounds integer not null default 0;`,
 ];
 
 export interface Database {

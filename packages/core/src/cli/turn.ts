@@ -109,11 +109,13 @@ export function splitCommit(text: string): { summary: string; commitMessage: str
 export async function runCliTurn(i: CliTurnInput): Promise<RunOutcome> {
   const preset = i.conn.preset as CliId;
   const resume = sessionFor(i.session, preset, i.model);
-  const results = i.mode === "read" ? (i.stopTools ?? []).filter((n) => i.extraTools?.[n]) : [];
+  // A CLI cannot be held to "commands but no edits": the acceptance agent only reads there.
+  const mode = i.mode === "review" ? "read" : i.mode;
+  const results = mode === "read" ? (i.stopTools ?? []).filter((n) => i.extraTools?.[n]) : [];
   const answer = results.length ? await contract(i.extraTools!, results) : null;
   const last = i.messages.at(-1);
   const prompt = [
-    resume ? "" : brief(longPath(i.worktree), i.mode),
+    resume ? "" : brief(longPath(i.worktree), mode),
     i.instructions ?? "",
     resume ? "" : transcript(i.messages.slice(0, -1)),
     typeof last?.content === "string" ? last.content : "",
@@ -128,7 +130,7 @@ export async function runCliTurn(i: CliTurnInput): Promise<RunOutcome> {
     cwd: i.worktree,
     prompt,
     model: i.model,
-    mode: i.mode,
+    mode,
     web: true,
     resume,
     schema: answer?.schema ?? null,

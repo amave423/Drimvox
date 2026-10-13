@@ -21,9 +21,10 @@ type Run<S extends z.ZodType> = (input: z.infer<S>, signal?: AbortSignal) => Pro
 
 /**
  * The agent's tools, bound to one task's copy of the project. "read" mode, for the interview and
- * the spec, leaves out everything that changes files or runs commands.
+ * the spec, leaves out everything that changes files or runs commands. "review" mode, for the acceptance
+ * agent, reads and runs commands but has no way to edit files or finish the task.
  */
-export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "write" = "write", extra: ToolSet = {}): ToolSet {
+export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "review" | "write" = "write", extra: ToolSet = {}): ToolSet {
   function wrap<S extends z.ZodType>(name: string, description: string, inputSchema: S, run: Run<S>) {
     return tool({
       description,
@@ -76,6 +77,22 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "writ
 
   if (mode === "read") return { ...readTools, ...stepTools };
 
+  const run_command = wrap(
+    "run_command",
+    "Run a shell command in the project folder, e.g. tests or a build. Returns the exit code and the end of the output.",
+    z.object({ command: z.string().min(1), timeout_seconds: z.number().int().min(1).max(600).default(120) }),
+    async ({ command, timeout_seconds }, signal) => {
+      const verdict = classifyCommand(command, ws.root);
+      if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal))) {
+        return { ok: false, output: "The user denied this command. Do not retry it; find another way or explain in finish." };
+      }
+      const result = await runCommand(command, ws.root, timeout_seconds * 1000, signal);
+      const head = result.timedOut ? `Timed out after ${timeout_seconds}s` : `Exit code: ${result.exitCode}`;
+      return { ok: result.exitCode === 0 && !result.timedOut, output: `${head}\n${result.output}` };
+    },
+  );
+  if (mode === "review") return { ...readTools, ...stepTools, run_command };
+
   return {
     ...readTools,
     ...stepTools,
@@ -97,20 +114,7 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "writ
         return ok(`Edited ${path}`);
       },
     ),
-    run_command: wrap(
-      "run_command",
-      "Run a shell command in the project folder, e.g. tests or a build. Returns the exit code and the end of the output.",
-      z.object({ command: z.string().min(1), timeout_seconds: z.number().int().min(1).max(600).default(120) }),
-      async ({ command, timeout_seconds }, signal) => {
-        const verdict = classifyCommand(command, ws.root);
-        if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal))) {
-          return { ok: false, output: "The user denied this command. Do not retry it; find another way or explain in finish." };
-        }
-        const result = await runCommand(command, ws.root, timeout_seconds * 1000, signal);
-        const head = result.timedOut ? `Timed out after ${timeout_seconds}s` : `Exit code: ${result.exitCode}`;
-        return { ok: result.exitCode === 0 && !result.timedOut, output: `${head}\n${result.output}` };
-      },
-    ),
+    run_command,
     finish: wrap(
       "finish",
       "Call once when the task is done (or cannot be done).",

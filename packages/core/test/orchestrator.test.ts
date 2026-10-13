@@ -43,19 +43,22 @@ interface Planned {
   checks?: string[];
 }
 
-const plan = (subtasks: Planned[], checks = ["node --test"]) =>
+const plan = (subtasks: Planned[], checks = ["node --test"], requirements: unknown[] = []) =>
   call("propose_plan", {
     spec: "# Цель\n\nНесколько модулей.",
     checks,
+    requirements,
     commit_message: "Add the modules",
     subtasks: subtasks.map((s) => ({ title: `Модуль ${s.id}`, description: `Сделай ${s.id}.js и тест`, dependsOn: [], ...s })),
   });
 
-/** Answers the lead model from its own script and every subtask from the script under its id. */
-function team(lead: FakeTurn[], subs: Record<string, FakeTurn[]>) {
+/** Answers the lead model from its own script, every subtask from the script under its id, the acceptance agent from its own. */
+function team(lead: FakeTurn[], subs: Record<string, FakeTurn[]>, acceptor: FakeTurn[] = []) {
   const leadQueue = [...lead];
+  const acceptorQueue = [...acceptor];
   const queues = Object.fromEntries(Object.entries(subs).map(([k, v]) => [k, [...v]]));
   return (body: any): FakeTurn => {
+    if (/acceptance agent/i.test(JSON.stringify(body.messages?.[0]?.content ?? ""))) return acceptorQueue.shift() ?? { text: "Done." };
     if (body.model === "lead") return leadQueue.shift() ?? { text: "Done." };
     const id = JSON.stringify(body.messages).match(/Subtask id: ([\w-]+)/)?.[1] ?? "";
     return queues[id]?.shift() ?? { text: "Done." };
@@ -188,6 +191,40 @@ describe("the team at work", { timeout: 30_000 }, () => {
     expect(log).toContainEqual(["two", "conflict"]);
     const diff = await (await env.call("GET", `/api/tasks/${id}/diff`)).json();
     expect(diff[0].hunks[0].lines.filter((l: any) => l.kind === "add").map((l: any) => l.text)).toEqual(["one", "two"]);
+  });
+
+  it("accepts the whole goal against its requirements and sends what is missing to a fix subtask", async () => {
+    const requirements = [
+      { id: "R1", text: "Есть модули sub и mul с тестами", verify: "check", how: "node --test" },
+      { id: "R2", text: "README.md описывает оба модуля", verify: "review", how: "прочитать README.md" },
+    ];
+    const verdict = (r2: string) =>
+      call("report_acceptance", {
+        results: [
+          { id: "R1", status: "done", evidence: "node --test", problem: "" },
+          { id: "R2", status: r2, evidence: "README.md", problem: r2 === "done" ? "" : "README.md нет" },
+        ],
+        summary: r2 === "done" ? "Принято" : "Нет README",
+      });
+    const id = await startGoal(
+      team(
+        [plan([{ id: "sub" }, { id: "mul" }], ["node --test"], requirements)],
+        { sub: addModule("sub"), mul: addModule("mul"), "fix-1": [write("README.md", "# sub и mul\n"), finish("README")] },
+        [verdict("missing"), verdict("done")],
+      ),
+    );
+    await approve(id);
+    const done = await waitFor(id, goalIs("review"));
+    expect(done.statusReason).toBeNull();
+    expect(done.requirements.map((r: any) => r.id)).toEqual(["R1", "R2"]);
+    expect(done.acceptance).toMatchObject({ round: 2, summary: "Принято" });
+    expect(done.subtasks.map((s: any) => [s.id, s.status])).toEqual([
+      ["sub", "merged"],
+      ["mul", "merged"],
+      ["fix-1", "merged"],
+    ]);
+    const fix = await (await env.call("GET", `/api/tasks/${done.subtasks[2].taskId}`)).json();
+    expect(fix.task).toContain("README.md нет");
   });
 
   it("adds a fix subtask when the goal's checks go red after a merge", async () => {

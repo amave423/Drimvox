@@ -17,6 +17,8 @@ export const settingsSchema = z.object({
   visionModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
   /** Windows notifications when a task needs the user and the window is not in front. */
   notifications: z.boolean(),
+  /** Model of the acceptance agent; null means the strong model, then the task's own. */
+  acceptanceModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
   /** Image model agents draw with; null means agents have no picture tool. */
   imageModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
 });
@@ -29,4 +31,4 @@ export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 export type Currency = Settings["currency"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, notifications: true };
+export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true };

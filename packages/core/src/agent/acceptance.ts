@@ -1,0 +1,170 @@
+import type { AcceptanceReport, AcceptanceResult, ModelInfo, ProviderError, Requirement } from "@artel/shared";
+import { tool, type ToolSet } from "ai";
+import { z } from "zod";
+import { isCli } from "../cli/kinds";
+import { runCliTurn } from "../cli/turn";
+import type { Connection } from "../providers/repo";
+import { nowLine } from "../now";
+import { requirementsText } from "./phases";
+import { runAgent, type RunInput } from "./run";
+
+/** Acceptance rounds before the work goes to the user anyway, with an honest report. */
+export const MAX_ACCEPTANCE_ROUNDS = 3;
+
+const VERDICT_REMINDER = "You have not given a verdict. Call report_acceptance now with a result for every requirement.";
+
+function systemPrompt(root: string, platform = process.platform): string {
+  const shell = platform === "win32" ? "Windows PowerShell 5.1 (no && or ||: separate commands with ; or use if ($?) { ... })" : "sh";
+  return [
+    "You are the acceptance agent in Artel. Another agent wrote the code; you did not, and you must not change it.",
+    `The work is in a copy of the project at: ${root}`,
+    nowLine(),
+    `Commands run with ${shell} in that folder.`,
+    "",
+    "Check every requirement against what was actually built:",
+    "- read the code that implements it;",
+    "- run what proves it: the tests, the program itself with real input, a request to the server (start it with start_background",
+    "  and stop it afterwards), a page with look_at_page when it has an interface;",
+    "- trust what you saw, not what the code or the other agent's summary claims.",
+    "Mark a requirement done only with evidence. Partial: it works in some cases or only part of it is there. Missing: absent or broken.",
+    "Do not edit files and do not try to fix anything: describe what is wrong precisely enough for the coder to fix it.",
+    "Leave the project as you found it: delete anything you created only to check.",
+    "Finish by calling report_acceptance once, with a result for every requirement and a short summary in the user's language.",
+  ].join("\n");
+}
+
+/** What the acceptance agent is asked: the task as the user put it, the spec and the requirements. */
+function brief(task: string, spec: string | null, requirements: Requirement[], decisions: string[], round: number): string {
+  return [
+    `Accept the work on this task (acceptance round ${round}).`,
+    "",
+    "The user's task:",
+    task,
+    "",
+    spec ? `The approved spec:\n${spec}\n` : "",
+    "Requirements:",
+    requirementsText(requirements),
+    decisions.length ? `\nChoices the coder made on its own (not requirements):\n${decisions.map((d) => `- ${d}`).join("\n")}` : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+}
+
+function verdictTools(requirements: Requirement[], onReport: (r: { results: AcceptanceResult[]; summary: string }) => void): ToolSet {
+  return {
+    report_acceptance: tool({
+      description: "Give the verdict: one result for every requirement, with evidence, and a short summary.",
+      inputSchema: z.object({
+        results: z
+          .array(
+            z.object({
+              id: z.string().min(1).max(10),
+              status: z.enum(["done", "partial", "missing"]),
+              evidence: z.string().max(4000).default(""),
+              problem: z.string().max(4000).default(""),
+            }),
+          )
+          .min(1)
+          .max(60),
+        summary: z.string().min(1).max(4000),
+      }),
+      execute: async ({ results, summary }) => {
+        // A requirement the agent did not mention is not accepted.
+        const byId = new Map(results.map((r) => [r.id.trim(), r]));
+        const full = requirements.map(
+          (req): AcceptanceResult =>
+            byId.get(req.id) ?? { id: req.id, status: "missing", evidence: "", problem: "The acceptance agent gave no verdict on this requirement." },
+        );
+        onReport({ results: full, summary });
+        return "Verdict recorded.";
+      },
+    }),
+  };
+}
+
+export interface AcceptanceInput {
+  conn: Connection;
+  model: string;
+  price: ModelInfo | undefined;
+  worktree: string;
+  task: string;
+  spec: string | null;
+  requirements: Requirement[];
+  decisions: string[];
+  round: number;
+  /** Background processes and page screenshots, as the coder has them. */
+  ownTools: ToolSet;
+  spentUsd: number;
+  budgetUsd: number;
+  signal: AbortSignal;
+  idleTimeoutMs: number;
+  hooks: RunInput["hooks"];
+  onStep: RunInput["onStep"];
+}
+
+export type AcceptanceOutcome =
+  | { kind: "report"; report: AcceptanceReport }
+  | { kind: "stopped" }
+  | { kind: "budget" }
+  | { kind: "error"; error: ProviderError };
+
+/** One acceptance round: a separate agent reads, runs and looks, then gives a verdict per requirement. */
+export async function runAcceptance(i: AcceptanceInput): Promise<AcceptanceOutcome> {
+  let verdict: { results: AcceptanceResult[]; summary: string } | null = null;
+  const messages: RunInput["messages"] = [{ role: "user", content: brief(i.task, i.spec, i.requirements, i.decisions, i.round) }];
+  for (let attempt = 0; attempt < 2 && !verdict; attempt++) {
+    if (attempt > 0) messages.push({ role: "user", content: VERDICT_REMINDER });
+    const input: RunInput = {
+      conn: i.conn,
+      model: i.model,
+      price: i.price,
+      worktree: i.worktree,
+      messages,
+      mode: "review",
+      extraTools: verdictTools(i.requirements, (v) => (verdict = v)),
+      ownTools: i.ownTools,
+      stopTools: ["report_acceptance"],
+      system: systemPrompt(i.worktree),
+      spentUsd: i.spentUsd,
+      budgetUsd: i.budgetUsd,
+      signal: i.signal,
+      idleTimeoutMs: i.idleTimeoutMs,
+      hooks: i.hooks,
+      onText: () => {},
+      onStep: (step) => {
+        messages.push(...step.messages);
+        i.onStep(step);
+      },
+    };
+    const outcome = isCli(i.conn.preset) ? await runCliTurn({ ...input, session: null, onSession: () => {} }) : await runAgent(input);
+    if (outcome.kind === "stopped") return { kind: "stopped" };
+    if (outcome.kind === "error") return { kind: "error", error: outcome.error };
+    if (outcome.kind === "budget") return { kind: "budget" };
+  }
+  const given = verdict as { results: AcceptanceResult[]; summary: string } | null;
+  const results =
+    given?.results ??
+    i.requirements.map((r): AcceptanceResult => ({ id: r.id, status: "missing", evidence: "", problem: "The acceptance agent gave no verdict." }));
+  return { kind: "report", report: { round: i.round, results, summary: given?.summary ?? "—", model: i.model } };
+}
+
+export function accepted(report: AcceptanceReport): boolean {
+  return report.results.every((r) => r.status === "done");
+}
+
+/** What goes back to the coder after a round that found unmet requirements. */
+export function reworkMessage(report: AcceptanceReport, requirements: Requirement[]): string {
+  const lines = report.results
+    .filter((r) => r.status !== "done")
+    .map((r) => {
+      const req = requirements.find((q) => q.id === r.id);
+      return `- ${r.id} (${r.status}): ${req?.text ?? ""}\n  Problem: ${r.problem || "—"}${r.evidence ? `\n  Seen: ${r.evidence}` : ""}`;
+    });
+  return [
+    "A reviewer checked the work against the requirements and these are not met yet:",
+    "",
+    ...lines,
+    "",
+    "Fix every one of them (not the tests), run the checks, then call finish.",
+  ].join("\n");
+}

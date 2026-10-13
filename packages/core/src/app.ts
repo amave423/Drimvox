@@ -99,6 +99,7 @@ export function createCore(o: AppOptions) {
     dataDir: o.dataDir,
     budgetUsd: () => readSettings(o.db).agentBudgetUsd,
     strongModel: () => readSettings(o.db).strongModel,
+    acceptanceModel: () => readSettings(o.db).acceptanceModel,
     imageModel: () => readSettings(o.db).imageModel,
     media,
     web,

@@ -184,3 +184,21 @@
 .visual-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
 .visual-list li { display: grid; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .visual-list .link { justify-self: start; }
+
+/* Requirements in the spec and the acceptance agent's checklist in review. */
+.requirements { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.requirements li { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; overflow-wrap: anywhere; }
+.requirement-id { color: var(--ink); font-size: 13px; padding-top: 2px; }
+.requirement-how { grid-column: 2; font-size: 13px; }
+.decisions { margin: 6px 0 0; padding-left: 20px; color: var(--muted); }
+.acceptance { margin: 18px 0 8px; }
+.acceptance-meta { margin: 2px 0 8px; font-size: 13px; }
+.acceptance-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.acceptance-item { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--sheet); }
+.acceptance-item p { margin: 0; overflow-wrap: anywhere; }
+.acceptance-mark { font: 500 12.5px var(--font-ui); padding: 2px 8px; border-radius: 999px; justify-self: start; align-self: start; }
+.acceptance-item.is-done .acceptance-mark { color: var(--ok); background: var(--ok-soft); }
+.acceptance-item.is-partial .acceptance-mark { color: var(--wait); background: var(--wait-soft); }
+.acceptance-item.is-missing .acceptance-mark { color: var(--pencil); background: var(--pencil-soft); }
+.acceptance-problem { color: var(--pencil); margin-top: 4px !important; }
+.acceptance-body { min-width: 0; }

@@ -13,7 +13,8 @@ export type FeedItem =
     }
   | { kind: "approval"; seq: number; id: string; command: string; reason: string; allowed: boolean | null; always: boolean }
   | { kind: "status"; seq: number; status: string; reason: string | null; detail: string | null }
-  | { kind: "phase"; seq: number; phase: string }
+  | { kind: "phase"; seq: number; phase: string; round: number | null }
+  | { kind: "acceptance"; seq: number; round: number; done: number; total: number; summary: string }
   | { kind: "questions"; seq: number; questions: { id: string; question: string }[] }
   | { kind: "answers"; seq: number; answers: { id: string; answer: string }[]; skipped: boolean }
   | { kind: "spec"; seq: number; spec: string; checks: string[]; edited: boolean }
@@ -67,7 +68,17 @@ export function buildFeed(events: TaskEvent[]): FeedItem[] {
         items.push({ kind: "status", seq: e.seq, status: d.status, reason: d.reason ?? null, detail: d.detail ?? null });
         break;
       case "phase":
-        items.push({ kind: "phase", seq: e.seq, phase: d.phase });
+        items.push({ kind: "phase", seq: e.seq, phase: d.phase, round: typeof d.round === "number" ? d.round : null });
+        break;
+      case "acceptance":
+        items.push({
+          kind: "acceptance",
+          seq: e.seq,
+          round: Number(d.round ?? 1),
+          done: (d.results ?? []).filter((r: { status: string }) => r.status === "done").length,
+          total: (d.results ?? []).length,
+          summary: String(d.summary ?? ""),
+        });
         break;
       case "questions":
         items.push({ kind: "questions", seq: e.seq, questions: d.questions ?? [] });

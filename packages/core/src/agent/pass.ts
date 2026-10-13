@@ -1,4 +1,4 @@
-import type { Question, TaskEvent, TaskPhase, TaskStages, VisualCheck } from "@artel/shared";
+import type { Question, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
@@ -15,7 +15,7 @@ import {
   type SpecProposal,
 } from "./phases";
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
-import { hasChanges, snapshot } from "./review";
+import { done, lastSummary } from "./landing";
 import { runAgent } from "./run";
 import { isCli } from "../cli/kinds";
 import { runCliTurn } from "../cli/turn";
@@ -39,6 +39,8 @@ export interface PassContext {
   providers: ProviderRepo;
   idleTimeoutMs: number;
   strongModel(): { providerId: string; model: string } | null;
+  /** Who accepts the work: the acceptance model from the settings, else the strong one; null means the task's own. */
+  acceptanceModel(): { providerId: string; model: string } | null;
   signal: AbortSignal;
   closed(): boolean;
   event(kind: TaskEvent["kind"], data: unknown): void;
@@ -226,6 +228,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       plan: JSON.stringify(planned.plan),
       planned: JSON.stringify(planned.subtasks),
       ...(planned.commitMessage ? { commit_message: planned.commitMessage } : {}),
+      requirements: JSON.stringify(planned.requirements),
+      decisions: JSON.stringify(planned.decisions),
     });
     ctx.event("plan", { spec: planned.spec, checks: planned.checks, subtasks: planned.subtasks });
     if (stages.approveSpec) return finish(ctx, "waiting", "plan_review");
@@ -246,52 +250,21 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       checks: JSON.stringify(proposed.checks),
       plan: JSON.stringify(proposed.plan),
       visual: JSON.stringify(proposed.visualChecks ?? []),
+      requirements: JSON.stringify(proposed.requirements ?? []),
+      decisions: JSON.stringify(proposed.decisions ?? []),
     });
     ctx.event("spec", proposed);
     if (stages.approveSpec) return finish(ctx, "waiting", "spec_review");
     const { kept, dropped } = safeChecks(proposed.checks, row.worktree);
     ctx.tasks.update(id, { checks: JSON.stringify(kept) });
     if (dropped.length) ctx.event("text", { text: `Artel removed checks that would need permission: ${dropped.join(", ")}` });
-    return startWork(ctx, id, stages, specMessage(proposed.spec, kept, false), kept);
+    return startWork(ctx, id, stages, specMessage(proposed.spec, kept, false, proposed.requirements), kept);
   }
 
   const checks = JSON.parse(row.checks) as string[];
   if (phase === "tests") return testsGate(ctx, id, row, checks);
   if (phase === "code" && checks.length > 0) return codeGate(ctx, id, row, checks, visual, outcome.commitMessage ? outcome : null);
   return done(ctx, id, row, visual, outcome.summary, outcome.commitMessage);
-}
-
-/** Visual checks this many times in a row fail before the task waits for the user. */
-export const MAX_VISUAL_ATTEMPTS = 2;
-
-/** Green checks: Artel looks at the pages from the spec, then the work goes to review. */
-async function done(
-  ctx: PassContext,
-  id: string,
-  row: TaskRow,
-  visual: VisualDeps,
-  summary: string | null,
-  commitMessage: string | null,
-): Promise<string | null> {
-  const pages = JSON.parse(row.visual) as VisualCheck[];
-  if (pages.length > 0 && (!visual.vision || !visual.kit.screenshot)) {
-    ctx.event("text", {
-      text: "Artel skipped the visual checks: there is no model that sees pictures (pick one in the settings) or no way to take screenshots here.",
-    });
-  } else if (pages.length > 0) {
-    const results = await runVisualChecks(visual, pages, ctx.signal);
-    if (ctx.signal.aborted) return finish(ctx, "stopped", "user");
-    const failed = results.filter((r) => !r.ok);
-    if (failed.length > 0) {
-      const attempts = row.visual_attempts + 1;
-      ctx.tasks.update(id, { visual_attempts: attempts });
-      const report = failed.map((f) => `${f.check.url}\nExpected: ${f.check.expect}\nSeen: ${f.answer}`).join("\n\n");
-      if (attempts >= MAX_VISUAL_ATTEMPTS) return finish(ctx, "waiting", "visual_failed", report.slice(0, 4000));
-      return `Artel looked at the page and it does not match the spec yet:\n\n${report}\n\nFix it, run the checks, then call finish.`;
-    }
-  }
-  await complete(ctx, id, summary, commitMessage);
-  return null;
 }
 
 /** Moves from an approved spec to the tests or the code, with the message that starts it. */
@@ -357,31 +330,7 @@ async function codeGate(
   return finish(ctx, "waiting", "stuck", report.slice(0, 4000));
 }
 
-function lastSummary(ctx: PassContext, id: string): string | null {
-  const finishCall = ctx.tasks
-    .events(id)
-    .filter((e) => e.kind === "tool_call" && e.data?.name === "finish")
-    .at(-1);
-  return (finishCall?.data?.input?.summary as string | undefined) ?? null;
-}
-
-async function complete(ctx: PassContext, id: string, summary: string | null, commitMessage: string | null): Promise<void> {
-  const current = ctx.tasks.row(id)!;
-  await snapshot(current);
-  const project = ctx.projects.get(current.project_id)!;
-  const changed = await hasChanges(project.path, current);
-  const finishInput = ctx.tasks
-    .events(id)
-    .filter((e) => e.kind === "tool_call" && e.data?.name === "finish")
-    .at(-1)?.data?.input as { commit_message?: string } | undefined;
-  ctx.tasks.update(id, {
-    summary: summary ?? current.summary ?? "—",
-    commit_message: commitMessage ?? finishInput?.commit_message?.split("\n")[0]?.trim() ?? current.commit_message ?? current.title,
-  });
-  ctx.finish(changed ? "review" : "done_empty", null);
-}
-
-function finish(ctx: PassContext, status: TaskRow["status"], reason: string, detail?: string): null {
+export function finish(ctx: PassContext, status: TaskRow["status"], reason: string, detail?: string): null {
   ctx.finish(status, reason, detail);
   return null;
 }

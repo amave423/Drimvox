@@ -161,6 +161,7 @@ packages/shared — типы и схемы (zod), общие для UI и core
 | M6 ✓ | MCP, скиллы, веб-поиск, визуальная проверка, уведомления | Сделано 2026-10-12, спека в `docs/specs/tools.md`. Проверено вживую на RouterAI (`npm run live-check -- --tools`) |
 | M7 ✓ | CLI-агенты (Claude Code / Codex / Gemini CLI), прямые API Anthropic/OpenAI/Gemini/xAI | Сделано 2026-10-13, спека в `docs/specs/cli-agents.md`. Claude Code проверен вживую по подписке: чат и задача через весь конвейер (`npm run live-check -- --cli`); Codex и Gemini CLI — только по тестам, они не установлены |
 | M8 | Серверный режим Ubuntu + Tailscale + вход по паролю | Сделано 2026-10-13 по тестам, спека в `docs/specs/server.md`: `apps/server`, `npm run server:install` (systemd + `tailscale serve`), вход по паролю с кодом первого входа, e2e в браузере против собранного сервера. Живая проверка — на Ubuntu владельца |
+| M9 | Качество результата: опрос до полной картины, требования вместо текста спеки, агент-приёмщик, этапы для больших задач, «Самостоятельно / С остановками», настройка «Я разработчик» | Спека `docs/specs/quality.md` |
 
 ## 11. Открытые вопросы
 

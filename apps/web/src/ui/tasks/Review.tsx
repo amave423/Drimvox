@@ -4,6 +4,7 @@ import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { IdentityHelp } from "../projects/ProjectSheet";
+import { AcceptanceReport } from "./AcceptanceReport";
 import { DiffView, type LineComment } from "./DiffView";
 
 interface Props {
@@ -90,6 +91,8 @@ export function Review({ task, comments, setComments }: Props) {
     <section className="review">
       <h2 className="sheet-h">{stuck ? t("review.titleStuck") : empty ? t(team ? "team.reviewEmpty" : "review.empty") : t(team ? "team.reviewTitle" : "review.title")}</h2>
       {task.summary && !stuck && <p className="review-summary">{task.summary}</p>}
+      {task.statusReason === "acceptance_partial" && <p className="note is-pencil">{t("acceptance.partial")}</p>}
+      {task.acceptance && !stuck && <AcceptanceReport report={task.acceptance} requirements={task.requirements} />}
       {!stuck && task.phase !== null && (
         <p className={task.checks.length ? "note is-ok checks-note" : "muted checks-note"}>
           {task.checks.length ? t("review.checksGreen") : t("review.noChecks")}
