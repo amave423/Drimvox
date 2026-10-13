@@ -1,3 +1,4 @@
+import { authHeaders } from "../api";
 /**
  * Incremental parser for `data:` lines of a server-sent event stream.
  * Chunks may split lines anywhere; complete events are returned as parsed JSON.
@@ -23,17 +24,17 @@ export function createSseParser<T>() {
 }
 
 /** POSTs JSON and hands every event to `onEvent` until the stream ends or `signal` aborts. */
-export function postStream<T>(url: string, token: string, body: unknown, onEvent: (event: T) => void, signal: AbortSignal) {
+export function postStream<T>(url: string, token: string | null, body: unknown, onEvent: (event: T) => void, signal: AbortSignal) {
   return readStream<T>(
     url,
-    { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal },
+    { method: "POST", headers: { ...authHeaders(token), "Content-Type": "application/json" }, body: JSON.stringify(body), signal },
     onEvent,
   );
 }
 
 /** Follows a GET event stream until it ends or `signal` aborts. */
-export function getStream<T>(url: string, token: string, onEvent: (event: T) => void, signal: AbortSignal) {
-  return readStream<T>(url, { headers: { Authorization: `Bearer ${token}` }, signal }, onEvent);
+export function getStream<T>(url: string, token: string | null, onEvent: (event: T) => void, signal: AbortSignal) {
+  return readStream<T>(url, { headers: authHeaders(token), signal }, onEvent);
 }
 
 async function readStream<T>(url: string, init: RequestInit, onEvent: (event: T) => void): Promise<void> {

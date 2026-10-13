@@ -1,0 +1,56 @@
+import { startServer } from "@artel/core";
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { loadSecretKey, readConfig, setupCode, tailscaleName } from "./config";
+import { closeBrowser, screenshot } from "./screenshot";
+
+/** Injected by build.mjs. */
+declare const __ARTEL_VERSION__: string;
+
+/** The machine's name in the tailnet, when Tailscale runs here; `tailscale serve` sends requests under it. */
+function tailscale(): Promise<string | null> {
+  return new Promise((done) =>
+    execFile("tailscale", ["status", "--json"], { timeout: 10_000 }, (err, stdout) => done(err ? null : tailscaleName(stdout))),
+  );
+}
+
+async function main() {
+  const config = readConfig(process.env, homedir());
+  const here = fileURLToPath(new URL(".", import.meta.url));
+  const webDir = resolve(here, "..", "..", "web", "dist");
+  if (!existsSync(join(webDir, "index.html"))) throw new Error(`The UI is not built: ${webDir}. Run "npm run server" from the Artel folder.`);
+
+  const name = await tailscale();
+  const code = setupCode();
+  const server = await startServer({
+    host: "127.0.0.1",
+    port: config.port,
+    dataDir: config.dataDir,
+    webDir,
+    secretKey: loadSecretKey(config.dataDir),
+    version: __ARTEL_VERSION__,
+    allowedHosts: ["127.0.0.1", "localhost", "[::1]", ...(name ? [name] : []), ...config.hosts],
+    password: { setupCode: code },
+    screenshot,
+  });
+
+  console.log(`Artel ${__ARTEL_VERSION__} listens on http://127.0.0.1:${server.port}, data in ${config.dataDir}`);
+  console.log(name ? `Open https://${name} (after "tailscale serve --bg ${server.port}")` : "Tailscale is not running: only this machine can open Artel.");
+  if (server.needsPassword()) console.log(`No password yet. The code to set it in the browser: ${code}`);
+
+  const stop = async () => {
+    await server.close();
+    await closeBrowser();
+    process.exit(0);
+  };
+  process.once("SIGTERM", () => void stop());
+  process.once("SIGINT", () => void stop());
+}
+
+main().catch((err: unknown) => {
+  console.error(err instanceof Error ? err.message : err);
+  process.exit(1);
+});

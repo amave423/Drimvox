@@ -1,8 +1,13 @@
 import type { AppType } from "@artel/core";
 import { hc } from "hono/client";
 
-export function createApi(token: string) {
-  return hc<AppType>(location.origin, { headers: { Authorization: `Bearer ${token}` } }).api;
+/** The desktop window sends its token; a browser on the server is signed in by its session cookie instead. */
+export function authHeaders(token: string | null): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export function createApi(token: string | null) {
+  return hc<AppType>(location.origin, { headers: authHeaders(token) }).api;
 }
 
 export type Api = ReturnType<typeof createApi>;

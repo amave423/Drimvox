@@ -151,6 +151,12 @@ const migrations: string[] = [
    alter table chats add column cli_session text;`,
   // Requests of this provider go through the proxy from the settings.
   `alter table providers add column use_proxy integer not null default 0;`,
+  // Server mode: signed-in browsers, by the hash of their cookie.
+  `create table sessions (
+     hash text primary key,
+     created_at integer not null,
+     expires_at integer not null
+   ) strict;`,
 ];
 
 export interface Database {

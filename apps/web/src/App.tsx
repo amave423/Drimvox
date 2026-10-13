@@ -18,7 +18,8 @@ import { TopBar } from "./ui/TopBar";
 
 interface Props {
   api: Api;
-  token: string;
+  /** Null in a browser on the server, signed in by its cookie. */
+  token: string | null;
   initialSettings: Settings;
   status: CoreStatus;
 }
@@ -89,9 +90,19 @@ export function App({ api, token, initialSettings, status }: Props) {
     if (!tasksLoaded.current) return;
     const notices = noticesFor(seenTasks.current, tasks);
     seenTasks.current = tasks;
-    if (!settings.notifications || !window.artel?.notify) return;
+    if (!settings.notifications) return;
     for (const n of notices) {
-      window.artel.notify({ title: translate(settings.locale, `notice.${n.kind}`), body: n.title, taskId: n.taskId });
+      const title = translate(settings.locale, `notice.${n.kind}`);
+      if (window.artel?.notify) window.artel.notify({ title, body: n.title, taskId: n.taskId });
+      // In a browser: the browser's own notifications, once allowed, while the tab is in the background.
+      else if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
+        const shown = new Notification(title, { body: n.title, tag: n.taskId });
+        shown.onclick = () => {
+          window.focus();
+          setView({ kind: "task", taskId: n.taskId });
+          shown.close();
+        };
+      }
     }
   }, [tasks]);
   useEffect(() => window.artel?.onOpenTask?.((taskId) => setView({ kind: "task", taskId })), []);

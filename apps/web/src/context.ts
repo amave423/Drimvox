@@ -25,7 +25,7 @@ export type View =
 
 export interface AppContextValue {
   api: Api;
-  token: string;
+  token: string | null;
   settings: Settings;
   status: CoreStatus;
   /** Saves a change; resolves to false when the core refused or did not answer. */

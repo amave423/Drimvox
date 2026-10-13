@@ -8,6 +8,8 @@ import { ChatApprovals } from "./chats/approvals";
 import { ChatRepo } from "./chats/repo";
 import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
+import { authRoutes, sessionGuard } from "./auth/routes";
+import { AuthStore } from "./auth/store";
 import { duckDuckGo, type WebAccess } from "./internet/web";
 import { Background } from "./agent/background";
 import { McpHub } from "./mcp/hub";
@@ -35,8 +37,13 @@ import { webHandler } from "./web";
 
 export interface AppOptions {
   db: Database;
-  /** Shared secret the UI sends as `Authorization: Bearer <token>`. */
-  token: string;
+  /** Desktop: the shared secret the window sends as `Authorization: Bearer <token>`. */
+  token?: string;
+  /**
+   * Server: a password set in the browser, then a session cookie. `setupCode` is what the server writes to its log
+   * while no password is set; setting the first password needs it. Replaces the token.
+   */
+  password?: { setupCode: string };
   /** 32 bytes that encrypt provider keys at rest. */
   secretKey: Buffer;
   version: string;
@@ -129,15 +136,21 @@ export function createCore(o: AppOptions) {
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/tasks", taskRoutes(tasks, runner, shots));
 
+  const hosts = new Set(o.allowedHosts ?? defaultHosts);
+  const auth = new AuthStore(o.db);
+  if (!o.password && !o.token) throw new Error("Either a token or a password setup is required");
   const app = new Hono()
-    .use("*", hostGuard(new Set(o.allowedHosts ?? defaultHosts)))
-    .use("/api/*", tokenGuard(o.token, new Set(["/api/health"])))
+    .use("*", hostGuard(hosts))
+    .use("/api/*", o.password ? sessionGuard(auth, hosts) : tokenGuard(o.token!, new Set(["/api/health"])))
+    .route("/api/auth", authRoutes(auth, o.password?.setupCode ?? null))
     .route("/api", api);
 
   app.all("/api/*", (c) => c.json({ error: "not_found" }, 404));
   if (o.webDir) app.get("*", webHandler(o.webDir));
   return {
     app,
+    /** Server mode: nobody can sign in until the first password is set with the setup code. */
+    needsPassword: () => !!o.password && !auth.passwordSet(),
     shutdown: async () => {
       studio.shutdown();
       await runner.shutdown();

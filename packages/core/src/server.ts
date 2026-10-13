@@ -11,17 +11,20 @@ export interface ServerOptions extends Omit<AppOptions, "db"> {
 
 export interface RunningServer {
   port: number;
+  /** Server mode: no password yet, so the setup code is needed to set one. */
+  needsPassword(): boolean;
   close(): Promise<void>;
 }
 
 export function startServer(o: ServerOptions): Promise<RunningServer> {
   const db = openDatabase(join(o.dataDir, "artel.db"));
-  const { app, shutdown } = createCore({ ...o, db });
+  const { app, shutdown, needsPassword } = createCore({ ...o, db });
 
   return new Promise((resolvePromise, reject) => {
     const server = serve({ fetch: app.fetch, hostname: o.host ?? "127.0.0.1", port: o.port ?? 0 }, (info) => {
       resolvePromise({
         port: info.port,
+        needsPassword,
         close: async () => {
           await shutdown();
           // Live task streams stay open forever; cut them so close() can finish.

@@ -22,6 +22,8 @@ export interface TestEnv {
   app(webDir?: string): ReturnType<typeof createCore>["app"];
   /** JSON request against the API with the token. */
   call(method: string, path: string, body?: unknown): Promise<JsonResponse>;
+  /** A request with only the headers given: no token, as a browser on the server would send it. */
+  raw(method: string, path: string, init?: { body?: unknown; headers?: Record<string, string> }): Promise<JsonResponse>;
   reopen(): void;
   /** Shortens how long a reply may stay silent, so tests do not wait 90 seconds. */
   setIdleTimeout(ms: number): void;
@@ -44,7 +46,8 @@ export interface TestEnv {
   closeAsync(): Promise<void>;
 }
 
-export function createTestEnv(): TestEnv {
+/** `setupCode` turns on the server's password sign-in instead of the desktop's token. */
+export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
   const dir = mkdtempSync(join(tmpdir(), "artel-core-"));
   const secretKey = randomBytes(32);
   let idleTimeoutMs: number | undefined;
@@ -80,6 +83,7 @@ export function createTestEnv(): TestEnv {
       screenshot,
       cliCommands,
       proxyCheckUrl,
+      ...(o.setupCode ? { password: { setupCode: o.setupCode } } : {}),
     };
     if (webDir) return createCore({ ...options, webDir });
     core ??= createCore(options);
@@ -132,6 +136,12 @@ export function createTestEnv(): TestEnv {
         method,
         headers: { ...auth, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
         body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+    raw: async (method, path, init = {}) =>
+      await env.app().request(`${BASE}${path}`, {
+        method,
+        headers: { ...(init.body === undefined ? {} : { "Content-Type": "application/json" }), ...init.headers },
+        body: init.body === undefined ? undefined : JSON.stringify(init.body),
       }),
     reopen() {
       void core?.shutdown();

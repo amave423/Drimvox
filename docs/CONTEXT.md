@@ -160,7 +160,7 @@ packages/shared — типы и схемы (zod), общие для UI и core
 | M5 | Картинки и видео через OpenRouter: в чате, галерея, картинки-ассеты у агентов | Сделано 2026-10-12 по тестам, спека в `docs/specs/media.md`. Живая проверка (`npm run live-check -- --media`) ждёт пополнения баланса OpenRouter |
 | M6 ✓ | MCP, скиллы, веб-поиск, визуальная проверка, уведомления | Сделано 2026-10-12, спека в `docs/specs/tools.md`. Проверено вживую на RouterAI (`npm run live-check -- --tools`) |
 | M7 ✓ | CLI-агенты (Claude Code / Codex / Gemini CLI), прямые API Anthropic/OpenAI/Gemini/xAI | Сделано 2026-10-13, спека в `docs/specs/cli-agents.md`. Claude Code проверен вживую по подписке: чат и задача через весь конвейер (`npm run live-check -- --cli`); Codex и Gemini CLI — только по тестам, они не установлены |
-| M8 | Серверный режим Ubuntu + Tailscale + вход по паролю | Тот же UI по IP, данные на сервере |
+| M8 | Серверный режим Ubuntu + Tailscale + вход по паролю | Сделано 2026-10-13 по тестам, спека в `docs/specs/server.md`: `apps/server`, `npm run server:install` (systemd + `tailscale serve`), вход по паролю с кодом первого входа, e2e в браузере против собранного сервера. Живая проверка — на Ubuntu владельца |
 
 ## 11. Открытые вопросы
 

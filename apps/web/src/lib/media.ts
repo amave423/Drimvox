@@ -1,3 +1,4 @@
+import { authHeaders } from "../api";
 import type { MediaKind, MediaModel } from "@artel/shared";
 import { useEffect, useState } from "react";
 import type { Api } from "../api";
@@ -40,14 +41,14 @@ const blobs = new Map<string, Promise<string | null>>();
  * Files come from the core with the token, which an <img> cannot send; they are fetched and shown
  * as blob URLs. Each file is fetched once per session.
  */
-export function useAuthorizedUrl(url: string | null, token: string): string | null {
+export function useAuthorizedUrl(url: string | null, token: string | null): string | null {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     if (!url) return setSrc(null);
     let live = true;
     let hit = blobs.get(url);
     if (!hit) {
-      hit = fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      hit = fetch(url, { headers: authHeaders(token) })
         .then(async (r) => (r.ok ? URL.createObjectURL(await r.blob()) : null))
         .catch(() => null);
       blobs.set(url, hit);

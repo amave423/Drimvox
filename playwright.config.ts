@@ -4,7 +4,9 @@ import { defineConfig } from "@playwright/test";
 process.env.ARTEL_TEST_USD_RUB = "80";
 
 export default defineConfig({
-  testDir: "apps/desktop/e2e",
+  // The desktop window (Electron) and the server in a browser.
+  testDir: "apps",
+  testMatch: "**/e2e/*.spec.ts",
   workers: 1,
   timeout: 60_000,
   reporter: [["list"]],

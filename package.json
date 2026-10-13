@@ -8,13 +8,15 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "npm run build -w @artel/web && npm run build -w @artel/desktop",
+    "build": "npm run build -w @artel/web && npm run build -w @artel/desktop && npm run build -w @artel/server",
     "start": "npm run build && npm run start -w @artel/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "e2e": "npm run build && playwright test",
     "verify": "npm run typecheck && npm run test && npm run e2e",
-    "live-check": "node scripts/live-check.mjs"
+    "live-check": "node scripts/live-check.mjs",
+    "server": "npm run build -w @artel/web && npm run build -w @artel/server && node apps/server/dist/server.mjs",
+    "server:install": "bash scripts/install-server.sh"
   },
   "engines": {
     "node": ">=22.13"

@@ -6,6 +6,7 @@ import { ModelPicker } from "./chat/ModelPicker";
 import { Segmented } from "./Segmented";
 import { McpSection } from "./McpSection";
 import { ProxySection } from "./ProxySection";
+import { AccountSection } from "./AccountSection";
 import { Toggle } from "./Toggle";
 import { SkillsSection } from "./SkillsSection";
 
@@ -53,8 +54,17 @@ export function SettingsSheet() {
         />
 
         <h2 className="sheet-h">{t("settings.notifications")}</h2>
-        <Toggle checked={settings.notifications} onChange={(notifications) => void save({ notifications })}>
-          {t("settings.notificationsOn")}
+        <Toggle
+          checked={settings.notifications}
+          onChange={(notifications) => {
+            // A browser asks the user once before it shows anything.
+            if (notifications && !window.artel && typeof Notification !== "undefined" && Notification.permission === "default") {
+              void Notification.requestPermission();
+            }
+            void save({ notifications });
+          }}
+        >
+          {window.artel ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
         </Toggle>
 
         <h2 className="sheet-h" id="currency-label">
@@ -127,6 +137,7 @@ export function SettingsSheet() {
         </div>
         <p className="muted">{t("settings.visionModelHint")}</p>
 
+        {!window.artel && <AccountSection />}
         <ProxySection />
         <McpSection />
         <SkillsSection />

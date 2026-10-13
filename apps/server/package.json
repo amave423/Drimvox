@@ -1,0 +1,19 @@
+{
+  "name": "@artel/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Artel without a window: the core and the UI for a browser, for a Linux server behind Tailscale",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node dist/server.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@artel/core": "^0.1.0",
+    "playwright-core": "^1.64.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
