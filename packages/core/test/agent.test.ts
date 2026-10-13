@@ -282,6 +282,22 @@ describe("review", () => {
   });
 });
 
+describe("cost", () => {
+  it("does not send every old file read again and again: the request stays bounded", async () => {
+    writeFileSync(join(repo, "big.txt"), "строка большого файла\n".repeat(1500));
+    git(repo, "add", "big.txt");
+    git(repo, "commit", "-q", "-m", "Big file");
+    const reads = Array.from({ length: 14 }, () => ({ toolCalls: [{ name: "read_file", args: { path: "big.txt" } }] }));
+    setupResult = setup([...reads, { toolCalls: [finish()] }]);
+    const { id } = await startTask();
+    await waitFor(id, ["review", "done_empty"]);
+    const sent = fake!.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => JSON.stringify(r.body.messages));
+    // Each read is about 50 000 characters: fourteen of them whole would be some 700 000.
+    expect(sent.at(-1)!.length).toBeLessThan(450_000);
+    expect(sent.at(-1)).toContain("cut by Artel");
+  });
+});
+
 describe("recovery", () => {
   // Seen live: Dellmar answers 429 "too many concurrent requests" while another agent's request is in flight.
   it("waits out a provider that is briefly busy instead of failing the task", async () => {

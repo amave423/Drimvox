@@ -1,10 +1,12 @@
 import type { ModelInfo, ProviderError } from "@artel/shared";
 import { hasToolCall, isStepCount, streamText, type ModelMessage, type StopCondition, type ToolSet } from "ai";
 import { describeError } from "../providers/errors";
+import { costOf, usageOf } from "../providers/pricing";
 import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
+import { compactHistory } from "./compact";
 import { Workspace } from "./workspace";
 
 export const MAX_STEPS = 60;
@@ -54,12 +56,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let spent = i.spentUsd;
   let steps = 0;
 
-  const costOf = (input: number, output: number) =>
-    i.price?.priceIn != null && i.price.priceOut != null
-      ? Number(((input * i.price.priceIn + output * i.price.priceOut) / 1_000_000).toFixed(9))
-      : 0;
-  const overBudget: StopCondition<ToolSet> = ({ steps: done }) =>
-    i.spentUsd + done.reduce((sum, s) => sum + costOf(s.usage.inputTokens ?? 0, s.usage.outputTokens ?? 0), 0) >= i.budgetUsd;
+  const stepCost = (usage: Parameters<typeof usageOf>[0]) => costOf(i.price, i.conn.preset, usageOf(usage)) ?? 0;
+  const overBudget: StopCondition<ToolSet> = ({ steps: done }) => i.spentUsd + done.reduce((sum, s) => sum + stepCost(s.usage), 0) >= i.budgetUsd;
 
   // A model that sends nothing for too long is treated like a provider error.
   const silence = new AbortController();
@@ -97,6 +95,11 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       system: i.system ?? (i.instructions ? `${systemPrompt(i.worktree)}\n\n${i.instructions}` : systemPrompt(i.worktree)),
       messages: i.messages,
       tools,
+      // Old file reads and command outputs are cut once the conversation is big; see compact.ts.
+      prepareStep: ({ messages }) => {
+        const compacted = compactHistory(messages);
+        return compacted === messages ? {} : { messages: compacted };
+      },
       stopWhen: [hasToolCall("finish"), ...(i.stopTools ?? []).map((name) => hasToolCall(name)), isStepCount(MAX_STEPS), overBudget],
       // Busy providers (429, 5xx) are tried again after 2, 4, 8 and 16 seconds: an agent is in no hurry,
       // and some keys allow one request at a time, which a team of agents runs into.
@@ -107,7 +110,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         steps++;
         const input = step.usage.inputTokens ?? 0;
         const output = step.usage.outputTokens ?? 0;
-        const cost = costOf(input, output);
+        const cost = stepCost(step.usage);
         spent += cost;
         i.onStep({
           messages: step.response.messages as ModelMessage[],
