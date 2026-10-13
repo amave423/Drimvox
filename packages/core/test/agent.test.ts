@@ -163,6 +163,34 @@ describe("a task", () => {
     expect(result.data.output).toMatch(/denied/i);
   });
 
+  // Seen live: a task "on its own" stopped at every 60 steps and asked to go on; only the budget should stop it.
+  it("goes past the step limit by itself when the task runs on its own", async () => {
+    const look = { toolCalls: [{ name: "list_files", args: { path: "." } }] };
+    setupResult = setup([...Array(65).fill(look), { toolCalls: [finish()] }]);
+    const { id } = await startTask();
+    const task = await waitFor(id, ["done_empty", "waiting", "failed"], 30_000);
+    expect(task).toMatchObject({ status: "done_empty" });
+    expect((await events(id)).some((e) => e.kind === "text" && /continues on its own/.test(e.data.text))).toBe(true);
+  });
+
+  // Seen live: an answer given after two minutes failed the task with "timeout", as if the model had gone silent.
+  it("waits for the user's answer longer than a model may stay silent", async () => {
+    env.setIdleTimeout(300);
+    setupResult = setup([{ toolCalls: [{ name: "run_command", args: { command: "git push origin main" } }] }, { toolCalls: [finish()] }]);
+    const { id } = await startTask();
+    const waiting = await waitFor(id, ["waiting"]);
+    await new Promise((r) => setTimeout(r, 900));
+    await env.call("POST", `/api/tasks/${id}/approvals/${waiting.pendingApproval.id}`, { allow: false });
+    expect(await waitFor(id, ["done_empty", "failed"])).toMatchObject({ status: "done_empty" });
+  });
+
+  it("lets a long command run longer than a model may stay silent", async () => {
+    env.setIdleTimeout(300);
+    setupResult = setup([{ toolCalls: [{ name: "run_command", args: { command: 'node -e "setTimeout(() => {}, 1200)"' } }] }, { toolCalls: [finish()] }]);
+    const { id } = await startTask();
+    expect(await waitFor(id, ["done_empty", "failed"])).toMatchObject({ status: "done_empty" });
+  });
+
   it("stops at the budget and continues when asked", async () => {
     setupResult = setup(
       [

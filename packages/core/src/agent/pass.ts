@@ -16,7 +16,7 @@ import { briefInstructions, designInstructions, lookInstructions } from "./desig
 import { planInstructions, planTools, type PlanProposal } from "./plan";
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { done, lastSummary } from "./landing";
-import { runAgent } from "./run";
+import { MAX_STEPS, runAgent } from "./run";
 import { isCli } from "../cli/kinds";
 import { runCliTurn } from "../cli/turn";
 import { webTools } from "../internet/tools";
@@ -31,6 +31,8 @@ const PLAN_REMINDER = "You must call propose_plan with the spec, the checks and 
 
 /** Red check rounds in a row before a task escalates or stops. */
 export const MAX_ATTEMPTS = 3;
+/** A task on its own goes past the step limit this many times before it asks; the budget limits it anyway. */
+export const MAX_STEP_ROUNDS = 3;
 
 /** What a pass needs from the runner: storage, notifications and the user's settings. */
 export interface PassContext {
@@ -200,6 +202,11 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
 
   if (outcome.kind === "stopped") return finish(ctx, "stopped", "user");
   if (outcome.kind === "error") return finish(ctx, "failed", outcome.error.code, outcome.error.detail);
+  if (outcome.kind === "steps" && !(JSON.parse(row.stages) as TaskStages).approveSpec && row.step_rounds < MAX_STEP_ROUNDS) {
+    ctx.tasks.update(id, { step_rounds: row.step_rounds + 1 });
+    ctx.event("text", { text: `Artel continues on its own after ${MAX_STEPS} steps; the budget still limits the spending.` });
+    return "Continue the task.";
+  }
   if (outcome.kind === "budget" || outcome.kind === "steps") return finish(ctx, "waiting", outcome.kind);
 
   // A question, not a task: the answer is the result and there is nothing to review.

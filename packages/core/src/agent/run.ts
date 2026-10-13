@@ -61,12 +61,14 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   const stepCost = (usage: Parameters<typeof usageOf>[0]) => costOf(i.price, i.conn.preset, usageOf(usage)) ?? 0;
   const overBudget: StopCondition<ToolSet> = ({ steps: done }) => i.spentUsd + done.reduce((sum, s) => sum + stepCost(s.usage), 0) >= i.budgetUsd;
 
-  // A model that sends nothing for too long is treated like a provider error.
+  // A model that sends nothing for too long is treated like a provider error. While a tool runs (a long command,
+  // a question to the user) the model is not the one keeping quiet: the clock stands still until the last tool ends.
   const silence = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let running = 0;
   const resetClock = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => silence.abort(), i.idleTimeoutMs);
+    if (running === 0) timer = setTimeout(() => silence.abort(), i.idleTimeoutMs);
   };
 
   // Calls our own tools reported; the rest are the SDK's rejections.
@@ -77,18 +79,18 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       reported.add(call.callId);
       i.hooks.onCall(call);
     },
-    // Waiting for the user is not silence from the model.
-    askApproval: async (command, reason, signal) => {
-      clearTimeout(timer);
-      try {
-        return await i.hooks.askApproval(command, reason, signal);
-      } finally {
-        resetClock();
-      }
-    },
     onFinish: (result: { summary: string; commitMessage: string }) => (finished = result),
   };
-  const tools = { ...buildTools(new Workspace(i.worktree), hooks, i.mode, i.extraTools), ...i.ownTools };
+  const tools = paused({ ...buildTools(new Workspace(i.worktree), hooks, i.mode, i.extraTools), ...i.ownTools }, {
+    start: () => {
+      running++;
+      clearTimeout(timer);
+    },
+    end: () => {
+      running--;
+      resetClock();
+    },
+  });
 
   resetClock();
   try {
@@ -156,4 +158,28 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   if (steps >= MAX_STEPS) return { kind: "steps" };
   // The model ended with plain text instead of calling finish: take its last words as the summary.
   return { kind: "finished", summary: lastText || "—", commitMessage: null };
+}
+
+/** The same tools, each telling when it starts and ends. */
+function paused(tools: ToolSet, clock: { start(): void; end(): void }): ToolSet {
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, t]) => {
+      const execute = t.execute;
+      if (!execute) return [name, t];
+      return [
+        name,
+        {
+          ...t,
+          execute: async (...args: Parameters<typeof execute>) => {
+            clock.start();
+            try {
+              return await execute(...args);
+            } finally {
+              clock.end();
+            }
+          },
+        },
+      ];
+    }),
+  ) as ToolSet;
 }
