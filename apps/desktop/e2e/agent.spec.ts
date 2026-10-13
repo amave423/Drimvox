@@ -114,6 +114,31 @@ test("the agent asks before git push and respects a refusal", async () => {
   await expect(page.getByText("Пуш не разрешили, ничего не менял.")).toBeVisible();
 });
 
+// Seen live: a subtask's feed grew 138 000 px wide from one inline script; text and the approval card ran off the screen.
+test("long commands and messages stay inside the feed", async () => {
+  const script = `node -e "${"const value = 'кусок длинного скрипта без пробелов'; ".repeat(60)}"`;
+  const page = await launch([
+    { text: `Проверю это: ${"ДлинноеСловоБезПробелов".repeat(40)}`, toolCalls: [{ name: "run_command", args: { command: script } }] },
+    { toolCalls: [{ name: "run_command", args: { command: `${script}; git push origin main` } }] },
+    { toolCalls: [{ name: "finish", args: { summary: "Готово", commit_message: "Nothing" } }] },
+  ]);
+  await startTask(page, "Проверь длинные команды");
+  await expect(page.getByText("Агент просит разрешения")).toBeVisible();
+
+  const overflow = await page.evaluate(() => {
+    const feed = document.querySelector("ol.feed")!;
+    const sheet = document.querySelector(".sheet-body")!;
+    const right = sheet.getBoundingClientRect().right;
+    const wide = [...feed.querySelectorAll("*")].filter((e) => e.getBoundingClientRect().right > right + 1).map((e) => e.className);
+    return { scroll: feed.scrollWidth - feed.clientWidth, wide: wide.slice(0, 5) };
+  });
+  expect(overflow).toEqual({ scroll: 0, wide: [] });
+  await page.getByRole("button", { name: "Запретить" }).click();
+  // A refused command is marked as refused, not as one that ran out of time.
+  await expect(page.locator(".action-bad", { hasText: "запрещено" })).toBeVisible();
+  await expect(page.getByText("превышено время")).toHaveCount(0);
+});
+
 test("a question about the project gets an answer, not a spec", async () => {
   const page = await launch([
     { toolCalls: [{ name: "read_file", args: { path: "math.js" } }] },

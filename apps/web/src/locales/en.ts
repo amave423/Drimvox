@@ -172,6 +172,7 @@ export const en: Record<keyof typeof ru, string> = {
   "action.run_command": "Runs {target}",
   "action.exit": "exit {code}",
   "action.timeout": "timed out",
+  "action.denied": "denied",
   "action.failed": "error",
 
   "approval.title": "The agent asks for permission",

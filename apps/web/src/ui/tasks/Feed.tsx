@@ -161,7 +161,9 @@ function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props
       : item.name;
 
   let outcome: { text: string; bad: boolean } | null = null;
-  if (item.result && item.name === "run_command") {
+  if (item.result && !item.result.ok && item.result.output.startsWith("The user denied")) {
+    outcome = { text: t("action.denied"), bad: true };
+  } else if (item.result && item.name === "run_command") {
     const code = exitCodeOf(item.result.output);
     outcome = code === null ? { text: t("action.timeout"), bad: true } : { text: t("action.exit", { code }), bad: code !== 0 };
   } else if (item.result && !item.result.ok) {

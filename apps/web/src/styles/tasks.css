@@ -44,30 +44,32 @@
 .task-notice p { margin: 0; flex: 1; min-width: 240px; }
 .task-notice.is-wait { border-color: var(--wait); }
 .task-notice.is-failed { border-color: var(--pencil); }
-.action-spinner { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink-soft); border-top-color: var(--ink); }
+.action-spinner { display: inline-block; flex: none; box-sizing: border-box; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink-soft); border-top-color: var(--ink); }
 @media (prefers-reduced-motion: no-preference) {
   .action-spinner { animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 }
 
 /* Feed: one line per action */
-.feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.feed > li > p { margin: 4px 0; }
+/* One column no wider than the sheet: a long command must not stretch the feed (its line is cut with an ellipsis). */
+.feed { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.feed > li, .action, .action summary { min-width: 0; }
+.feed > li > p { margin: 4px 0; overflow-wrap: anywhere; }
 .feed-note > p { color: var(--fg); }
-.feed-bubble { justify-self: end; margin: 6px 0 !important; background: var(--paper); border: 1px solid var(--line); border-radius: 14px 14px 4px 14px; padding: 10px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.feed-bubble { justify-self: end; max-width: 100%; margin: 6px 0 !important; background: var(--paper); border: 1px solid var(--line); border-radius: 14px 14px 4px 14px; padding: 10px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .feed-user { display: grid; }
-.action summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; padding: 3px 0; font-size: 14px; color: var(--ink); }
+.action summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; padding: 3px 4px 3px 0; font-size: 14px; color: var(--ink); }
 .action summary::-webkit-details-marker { display: none; }
-.action summary::before { content: "›"; color: var(--muted); width: 8px; transition: transform 120ms; }
+.action summary::before { content: "›"; flex: none; color: var(--muted); width: 8px; transition: transform 120ms; }
 .action[open] summary::before { transform: rotate(90deg); }
 .action-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .action-label.mono { font-size: 13px; }
-.action-ok, .action-bad { font: 12px var(--font-mono); white-space: nowrap; }
+.action-ok, .action-bad { flex: none; font: 12px var(--font-mono); white-space: nowrap; }
 .action-ok { color: var(--ok); }
 .action-bad { color: var(--pencil); }
 .action-output { margin: 4px 0 8px 18px; padding: 10px 12px; max-height: 260px; overflow: auto; background: var(--paper); border-radius: 8px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .approval { display: grid; gap: 6px; margin: 8px 0; padding: 12px 14px; border: 1.5px solid var(--pencil); border-radius: 10px; background: var(--pencil-soft); }
-.approval code { padding: 6px 8px; background: var(--sheet); border-radius: 6px; font-size: 13px; overflow-wrap: anywhere; }
+.approval code { padding: 6px 8px; max-height: 220px; overflow: auto; background: var(--sheet); border-radius: 6px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .worked { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 10px; }
 .worked > summary { cursor: pointer; font: italic 500 16px var(--font-serif); color: var(--muted); }
 .worked .feed { margin-top: 10px; }

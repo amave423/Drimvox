@@ -171,6 +171,7 @@ export const ru = {
   "action.run_command": "Запускает {target}",
   "action.exit": "код {code}",
   "action.timeout": "превышено время",
+  "action.denied": "запрещено",
   "action.failed": "ошибка",
 
   "approval.title": "Агент просит разрешения",
