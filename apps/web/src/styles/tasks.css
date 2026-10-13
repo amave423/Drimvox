@@ -40,7 +40,10 @@
 .task-head { display: grid; gap: 8px; margin-bottom: 14px; }
 .task-head h1 { overflow-wrap: anywhere; }
 .task-head .facts { align-items: center; font-size: 13px; }
-.task-notice { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.task-notice { position: sticky; top: 0; z-index: 5; background: var(--sheet); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.task-notice.is-asking { align-items: flex-start; }
+.task-notice.is-asking .approval { flex: 1 1 320px; min-width: 0; margin: 0; }
+.task-notice.is-asking .approval code { max-height: 180px; overflow: auto; }
 .task-notice p { margin: 0; flex: 1; min-width: 240px; }
 .task-notice.is-wait { border-color: var(--wait); }
 .task-notice.is-failed { border-color: var(--pencil); }
@@ -68,7 +71,9 @@
 .action-ok { color: var(--ok); }
 .action-bad { color: var(--pencil); }
 .action-output { margin: 4px 0 8px 18px; padding: 10px 12px; max-height: 260px; overflow: auto; background: var(--paper); border-radius: 8px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.approval { display: grid; gap: 6px; margin: 8px 0; padding: 12px 14px; border: 1.5px solid var(--pencil); border-radius: 10px; background: var(--pencil-soft); }
+.approval { display: grid; gap: 6px; margin: 8px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+/* Only the question waiting for an answer, at the top of the task, is loud; the feed keeps a quiet record. */
+.approval.is-asking { border: 1.5px solid var(--pencil); background: var(--pencil-soft); }
 .approval code { padding: 6px 8px; max-height: 220px; overflow: auto; background: var(--sheet); border-radius: 6px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .worked { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 10px; }
 .worked > summary { cursor: pointer; font: italic 500 16px var(--font-serif); color: var(--muted); }

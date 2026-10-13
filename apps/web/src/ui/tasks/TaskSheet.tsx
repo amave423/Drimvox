@@ -10,6 +10,7 @@ import type { LineComment } from "./DiffView";
 import { Feed } from "./Feed";
 import { Answer } from "./Answer";
 import { Interview } from "./Interview";
+import { ApprovalCard } from "./Approval";
 import { DesignNote } from "./Design";
 import { PlanReview } from "./PlanReview";
 import { Review } from "./Review";
@@ -73,7 +74,7 @@ export function TaskSheet({ taskId }: { taskId: string }) {
           )}
         </header>
 
-        <TaskNotice task={task} feed={feed} />
+        <TaskNotice task={task} feed={feed} onAnswer={answer} />
         {unfinished && (
           <details className="worked so-far">
             <summary>{t("review.soFar")}</summary>
@@ -102,7 +103,7 @@ export function TaskSheet({ taskId }: { taskId: string }) {
         ) : (
           <>
             <h2 className="sheet-h">{t("task.feed")}</h2>
-            <Feed items={feed} taskId={task.id} onAnswer={task.pendingApproval ? answer : undefined} />
+            <Feed items={feed} taskId={task.id} />
           </>
         )}
       </div>
@@ -146,8 +147,8 @@ export function TaskSheet({ taskId }: { taskId: string }) {
 }
 
 /** What the task waits for and the one action that moves it on. */
-function TaskNotice({ task, feed }: { task: TaskView; feed: FeedItem[] }) {
-  const { api, t, settings } = useApp();
+function TaskNotice({ task, feed, onAnswer }: { task: TaskView; feed: FeedItem[]; onAnswer(approvalId: string, allow: boolean, always?: boolean): void }) {
+  const { api, t, settings, navigate } = useApp();
   const stop = () => void api.tasks[":id"].stop.$post({ param: { id: task.id } }).catch(() => null);
   const carryOn = () => void api.tasks[":id"].continue.$post({ param: { id: task.id }, json: {} }).catch(() => null);
   const drop = () => void api.tasks[":id"].drop.$post({ param: { id: task.id } }).catch(() => null);
@@ -158,6 +159,18 @@ function TaskNotice({ task, feed }: { task: TaskView; feed: FeedItem[] }) {
     </button>
   );
 
+  // The question is answered here, at the top, next to Stop: not at the bottom of a long feed.
+  if (task.status === "waiting" && task.statusReason === "approval" && task.pendingApproval) {
+    return (
+      <div className="task-notice is-wait is-asking">
+        <ApprovalCard approval={task.pendingApproval} allowed={null} onAnswer={onAnswer} />
+        <button className="btn is-pencil" onClick={stop}>
+          {t("task.stop")}
+        </button>
+      </div>
+    );
+  }
+  const asker = task.subtasks.find((s) => s.status === "waiting" && s.statusReason === "approval");
   const asking = task.status === "waiting" && (task.statusReason === "approval" || task.statusReason === "subtask_waiting");
   if (task.status === "running" || asking) {
     const working = task.kind === "goal" && task.phase === "orchestrate" ? "team.working" : "task.working";
@@ -165,6 +178,11 @@ function TaskNotice({ task, feed }: { task: TaskView; feed: FeedItem[] }) {
       <div className={`task-notice${asking ? " is-wait" : ""}`}>
         {!asking && <span className="action-spinner" aria-hidden />}
         <p>{t(asking ? (task.statusReason === "approval" ? "task.waitingApproval" : "team.subtaskAsks") : working)}</p>
+        {asking && asker && (
+          <button className="btn is-primary" onClick={() => navigate({ kind: "task", taskId: asker.taskId })}>
+            {t("team.openAsker", { title: asker.title })}
+          </button>
+        )}
         <button className="btn is-pencil" onClick={stop}>
           {t("task.stop")}
         </button>

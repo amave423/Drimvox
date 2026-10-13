@@ -1,10 +1,9 @@
-import { CONFIRM_ABOVE_USD } from "@artel/shared";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { exitCodeOf, type FeedItem } from "../../lib/activity";
-import { formatUsd } from "../../lib/format";
 import { useAuthorizedUrl } from "../../lib/media";
 import { Markdown } from "../chat/Markdown";
+import { ApprovalCard } from "./Approval";
 
 interface Props {
   items: FeedItem[];
@@ -124,36 +123,7 @@ function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props
     );
   }
 
-  if (item.kind === "approval") {
-    return (
-      <div className="approval" role={item.allowed === null ? "alert" : undefined}>
-        <strong>{t("approval.title")}</strong>
-        <span>{t(`approval.reason.${item.reason}` as MessageKey, { limit: formatUsd(CONFIRM_ABOVE_USD) })}</span>
-        <code className="mono">{item.command}</code>
-        {item.allowed === null && onAnswer ? (
-          <div className="actions">
-            <button className="btn is-primary" onClick={() => onAnswer(item.id, true)}>
-              {t("approval.allow")}
-            </button>
-            {item.reason === "mcp" && (
-              <button className="btn" onClick={() => onAnswer(item.id, true, true)}>
-                {t("approval.always")}
-              </button>
-            )}
-            <button className="btn is-pencil" onClick={() => onAnswer(item.id, false)}>
-              {t("approval.deny")}
-            </button>
-          </div>
-        ) : (
-          item.allowed !== null && (
-            <span className={item.allowed ? "is-ok" : "is-pencil-text"}>
-              {t(item.always ? "approval.allowedAlways" : item.allowed ? "approval.allowed" : "approval.denied")}
-            </span>
-          )
-        )}
-      </div>
-    );
-  }
+  if (item.kind === "approval") return <ApprovalCard approval={item} allowed={item.allowed} always={item.always} onAnswer={onAnswer} />;
 
   const input = item.input as Record<string, string | undefined>;
   const target =

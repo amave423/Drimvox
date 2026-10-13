@@ -658,4 +658,9 @@ export const en: Record<keyof typeof ru, string> = {
   "local.pick.qwen3-4b": "Small but capable: chat and simple tasks with tools.",
   "review.soFar": "What is done so far",
   "review.titlePartial": "The work is not finished: this is what the agent got done. Accept it as it is, or continue.",
+  "approval.answerAbove": "Waiting for an answer: the buttons are at the top of the page.",
+  "team.openAsker": "Open «{title}»",
+  "settings.notificationsTest": "Test a notification",
+  "notice.test": "Notifications work",
+  "notice.testBody": "This is how Artel tells you a task needs you.",
 };

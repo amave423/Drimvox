@@ -657,4 +657,9 @@ export const ru = {
   "local.pick.qwen3-4b": "Маленькая, но толковая: чат по-русски и простые задачи с инструментами.",
   "review.soFar": "Что уже сделано",
   "review.titlePartial": "Работа не закончена: вот что агент успел сделать. Можно принять как есть или продолжить.",
+  "approval.answerAbove": "Ждёт ответа — кнопки вверху страницы.",
+  "team.openAsker": "Открыть «{title}»",
+  "settings.notificationsTest": "Проверить уведомление",
+  "notice.test": "Уведомления работают",
+  "notice.testBody": "Так Artel сообщит, когда задаче нужен ты.",
 } as const;

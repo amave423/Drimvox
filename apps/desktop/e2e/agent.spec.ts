@@ -106,8 +106,10 @@ test("the agent asks before git push and respects a refusal", async () => {
   ]);
   await startTask(page, "Запушь проект");
 
-  await expect(page.getByText("Агент просит разрешения")).toBeVisible();
-  await expect(page.getByText("Отправка кода на сервер (git push)")).toBeVisible();
+  // The question sits at the top, next to Stop, not at the bottom of the feed.
+  const ask = page.locator(".task-notice").getByRole("alert");
+  await expect(ask.getByText("Агент просит разрешения")).toBeVisible();
+  await expect(ask.getByText("Отправка кода на сервер (git push)")).toBeVisible();
   await page.getByRole("button", { name: "Запретить" }).click();
 
   await expect(page.getByText("Агент закончил, но файлы не изменились.")).toBeVisible();
@@ -123,7 +125,7 @@ test("long commands and messages stay inside the feed", async () => {
     { toolCalls: [{ name: "finish", args: { summary: "Готово", commit_message: "Nothing" } }] },
   ]);
   await startTask(page, "Проверь длинные команды");
-  await expect(page.getByText("Агент просит разрешения")).toBeVisible();
+  await expect(page.getByRole("alert").getByText("Агент просит разрешения")).toBeVisible();
 
   const overflow = await page.evaluate(() => {
     const feed = document.querySelector("ol.feed")!;
