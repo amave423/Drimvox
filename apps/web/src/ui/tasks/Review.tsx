@@ -12,6 +12,8 @@ interface Props {
   task: TaskView;
   comments: LineComment[];
   setComments(comments: LineComment[]): void;
+  /** The task did not finish (it failed, stopped or ran out of budget): its work so far, to take as it is. */
+  partial?: boolean;
 }
 
 interface Refusal {
@@ -20,7 +22,7 @@ interface Refusal {
 }
 
 /** The proofreading screen: the agent's summary, its changes, and the decision. */
-export function Review({ task, comments, setComments }: Props) {
+export function Review({ task, comments, setComments, partial = false }: Props) {
   const { api, t } = useApp();
   const [diff, setDiff] = useState<DiffFile[] | null>(null);
   const [note, setNote] = useState("");
@@ -29,7 +31,7 @@ export function Review({ task, comments, setComments }: Props) {
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [commit, setCommit] = useState<string | null | undefined>(undefined);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const stuck = task.status === "waiting" && (task.statusReason === "stuck" || task.statusReason === "visual_failed");
+  const stuck = partial || (task.status === "waiting" && (task.statusReason === "stuck" || task.statusReason === "visual_failed"));
   const open = task.status === "review" || task.status === "done_empty" || stuck;
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export function Review({ task, comments, setComments }: Props) {
   const team = task.kind === "goal";
   return (
     <section className="review">
-      <h2 className="sheet-h">{stuck ? t("review.titleStuck") : empty ? t(team ? "team.reviewEmpty" : "review.empty") : t(team ? "team.reviewTitle" : "review.title")}</h2>
+      <h2 className="sheet-h">{partial ? t("review.titlePartial") : stuck ? t("review.titleStuck") : empty ? t(team ? "team.reviewEmpty" : "review.empty") : t(team ? "team.reviewTitle" : "review.title")}</h2>
       {task.summary && !stuck && <p className="review-summary">{task.summary}</p>}
       {task.statusReason === "acceptance_partial" && <p className="note is-pencil">{t("acceptance.partial")}</p>}
       {task.statusReason === "milestones_left" && (

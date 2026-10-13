@@ -22,6 +22,8 @@ import { useTaskStream } from "./useTaskStream";
 const REVIEW_STATES = new Set(["review", "done_empty", "accepted", "discarded"]);
 /** Waiting states with their own controls below the notice. */
 const ANSWERED_BELOW = new Set(["questions", "spec_review", "plan_review"]);
+/** Waiting states where the work stopped short and only "Continue" moves it on. */
+const UNFINISHED = new Set(["budget", "steps", "acceptance_error"]);
 /** Waiting states whose last status line explains what went wrong. */
 const WITH_DETAIL = new Set(["stuck", "integration_red", "subtask_stuck", "visual_failed"]);
 
@@ -41,6 +43,12 @@ export function TaskSheet({ taskId }: { taskId: string }) {
   const answered = task.status === "done_empty" && task.statusReason === "answered";
   const reviewing = task.kind !== "subtask" && !answered && (REVIEW_STATES.has(task.status) || stuck);
   const waitingFor = task.status === "waiting" ? task.statusReason : null;
+  // Failed, stopped or out of budget: what is done so far can be looked at and taken as it is.
+  const unfinished =
+    task.kind !== "subtask" &&
+    !reviewing &&
+    !answered &&
+    (task.status === "failed" || task.status === "stopped" || (task.status === "waiting" && UNFINISHED.has(task.statusReason ?? "")));
 
   const answer = (approvalId: string, allow: boolean, always = false) =>
     void api.tasks[":id"].approvals[":approvalId"].$post({ param: { id: task.id, approvalId }, json: { allow, always } }).catch(() => null);
@@ -66,6 +74,12 @@ export function TaskSheet({ taskId }: { taskId: string }) {
         </header>
 
         <TaskNotice task={task} feed={feed} />
+        {unfinished && (
+          <details className="worked so-far">
+            <summary>{t("review.soFar")}</summary>
+            <Review task={task} comments={comments} setComments={setComments} partial />
+          </details>
+        )}
         {waitingFor === "questions" && <Interview key={task.updatedAt} task={task} />}
         {waitingFor === "spec_review" && <SpecReview key={task.spec ?? ""} task={task} />}
         {waitingFor === "plan_review" && <PlanReview key={task.updatedAt} task={task} />}

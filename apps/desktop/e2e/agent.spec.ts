@@ -181,6 +181,24 @@ test("a Windows notification says the task is ready, and a click opens it", asyn
   await expect(page.getByRole("heading", { level: 1, name: "Добавь notes.txt" })).toBeVisible();
 });
 
+// Seen live: a task that failed after writing 38 files showed none of them, only "Continue".
+test("a stopped task still shows what is done and lets it be accepted", async () => {
+  const page = await launch([
+    { toolCalls: [{ name: "write_file", args: { path: "sky.js", content: "export const stars = 16;\n" } }] },
+    { text: "Думаю дальше…", delayMs: 30_000 },
+  ]);
+  await startTask(page, "Нарисуй небо");
+  await expect(page.getByText("Пишет sky.js")).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Стоп" }).click();
+  await expect(page.getByText("Остановлен").first()).toBeVisible();
+
+  await page.getByText("Что уже сделано").click();
+  await expect(page.getByText("export const stars = 16;")).toBeVisible();
+  await page.getByRole("button", { name: "Принять" }).click();
+  await expect(page.getByText(/Принято/).first()).toBeVisible();
+  expect(readFileSync(join(repo, "sky.js"), "utf8")).toBe("export const stars = 16;\n");
+});
+
 test("discarding removes the copy and leaves the project alone", async () => {
   const page = await launch([
     { toolCalls: [{ name: "write_file", args: { path: "extra.txt", content: "x" } }] },

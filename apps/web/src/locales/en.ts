@@ -656,4 +656,6 @@ export const en: Record<keyof typeof ru, string> = {
   "web.noTools": "This model is too small to search the internet: it answers on its own.",
   "local.pick.qwen3-1.7b": "The lightest: simple chat on any computer, even without a video card.",
   "local.pick.qwen3-4b": "Small but capable: chat and simple tasks with tools.",
+  "review.soFar": "What is done so far",
+  "review.titlePartial": "The work is not finished: this is what the agent got done. Accept it as it is, or continue.",
 };
