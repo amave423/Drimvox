@@ -56,7 +56,7 @@ function fromShim(cmd: string): string[] | null {
  * Every file on PATH that runs as `name`, in PATH order. Searched here rather than with where.exe, which prints
  * in the console's code page and garbles folders with non-Latin names, such as a Cyrillic user name.
  */
-function onPath(name: string): string[] {
+export function onPath(name: string): string[] {
   const win = process.platform === "win32";
   const exts = win ? (process.env.PATHEXT ?? ".EXE;.CMD").split(";").filter(Boolean) : [""];
   const dirs = (process.env.PATH ?? process.env.Path ?? "").split(delimiter).filter(Boolean);

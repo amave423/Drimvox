@@ -16,6 +16,7 @@ import { McpHub } from "./mcp/hub";
 import { McpRepo } from "./mcp/repo";
 import { MediaRepo } from "./media/repo";
 import { Studio } from "./media/studio";
+import { LocalModels, type LocalOptions } from "./local/service";
 import { ProviderRepo } from "./providers/repo";
 import { chatRoutes, usageRoutes } from "./routes/chats";
 import { mcpRoutes } from "./routes/mcp";
@@ -23,6 +24,7 @@ import { mediaRoutes } from "./routes/media";
 import { skillRoutes } from "./routes/skills";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
+import { localRoutes } from "./routes/local";
 import { proxyRoutes } from "./routes/proxy";
 import { ProxyStore } from "./proxy";
 import { taskRoutes } from "./routes/tasks";
@@ -68,6 +70,8 @@ export interface AppOptions {
   cliCommands?: Partial<Record<CliId, string[]>>;
   /** What "Check the proxy" opens through it; a small page that answers fast by default. */
   proxyCheckUrl?: string;
+  /** Ollama and its catalogs; tests give a fake program, fixed hardware and fake catalogs. */
+  local?: LocalOptions;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
@@ -81,6 +85,8 @@ export function createCore(o: AppOptions) {
   const cipher = createCipher(o.secretKey);
   const proxies = new ProxyStore(o.db, cipher);
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
+  const local = new LocalModels(providers, providers.urlOf("ollama"), o.local);
+  providers.setWaker(local.ollama);
   const mcpRepo = new McpRepo(o.db, cipher);
   const mcp = new McpHub(mcpRepo);
   const approvals = new ChatApprovals();
@@ -129,6 +135,7 @@ export function createCore(o: AppOptions) {
       c.json(writeSettings(o.db, c.req.valid("json"))),
     )
     .route("/providers", providerRoutes(providers))
+    .route("/local", localRoutes(local))
     .route("/proxy", proxyRoutes(proxies, o.proxyCheckUrl ?? "https://www.google.com/generate_204"))
     .route("/chats", chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs, join(o.dataDir, "cli-chats")))
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
@@ -158,6 +165,7 @@ export function createCore(o: AppOptions) {
       await runner.shutdown();
       visualKit.background.shutdown();
       await mcp.shutdown();
+      local.close();
     },
   };
 }

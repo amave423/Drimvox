@@ -1,5 +1,5 @@
 /** Entry of the Electron utility process that runs the core. Same core runs headless in server mode. */
-import { startServer } from "@artel/core";
+import { startServer, type RunningServer } from "@artel/core";
 
 export interface InitMessage {
   type: "init";
@@ -15,7 +15,14 @@ export interface InitMessage {
 /** Screenshots come from the main process, which has a browser; the core asks for them by message. */
 const shots = new Map<number, { resolve(png: Buffer): void; reject(err: Error): void }>();
 let nextShot = 1;
+let running: RunningServer | null = null;
 process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number; png?: string; error?: string } }) => {
+  // The app is closing: stop what the core started (agents, the Ollama it runs), then go.
+  if (data?.type === "quit") {
+    setTimeout(() => process.exit(0), 2_500).unref();
+    void (running?.close() ?? Promise.resolve()).finally(() => process.exit(0));
+    return;
+  }
   if (data?.type !== "screenshot-done" || typeof data.id !== "number") return;
   const waiting = shots.get(data.id);
   shots.delete(data.id);
@@ -53,10 +60,18 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     // Tests run a fake Claude Code, Codex or Gemini CLI: {"claude-code": ["node", "fake-cli.mjs", "claude"]}.
     cliCommands: process.env.ARTEL_TEST_CLI ? JSON.parse(process.env.ARTEL_TEST_CLI) : undefined,
     // Tests: a fake public model catalog and a fake page to check the proxy against.
-    presetUrls: process.env.ARTEL_TEST_OPENROUTER_URL ? { openrouter: process.env.ARTEL_TEST_OPENROUTER_URL } : undefined,
+    presetUrls: {
+      ...(process.env.ARTEL_TEST_OPENROUTER_URL ? { openrouter: process.env.ARTEL_TEST_OPENROUTER_URL } : {}),
+      ...(process.env.ARTEL_TEST_OLLAMA_URL ? { ollama: process.env.ARTEL_TEST_OLLAMA_URL } : {}),
+    },
     proxyCheckUrl: process.env.ARTEL_TEST_PROXY_CHECK_URL,
+    // Tests: a fake Ollama program, fixed hardware and fake catalogs, as JSON of LocalOptions.
+    local: process.env.ARTEL_TEST_LOCAL ? JSON.parse(process.env.ARTEL_TEST_LOCAL) : undefined,
   })
-    .then((server) => process.parentPort.postMessage({ type: "ready", port: server.port }))
+    .then((server) => {
+      running = server;
+      process.parentPort.postMessage({ type: "ready", port: server.port });
+    })
     .catch((err: unknown) => {
       process.parentPort.postMessage({ type: "error", error: err instanceof Error ? err.message : String(err) });
       process.exit(1);

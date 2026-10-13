@@ -9,3 +9,4 @@ export * from "./proxy";
 export * from "./auth";
 export * from "./quality";
 export * from "./design";
+export * from "./local";

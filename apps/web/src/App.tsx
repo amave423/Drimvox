@@ -10,6 +10,7 @@ import { ChatSheet } from "./ui/chat/ChatSheet";
 import { HomeSheet } from "./ui/HomeSheet";
 import { ProjectSheet } from "./ui/projects/ProjectSheet";
 import { ProvidersSheet } from "./ui/providers/ProvidersSheet";
+import { LocalModelsSheet } from "./ui/local/LocalModelsSheet";
 import { TaskSheet } from "./ui/tasks/TaskSheet";
 import { GallerySheet } from "./ui/GallerySheet";
 import { SettingsSheet } from "./ui/SettingsSheet";
@@ -179,6 +180,7 @@ export function App({ api, token, initialSettings, status }: Props) {
           {view.kind === "home" && <HomeSheet />}
           {view.kind === "settings" && <SettingsSheet />}
           {view.kind === "providers" && <ProvidersSheet />}
+          {view.kind === "local" && <LocalModelsSheet />}
           {view.kind === "gallery" && <GallerySheet />}
           {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} />}
           {view.kind === "project" && <ProjectSheet key={view.projectId} projectId={view.projectId} />}

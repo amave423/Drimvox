@@ -7,6 +7,7 @@ import { createCore, openDatabase, type Database } from "../src";
 import type { WebAccess } from "../src/internet/web";
 import type { Screenshotter } from "../src/visual/look";
 import type { CliId } from "../src/cli/kinds";
+import type { LocalOptions } from "../src/local/service";
 
 export const TOKEN = "test-token";
 export const BASE = "http://127.0.0.1";
@@ -41,6 +42,8 @@ export interface TestEnv {
   setCliCommand(id: CliId, argv: string[]): void;
   /** What checking the proxy opens through it. */
   setProxyCheckUrl(url: string): void;
+  /** Ollama and its catalogs: by default nothing is installed and no catalog answers. */
+  setLocal(o: LocalOptions): void;
   close(): void;
   /** Stops running agents first; use when a test may leave one running. */
   closeAsync(): Promise<void>;
@@ -58,6 +61,13 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
   let screenshot: Screenshotter | undefined;
   const cliCommands: Partial<Record<CliId, string[]>> = {};
   let proxyCheckUrl = "http://127.0.0.1:9/no-internet-in-tests";
+  // Never the real Ollama, Hugging Face or this computer's hardware in tests.
+  let local: LocalOptions = {
+    command: null,
+    hardware: { ramBytes: 32 * 2 ** 30, gpu: { name: "Test GPU", vramBytes: 10 * 2 ** 30 }, unified: false },
+    registryUrl: "http://127.0.0.1:9",
+    hfUrl: "http://127.0.0.1:9",
+  };
   let web: WebAccess = {
     search: async () => {
       throw new Error("No internet in tests");
@@ -83,6 +93,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
       screenshot,
       cliCommands,
       proxyCheckUrl,
+      local,
       ...(o.setupCode ? { password: { setupCode: o.setupCode } } : {}),
     };
     if (webDir) return createCore({ ...options, webDir });
@@ -125,6 +136,10 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
     },
     setProxyCheckUrl(url) {
       proxyCheckUrl = url;
+      void dropCore();
+    },
+    setLocal(next) {
+      local = { ...local, ...next };
       void dropCore();
     },
     setCliCommand(id, argv) {

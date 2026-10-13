@@ -1,0 +1,179 @@
+import type { LocalPull, LocalStatus } from "@artel/shared";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ok } from "../../api";
+import { useApp } from "../../context";
+import { LocalCatalogView } from "./LocalCatalog";
+import { useSize } from "./size";
+
+const OLLAMA_DOWNLOAD = "https://ollama.com/download";
+
+/** Models on this computer through Ollama: its state, what is downloaded and downloading, the catalog. */
+export function LocalModelsSheet() {
+  const { api, t, reloadProviders } = useApp();
+  const size = useSize();
+  const [status, setStatus] = useState<LocalStatus | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const known = useRef<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const next = await api.local.$get().then((r) => ok<LocalStatus>(r));
+      setStatus(next);
+      setFailed(false);
+      // A finished download may have added the Ollama provider: the chat's model list should know.
+      const key = `${next.providerId}:${next.models.map((m) => m.name).join()}`;
+      if (known.current !== null && known.current !== key) void reloadProviders();
+      known.current = key;
+    } catch {
+      setFailed(true);
+    }
+  }, [api, reloadProviders]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+  // While something downloads, progress is read every second.
+  const downloading = !!status?.pulls.some((p) => !p.done);
+  useEffect(() => {
+    if (!downloading) return;
+    const timer = setInterval(() => void load(), 1000);
+    return () => clearInterval(timer);
+  }, [downloading, load]);
+
+  const pull = async (model: string) => {
+    await api.local.pulls.$post({ json: { model } }).catch(() => null);
+    await load();
+  };
+  const cancel = async (model: string) => {
+    await api.local.pulls.$delete({ query: { model } }).catch(() => null);
+    await load();
+  };
+  const remove = async (name: string) => {
+    setConfirm(null);
+    await api.local.models.$delete({ query: { name } }).catch(() => null);
+    await load();
+  };
+  const connect = async () => {
+    await api.local.connect.$post().catch(() => null);
+    await load();
+    await reloadProviders();
+  };
+
+  const hw = status?.hardware;
+  return (
+    <article className="sheet">
+      <div className="sheet-body local">
+        <h1>{t("local.title")}</h1>
+        <p className="lede">{t("local.lede")}</p>
+
+        {failed && <p className="note is-pencil">{t("local.failed")}</p>}
+        {!status && !failed && <p className="muted">{t("local.checking")}</p>}
+        {status && !status.installed && (
+          <div className="note is-pencil local-missing">
+            <p>{t("local.notInstalled")}</p>
+            <p className="actions">
+              <a className="btn is-primary" href={OLLAMA_DOWNLOAD} target="_blank" rel="noreferrer">
+                {t("local.download")}
+              </a>
+              <button type="button" className="btn" onClick={() => void load()}>
+                {t("local.checkAgain")}
+              </button>
+            </p>
+          </div>
+        )}
+        {status?.installed && !status.running && <p className="note is-pencil">{t("local.notRunning")}</p>}
+        {status?.running && (
+          <p className="note is-ok">
+            {status.managed ? t("local.runningManaged", { version: status.version ?? "" }) : t("local.running", { version: status.version ?? "" })}
+          </p>
+        )}
+        {hw && (
+          <p className="muted local-hw">
+            {hw.unified
+              ? t("local.hwUnified", { ram: size(hw.ramBytes) })
+              : hw.gpu
+                ? t("local.hwGpu", { gpu: hw.gpu.name, vram: size(hw.gpu.vramBytes), ram: size(hw.ramBytes) })
+                : t("local.hwCpu", { ram: size(hw.ramBytes) })}
+          </p>
+        )}
+
+        {status && status.pulls.length > 0 && (
+          <>
+            <h2 className="sheet-h">{t("local.pulls")}</h2>
+            <ul className="local-list">
+              {status.pulls.map((p) => (
+                <PullRow key={p.model} pull={p} onCancel={() => void cancel(p.model)} />
+              ))}
+            </ul>
+          </>
+        )}
+
+        {status && status.models.length > 0 && (
+          <>
+            <h2 className="sheet-h">{t("local.installed")}</h2>
+            {!status.providerId && (
+              <p className="note">
+                {t("local.notConnected")}{" "}
+                <button type="button" className="link" onClick={() => void connect()}>
+                  {t("local.connect")}
+                </button>
+              </p>
+            )}
+            <ul className="local-list">
+              {status.models.map((m) => (
+                <li key={m.name} className="local-row">
+                  <span className="mono">{m.name}</span>
+                  <span className="muted">{size(m.sizeBytes)}</span>
+                  {confirm === m.name ? (
+                    <span className="local-actions">
+                      <button type="button" className="btn is-pencil" onClick={() => void remove(m.name)}>
+                        {t("local.removeConfirm")}
+                      </button>
+                      <button type="button" className="link" onClick={() => setConfirm(null)}>
+                        {t("local.keep")}
+                      </button>
+                    </span>
+                  ) : (
+                    <button type="button" className="link" onClick={() => setConfirm(m.name)}>
+                      {t("local.remove")}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {status?.running && <LocalCatalogView status={status} onPull={(model) => void pull(model)} />}
+      </div>
+      <aside className="margin">
+        <p className="note">{t("local.marginTip")}</p>
+      </aside>
+    </article>
+  );
+}
+
+function PullRow({ pull, onCancel }: { pull: LocalPull; onCancel(): void }) {
+  const { t } = useApp();
+  const size = useSize();
+  const share = pull.total > 0 ? Math.min(100, Math.round((pull.completed / pull.total) * 100)) : 0;
+  return (
+    <li className="local-row local-pull">
+      <span className="mono">{pull.model}</span>
+      {pull.error ? (
+        <span className="is-pencil-text">{t("local.pullFailed", { error: pull.error })}</span>
+      ) : pull.done ? (
+        <span className="is-ok-text">{t("local.pulled")}</span>
+      ) : (
+        <span className="local-progress">
+          <progress max={100} value={share} aria-label={t("local.progress", { model: pull.model })} />
+          <span className="muted">{pull.total > 0 ? t("local.pullBytes", { done: size(pull.completed), total: size(pull.total), share }) : pull.status}</span>
+        </span>
+      )}
+      <button type="button" className="link" onClick={onCancel}>
+        {pull.done ? t("local.dismiss") : t("local.cancel")}
+      </button>
+    </li>
+  );
+}

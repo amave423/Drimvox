@@ -230,7 +230,17 @@ async function createWindow() {
 }
 
 app.on("window-all-closed", () => app.quit());
-app.on("before-quit", () => {
-  core?.kill();
-  core = null;
+let quitting = false;
+app.on("before-quit", (event) => {
+  const child = core;
+  if (!child || quitting) return;
+  // The core stops what it started, such as Ollama, before it goes; a hung core is stopped hard.
+  event.preventDefault();
+  quitting = true;
+  child.once("exit", () => {
+    core = null;
+    app.quit();
+  });
+  child.postMessage({ type: "quit" });
+  setTimeout(() => child.kill(), 3_000).unref();
 });

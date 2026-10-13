@@ -106,6 +106,9 @@ export function Sidebar() {
           {t("side.keys")}
           <small>{providers.length}</small>
         </button>
+        <button className={`side-link${view.kind === "local" ? " is-on" : ""}`} onClick={() => navigate({ kind: "local" })}>
+          {t("side.local")}
+        </button>
         <button
           className={`side-link${view.kind === "settings" ? " is-on" : ""}`}
           onClick={() => navigate({ kind: "settings" })}

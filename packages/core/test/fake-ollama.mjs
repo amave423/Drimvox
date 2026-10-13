@@ -1,0 +1,87 @@
+// A stand-in for `ollama serve`: listens on OLLAMA_HOST and answers the parts of Ollama's API Artel uses.
+// FAKE_OLLAMA_MODELS: JSON list of installed names. FAKE_OLLAMA_PULL_MS: delay between progress lines.
+// FAKE_OLLAMA_KEEP_MS: how long a model stays loaded after a chat (what /api/ps shows).
+import { createServer } from "node:http";
+
+const [host, port] = (process.env.OLLAMA_HOST ?? "127.0.0.1:11434").replace(/^https?:\/\//, "").split(":");
+const pullMs = Number(process.env.FAKE_OLLAMA_PULL_MS ?? 20);
+const keepMs = Number(process.env.FAKE_OLLAMA_KEEP_MS ?? 100);
+const models = new Map((JSON.parse(process.env.FAKE_OLLAMA_MODELS ?? "[]")).map((name) => [name, 1000]));
+let loadedUntil = 0;
+let loadedModel = "";
+
+const json = (res, status, body) => {
+  res.writeHead(status, { "content-type": "application/json" });
+  res.end(JSON.stringify(body));
+};
+const read = (req) =>
+  new Promise((resolve) => {
+    let s = "";
+    req.on("data", (d) => (s += d)).on("end", () => resolve(s ? JSON.parse(s) : {}));
+  });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+createServer(async (req, res) => {
+  const url = new URL(req.url, "http://x");
+  if (url.pathname === "/api/version") return json(res, 200, { version: "0.31.1-fake" });
+  if (url.pathname === "/fake/env") return json(res, 200, { contextLength: process.env.OLLAMA_CONTEXT_LENGTH ?? null, pid: process.pid });
+  if (url.pathname === "/api/tags") {
+    return json(res, 200, { models: [...models].map(([name, size]) => ({ name, model: name, size, modified_at: "2026-10-13T10:00:00Z" })) });
+  }
+  if (url.pathname === "/api/ps") {
+    return json(res, 200, { models: Date.now() < loadedUntil ? [{ name: loadedModel, model: loadedModel, size: 1000 }] : [] });
+  }
+  if (url.pathname === "/api/delete" && req.method === "DELETE") {
+    const { model } = await read(req);
+    if (!models.delete(model)) return json(res, 404, { error: `model '${model}' not found` });
+    return json(res, 200, {});
+  }
+  if (url.pathname === "/api/pull" && req.method === "POST") {
+    const { model } = await read(req);
+    res.writeHead(200, { "content-type": "application/x-ndjson" });
+    const line = (o) => res.write(`${JSON.stringify(o)}\n`);
+    line({ status: "pulling manifest" });
+    if (model.includes("missing")) {
+      line({ error: "pull model manifest: file does not exist" });
+      return res.end();
+    }
+    let closed = false;
+    res.on("close", () => (closed = true));
+    for (let done = 0; done <= 1000; done += 100) {
+      if (closed) return;
+      line({ status: `pulling ${"a".repeat(12)}`, digest: "sha256:aaaa", total: 1000, completed: done });
+      await sleep(pullMs);
+    }
+    if (closed) return;
+    line({ status: "verifying sha256 digest" });
+    line({ status: "writing manifest" });
+    models.set(model, 1000);
+    line({ status: "success" });
+    return res.end();
+  }
+  if (url.pathname === "/v1/models") return json(res, 200, { object: "list", data: [...models.keys()].map((id) => ({ id, object: "model", owned_by: "library" })) });
+  if (url.pathname === "/v1/chat/completions" && req.method === "POST") {
+    const body = await read(req);
+    loadedModel = body.model;
+    loadedUntil = Date.now() + keepMs;
+    const text = "Привет из Ollama";
+    if (!body.stream) {
+      return json(res, 200, {
+        id: "c1",
+        object: "chat.completion",
+        model: body.model,
+        choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+      });
+    }
+    res.writeHead(200, { "content-type": "text/event-stream" });
+    const chunk = (delta, finish = null, usage) =>
+      res.write(`data: ${JSON.stringify({ id: "c1", object: "chat.completion.chunk", model: body.model, choices: [{ index: 0, delta, finish_reason: finish }], ...(usage ? { usage } : {}) })}\n\n`);
+    chunk({ role: "assistant", content: "" });
+    chunk({ content: text });
+    chunk({}, "stop", { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 });
+    res.write("data: [DONE]\n\n");
+    return res.end();
+  }
+  json(res, 404, { error: "not found" });
+}).listen(Number(port), host);

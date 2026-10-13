@@ -232,3 +232,30 @@
 .design-brief .swatches { justify-self: start; }
 .design-note .swatches { display: flex; width: max-content; margin-top: 6px; }
 .feed-reference { display: grid; gap: 4px; }
+
+/* Local models */
+.is-ok-text { color: var(--ok); }
+.local-hw { margin-top: 8px; }
+.local-missing p { margin: 0 0 8px; }
+.local-list, .local-cards, .local-variants { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.local-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.local-row .mono { min-width: 0; overflow-wrap: anywhere; }
+.local-actions { display: inline-flex; gap: 10px; align-items: center; }
+.local-progress { display: inline-flex; align-items: center; gap: 10px; flex: 1 1 200px; min-width: 0; }
+.local-progress progress { flex: 1 1 120px; min-width: 80px; accent-color: var(--ink); }
+.local-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); margin-top: 10px; }
+.local-card { display: grid; gap: 6px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--sheet); }
+.local-card p { margin: 0; }
+.local-card .btn, .local-card .is-ok-text { justify-self: start; }
+.local-card-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.local-uses { display: flex; flex-wrap: wrap; gap: 4px; }
+.local-use { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); color: var(--muted); }
+.local-fit { font-size: 12px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.local-fit.is-fast { background: var(--ok-soft); color: var(--ok); }
+.local-fit.is-slow { background: var(--wait-soft); color: var(--wait); }
+.local-search { display: flex; gap: 8px; margin: 8px 0 12px; }
+.local-search .field-input { flex: 1 1 auto; min-width: 0; }
+.local-repo { border-bottom: 1px solid var(--line); }
+.local-repo-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; width: 100%; padding: 8px 0; background: none; border: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.local-repo-head .mono { overflow-wrap: anywhere; min-width: 0; }
+.local-variants { padding: 0 0 10px 14px; }

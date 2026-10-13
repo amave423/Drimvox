@@ -38,7 +38,16 @@ interface Row {
 /** A custom address that is really a known service gets that service's preset: prices, currency, media. */
 const KNOWN_HOSTS: Partial<Record<string, PresetId>> = { "routerai.ru": "routerai", "openrouter.ai": "openrouter" };
 
+/** The Ollama Artel looks after: its requests wake it up first. */
+export interface LocalWaker {
+  handles(baseUrl: string): boolean;
+  ensureRunning(): Promise<boolean>;
+  touch(): void;
+}
+
 export class ProviderRepo {
+  private waker: LocalWaker | null = null;
+
   constructor(
     private readonly db: Database,
     private readonly cipher: Cipher,
@@ -47,7 +56,12 @@ export class ProviderRepo {
     private readonly presetUrls: Partial<Record<PresetId, string>> = {},
   ) {}
 
-  private urlOf(preset: PresetId): string {
+  /** Set once the local models are set up: they need the providers too. */
+  setWaker(waker: LocalWaker): void {
+    this.waker = waker;
+  }
+
+  urlOf(preset: PresetId): string {
     return this.presetUrls[preset] ?? presets[preset].baseUrl;
   }
 
@@ -140,8 +154,22 @@ export class ProviderRepo {
       cacheKey: `${id}:${row.updated_at}:${proxy ?? ""}`,
       useProxy,
       proxy,
-      fetch: !useProxy ? globalThis.fetch : proxy ? fetchVia(proxy) : noProxyFetch,
+      fetch: this.wake(row.preset, baseUrl, !useProxy ? globalThis.fetch : proxy ? fetchVia(proxy) : noProxyFetch),
     };
+  }
+
+  /** Requests to the Ollama Artel started and stops: it is woken first, and each request keeps it a while longer. */
+  private wake(preset: PresetId, baseUrl: string, inner: typeof fetch): typeof fetch {
+    const waker = this.waker;
+    if (preset !== "ollama" || !waker?.handles(baseUrl)) return inner;
+    return (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      await waker.ensureRunning();
+      try {
+        return await inner(input, init);
+      } finally {
+        waker.touch();
+      }
+    }) as typeof fetch;
   }
 
   private row(id: string): Row | undefined {
