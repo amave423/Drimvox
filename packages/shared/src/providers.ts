@@ -226,6 +226,8 @@ export interface ModelInfo {
   /** USD per 1M tokens; null when the provider does not publish prices. */
   priceIn: number | null;
   priceOut: number | null;
+  /** USD per 1M input tokens the provider serves from its cache, when it publishes such a price. */
+  priceCacheRead?: number;
   /** True when prices come from a table built into Artel rather than from the provider. */
   priceEstimated: boolean;
   tools: boolean | null;

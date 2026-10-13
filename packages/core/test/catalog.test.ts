@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { fetchBalance } from "../src/providers/balance";
 import { normalizeModels } from "../src/providers/catalog";
+import { costOf } from "../src/providers/pricing";
 import { createCipher } from "../src/secrets";
 import { startFakeProvider, type FakeProvider } from "./fake-provider";
 
@@ -35,10 +36,19 @@ describe("normalizeModels", () => {
     });
   });
 
+  it("reads the price of input the provider serves from its cache", () => {
+    const [model] = normalizeModels("openrouter", [
+      { id: "a/b", name: "B", pricing: { prompt: "0.000001", completion: "0.000002", input_cache_read: "0.0000001" } },
+    ]);
+    expect(model).toMatchObject({ priceIn: 1, priceOut: 2, priceCacheRead: 0.1 });
+  });
+
   it("uses the built-in price table for DeepSeek and marks it as an estimate", () => {
     const [model] = normalizeModels("deepseek", [{ id: "deepseek-flash", name: "DeepSeek-V4.1-Flash", context_window: 1048576 }]);
     expect(model).toMatchObject({ id: "deepseek-flash", name: "DeepSeek-V4.1-Flash", contextLength: 1048576, priceEstimated: true });
     expect(model?.priceIn).toBeGreaterThan(0);
+    // From api-docs.deepseek.com/quick_start/pricing: a cache hit costs a fiftieth of a miss.
+    expect(model).toMatchObject({ priceIn: 0.3, priceOut: 1.2, priceCacheRead: 0.006 });
   });
 
   it("leaves NVIDIA models that cannot chat out of the list", () => {
@@ -74,6 +84,30 @@ describe("normalizeModels", () => {
   it("sorts by name and drops entries without an id", () => {
     const models = normalizeModels("custom", [{ id: "b" }, { name: "no id" }, { id: "a" }]);
     expect(models.map((m) => m.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("costOf", () => {
+  const model = { id: "m", name: "M", contextLength: null, priceIn: 1, priceOut: 2, priceEstimated: false, tools: true, vision: null };
+  const monday = new Date("2026-10-12T07:00:00Z");
+
+  it("counts input from the provider's cache at the cache price", () => {
+    expect(costOf({ ...model, priceCacheRead: 0.1 }, "openrouter", { input: 1000, cacheRead: 800, output: 100 }, monday)).toBeCloseTo(0.00048, 12);
+  });
+
+  it("counts cached input at the full price when the cache price is unknown", () => {
+    expect(costOf(model, "openrouter", { input: 1000, cacheRead: 800, output: 100 }, monday)).toBeCloseTo(0.0012, 12);
+  });
+
+  it("halves DeepSeek outside its peak hours", () => {
+    const usage = { input: 1000, cacheRead: 0, output: 1000 };
+    expect(costOf(model, "deepseek", usage, monday)).toBeCloseTo(0.003, 12);
+    expect(costOf(model, "deepseek", usage, new Date("2026-10-12T12:00:00Z"))).toBeCloseTo(0.0015, 12);
+    expect(costOf(model, "deepseek", usage, new Date("2026-10-17T07:00:00Z"))).toBeCloseTo(0.0015, 12);
+  });
+
+  it("is unknown without a price", () => {
+    expect(costOf(undefined, "openrouter", { input: 1, cacheRead: 0, output: 1 })).toBeNull();
   });
 });
 

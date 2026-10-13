@@ -71,6 +71,17 @@ describe("sending a message", () => {
     expect(done.costUsd).toBeCloseTo(0.002, 10);
   });
 
+  it("prices input served from the provider's cache at the cache price", async () => {
+    const { chat } = await setup({
+      models: [{ id: "fake-model", name: "Fake Model", pricing: { prompt: "0.000001", completion: "0.000002", input_cache_read: "0.0000001" } }],
+      chunks: [{ text: "Привет" }],
+      usage: { prompt_tokens: 1000, completion_tokens: 500, prompt_tokens_details: { cached_tokens: 800 } },
+    });
+    const done = (await readEvents(await send(chat.id, "Привет"))).at(-1).message;
+    // 200 fresh tokens at $1/M, 800 cached at $0.1/M, 500 out at $2/M.
+    expect(done.costUsd).toBeCloseTo(0.00128, 10);
+  });
+
   it("keeps the conversation and sends the history upstream", async () => {
     const { chat } = await setup({ chunks: [{ text: "Ответ" }] });
     await readEvents(await send(chat.id, "Первый"));

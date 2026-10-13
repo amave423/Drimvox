@@ -100,6 +100,7 @@ export async function nativeModels(conn: Connection): Promise<ModelInfo[]> {
         priceIn: known?.priceIn ?? null,
         priceOut: known?.priceOut ?? null,
         priceEstimated: !!known,
+        ...(known?.priceCacheRead !== undefined ? { priceCacheRead: known.priceCacheRead } : {}),
         tools: known?.tools ?? null,
         vision: known?.vision ?? null,
       };

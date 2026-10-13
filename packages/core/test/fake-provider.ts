@@ -1,5 +1,12 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 
+/** OpenAI-style usage; `prompt_tokens_details.cached_tokens` are the ones served from the provider's cache. */
+export interface FakeUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  prompt_tokens_details?: { cached_tokens: number };
+}
+
 export interface FakeChunk {
   reasoning?: string;
   text?: string;
@@ -9,7 +16,7 @@ export interface FakeChunk {
 export interface FakeTurn {
   text?: string;
   toolCalls?: { name: string; args: Record<string, unknown> }[];
-  usage?: { prompt_tokens: number; completion_tokens: number };
+  usage?: FakeUsage;
   /** Wait before answering, ms. */
   delayMs?: number;
 }
@@ -26,7 +33,7 @@ export interface FakeProviderOptions {
   /** Items of GET /models; OpenRouter-style fields are optional. */
   models?: Record<string, unknown>[];
   chunks?: FakeChunk[];
-  usage?: { prompt_tokens: number; completion_tokens: number };
+  usage?: FakeUsage;
   /** Delay between streamed chunks, ms. */
   delayMs?: number;
   /** Answer chat requests with this status and an OpenAI-style error body. */

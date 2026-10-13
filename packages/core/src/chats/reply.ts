@@ -6,6 +6,7 @@ import { isCli } from "../cli/kinds";
 import { WEB_HINT, webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
+import { costOf, usageOf } from "../providers/pricing";
 import { describeError } from "../providers/errors";
 import { nowLine } from "../now";
 import { languageModel } from "../providers/model";
@@ -58,7 +59,7 @@ export async function reply(i: ReplyInput): Promise<void> {
   let text = "";
   let reasoning = "";
   let error: ProviderError | null = null;
-  let usage: { inputTokens?: number; outputTokens?: number } | undefined;
+  let usage: Parameters<typeof usageOf>[0];
 
   // Some hosted models sit in a queue or hang; every streamed part resets the clock.
   const silence = new AbortController();
@@ -129,14 +130,10 @@ export async function reply(i: ReplyInput): Promise<void> {
     status: stopped ? "stopped" : error ? "error" : "done",
     inputTokens,
     outputTokens,
-    costUsd: cost(price, inputTokens, outputTokens),
+    costUsd: inputTokens !== null && outputTokens !== null ? costOf(price, i.conn.preset, usageOf(usage)) : null,
     error: stopped ? null : error,
   });
   if (!stopped) await i.emit({ type: "done", message });
 }
 
-function cost(model: ModelInfo | undefined, input: number | null, output: number | null): number | null {
-  if (!model || model.priceIn === null || model.priceOut === null || input === null || output === null) return null;
-  // Rounded to a billionth of a dollar so sums do not show float noise like 0.00006089999999.
-  return Number(((input * model.priceIn + output * model.priceOut) / 1_000_000).toFixed(9));
-}
+

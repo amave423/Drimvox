@@ -8,13 +8,13 @@ import type { Connection } from "./repo";
 
 /**
  * DeepSeek does not publish prices through its API. USD per 1M tokens from
- * api-docs.deepseek.com/quick_start/pricing (checked 2026-10-12): peak-hour rate, cache-miss input,
- * so the estimate errs high. Legacy names are served by the Flash model at Flash prices.
+ * api-docs.deepseek.com/quick_start/pricing (checked 2026-10-13), at the peak-hour rate: input, output, input served
+ * from the cache. costOf halves them outside peak hours. Legacy names are served by the Flash model at Flash prices.
  */
-const flash: [number, number] = [0.3, 1.2];
-const deepseekPrices: Record<string, [number, number]> = {
+const flash: [number, number, number] = [0.3, 1.2, 0.006];
+const deepseekPrices: Record<string, [number, number, number]> = {
   "deepseek-flash": flash,
-  "deepseek-v4-pro": [1.32, 3.96],
+  "deepseek-v4-pro": [1.32, 3.96, 0.044],
   "deepseek-v4-flash": flash,
   "deepseek-chat": flash,
   "deepseek-reasoner": flash,
@@ -44,10 +44,11 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
 
     let priceIn = perMillion((raw.pricing as Raw | undefined)?.prompt, toUsd);
     let priceOut = perMillion((raw.pricing as Raw | undefined)?.completion, toUsd);
+    let priceCacheRead = perMillion((raw.pricing as Raw | undefined)?.input_cache_read, toUsd);
     let priceEstimated = false;
     const table = preset === "deepseek" ? deepseekPrices[raw.id] : undefined;
     if (priceIn === null && table) {
-      [priceIn, priceOut] = table;
+      [priceIn, priceOut, priceCacheRead] = table;
       priceEstimated = true;
     }
     if (priceIn === null && free) {
@@ -64,6 +65,7 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
       priceIn,
       priceOut,
       priceEstimated,
+      ...(priceCacheRead !== null && priceIn !== null && priceCacheRead < priceIn ? { priceCacheRead } : {}),
       tools: Array.isArray(params) ? params.includes("tools") : null,
       vision: Array.isArray(inputs) ? inputs.includes("image") : null,
     });
