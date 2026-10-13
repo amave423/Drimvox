@@ -80,6 +80,17 @@ describe("look_at_page", () => {
     expect(file.headers.get("content-type")).toBe("image/png");
   });
 
+  // Seen live: an agent told to care about the look kept photographing its page, a dozen times and $0.80 later.
+  it("lets an agent look a few times per turn, then tells it to finish", async () => {
+    const look = call("look_at_page", { url: "http://localhost:5173/", question: "Как выглядит?" });
+    const id = await start([look, look, look, look, look, finish], []);
+    await waitTask(id, (t) => t.status === "done_empty");
+    expect(shots).toHaveLength(4);
+    const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
+    expect(results.map((r) => r.data.ok)).toEqual([true, true, true, true, false]);
+    expect(results.at(-1).data.output).toMatch(/design review/);
+  });
+
   it("opens only this computer and the public internet", async () => {
     const id = await start([call("look_at_page", { url: "http://192.168.1.10/admin", question: "?" }), finish], []);
     await waitTask(id, (t) => t.status === "done_empty");

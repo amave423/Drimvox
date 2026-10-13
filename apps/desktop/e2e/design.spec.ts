@@ -98,9 +98,10 @@ test("the look: samples in the interview, the user's own sample, the brief, a de
     respond: (body) => {
       const text = JSON.stringify(body.messages);
       if (/acceptance agent/i.test(JSON.stringify(body.messages?.[0]?.content ?? ""))) return verdict;
-      if (/design review/i.test(text)) return { text: reviews.shift() ?? "GOOD" };
-      if (/visual style/i.test(text)) return { text: "Тёмно-зелёный фон, кремовый текст, рукописные заголовки" };
-      if (text.includes("data:image/png;base64,")) return { text: "PASS: заголовок виден" };
+      // The vision model's questions come without tools; the coder's instructions mention the design review too.
+      if (!body.tools && /design review/i.test(text)) return { text: reviews.shift() ?? "GOOD" };
+      if (!body.tools && /visual style/i.test(text)) return { text: "Тёмно-зелёный фон, кремовый текст, рукописные заголовки" };
+      if (!body.tools && text.includes("data:image/png;base64,")) return { text: "PASS: заголовок виден" };
       return coder.shift() ?? { text: "Done." };
     },
   });

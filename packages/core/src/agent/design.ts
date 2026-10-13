@@ -76,6 +76,8 @@ export function designInstructions(brief: DesignBrief): string {
     `The look (design brief):\n${briefText(brief)}`,
     "Put the palette and the fonts in one place first (CSS variables or the theme) and take colours only from there.",
     "Load the fonts with a fallback of the same kind. If the project has no DESIGN.md, save this brief there.",
+    "Look at your pages a couple of times, not more: once the first full version stands and once before you finish. Do not chase",
+    "pixels: Artel's design review looks at the screens on a desktop and a phone after acceptance and sends concrete notes.",
     `Never:\n${list(CLICHES)}`,
     `Always:\n${list(CRAFT)}`,
   ].join("\n");

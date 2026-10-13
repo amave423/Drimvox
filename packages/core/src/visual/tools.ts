@@ -26,6 +26,8 @@ export interface VisualDeps {
 }
 
 const SIZE = { width: 1280, height: 800 };
+/** Looks per turn: enough to check a page and its fix; the polish comes from Artel's design review. */
+export const MAX_LOOKS = 4;
 
 export const VISUAL_HINT =
   "To see an interface you built, start it with start_background (for example npm run dev), read its output with " +
@@ -93,12 +95,18 @@ export function visualTools(d: VisualDeps): ToolSet {
   };
   if (!d.kit.screenshot || !d.vision) return tools;
 
+  let looks = 0;
   tools.look_at_page = tool({
     description: "Open a page in a browser, take a screenshot and ask a model that sees pictures about it.",
     inputSchema: z.object({ url: z.string().min(1).max(2000), question: z.string().min(1).max(2000) }),
     execute: ({ url, question }, o: Options) =>
       run(o.toolCallId, "look_at_page", { url, question }, async () => {
         if (!mayLookAt(url)) throw new Error("Only this computer (localhost) and public addresses can be opened");
+        if (++looks > MAX_LOOKS) {
+          throw new Error(
+            `You have looked at pages ${MAX_LOOKS} times in this turn. Finish with what you have: Artel's design review looks at the screens after acceptance and sends concrete notes.`,
+          );
+        }
         return (await look(d, url, question, o.abortSignal)).answer;
       }),
   });
