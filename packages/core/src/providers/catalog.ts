@@ -1,3 +1,4 @@
+import { withOllamaDetails } from "./ollama-details";
 import { presets, type ModelInfo, type PresetId } from "@artel/shared";
 import { fetchJson } from "./http";
 import { usdPer } from "../rates";
@@ -98,6 +99,7 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
     const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
     const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
     models = normalizeModels(conn.preset, items, await usdPer(conn.currency));
+    if (conn.preset === "ollama") models = await withOllamaDetails(conn, models);
   }
   cache.set(conn.cacheKey, { at: Date.now(), models });
   return models;

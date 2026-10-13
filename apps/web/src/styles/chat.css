@@ -117,3 +117,5 @@
 .md .hljs-number, .md .hljs-literal, .md .hljs-attr, .md .hljs-property, .md .hljs-symbol { color: var(--wait); }
 .md .hljs-built_in, .md .hljs-type, .md .hljs-deletion { color: var(--pencil); }
 .md .hljs-comment, .md .hljs-quote, .md .hljs-meta { color: var(--muted); font-style: italic; }
+
+.web-note { padding: 6px 10px 4px; font-size: 12.5px; max-width: 280px; }

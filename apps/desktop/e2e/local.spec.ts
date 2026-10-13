@@ -36,7 +36,7 @@ const freePort = () =>
 
 /** Ollama's registry with three of the picks: two that fit a 10 GB card and one far too big. */
 async function serveRegistry(): Promise<string> {
-  const sizes: Record<string, number> = { "llama3.2/3b": 1.9, "qwen3/8b": 4.9, "qwen3.6/35b": 60 };
+  const sizes: Record<string, number> = { "qwen3/1.7b": 1.3, "qwen3/8b": 4.9, "qwen3.6/35b": 60 };
   registry = createServer((req, res) => {
     const m = req.url!.match(/^\/v2\/library\/([^/]+)\/manifests\/(.+)$/);
     const gb = m ? sizes[`${m[1]}/${m[2]}`] : undefined;
@@ -80,20 +80,25 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   // Only what runs here: the 60 GB model is not offered at all.
   const cards = page.locator(".local-card");
   await expect(cards).toHaveCount(2);
-  await expect(cards.nth(0)).toContainText("llama3.2:3b");
+  await expect(cards.nth(0)).toContainText("qwen3:1.7b");
   await expect(cards.nth(0)).toContainText("быстро");
   await expect(page.getByText("qwen3.6:35b")).toHaveCount(0);
 
-  await cards.nth(0).getByRole("button", { name: /Скачать · 1,9 ГБ/ }).click();
-  await expect(page.getByRole("progressbar", { name: "Скачивание llama3.2:3b" })).toBeVisible();
+  await cards.nth(0).getByRole("button", { name: /Скачать · 1,3 ГБ/ }).click();
+  await expect(page.getByRole("progressbar", { name: "Скачивание qwen3:1.7b" })).toBeVisible();
   await expect(page.getByText("Скачано")).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator(".local-row", { hasText: "llama3.2:3b" }).first()).toBeVisible();
+  await expect(page.locator(".local-row", { hasText: "qwen3:1.7b" }).first()).toBeVisible();
   await expect(cards.nth(0)).toContainText("Скачана");
 
   // The download added the Ollama provider: the model is in the chat and answers.
   await page.getByRole("button", { name: "+ Новый чат" }).click();
   await page.getByRole("button", { name: "Выбери модель" }).click();
-  await page.getByRole("option", { name: /llama3\.2:3b/ }).click();
+  await page.getByRole("option", { name: /qwen3:1\.7b/ }).click();
+  // A model this small gets no search: the switch says so instead of offering it.
+  await page.getByRole("button", { name: /^Интернет:/ }).click();
+  await expect(page.getByText("Эта модель слишком мала, чтобы искать в интернете: она отвечает сама.")).toBeVisible();
+  await expect(page.getByRole("option", { name: /Поиск Artel/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   const box = page.getByRole("textbox", { name: /Сообщение/ });
   await box.fill("Привет");
   await box.press("Enter");

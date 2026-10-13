@@ -21,6 +21,7 @@ import { MediaOptions } from "./MediaOptions";
 import { AssistantMessage, UserMessage, type ChatApproval } from "./Messages";
 import { ModelNote } from "./ModelNote";
 import { ModelPicker } from "./ModelPicker";
+import { loadModels } from "../../lib/models";
 import { readWebMode, WebSwitch } from "./WebSwitch";
 
 interface Draft {
@@ -49,9 +50,21 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const [mediaModel, setMediaModel] = useState<MediaModel | null>(null);
   const [options, setOptions] = useState<Options>({});
   const [web, setWeb] = useState(readWebMode);
+  // Small local models cannot call tools: they chat without Artel's search.
+  const [noTools, setNoTools] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const kind = choice?.kind ?? "text";
+
+  useEffect(() => {
+    setNoTools(false);
+    if (!choice || kind !== "text") return;
+    let live = true;
+    void loadModels(api, choice.providerId).then((r) => live && setNoTools("models" in r && r.models.find((m) => m.id === choice.model)?.tools === false));
+    return () => {
+      live = false;
+    };
+  }, [api, choice?.providerId, choice?.model, kind]);
 
   async function load(id: string) {
     const loaded = await api.chats[":id"].$get({ param: { id } }).then((r) => ok<ChatWithMessages>(r)).catch(() => null);
@@ -109,7 +122,8 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const preset = providers.find((p) => p.id === choice?.providerId)?.preset;
   const providerSearch = preset === "openrouter" || preset === "routerai";
   const searchProvider = providerSearch && preset ? presets[preset].name : null;
-  const webMode = web === "provider" && !providerSearch ? "free" : web;
+  const asked = web === "provider" && !providerSearch ? "free" : web;
+  const webMode = noTools && asked === "free" ? "off" : asked;
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
 
   async function send(content: string) {
@@ -253,7 +267,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           tools={
             <>
               <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />
-              {kind === "text" && choice && <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} />}
+              {kind === "text" && choice && <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} />}
             </>
           }
           extra={mediaModel && <MediaOptions model={mediaModel} value={options} onChange={setOptions} estimateUsd={estimateUsd} />}

@@ -631,7 +631,6 @@ export const en: Record<keyof typeof ru, string> = {
   "local.use.code": "code",
   "local.use.vision": "pictures",
   "local.use.tools": "tools",
-  "local.pick.llama3.2-3b": "The lightest: quick chat on any computer, even without a video card.",
   "local.pick.gemma4-e2b": "A small Google model that understands pictures. Good for everyday chat.",
   "local.pick.gemma4-e4b": "A bit larger and smarter: chat, pictures and simple tasks with tools.",
   "local.pick.qwen3-8b": "Strong for its size: reasons and calls tools.",
@@ -654,4 +653,7 @@ export const en: Record<keyof typeof ru, string> = {
   "local.variantsNone": "No variant fits in this computer's memory.",
   "local.advice": "Advised",
   "local.marginTip": "An Ollama started by Artel closes by itself after 10 idle minutes. An Ollama you started yourself is left alone.",
+  "web.noTools": "This model is too small to search the internet: it answers on its own.",
+  "local.pick.qwen3-1.7b": "The lightest: simple chat on any computer, even without a video card.",
+  "local.pick.qwen3-4b": "Small but capable: chat and simple tasks with tools.",
 };

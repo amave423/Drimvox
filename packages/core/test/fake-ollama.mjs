@@ -7,6 +7,7 @@ const [host, port] = (process.env.OLLAMA_HOST ?? "127.0.0.1:11434").replace(/^ht
 const pullMs = Number(process.env.FAKE_OLLAMA_PULL_MS ?? 20);
 const keepMs = Number(process.env.FAKE_OLLAMA_KEEP_MS ?? 100);
 const models = new Map((JSON.parse(process.env.FAKE_OLLAMA_MODELS ?? "[]")).map((name) => [name, 1000]));
+const chats = [];
 let loadedUntil = 0;
 let loadedModel = "";
 
@@ -30,6 +31,17 @@ createServer(async (req, res) => {
   }
   if (url.pathname === "/api/ps") {
     return json(res, 200, { models: Date.now() < loadedUntil ? [{ name: loadedModel, model: loadedModel, size: 1000 }] : [] });
+  }
+  if (url.pathname === "/fake/requests") return json(res, 200, chats);
+  // What a model can do: llama3.2 and 1.7b models are small, gemma sees pictures.
+  if (url.pathname === "/api/show" && req.method === "POST") {
+    const { model } = await read(req);
+    if (!models.has(model)) return json(res, 404, { error: `model '${model}' not found` });
+    const small = /llama3\.2|1\.7b/.test(model);
+    return json(res, 200, {
+      capabilities: ["completion", "tools", ...(/gemma/.test(model) ? ["vision"] : [])],
+      model_info: { "general.architecture": "llama", "general.parameter_count": small ? 3_200_000_000 : 8_000_000_000, "llama.context_length": 131072 },
+    });
   }
   if (url.pathname === "/api/delete" && req.method === "DELETE") {
     const { model } = await read(req);
@@ -62,6 +74,7 @@ createServer(async (req, res) => {
   if (url.pathname === "/v1/models") return json(res, 200, { object: "list", data: [...models.keys()].map((id) => ({ id, object: "model", owned_by: "library" })) });
   if (url.pathname === "/v1/chat/completions" && req.method === "POST") {
     const body = await read(req);
+    chats.push(body);
     loadedModel = body.model;
     loadedUntil = Date.now() + keepMs;
     const text = "Привет из Ollama";

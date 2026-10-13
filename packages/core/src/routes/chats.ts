@@ -15,6 +15,7 @@ import { z } from "zod";
 import { reply } from "../chats/reply";
 import type { ChatRepo } from "../chats/repo";
 import { mediaModel } from "../media/catalog";
+import { findModel } from "../providers/catalog";
 import type { ChatApprovals } from "../chats/approvals";
 import type { WebAccess } from "../internet/web";
 import type { McpHub } from "../mcp/hub";
@@ -86,6 +87,8 @@ export function chatRoutes(
         });
       }
 
+      // A model that cannot call tools gets none: no free search, no MCP. The provider's own search needs no tools.
+      const toolsOk = (await findModel(conn, chat.model))?.tools !== false;
       return streamSSE(c, async (stream) => {
         const controller = new AbortController();
         stream.onAbort(() => controller.abort());
@@ -93,10 +96,12 @@ export function chatRoutes(
           if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
         };
         // MCP tools of the user's servers; each new tool asks in the answer first.
-        const mcpTools = await mcp.toolsFor((call) => approvals.ask(chat.id, emit, call), {
-          onCall: (call) => void emit({ type: "tool", name: call.name, input: JSON.stringify(call.input) }),
-          onResult: () => {},
-        });
+        const mcpTools = toolsOk
+          ? await mcp.toolsFor((call) => approvals.ask(chat.id, emit, call), {
+              onCall: (call) => void emit({ type: "tool", name: call.name, input: JSON.stringify(call.input) }),
+              onResult: () => {},
+            })
+          : {};
         await reply({
           chats,
           chatId: chat.id,
@@ -105,7 +110,7 @@ export function chatRoutes(
           content,
           signal: controller.signal,
           idleTimeoutMs,
-          web: webMode,
+          web: !toolsOk && webMode === "free" ? "off" : webMode,
           webAccess: web,
           extraTools: mcpTools,
           cliDir,

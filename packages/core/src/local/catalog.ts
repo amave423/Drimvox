@@ -2,11 +2,12 @@ import type { HfRepo, HfVariant, LocalHardware, LocalPick, LocalUse } from "@art
 import { fitOf, recommend } from "./fit";
 
 /**
- * Artel's short list from Ollama's catalog, small to large, so that every computer gets something. Sizes are read
- * from Ollama's registry when shown; a tag the registry no longer has is left out. Checked 2026-10-13.
+ * Artel's short list from Ollama's catalog, small to large, so that every computer gets something. All of them speak
+ * Russian: Llama 3.2 does not, and in a live chat it mixed languages. Sizes are read from Ollama's registry when shown; a tag the registry no longer has is left out. Checked 2026-10-13.
  */
 export const PICKS: { model: string; uses: LocalUse[] }[] = [
-  { model: "llama3.2:3b", uses: ["chat"] },
+  { model: "qwen3:1.7b", uses: ["chat"] },
+  { model: "qwen3:4b", uses: ["chat", "tools"] },
   { model: "gemma4:e2b", uses: ["chat", "vision"] },
   { model: "gemma4:e4b", uses: ["chat", "vision", "tools"] },
   { model: "qwen3:8b", uses: ["chat", "tools"] },

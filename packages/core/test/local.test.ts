@@ -187,7 +187,7 @@ describe("downloads", () => {
 });
 
 describe("catalog", () => {
-  const sizes: Record<string, number> = { "llama3.2/3b": 1.9, "gemma4/e2b": 4.3, "qwen3/8b": 4.9, "gpt-oss/20b": 12.9, "qwen3.6/35b": 21 };
+  const sizes: Record<string, number> = { "qwen3/1.7b": 1.3, "qwen3/4b": 2.3, "gemma4/e2b": 4.3, "qwen3/8b": 4.9, "gpt-oss/20b": 12.9, "qwen3.6/35b": 21 };
   const registry = () =>
     serve((path) => {
       const m = path.match(/^\/v2\/library\/([^/]+)\/manifests\/(.+)$/);
@@ -196,11 +196,12 @@ describe("catalog", () => {
     });
 
   it("offers picks sized from the registry and hides what this computer cannot run", async () => {
-    setup({ registry: await registry(), hardware: laptop, models: ["llama3.2:3b"] });
+    setup({ registry: await registry(), hardware: laptop, models: ["qwen3:1.7b"] });
     const picks = await (await env.call("GET", "/api/local/picks")).json();
     // On 8 GB without a video card only the small ones run; tags the registry does not know are left out.
     expect(picks.map((p: any) => [p.model, p.fit, p.installed])).toEqual([
-      ["llama3.2:3b", "slow", true],
+      ["qwen3:1.7b", "slow", true],
+      ["qwen3:4b", "slow", false],
       ["gemma4:e2b", "slow", false],
     ]);
   });
@@ -209,13 +210,14 @@ describe("catalog", () => {
     setup({ registry: await registry() });
     const picks = await (await env.call("GET", "/api/local/picks")).json();
     expect(picks.map((p: any) => [p.model, p.fit])).toEqual([
-      ["llama3.2:3b", "fast"],
+      ["qwen3:1.7b", "fast"],
+      ["qwen3:4b", "fast"],
       ["gemma4:e2b", "fast"],
       ["qwen3:8b", "fast"],
       ["gpt-oss:20b", "slow"],
       ["qwen3.6:35b", "slow"],
     ]);
-    expect(picks[0]).toMatchObject({ family: "llama3.2-3b", uses: ["chat"] });
+    expect(picks[0]).toMatchObject({ family: "qwen3-1.7b", uses: ["chat"] });
   });
 
   const hf = () =>
@@ -261,6 +263,29 @@ describe("catalog", () => {
     setup({ hf: "http://127.0.0.1:9" });
     const res = await env.call("GET", "/api/local/search?q=gemma");
     expect(res.status).toBe(502);
+  });
+});
+
+describe("what a local model can do", () => {
+  it("reads tools, pictures and the context window from Ollama, and keeps tools from models too small for them", async () => {
+    setup({ models: ["llama3.2:3b", "qwen3:8b", "gemma4:e4b"] });
+    const { providerId } = await (await env.call("POST", "/api/local/connect")).json();
+    const models = await (await env.call("GET", `/api/providers/${providerId}/models`)).json();
+    const of = (id: string) => models.find((m: any) => m.id === id);
+    expect(of("llama3.2:3b")).toMatchObject({ tools: false, vision: false, contextLength: 131072 });
+    expect(of("qwen3:8b")).toMatchObject({ tools: true, vision: false });
+    expect(of("gemma4:e4b")).toMatchObject({ tools: true, vision: true });
+  });
+
+  // Seen live: llama3.2:3b with search on answered "привет" by writing a search call as text.
+  it("chats with a model too small for tools without giving it the internet", async () => {
+    setup({ models: ["llama3.2:3b"] });
+    const { providerId } = await (await env.call("POST", "/api/local/connect")).json();
+    const chat = await (await env.call("POST", "/api/chats", { providerId, model: "llama3.2:3b" })).json();
+    await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "привет, как дела?", web: "free" }));
+    const sent = (await (await fetch(`${base()}/fake/requests`)).json()) as any[];
+    expect(sent).toHaveLength(1);
+    expect(sent[0].tools).toBeUndefined();
   });
 });
 
