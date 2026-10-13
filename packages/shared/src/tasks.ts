@@ -1,4 +1,4 @@
-import { requirementSchema, type AcceptanceReport, type Requirement } from "./quality";
+import { requirementSchema, type AcceptanceReport, type Milestone, type Requirement } from "./quality";
 import { z } from "zod";
 
 export const projectCreateSchema = z.object({ path: z.string().trim().min(1).max(1000) }).strict();
@@ -45,6 +45,8 @@ export const plannedSubtaskSchema = z.object({
   dependsOn: z.array(z.string()).max(8).default([]),
   /** Commands that pass once this subtask alone is done; the goal's checks pass once all are merged. */
   checks: z.array(z.string().trim().min(1).max(500)).max(10).default([]),
+  /** For a goal done in stages: the stage this subtask belongs to. */
+  stage: z.number().int().min(1).max(10).optional(),
 });
 export type PlannedSubtask = z.infer<typeof plannedSubtaskSchema>;
 
@@ -225,6 +227,10 @@ export interface TaskView {
   acceptance: AcceptanceReport | null;
   /** Where the interview stands: its round, what the agent understood and what it still does not know. */
   interview: InterviewState | null;
+  /** The stages of a big task; empty for a task done in one go. */
+  milestones: Milestone[];
+  /** The stage at work now (1-based); for a subtask, the stage it belongs to. */
+  milestone: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -246,7 +252,8 @@ export type TaskEventKind =
   | "escalation"
   | "plan"
   | "subtask"
-  | "acceptance";
+  | "acceptance"
+  | "milestone";
 
 export interface TaskEvent {
   seq: number;

@@ -8,10 +8,11 @@ import {
   dirtyFiles,
   ensureIdentity,
   removeWorktree,
+  showFile,
   squashInto,
 } from "./git";
 import { parseDiff } from "./diff";
-import type { TaskRow } from "./repo";
+import type { TaskRepo, TaskRow } from "./repo";
 
 export const WIP_MESSAGE = "Artel: work in progress";
 
@@ -61,4 +62,31 @@ export async function acceptTask(repo: string, task: TaskRow, message: string): 
 
 export async function discardTask(repo: string, task: TaskRow): Promise<void> {
   await removeWorktree(repo, task.worktree, task.branch);
+}
+
+const CLOSED = ["accepted", "discarded", "merged", "queued"];
+
+/** The task's changes against where it started; a running task's copy is saved first. */
+export async function reviewDiff(row: TaskRow, repo: string | null, running: boolean): Promise<DiffFile[]> {
+  if (!repo || CLOSED.includes(row.status)) return [];
+  // A goal's copy changes only through the commits of merged subtasks.
+  if (!running && row.kind !== "goal") await snapshot(row);
+  return taskDiff(repo, row);
+}
+
+/** A file as the task's branch has it, for showing pictures in the review. */
+export async function reviewFile(row: TaskRow, repo: string | null, running: boolean, path: string): Promise<Buffer | null> {
+  if (!repo || CLOSED.includes(row.status)) return null;
+  if (!running && row.kind !== "goal") await snapshot(row);
+  return showFile(repo, row.branch, path);
+}
+
+/** A goal that ends takes its unmerged subtasks and their copies with it. */
+export async function closeSubtasks(tasks: TaskRepo, repo: string, goal: TaskRow): Promise<void> {
+  if (goal.kind !== "goal") return;
+  for (const sub of tasks.children(goal.id)) {
+    if (sub.status === "merged") continue;
+    await removeWorktree(repo, sub.worktree, sub.branch);
+    tasks.update(sub.id, { status: "discarded", status_reason: null });
+  }
 }

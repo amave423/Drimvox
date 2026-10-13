@@ -1,9 +1,10 @@
-import type { AcceptanceReport, Requirement, VisualCheck } from "@artel/shared";
+import type { AcceptanceReport, Milestone, Requirement, TaskStages, VisualCheck } from "@artel/shared";
 import { findModel } from "../providers/catalog";
 import { runVisualChecks, visualTools, type VisualDeps } from "../visual/tools";
 import { accepted, MAX_ACCEPTANCE_ROUNDS, reworkMessage, runAcceptance } from "./acceptance";
 import { discardChanges } from "./git";
 import type { PassContext } from "./pass";
+import { requirementsUpTo, stageNote } from "./phases";
 import type { TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
 
@@ -40,16 +41,48 @@ export async function done(
     }
   }
 
-  const requirements = JSON.parse(row.requirements) as Requirement[];
+  // A stage of a big task is accepted on its own requirements and every earlier stage's.
+  const milestones = JSON.parse(row.milestones) as Milestone[];
+  const requirements = requirementsUpTo(JSON.parse(row.requirements) as Requirement[], row.milestone);
+  const more = row.milestone < milestones.length;
   let reason: string | null = null;
   if (requirements.length > 0) {
     const verdict = await acceptWork(ctx, id, row, visual, requirements);
     if (verdict === null) return null;
     if (typeof verdict === "string") return verdict;
     if (!accepted(verdict)) reason = "acceptance_partial";
-  }
+    else if (more) return nextStage(ctx, id, row, milestones, verdict.summary);
+  } else if (more) return nextStage(ctx, id, row, milestones, null);
   await complete(ctx, id, summary, commitMessage, reason);
   return null;
+}
+
+/**
+ * A stage is accepted: on to the next one, or a stop for the user's "Next" when the task runs with stops.
+ * The work so far is saved on the task branch either way.
+ */
+async function nextStage(ctx: PassContext, id: string, row: TaskRow, milestones: Milestone[], summary: string | null): Promise<string | null> {
+  await snapshot(row);
+  ctx.event("milestone", { stage: row.milestone, title: milestones[row.milestone - 1]?.title ?? "", total: milestones.length, summary });
+  ctx.tasks.update(id, { milestone: row.milestone + 1, acceptance_rounds: 0, attempts: 0, visual_attempts: 0 });
+  const stages = JSON.parse(row.stages) as TaskStages;
+  if (stages.approveSpec) return stop(ctx, "waiting", "milestone_review");
+  return nextStageMessage(ctx.tasks.row(id)!);
+}
+
+/** What starts the stage the task is now on. */
+export function nextStageMessage(row: TaskRow): string {
+  const milestones = JSON.parse(row.milestones) as Milestone[];
+  return [
+    `Stage ${row.milestone - 1} is accepted.`,
+    stageNote(milestones, JSON.parse(row.requirements) as Requirement[], row.milestone),
+    "Implement it now, run the checks, then call finish.",
+  ].join("\n\n");
+}
+
+/** "Enough" between stages: what is done and accepted goes to review; the later stages stay undone. */
+export async function finishEarly(ctx: PassContext, id: string): Promise<void> {
+  await complete(ctx, id, null, null, "milestones_left");
 }
 
 /**
@@ -140,7 +173,7 @@ export async function acceptGoal(ctx: PassContext, id: string): Promise<Acceptan
     event: (kind, data) => ctx.event(kind, data),
   };
   ctx.setStatus("running", null);
-  return acceptWork(ctx, id, row, visual, JSON.parse(row.requirements) as Requirement[]);
+  return acceptWork(ctx, id, row, visual, requirementsUpTo(JSON.parse(row.requirements) as Requirement[], row.milestone));
 }
 
 export function lastSummary(ctx: PassContext, id: string): string | null {

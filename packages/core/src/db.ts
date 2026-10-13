@@ -165,6 +165,9 @@ const migrations: string[] = [
   // The interview in rounds: how many were asked, what the agent understood and what it still does not know.
   `alter table tasks add column interview_round integer not null default 0;
    alter table tasks add column interview_notes text;`,
+  // A big task in stages: their titles and the stage at work (for a subtask, the stage it belongs to).
+  `alter table tasks add column milestones text not null default '[]';
+   alter table tasks add column milestone integer not null default 1;`,
 ];
 
 export interface Database {

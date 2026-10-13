@@ -56,6 +56,12 @@ export function TaskSheet({ taskId }: { taskId: string }) {
             {task.team && <span className="muted">{t("team.workers", { model: task.team.model })}</span>}
           </div>
           {!answered && <PhaseSteps task={task} />}
+          {task.milestones.length > 1 && (task.status === "running" || task.status === "waiting") && (
+            <p className="muted stage-now">
+              {t("task.stageNow", { stage: Math.min(task.milestone, task.milestones.length), total: task.milestones.length })}:{" "}
+              {task.milestones[Math.min(task.milestone, task.milestones.length) - 1]?.title}
+            </p>
+          )}
         </header>
 
         <TaskNotice task={task} feed={feed} />
@@ -154,6 +160,23 @@ function TaskNotice({ task, feed }: { task: TaskView; feed: FeedItem[] }) {
     return (
       <div className="task-notice">
         <p>{t(task.status === "queued" ? "team.queued" : "team.merged")}</p>
+      </div>
+    );
+  }
+
+  // Between the stages of a big task: on to the next one, or review what is done.
+  if (task.status === "waiting" && task.statusReason === "milestone_review") {
+    const doneStage = task.milestone - 1;
+    const finishEarly = () => void api.tasks[":id"]["finish-early"].$post({ param: { id: task.id } }).catch(() => null);
+    return (
+      <div className="task-notice is-wait">
+        <p>{t("task.milestoneDone", { stage: doneStage, total: task.milestones.length, title: task.milestones[doneStage - 1]?.title ?? "" })}</p>
+        <button className="btn is-primary" onClick={carryOn}>
+          {t("task.nextStage", { stage: task.milestone })}
+        </button>
+        <button className="btn" onClick={finishEarly}>
+          {t("task.stagesEnough")}
+        </button>
       </div>
     );
   }

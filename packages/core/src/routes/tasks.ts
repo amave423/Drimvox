@@ -136,6 +136,15 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner, shots: Shots) {
         return c.json(refusal(err), 409);
       }
     })
+    .post("/:id/finish-early", async (c) => {
+      const id = c.req.param("id");
+      if (!runner.view(id)) return c.json(notFound, 404);
+      try {
+        return c.json(await runner.finishEarly(id), 200);
+      } catch (err) {
+        return c.json(refusal(err), 409);
+      }
+    })
     .post("/:id/drop", (c) => {
       const id = c.req.param("id");
       if (!runner.view(id)) return c.json(notFound, 404);

@@ -90,3 +90,6 @@ a { color: var(--ink); }
 .toggle:hover input:not(:checked):not(:disabled) + .toggle-track { background: var(--muted); }
 .toggle.is-disabled { cursor: default; color: var(--muted); }
 .toggle.is-disabled .toggle-track { opacity: 0.5; }
+
+/* Read by screen readers only. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

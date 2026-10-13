@@ -47,7 +47,7 @@ export function SpecReview({ task }: { task: TaskView }) {
         </div>
       )}
 
-      <RequirementsList requirements={task.requirements} decisions={task.decisions} />
+      <RequirementsList requirements={task.requirements} decisions={task.decisions} milestones={task.milestones} />
 
       {task.plan.length > 0 && (
         <>

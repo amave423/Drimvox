@@ -1,4 +1,4 @@
-import type { AcceptanceReport, Requirement } from "@artel/shared";
+import type { AcceptanceReport, Milestone, Requirement } from "@artel/shared";
 import { MAX_INTERVIEW_ROUNDS } from "./phases";
 import type {
   ModelRef,
@@ -74,6 +74,8 @@ export interface TaskRow {
   acceptance_rounds: number;
   interview_round: number;
   interview_notes: string | null;
+  milestones: string;
+  milestone: number;
 }
 
 export class ProjectRepo {
@@ -143,6 +145,8 @@ export type TaskPatch = Partial<
     | "acceptance_rounds"
     | "interview_round"
     | "interview_notes"
+    | "milestones"
+    | "milestone"
   >
 >;
 
@@ -169,7 +173,7 @@ export class TaskRepo {
   create(
     row: Pick<TaskRow, "id" | "project_id" | "title" | "task" | "provider_id" | "model" | "status" | "branch" | "worktree" | "base_commit" | "budget_usd">,
     stages: TaskStages,
-    extra: Partial<Pick<TaskRow, "kind" | "parent_id" | "plan_id" | "depends_on" | "team" | "checks" | "spec">> = {},
+    extra: Partial<Pick<TaskRow, "kind" | "parent_id" | "plan_id" | "depends_on" | "team" | "checks" | "spec" | "milestone">> = {},
   ): TaskRow {
     const now = Date.now();
     const full: TaskRow = {
@@ -200,6 +204,8 @@ export class TaskRepo {
       acceptance_rounds: 0,
       interview_round: 0,
       interview_notes: null,
+      milestones: "[]",
+      milestone: 1,
       ...extra,
       status_reason: null,
       cost_usd: 0,
@@ -313,6 +319,8 @@ export function toTaskView(row: TaskRow, pendingApproval: TaskView["pendingAppro
     requirements: JSON.parse(row.requirements) as Requirement[],
     decisions: JSON.parse(row.decisions) as string[],
     acceptance: row.acceptance ? (JSON.parse(row.acceptance) as AcceptanceReport) : null,
+    milestones: JSON.parse(row.milestones) as Milestone[],
+    milestone: row.milestone,
     interview: row.interview_round > 0 ? { round: row.interview_round, maxRounds: MAX_INTERVIEW_ROUNDS, ...notesOf(row) } : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

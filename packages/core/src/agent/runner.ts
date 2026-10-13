@@ -1,14 +1,14 @@
-import type { ModelRef, PlannedSubtask, Question, Requirement, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@artel/shared";
+import type { Milestone, ModelRef, PlannedSubtask, Question, Requirement, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ProviderRepo } from "../providers/repo";
-import { addWorktree, headCommit, removeWorktree, showFile } from "./git";
-import { acceptGoal } from "./landing";
+import { addWorktree, headCommit } from "./git";
+import { acceptGoal, finishEarly, nextStageMessage } from "./landing";
 import { runPass, startWork, enterPhase, type PassContext } from "./pass";
 import { answersMessage, specMessage, MAX_INTERVIEW_ROUNDS } from "./phases";
 import { feedbackMessage } from "./prompt";
 import { toTaskView, type ProjectRepo, type TaskRepo, type TaskRow } from "./repo";
-import { acceptTask, discardTask, snapshot, taskDiff } from "./review";
+import { acceptTask, closeSubtasks, discardTask, reviewDiff, reviewFile } from "./review";
 import { Team, cleanPlan } from "./team";
 import { taskExtras, type ExtrasOptions } from "./extras";
 import { waitForApproval, type ApprovalAnswer, type ApprovalSlot } from "./approvals";
@@ -137,7 +137,7 @@ export class AgentRunner {
     });
     if (edited) this.event(id, "spec", { spec, checks, plan: JSON.parse(row.plan), edited: true });
     const stages = JSON.parse(row.stages) as TaskStages;
-    const message = startWork(this.context(id, new AbortController()), id, stages, specMessage(spec, checks, edited, kept), checks);
+    const message = startWork(this.context(id, new AbortController()), id, stages, specMessage(spec, checks, edited, kept, JSON.parse(row.milestones) as Milestone[]), checks);
     this.launch(id, message);
     return this.view(id)!;
   }
@@ -186,6 +186,10 @@ export class AgentRunner {
       this.team.restart(id);
       return this.view(id)!;
     }
+    if (row.status_reason === "milestone_review" && row.kind !== "goal") {
+      this.launch(id, note ? `${nextStageMessage(row)}\n\nThe user adds: ${note}` : nextStageMessage(row));
+      return this.view(id)!;
+    }
     if (row.status_reason === "budget") this.o.tasks.update(id, { budget_usd: row.budget_usd + this.o.budgetUsd() });
     if (row.status_reason === "stuck") this.o.tasks.update(id, { attempts: 0 });
     if (row.status_reason === "visual_failed") this.o.tasks.update(id, { visual_attempts: 0 });
@@ -196,6 +200,14 @@ export class AgentRunner {
           ? "The page still does not look as the spec says. Look at it yourself with look_at_page and fix it."
           : "Continue the task.";
     this.launch(id, note || again);
+    return this.view(id)!;
+  }
+
+  /** "Enough" between the stages of a big task: what is done and accepted goes to review. */
+  async finishEarly(id: string): Promise<TaskView> {
+    const row = this.requireWaiting(id, "milestone_review");
+    if (row.kind === "goal") await this.team.finishEarly(id);
+    else await finishEarly(this.context(id, new AbortController()), id);
     return this.view(id)!;
   }
 
@@ -235,28 +247,20 @@ export class AgentRunner {
 
   async diff(id: string) {
     const row = this.o.tasks.row(id);
-    if (!row) return null;
-    const project = this.o.projects.get(row.project_id);
-    if (!project || ["accepted", "discarded", "merged", "queued"].includes(row.status)) return [];
-    // A goal's copy changes only through the commits of merged subtasks.
-    if (!this.live.has(id) && row.kind !== "goal") await snapshot(row);
-    return taskDiff(project.path, row);
+    return row ? reviewDiff(row, this.o.projects.get(row.project_id)?.path ?? null, this.live.has(id)) : null;
   }
 
   /** A file as the task's branch has it, for showing pictures in the review. */
   async file(id: string, path: string): Promise<Buffer | null> {
     const row = this.o.tasks.row(id);
-    if (!row || ["accepted", "discarded", "merged", "queued"].includes(row.status)) return null;
-    if (!this.live.has(id) && row.kind !== "goal") await snapshot(row);
-    const project = this.o.projects.get(row.project_id);
-    return project ? showFile(project.path, row.branch, path) : null;
+    return row ? reviewFile(row, this.o.projects.get(row.project_id)?.path ?? null, this.live.has(id), path) : null;
   }
 
   async accept(id: string, message?: string): Promise<string | null> {
     const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"]);
     const project = this.o.projects.get(row.project_id)!;
     const commit = await acceptTask(project.path, row, message ?? row.commit_message ?? row.title);
-    await this.closeSubtasks(row);
+    await closeSubtasks(this.o.tasks, project.path, row);
     this.setStatus(id, "accepted", null);
     return commit;
   }
@@ -265,19 +269,8 @@ export class AgentRunner {
     const row = this.require(id, ["review", "done_empty", "stopped", "failed", "waiting"]);
     const project = this.o.projects.get(row.project_id)!;
     await discardTask(project.path, row);
-    await this.closeSubtasks(row);
+    await closeSubtasks(this.o.tasks, project.path, row);
     this.setStatus(id, "discarded", null);
-  }
-
-  /** A goal that ends takes its unmerged subtasks and their copies with it. */
-  private async closeSubtasks(goal: TaskRow): Promise<void> {
-    if (goal.kind !== "goal") return;
-    const project = this.o.projects.get(goal.project_id)!;
-    for (const sub of this.o.tasks.children(goal.id)) {
-      if (sub.status === "merged") continue;
-      await removeWorktree(project.path, sub.worktree, sub.branch);
-      this.o.tasks.update(sub.id, { status: "discarded", status_reason: null });
-    }
   }
 
   subscribe(id: string, listener: (u: TaskUpdate) => void): () => void {

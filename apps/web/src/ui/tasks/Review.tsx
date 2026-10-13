@@ -92,6 +92,15 @@ export function Review({ task, comments, setComments }: Props) {
       <h2 className="sheet-h">{stuck ? t("review.titleStuck") : empty ? t(team ? "team.reviewEmpty" : "review.empty") : t(team ? "team.reviewTitle" : "review.title")}</h2>
       {task.summary && !stuck && <p className="review-summary">{task.summary}</p>}
       {task.statusReason === "acceptance_partial" && <p className="note is-pencil">{t("acceptance.partial")}</p>}
+      {task.statusReason === "milestones_left" && (
+        <p className="note">
+          {t("review.milestonesLeft", { done: task.milestone - 1, total: task.milestones.length })}{" "}
+          {task.milestones
+            .slice(task.milestone - 1)
+            .map((m) => `«${m.title}»`)
+            .join(", ")}
+        </p>
+      )}
       {task.acceptance && !stuck && <AcceptanceReport report={task.acceptance} requirements={task.requirements} />}
       {!stuck && task.phase !== null && (
         <p className={task.checks.length ? "note is-ok checks-note" : "muted checks-note"}>

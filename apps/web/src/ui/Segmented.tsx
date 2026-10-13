@@ -16,6 +16,8 @@ export function Segmented<T extends string>({ value, options, labelledBy, onChan
       {options.map((o) => (
         <button
           key={o.value}
+          // Not a submit button: segmented choices sit inside forms, such as the new task form.
+          type="button"
           role="radio"
           aria-checked={o.value === value}
           className={o.value === value ? "is-on" : undefined}

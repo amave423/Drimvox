@@ -10,7 +10,14 @@ export const requirementSchema = z.object({
   verify: z.enum(verifyKinds),
   /** The command, the page and what must be on it, or what the acceptance agent does. */
   how: z.string().trim().max(2000).default(""),
+  /** For a big task done in stages: the stage that delivers it (1 is the first). */
+  stage: z.number().int().min(1).max(10).optional(),
 });
+
+/** One stage of a big task: stage 1 is the smallest version that works end to end, later ones extend it. */
+export interface Milestone {
+  title: string;
+}
 export type Requirement = z.infer<typeof requirementSchema>;
 
 export const acceptanceStatuses = ["done", "partial", "missing"] as const;

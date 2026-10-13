@@ -227,6 +227,33 @@ describe("the team at work", { timeout: 30_000 }, () => {
     expect(fix.task).toContain("README.md нет");
   });
 
+  it("runs a goal in stages: the next stage's subtasks start only after the stage before is accepted", async () => {
+    const requirements = [
+      { id: "R1", text: "Есть модуль sub", verify: "check", how: "node --test", stage: 1 },
+      { id: "R2", text: "Есть модуль mul", verify: "check", how: "node --test", stage: 2 },
+    ];
+    const verdict = (ids: string[]) =>
+      call("report_acceptance", { results: ids.map((id) => ({ id, status: "done", evidence: "ok", problem: "" })), summary: ids.join(" ") });
+    const staged = call("propose_plan", {
+      spec: "# Цель",
+      checks: ["node --test"],
+      requirements,
+      stages: [{ title: "Вычитание" }, { title: "Умножение" }],
+      subtasks: [
+        { id: "sub", title: "Модуль sub", description: "Сделай sub.js и тест", stage: 1 },
+        { id: "mul", title: "Модуль mul", description: "Сделай mul.js и тест", stage: 2 },
+      ],
+    });
+    const id = await startGoal(team([staged], { sub: addModule("sub"), mul: addModule("mul") }, [verdict(["R1"]), verdict(["R1", "R2"])]), false);
+    const done = await waitFor(id, goalIs("review"));
+    expect(done).toMatchObject({ milestone: 2, statusReason: null });
+    expect(done.milestones).toEqual([{ title: "Вычитание" }, { title: "Умножение" }]);
+    const flow = (await events(id))
+      .filter((e) => (e.kind === "subtask" && e.data.action === "started") || e.kind === "milestone")
+      .map((e) => (e.kind === "milestone" ? `stage ${e.data.stage} accepted` : `${e.data.id} started`));
+    expect(flow).toEqual(["sub started", "stage 1 accepted", "mul started"]);
+  });
+
   it("adds a fix subtask when the goal's checks go red after a merge", async () => {
     // Each subtask passes alone; only the two files together break the goal's check.
     // unlinkSync, not rmSync: on Node 24.11 rmSync silently keeps files under non-ASCII paths.

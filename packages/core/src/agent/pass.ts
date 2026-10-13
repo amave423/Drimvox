@@ -237,6 +237,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       ...(planned.commitMessage ? { commit_message: planned.commitMessage } : {}),
       requirements: JSON.stringify(planned.requirements),
       decisions: JSON.stringify(planned.decisions),
+      milestones: JSON.stringify(planned.milestones),
+      milestone: 1,
     });
     ctx.event("plan", { spec: planned.spec, checks: planned.checks, subtasks: planned.subtasks });
     if (stages.approveSpec) return finish(ctx, "waiting", "plan_review");
@@ -259,13 +261,15 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       visual: JSON.stringify(proposed.visualChecks ?? []),
       requirements: JSON.stringify(proposed.requirements ?? []),
       decisions: JSON.stringify(proposed.decisions ?? []),
+      milestones: JSON.stringify(proposed.milestones ?? []),
+      milestone: 1,
     });
     ctx.event("spec", proposed);
     if (stages.approveSpec) return finish(ctx, "waiting", "spec_review");
     const { kept, dropped } = safeChecks(proposed.checks, row.worktree);
     ctx.tasks.update(id, { checks: JSON.stringify(kept) });
     if (dropped.length) ctx.event("text", { text: `Artel removed checks that would need permission: ${dropped.join(", ")}` });
-    return startWork(ctx, id, stages, specMessage(proposed.spec, kept, false, proposed.requirements), kept);
+    return startWork(ctx, id, stages, specMessage(proposed.spec, kept, false, proposed.requirements, proposed.milestones), kept);
   }
 
   const checks = JSON.parse(row.checks) as string[];

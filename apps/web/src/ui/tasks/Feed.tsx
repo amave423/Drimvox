@@ -35,6 +35,9 @@ function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props
   if (item.kind === "note") return <p>{item.text}</p>;
   if (item.kind === "status") return <p className="muted">{t(`task.status.${item.status}` as MessageKey)}</p>;
   if (item.kind === "phase") return <p className="feed-step">{t(`feed.phase.${item.phase}` as MessageKey, { round: item.round ?? 1 })}</p>;
+  if (item.kind === "milestone") {
+    return <p className="feed-step is-ok">{t("feed.milestone", { stage: item.stage, total: item.total, title: item.title })}</p>;
+  }
   if (item.kind === "acceptance") {
     return (
       <p className={item.done === item.total ? "feed-step is-ok" : "feed-step is-pencil-text"}>

@@ -208,3 +208,6 @@
 .interview-notes p, .interview-notes ul { margin: 4px 0 0; }
 .interview-notes ul { padding-left: 18px; }
 .interview-hint { font-size: 13px; }
+.stages-mode { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 4px; }
+.stages-mode-hint { font-size: 13px; flex: 1 1 260px; }
+.stage-now { margin: 6px 0 0; font-size: 13.5px; }

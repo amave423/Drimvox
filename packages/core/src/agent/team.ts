@@ -1,4 +1,4 @@
-import type { AcceptanceReport } from "@artel/shared";
+import type { AcceptanceReport, Milestone, Requirement } from "@artel/shared";
 import { accepted } from "./acceptance";
 import type { ModelRef, PlannedSubtask, TaskEvent, TaskStages } from "@artel/shared";
 import { randomUUID } from "node:crypto";
@@ -59,7 +59,7 @@ export class Team {
     const team = JSON.parse(goal.team ?? "null") as ModelRef | null;
     const planned = JSON.parse(goal.planned) as PlannedSubtask[];
     // A subtask without checks of its own is held to the goal's.
-    for (const p of planned) this.addSubtask(goal, team, p.id, p.title, p.description, p.dependsOn, p.checks?.length ? p.checks : null);
+    for (const p of planned) this.addSubtask(goal, team, p.id, p.title, p.description, p.dependsOn, p.checks?.length ? p.checks : null, p.stage ?? 1);
     this.h.tasks.update(goalId, { phase: "orchestrate", attempts: 0 });
     this.h.event(goalId, "phase", { phase: "orchestrate" });
     this.h.setStatus(goalId, "running", null);
@@ -143,7 +143,7 @@ export class Team {
     const n = goal.fixes + 1;
     this.h.tasks.update(goal.id, { fixes: n });
     const team = JSON.parse(goal.team ?? "null") as ModelRef | null;
-    this.addSubtask(goal, team, `fix-${n}`, FIX_TITLE, description, [], checks);
+    this.addSubtask(goal, team, `fix-${n}`, FIX_TITLE, description, [], checks, goal.milestone);
     this.h.event(goal.id, "subtask", { id: `fix-${n}`, title: FIX_TITLE, action: "fix_added" });
   }
 
@@ -155,6 +155,7 @@ export class Team {
     description: string,
     dependsOn: string[],
     checks: string[] | null,
+    stage: number,
   ): void {
     const id = randomUUID();
     const goalStages = JSON.parse(goal.stages) as TaskStages;
@@ -180,6 +181,7 @@ export class Team {
         depends_on: JSON.stringify(dependsOn),
         checks: checks ? JSON.stringify(checks) : goal.checks,
         spec: goal.spec,
+        milestone: stage,
       },
     );
   }
@@ -207,7 +209,8 @@ export class Team {
     let running = subs.filter((s) => this.h.isRunning(s.id)).length;
     for (const sub of subs) {
       if (running >= MAX_PARALLEL) break;
-      if (sub.status !== "queued") continue;
+      // A goal in stages runs one stage at a time.
+      if (sub.status !== "queued" || sub.milestone > goal.milestone) continue;
       const deps = JSON.parse(sub.depends_on) as string[];
       if (!deps.every((d) => merged.has(d))) continue;
       await this.launchSubtask(goal, sub, subs, project.path);
@@ -215,9 +218,12 @@ export class Team {
     }
 
     subs = this.h.tasks.children(goalId);
-    if (subs.length > 0 && subs.every((s) => s.status === "merged" || s.status === "discarded")) {
+    const stageSubs = subs.filter((s) => s.milestone <= goal.milestone);
+    const settled = (s: TaskRow) => s.status === "merged" || s.status === "discarded";
+    if (subs.length > 0 && subs.every(settled)) {
       return this.finishGoal(goalId, subs.filter((s) => s.status === "merged"), project.path);
     }
+    if (stageSubs.length > 0 && stageSubs.every(settled) && subs.some((s) => !settled(s))) return this.finishStage(goalId, project.path);
 
     const blocked = subs.filter((s) => !this.h.isRunning(s.id) && ["failed", "stopped", "waiting"].includes(s.status));
     const asking = subs.some((s) => s.status === "waiting" && s.status_reason === "approval");
@@ -312,6 +318,47 @@ export class Team {
     this.h.launch(sub.id, message);
   }
 
+  /**
+   * Every subtask of the current stage is merged: the stage is accepted on its requirements, then the next stage starts,
+   * or the goal waits for the user's "Next" when it runs with stops.
+   */
+  private async finishStage(goalId: string, repo: string): Promise<void> {
+    const goal = this.h.tasks.row(goalId)!;
+    let summary: string | null = null;
+    if ((JSON.parse(goal.requirements) as Requirement[]).some((r) => (r.stage ?? 1) <= goal.milestone)) {
+      const verdict = await this.h.accept(goalId);
+      if (verdict === null) return;
+      if (typeof verdict === "string") {
+        // Fixes of an early stage are held to that stage's own checks: the goal's need every stage.
+        const merged = this.h.tasks.children(goalId).filter((s) => s.status === "merged");
+        this.addFix(this.h.tasks.row(goalId)!, verdict, [...new Set(merged.flatMap((s) => JSON.parse(s.checks) as string[]))]);
+        return void this.drive(goalId);
+      }
+      if (!accepted(verdict)) return this.land(goalId, repo, "acceptance_partial");
+      summary = verdict.summary;
+    }
+    const milestones = JSON.parse(goal.milestones) as Milestone[];
+    this.h.event(goalId, "milestone", { stage: goal.milestone, title: milestones[goal.milestone - 1]?.title ?? "", total: milestones.length, summary });
+    this.h.tasks.update(goalId, { milestone: goal.milestone + 1, acceptance_rounds: 0 });
+    if ((JSON.parse(goal.stages) as TaskStages).approveSpec) return this.h.finish(goalId, "waiting", "milestone_review");
+    return void this.drive(goalId);
+  }
+
+  /** "Enough" between stages: what is merged and accepted goes to review. */
+  finishEarly(goalId: string): Promise<void> {
+    const goal = this.h.tasks.row(goalId)!;
+    return this.enqueue(goalId, () => this.land(goalId, this.h.projects.get(goal.project_id)!.path, "milestones_left"));
+  }
+
+  private async land(goalId: string, repo: string, reason: string | null): Promise<void> {
+    const goal = this.h.tasks.row(goalId)!;
+    const subs = this.h.tasks.children(goalId).filter((s) => s.status === "merged");
+    const changed = await hasChanges(repo, goal);
+    const summary = subs.map((s) => `${s.title}: ${s.summary ?? "—"}`).join("\n");
+    this.h.tasks.update(goalId, { summary, commit_message: goal.commit_message ?? goal.title });
+    this.h.finish(goalId, changed ? "review" : "done_empty", changed ? reason : null);
+  }
+
   private async finishGoal(goalId: string, subs: TaskRow[], repo: string): Promise<void> {
     // Only now can the goal's own checks pass: they need every subtask.
     if (await this.integrate(goalId, JSON.parse(this.h.tasks.row(goalId)!.checks) as string[])) return;
@@ -327,10 +374,7 @@ export class Team {
       }
       if (!accepted(verdict)) reason = "acceptance_partial";
     }
-    const goal = this.h.tasks.row(goalId)!;
-    const changed = await hasChanges(repo, goal);
-    const summary = subs.map((s) => `${s.title}: ${s.summary ?? "—"}`).join("\n");
-    this.h.tasks.update(goalId, { summary, commit_message: goal.commit_message ?? goal.title });
-    this.h.finish(goalId, changed ? "review" : "done_empty", changed ? reason : null);
+    void subs;
+    return this.land(goalId, repo, reason);
   }
 }

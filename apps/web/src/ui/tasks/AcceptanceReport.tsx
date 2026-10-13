@@ -1,4 +1,4 @@
-import type { AcceptanceReport as Report, Requirement } from "@artel/shared";
+import type { AcceptanceReport as Report, Milestone, Requirement } from "@artel/shared";
 import { useApp } from "../../context";
 
 /** The acceptance agent's checklist: every requirement with its mark, what is wrong, and the evidence on request. */
@@ -37,12 +37,32 @@ export function AcceptanceReport({ report, requirements }: { report: Report; req
   );
 }
 
-/** The spec's requirements and the agent's own decisions, before the work starts. */
-export function RequirementsList({ requirements, decisions }: { requirements: Requirement[]; decisions: string[] }) {
+/** The spec's stages, requirements and the agent's own decisions, before the work starts. */
+export function RequirementsList({
+  requirements,
+  decisions,
+  milestones = [],
+}: {
+  requirements: Requirement[];
+  decisions: string[];
+  milestones?: Milestone[];
+}) {
   const { t } = useApp();
-  if (requirements.length === 0 && decisions.length === 0) return null;
+  if (requirements.length === 0 && decisions.length === 0 && milestones.length === 0) return null;
+  const staged = milestones.length > 1;
   return (
     <>
+      {staged && (
+        <>
+          <h3 className="spec-sub">{t("spec.milestones")}</h3>
+          <p className="muted spec-hint">{t("spec.milestonesHint")}</p>
+          <ol className="steps">
+            {milestones.map((m, i) => (
+              <li key={i}>{m.title}</li>
+            ))}
+          </ol>
+        </>
+      )}
       {requirements.length > 0 && (
         <>
           <h3 className="spec-sub">{t("spec.requirements")}</h3>
@@ -53,6 +73,7 @@ export function RequirementsList({ requirements, decisions }: { requirements: Re
                 <span className="mono requirement-id">{r.id}</span>
                 <span>{r.text}</span>
                 <span className="muted requirement-how">
+                  {staged ? `${t("spec.stageOf", { stage: r.stage ?? 1 })} · ` : ""}
                   {t(`spec.verify.${r.verify}`)}
                   {r.how ? `: ${r.how}` : ""}
                 </span>

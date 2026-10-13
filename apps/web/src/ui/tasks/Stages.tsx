@@ -1,6 +1,7 @@
 import type { TaskStages, TaskView } from "@artel/shared";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
+import { Segmented } from "../Segmented";
 
 const KEY = "artel.stages";
 const ALL_ON: TaskStages = { interview: true, spec: true, approveSpec: true, testsFirst: true };
@@ -42,12 +43,28 @@ export function StageSwitches({ value, onChange, team = false }: { value: TaskSt
       {t((team && key === "spec" ? "stages.plan" : `stages.${key}`) as MessageKey)}
     </label>
   );
+  // "With stops" waits for the user's OK on the spec or plan (and between the stages of a big task); "On its own" does not.
+  const mode = value.approveSpec ? "stops" : "auto";
   return (
     <fieldset className="stages">
       <legend>{t("stages.title")}</legend>
+      <div className="stages-mode">
+        <span id="stages-mode-label" className="sr-only">
+          {t("stages.mode")}
+        </span>
+        <Segmented
+          labelledBy="stages-mode-label"
+          value={mode}
+          options={[
+            { value: "stops", label: t("stages.stops") },
+            { value: "auto", label: t("stages.auto") },
+          ]}
+          onChange={(m) => set({ approveSpec: m === "stops" })}
+        />
+        <span className="muted stages-mode-hint">{t(mode === "auto" ? "stages.autoHint" : "stages.stopsHint")}</span>
+      </div>
       {box("interview")}
       {box("spec", false, team)}
-      {box("approveSpec", !spec)}
       {box("testsFirst", !spec)}
     </fieldset>
   );

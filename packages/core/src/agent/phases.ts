@@ -1,4 +1,4 @@
-import type { Question, Requirement, TaskPhase, VisualCheck } from "@artel/shared";
+import type { Milestone, Question, Requirement, TaskPhase, VisualCheck } from "@artel/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
@@ -72,7 +72,11 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[], o: 
         "and nothing they did not. For each say how it is verified: a check command, a visual check, or review by hand.",
         "A separate reviewer checks every requirement before the work reaches the user. Under decisions list the choices you",
         "made on your own (technologies, defaults, anything the user did not specify).",
-        "Then call propose_spec with the spec, the checks, a plan of 2-8 short steps, the requirements and the decisions.",
+        "If the task is big (more than a day of careful work for an experienced developer, or more than about 10 requirements),",
+        "split it into 2-6 stages: stage 1 is the smallest version that works end to end and is useful by itself, each later stage",
+        "extends it. Name them in stages and give every requirement its stage. Work and acceptance go stage by stage, and the user",
+        "may stop after any stage and keep what is done. A small task has no stages.",
+        "Then call propose_spec with the spec, the checks, a plan of 2-8 short steps, the requirements, the decisions and the stages, if any.",
         ANSWER_HINT,
       ]
         .filter(Boolean)
@@ -146,6 +150,7 @@ export interface SpecProposal {
   visualChecks?: VisualCheck[];
   requirements?: Requirement[];
   decisions?: string[];
+  milestones?: Milestone[];
 }
 
 const requirementsInput = z
@@ -155,6 +160,7 @@ const requirementsInput = z
       text: z.string().min(1).max(2000).describe("One checkable statement about the result, as the user would put it"),
       verify: z.enum(["check", "visual", "review"]).describe("check: a command or test proves it; visual: a look at a page; review: a reviewer checks it by hand"),
       how: z.string().max(2000).default("").describe("The command, the page and what must be on it, or what to do to see it"),
+      stage: z.number().int().min(1).max(10).optional().describe("For a task in stages: the stage that delivers it"),
     }),
   )
   .max(60)
@@ -162,7 +168,42 @@ const requirementsInput = z
 
 /** R1, R2… for requirements the model left unnumbered. */
 function numbered(items: z.infer<typeof requirementsInput>): Requirement[] {
-  return items.map((r, i) => ({ id: r.id?.trim() || `R${i + 1}`, text: r.text.trim(), verify: r.verify, how: r.how.trim() }));
+  return items.map((r, i) => ({
+    id: r.id?.trim() || `R${i + 1}`,
+    text: r.text.trim(),
+    verify: r.verify,
+    how: r.how.trim(),
+    ...(r.stage ? { stage: r.stage } : {}),
+  }));
+}
+
+const stagesInput = z
+  .array(z.object({ title: z.string().min(1).max(300) }))
+  .max(6)
+  .default([])
+  .describe("For a big task: its stages in order; empty for a task done in one go");
+
+/** Stage titles as given, when there are at least two of them. */
+function milestonesOf(stages: { title: string }[]): Milestone[] {
+  return stages.length > 1 ? stages.map((s) => ({ title: s.title.trim() })) : [];
+}
+
+/** The requirements a stage is accepted on: its own and every earlier stage's. */
+export function requirementsUpTo(requirements: Requirement[], stage: number): Requirement[] {
+  return requirements.filter((r) => (r.stage ?? 1) <= stage);
+}
+
+/** What the coder is told at the start of a stage of a big task. */
+export function stageNote(milestones: Milestone[], requirements: Requirement[], stage: number): string {
+  if (milestones.length < 2) return "";
+  const own = requirements.filter((r) => (r.stage ?? 1) === stage);
+  return [
+    `The work goes in ${milestones.length} stages. Now stage ${stage} of ${milestones.length}: ${milestones[stage - 1]?.title ?? ""}.`,
+    own.length ? `Its requirements:\n${requirementsText(own)}` : "",
+    "Do only this stage; the later ones come after it is accepted, and everything from earlier stages must keep working.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** The requirements as the coder and the reviewer read them. */
@@ -190,6 +231,7 @@ export function specTools(onSpec: (proposal: SpecProposal) => void): ToolSet {
           .default([]),
         requirements: requirementsInput,
         decisions: z.array(z.string().min(1).max(1000)).max(30).default([]).describe("Choices you made on your own that the user did not ask for"),
+        stages: stagesInput,
       }),
       execute: async (proposal) => {
         onSpec({
@@ -198,6 +240,7 @@ export function specTools(onSpec: (proposal: SpecProposal) => void): ToolSet {
           plan: proposal.plan,
           requirements: numbered(proposal.requirements),
           decisions: proposal.decisions.map((d) => d.trim()),
+          milestones: milestonesOf(proposal.stages),
           visualChecks: proposal.visual_checks.flatMap((v) => (/^https?:\/\//.test(v.url) ? [{ ...v, start: v.start?.trim() || undefined }] : [])),
         });
         return "Spec proposed.";
@@ -233,7 +276,8 @@ export function answersMessage(
   return [...head, tail].join("\n");
 }
 
-export function specMessage(spec: string, checks: string[], edited: boolean, requirements: Requirement[] = []): string {
+export function specMessage(spec: string, checks: string[], edited: boolean, requirements: Requirement[] = [], milestones: Milestone[] = []): string {
+  const note = stageNote(milestones, requirements, 1);
   return [
     edited ? "The user approved the spec with their edits. The approved spec:" : "The spec is approved:",
     "",
@@ -243,6 +287,7 @@ export function specMessage(spec: string, checks: string[], edited: boolean, req
       ? ["Requirements (a reviewer checks each one before the user sees the work):", requirementsText(requirements), ""]
       : []),
     `Checks: ${checks.length ? checks.join(" ; ") : "none"}`,
+    ...(note ? ["", note] : []),
   ].join("\n");
 }
 
@@ -260,6 +305,8 @@ export function planInstructions(): string {
     "Plan subtasks that touch different files, shared files such as package.json included.",
     "If two must edit the same file, make one depend on the other.",
     "If the project has no tests yet, the first subtask sets up the test runner and the others depend on it.",
+    "If the goal is big, split it into 2-6 stages: stage 1 is the smallest version that works end to end, later stages extend it.",
+    "Give every requirement and every subtask its stage; the team does and accepts one stage at a time, and the user may stop after any.",
     "List the goal's requirements: numbered, checkable statements about the result (R1, R2…), covering everything the user asked for;",
     "a separate reviewer checks each one once every subtask is merged. Under decisions list the choices you made on your own.",
     "Call propose_plan with the spec, the goal's checks, the subtasks, the requirements, the decisions and a short English commit message for the whole goal.",
@@ -273,6 +320,7 @@ export interface PlanProposal extends SpecProposal {
   commitMessage: string | null;
   requirements: Requirement[];
   decisions: string[];
+  milestones: Milestone[];
 }
 
 export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
@@ -290,6 +338,7 @@ export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
               description: z.string().min(1).max(10_000),
               dependsOn: z.array(z.string()).max(8).default([]),
               checks: z.array(z.string().min(1).max(500)).max(10).default([]),
+              stage: z.number().int().min(1).max(10).optional().describe("For a goal in stages: the stage this subtask belongs to"),
             }),
           )
           .min(1)
@@ -297,6 +346,7 @@ export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
         commit_message: z.string().max(200).optional().describe("Short English commit message in the imperative mood for the whole goal"),
         requirements: requirementsInput,
         decisions: z.array(z.string().min(1).max(1000)).max(30).default([]).describe("Choices you made on your own that the user did not ask for"),
+        stages: stagesInput,
       }),
       execute: async (p) => {
         const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "task";
@@ -309,6 +359,7 @@ export function planTools(onPlan: (proposal: PlanProposal) => void): ToolSet {
           commitMessage: p.commit_message?.split("\n")[0]?.trim() || null,
           requirements: numbered(p.requirements),
           decisions: p.decisions.map((d) => d.trim()),
+          milestones: milestonesOf(p.stages),
         });
         return "Plan proposed.";
       },

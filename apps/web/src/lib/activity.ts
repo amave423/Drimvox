@@ -15,6 +15,7 @@ export type FeedItem =
   | { kind: "status"; seq: number; status: string; reason: string | null; detail: string | null }
   | { kind: "phase"; seq: number; phase: string; round: number | null }
   | { kind: "acceptance"; seq: number; round: number; done: number; total: number; summary: string }
+  | { kind: "milestone"; seq: number; stage: number; total: number; title: string }
   | { kind: "questions"; seq: number; questions: { id: string; question: string }[] }
   | { kind: "answers"; seq: number; answers: { id: string; answer: string }[]; skipped: boolean }
   | { kind: "spec"; seq: number; spec: string; checks: string[]; edited: boolean }
@@ -69,6 +70,9 @@ export function buildFeed(events: TaskEvent[]): FeedItem[] {
         break;
       case "phase":
         items.push({ kind: "phase", seq: e.seq, phase: d.phase, round: typeof d.round === "number" ? d.round : null });
+        break;
+      case "milestone":
+        items.push({ kind: "milestone", seq: e.seq, stage: Number(d.stage ?? 1), total: Number(d.total ?? 1), title: String(d.title ?? "") });
         break;
       case "acceptance":
         items.push({
