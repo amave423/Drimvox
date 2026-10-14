@@ -10,7 +10,15 @@ const THRESHOLD_CHARS = 120_000;
 const KEEP = 6;
 const CHUNK = 6;
 /** What is left of a cut output or input. */
-const HEAD = 300;
+const HEAD = 200;
+/**
+ * Tool results further back than this are folded to a line each: the beginnings of cut items pile up over a long
+ * task (seen live: half a million characters a step after 362 steps). The fold moves in steps of FAR_CHUNK.
+ */
+const FAR = 30;
+const FAR_CHUNK = 15;
+/** What is left of a folded output. */
+const LINE = 80;
 export const MARK = "cut by Artel";
 
 /** The conversation as the model gets it for the next step; the same array when nothing needs cutting. */
@@ -23,7 +31,37 @@ export function compactHistory(messages: ModelMessage[]): ModelMessage[] {
   const cutBefore = Math.floor(Math.max(0, results.length - KEEP) / CHUNK) * CHUNK;
   if (cutBefore === 0) return messages;
   const boundary = results[cutBefore]!;
-  return messages.map((m, i) => (i < boundary ? cutMessage(m) : m));
+  const foldBefore = Math.floor(Math.max(0, results.length - FAR) / FAR_CHUNK) * FAR_CHUNK;
+  const far = foldBefore > 0 ? results[foldBefore]! : 0;
+  return messages.map((m, i) => (i < far ? foldMessage(cutMessage(m)) : i < boundary ? cutMessage(m) : m));
+}
+
+/** Far back: an output keeps its first line, an input keeps only its short fields. */
+function foldMessage(m: ModelMessage): ModelMessage {
+  if (m.role === "tool") {
+    return {
+      ...m,
+      content: m.content.map((part) => {
+        if (part.type !== "tool-result" || part.output.type !== "text") return part;
+        const text = part.output.value;
+        if (text.length <= LINE * 2) return part;
+        return { ...part, output: { type: "text" as const, value: `${text.slice(0, LINE)} [${part.toolName} output ${MARK}]` } };
+      }),
+    };
+  }
+  if (m.role === "assistant" && Array.isArray(m.content)) {
+    return {
+      ...m,
+      content: m.content.map((part) => {
+        if (part.type !== "tool-call" || !part.input || typeof part.input !== "object") return part;
+        const input = part.input as Record<string, unknown>;
+        const long = Object.entries(input).filter(([, v]) => typeof v === "string" && v.length > LINE && !(v.includes(MARK) && v.length < 200));
+        if (long.length === 0) return part;
+        return { ...part, input: { ...input, ...Object.fromEntries(long.map(([k, v]) => [k, `[${(v as string).length} characters of ${k} ${MARK}]`])) } };
+      }),
+    };
+  }
+  return m;
 }
 
 function cutMessage(m: ModelMessage): ModelMessage {

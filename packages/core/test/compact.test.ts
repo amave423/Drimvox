@@ -62,6 +62,23 @@ describe("compactHistory", () => {
     expect(reasoning(compacted.at(-2)!)).toBe(reasoning(long.at(-2)!));
   });
 
+  // Seen live: after 362 steps each step still sent half a million characters, mostly beginnings left of cut items.
+  it("folds what is far back into a line each, keeping the cache-friendly steps", () => {
+    const long = history(150, 3_000);
+    const compacted = compactHistory(long);
+    // Each step far back adds a couple of lines, not the beginnings of everything it did.
+    const perStep = (size(compacted) - size(compactHistory(history(105, 3_000)))) / 45;
+    expect(perStep).toBeLessThan(500);
+    // Far back: a line; near: the usual beginning; the newest: whole.
+    expect(resultText(compacted[2]!).length).toBeLessThan(200);
+    expect(resultText(compacted[2]!)).toMatch(/cut by Artel/);
+    expect(resultText(compacted.at(-1)!)).toBe(resultText(long.at(-1)!));
+    // Another step leaves the folded start as it was.
+    const next = compactHistory(history(151, 3_000));
+    expect(JSON.stringify(next.slice(0, 200))).toBe(JSON.stringify(compacted.slice(0, 200)));
+    expect(JSON.stringify(compactHistory(compacted))).toBe(JSON.stringify(compacted));
+  });
+
   it("changes nothing when given its own result again", () => {
     const once = compactHistory(history(20));
     expect(JSON.stringify(compactHistory(once))).toBe(JSON.stringify(once));
