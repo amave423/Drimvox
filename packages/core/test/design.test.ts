@@ -215,6 +215,24 @@ describe("the design brief", () => {
     expect(code).toMatch(/violet-to-blue gradient/);
   });
 
+  // Seen live: a good brief with twelve colours was thrown away whole, and the task went on without a look.
+  it("trims a brief that says more than it keeps instead of dropping it", async () => {
+    const generous = {
+      ...BRIEF,
+      direction: "Ночная обсерватория: строгий картографический прибор ".repeat(4),
+      concept: "Небо — главный экспонат. ".repeat(60),
+      palette: Array.from({ length: 12 }, (_, i) => ({ role: `цвет ${i + 1}`, hex: `#0B12${String(10 + i).padStart(2, "0")}` })),
+      rules: Array.from({ length: 15 }, (_, i) => `Правило ${i + 1}`),
+    };
+    const id = await start({ coder: [specWith({ design: generous }), finish], acceptor: [judge("Принято")] }, { vision: false });
+    const task = await waitFor(id, settled);
+    expect(task.design).not.toBeNull();
+    expect(task.design.palette).toHaveLength(10);
+    expect(task.design.rules).toHaveLength(12);
+    expect(task.design.direction.length).toBeLessThanOrEqual(120);
+    expect(task.design.concept.length).toBeLessThanOrEqual(600);
+  });
+
   it("drops a brief it cannot use instead of failing the spec", async () => {
     const id = await start({ coder: [specWith({ design: { ...BRIEF, palette: [{ role: "фон", hex: "blue" }] } }), finish], acceptor: [judge("Принято")] }, { vision: false });
     const task = await waitFor(id, settled);

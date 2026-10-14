@@ -136,27 +136,38 @@ export function toLook(input: z.infer<typeof lookInput>): Look | undefined {
 /** The brief as models send it with the spec or the plan; normalized by `toBrief`. */
 export const briefInput = z
   .object({
-    direction: z.string().max(200),
-    concept: z.string().max(1000),
-    palette: z.array(z.object({ role: z.string().max(60), hex: z.string().max(40) })).max(12),
+    direction: z.string().max(400),
+    concept: z.string().max(3000),
+    palette: z.array(z.object({ role: z.string().max(200), hex: z.string().max(40) })).max(24),
     fonts: z.object({ heading: fontInput, body: fontInput }),
-    rules: z.array(z.string().max(400)).max(12).default([]),
+    rules: z.array(z.string().max(1000)).max(24).default([]),
   })
   .optional()
-  .describe("The design brief, when the result has a visible interface");
+  .describe("The design brief, when the result has a visible interface: up to 10 colours and 12 rules are kept");
 
-/** A brief the coders can follow, or none: a brief without a usable palette is dropped rather than failing the spec. */
+const clip = (text: string, max: number) => (text.trim().length > max ? `${text.trim().slice(0, max - 1).trimEnd()}…` : text.trim());
+
+/**
+ * A brief the coders can follow, or none. What says more than a brief keeps is trimmed (seen live: twelve colours threw
+ * a good brief away whole); only a brief without a usable palette or fonts is dropped rather than failing the spec.
+ */
 export function toBrief(input: z.infer<typeof briefInput>): DesignBrief | null {
   if (!input) return null;
   const parsed = designBriefSchema.safeParse({
-    direction: input.direction,
-    concept: input.concept,
-    palette: input.palette.filter((c) => colours([c.hex]).length === 1).map((c) => ({ role: c.role.trim() || "colour", hex: c.hex.trim() })),
+    direction: clip(input.direction, 120),
+    concept: clip(input.concept, 600),
+    palette: input.palette
+      .filter((c) => colours([c.hex]).length === 1)
+      .slice(0, 10)
+      .map((c) => ({ role: clip(c.role, 60) || "colour", hex: c.hex.trim() })),
     fonts: {
-      heading: { name: input.fonts.heading.name, kind: fontKind(input.fonts.heading.kind) },
-      body: { name: input.fonts.body.name, kind: fontKind(input.fonts.body.kind) },
+      heading: { name: clip(input.fonts.heading.name, 80), kind: fontKind(input.fonts.heading.kind) },
+      body: { name: clip(input.fonts.body.name, 80), kind: fontKind(input.fonts.body.kind) },
     },
-    rules: input.rules.map((r) => r.trim()).filter(Boolean),
+    rules: input.rules
+      .map((r) => clip(r, 400))
+      .filter(Boolean)
+      .slice(0, 12),
   });
   return parsed.success ? parsed.data : null;
 }
