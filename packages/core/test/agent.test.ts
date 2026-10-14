@@ -173,6 +173,27 @@ describe("a task", () => {
     expect((await events(id)).some((e) => e.kind === "text" && /continues on its own/.test(e.data.text))).toBe(true);
   });
 
+  // Seen live: an agent rewrote a file from its own earlier write, already cut in the history, and saved the cut note
+  // ("[… 3710 more characters … cut by Artel]") in place of 3 700 characters of code.
+  it("refuses to write the history's cut-out notes into files", async () => {
+    const cut = "export const sun = 1;\n[… 3710 more characters of this content cut by Artel to save space; read or run it again if you need them]";
+    setupResult = setup([
+      { toolCalls: [{ name: "write_file", args: { path: "src/sun.ts", content: cut } }] },
+      { toolCalls: [{ name: "edit_file", args: { path: "src/app.ts", old: "'hi'", new: cut } }] },
+      { toolCalls: [{ name: "run_command", args: { command: `Set-Content src/sun.ts @'
+${cut}
+'@` } }] },
+      { toolCalls: [finish()] },
+    ]);
+    const { id } = await startTask();
+    await waitFor(id, ["done_empty", "review"]);
+    const results = (await events(id)).filter((e) => e.kind === "tool_result").map((e) => e.data);
+    expect(results.map((r) => r.ok)).toEqual([false, false, false, true]);
+    expect(results[0].output).toMatch(/read_file/);
+    const task = await (await env.call("GET", `/api/tasks/${id}`)).json();
+    expect(task.status).toBe("done_empty");
+  });
+
   // Seen live: an answer given after two minutes failed the task with "timeout", as if the model had gone silent.
   it("waits for the user's answer longer than a model may stay silent", async () => {
     env.setIdleTimeout(300);

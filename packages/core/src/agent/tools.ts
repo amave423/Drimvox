@@ -1,5 +1,6 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
+import { MARK } from "./compact";
 import { classifyCommand, runCommand, type CommandVerdict } from "./commands";
 import type { Workspace } from "./workspace";
 
@@ -82,6 +83,8 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
     "Run a shell command in the project folder, e.g. tests or a build. Returns the exit code and the end of the output.",
     z.object({ command: z.string().min(1), timeout_seconds: z.number().int().min(1).max(600).default(120) }),
     async ({ command, timeout_seconds }, signal) => {
+      // A command can write files too (Set-Content with the text inside).
+      refuseCutNotes(command);
       const verdict = classifyCommand(command, ws.root);
       if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal))) {
         return { ok: false, output: "The user denied this command. Do not retry it; find another way or explain in finish." };
@@ -101,6 +104,7 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
       "Create or overwrite a file with the full content. Creates missing folders.",
       z.object({ path: z.string(), content: z.string() }),
       async ({ path, content }) => {
+        refuseCutNotes(content);
         ws.writeFile(path, content);
         return ok(`Wrote ${path}`);
       },
@@ -110,6 +114,7 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
       "Replace one exact fragment of a file. `old` must appear exactly once; include surrounding lines to make it unique.",
       z.object({ path: z.string(), old: z.string().min(1), new: z.string() }),
       async ({ path, old, new: replacement }) => {
+        refuseCutNotes(old, replacement);
         ws.editFile(path, old, replacement);
         return ok(`Edited ${path}`);
       },
@@ -129,4 +134,13 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
 
 function clip(text: string): string {
   return text.length > OUTPUT_FOR_EVENTS ? `${text.slice(0, OUTPUT_FOR_EVENTS)}\n…` : text;
+}
+
+/** Text the history compaction left in place of what was cut is not code: it must never land in a file. */
+function refuseCutNotes(...texts: string[]): void {
+  if (texts.some((t) => t.includes(MARK))) {
+    throw new Error(
+      `This text holds a note Artel left in your history in place of something it cut ("${MARK}"), not real content. Read the file with read_file and write its real text.`,
+    );
+  }
 }

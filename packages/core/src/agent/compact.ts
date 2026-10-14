@@ -11,7 +11,7 @@ const KEEP = 6;
 const CHUNK = 6;
 /** What is left of a cut output or input. */
 const HEAD = 300;
-const MARK = "cut by Artel";
+export const MARK = "cut by Artel";
 
 /** The conversation as the model gets it for the next step; the same array when nothing needs cutting. */
 export function compactHistory(messages: ModelMessage[]): ModelMessage[] {
@@ -49,7 +49,11 @@ function cutMessage(m: ModelMessage): ModelMessage {
         const input = part.input as Record<string, unknown>;
         const long = Object.entries(input).filter(([, v]) => typeof v === "string" && v.length > HEAD * 2 && !v.includes(MARK));
         if (long.length === 0) return part;
-        return { ...part, input: { ...input, ...Object.fromEntries(long.map(([k, v]) => [k, cut(v as string, k)])) } };
+        // What the agent wrote goes whole, with no beginning left: seen live, an agent copied a cut write back into
+        // the file as if it were the file. The file itself is on disk.
+        const where = typeof input.path === "string" ? ` to ${input.path}` : "";
+        const note = (k: string, v: string) => `[${v.length} characters of ${k} written${where} were ${MARK} from this history; read the file for its current text]`;
+        return { ...part, input: { ...input, ...Object.fromEntries(long.map(([k, v]) => [k, note(k, v as string)])) } };
       }),
     };
   }
