@@ -136,9 +136,15 @@ function clip(text: string): string {
   return text.length > OUTPUT_FOR_EVENTS ? `${text.slice(0, OUTPUT_FOR_EVENTS)}\n…` : text;
 }
 
+/**
+ * The notes compaction leaves in place of what it cut, in full: "[… 3710 more characters of this content cut by Artel"
+ * or "[4010 characters of content written to x were cut by Artel". A search for the words alone is fine.
+ */
+const CUT_NOTE = /\[(?:… )?\d+ (?:more )?characters of [^\]]*cut by Artel/;
+
 /** Text the history compaction left in place of what was cut is not code: it must never land in a file. */
 function refuseCutNotes(...texts: string[]): void {
-  if (texts.some((t) => t.includes(MARK))) {
+  if (texts.some((t) => CUT_NOTE.test(t))) {
     throw new Error(
       `This text holds a note Artel left in your history in place of something it cut ("${MARK}"), not real content. Read the file with read_file and write its real text.`,
     );

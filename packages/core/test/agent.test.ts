@@ -183,12 +183,14 @@ describe("a task", () => {
       { toolCalls: [{ name: "run_command", args: { command: `Set-Content src/sun.ts @'
 ${cut}
 '@` } }] },
+      // Looking for such notes is fine.
+      { toolCalls: [{ name: "run_command", args: { command: 'Select-String -Path src/*.ts -Pattern "cut by Artel"' } }] },
       { toolCalls: [finish()] },
     ]);
     const { id } = await startTask();
     await waitFor(id, ["done_empty", "review"]);
     const results = (await events(id)).filter((e) => e.kind === "tool_result").map((e) => e.data);
-    expect(results.map((r) => r.ok)).toEqual([false, false, false, true]);
+    expect(results.map((r) => r.ok)).toEqual([false, false, false, true, true]);
     expect(results[0].output).toMatch(/read_file/);
     const task = await (await env.call("GET", `/api/tasks/${id}`)).json();
     expect(task.status).toBe("done_empty");
