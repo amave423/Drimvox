@@ -173,6 +173,16 @@ describe("a task", () => {
     expect((await events(id)).some((e) => e.kind === "text" && /continues on its own/.test(e.data.text))).toBe(true);
   });
 
+  // Seen live: after the user's "Continue" the task stopped again at every 60 steps.
+  it("goes past the step limit by itself again after the user says to continue", async () => {
+    const look = { toolCalls: [{ name: "list_files", args: { path: "." } }] };
+    setupResult = setup([...Array(240 + 70).fill(look), { toolCalls: [finish()] }]);
+    const { id } = await startTask();
+    expect(await waitFor(id, ["waiting", "done_empty", "failed"], 60_000)).toMatchObject({ status: "waiting", statusReason: "steps" });
+    await env.call("POST", `/api/tasks/${id}/continue`, {});
+    expect(await waitFor(id, ["waiting", "done_empty", "failed"], 60_000)).toMatchObject({ status: "done_empty" });
+  }, 120_000);
+
   // Seen live: an agent rewrote a file from its own earlier write, already cut in the history, and saved the cut note
   // ("[… 3710 more characters … cut by Artel]") in place of 3 700 characters of code.
   it("refuses to write the history's cut-out notes into files", async () => {
