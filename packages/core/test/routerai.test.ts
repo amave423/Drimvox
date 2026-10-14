@@ -133,6 +133,18 @@ describe("RouterAI", () => {
     expect(sent).toMatchObject({ model: "google/gemini-2.5-flash-image", modalities: ["image", "text"], image_config: { aspect_ratio: "16:9" } });
   });
 
+  // Seen live: by the catalog's prices Artel counted 126 ₽ where RouterAI took 80 ₽; its own bill comes with each answer.
+  it("charges a chat by RouterAI's own bill when it sends one", async () => {
+    await fake.close();
+    fake = await startFakeProvider({ key: KEY, models: catalog, usage: { prompt_tokens: 1000, completion_tokens: 10, cost: 8 } });
+    env.setPresetUrl("routerai", fake.baseUrl);
+    const providerId = await connect();
+    const chat = await (await env.call("POST", "/api/chats", { providerId, model: "deepseek/deepseek-v3.2" })).json();
+    const done = (await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Привет" }))).at(-1);
+    // 8 ₽ at 80 ₽ to the dollar, not the 0.00102 $ the catalog's prices give.
+    expect(done.message.costUsd).toBeCloseTo(0.1, 6);
+  });
+
   it("turns a custom provider pointing at RouterAI into the RouterAI preset", async () => {
     const res = await env.call("POST", "/api/providers", { preset: "custom", baseUrl: "https://routerai.ru/api/v1", apiKey: KEY });
     expect((await res.json()).preset).toBe("routerai");

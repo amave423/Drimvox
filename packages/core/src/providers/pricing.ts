@@ -35,3 +35,9 @@ export function costOf(model: ModelInfo | undefined, preset: PresetId, usage: To
 export function usageOf(u: { inputTokens?: number; outputTokens?: number; inputTokenDetails?: { cacheReadTokens?: number } } | undefined): TokenUsage {
   return { input: u?.inputTokens ?? 0, cacheRead: u?.inputTokenDetails?.cacheReadTokens ?? 0, output: u?.outputTokens ?? 0 };
 }
+
+/** The provider's own bill for a step in dollars, when it sent one (see `billed` in model.ts); null otherwise. */
+export function billedUsd(providerMetadata: unknown, usdPerUnit: number): number | null {
+  const billed = (providerMetadata as { artel?: { billed?: unknown } } | undefined)?.artel?.billed;
+  return typeof billed === "number" ? billed * usdPerUnit : null;
+}

@@ -5,6 +5,8 @@ export interface FakeUsage {
   prompt_tokens: number;
   completion_tokens: number;
   prompt_tokens_details?: { cached_tokens: number };
+  /** What the request cost, in the account's currency, as OpenRouter and RouterAI report it. */
+  cost?: number;
 }
 
 export interface FakeChunk {

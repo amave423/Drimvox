@@ -1,7 +1,8 @@
 import type { ModelInfo, ProviderError } from "@artel/shared";
 import { hasToolCall, isStepCount, streamText, type ModelMessage, type StopCondition, type ToolSet } from "ai";
 import { describeError } from "../providers/errors";
-import { costOf, usageOf } from "../providers/pricing";
+import { billedUsd, costOf, usageOf } from "../providers/pricing";
+import { usdRub } from "../rates";
 import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
@@ -58,8 +59,11 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let spent = i.spentUsd;
   let steps = 0;
 
-  const stepCost = (usage: Parameters<typeof usageOf>[0]) => costOf(i.price, i.conn.preset, usageOf(usage)) ?? 0;
-  const overBudget: StopCondition<ToolSet> = ({ steps: done }) => i.spentUsd + done.reduce((sum, s) => sum + stepCost(s.usage), 0) >= i.budgetUsd;
+  // The provider's own bill when it sends one (in rubles for RouterAI), else the catalog's prices.
+  const usdPerUnit = i.conn.currency === "RUB" ? 1 / (await usdRub()) : 1;
+  const stepCost = (step: { usage: Parameters<typeof usageOf>[0]; providerMetadata?: unknown }) =>
+    billedUsd(step.providerMetadata, usdPerUnit) ?? costOf(i.price, i.conn.preset, usageOf(step.usage)) ?? 0;
+  const overBudget: StopCondition<ToolSet> = ({ steps: done }) => i.spentUsd + done.reduce((sum, s) => sum + stepCost(s), 0) >= i.budgetUsd;
 
   // A model that sends nothing for too long is treated like a provider error. While a tool runs (a long command,
   // a question to the user) the model is not the one keeping quiet: the clock stands still until the last tool ends.
@@ -116,14 +120,14 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         steps++;
         const input = step.usage.inputTokens ?? 0;
         const output = step.usage.outputTokens ?? 0;
-        const cost = stepCost(step.usage);
+        const cost = stepCost(step);
         spent += cost;
         i.onStep({
           messages: step.response.messages as ModelMessage[],
           inputTokens: input,
           outputTokens: output,
           costUsd: cost,
-          priced: i.price?.priceIn != null && i.price.priceOut != null,
+          priced: billedUsd(step.providerMetadata, usdPerUnit) !== null || (i.price?.priceIn != null && i.price.priceOut != null),
         });
       },
     });

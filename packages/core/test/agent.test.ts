@@ -163,6 +163,20 @@ describe("a task", () => {
     expect(result.data.output).toMatch(/denied/i);
   });
 
+  it("charges a task by the provider's own bill when it sends one", async () => {
+    setupResult = setup(
+      [
+        { toolCalls: [{ name: "list_files", args: { path: "." } }], usage: { prompt_tokens: 600_000, completion_tokens: 10, cost: 0.03 } },
+        { toolCalls: [finish()], usage: { prompt_tokens: 600_000, completion_tokens: 10, cost: 0.02 } },
+      ],
+      [{ id: "coder", pricing: { prompt: "0.000001", completion: "0.000002" } }],
+    );
+    const { id } = await startTask();
+    const task = await waitFor(id, ["done_empty", "failed"]);
+    // The catalog's prices would make it 1.2 $.
+    expect(task.costUsd).toBeCloseTo(0.05, 6);
+  });
+
   // Seen live: a task stopped at every 60 steps and asked to go on, with stops or on its own; only the budget should stop it.
   it("goes past the step limit by itself", async () => {
     const look = { toolCalls: [{ name: "list_files", args: { path: "." } }] };

@@ -1,7 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createOpenAICompatible, type MetadataExtractor } from "@ai-sdk/openai-compatible";
 import type { LanguageModel } from "ai";
 import type { Connection } from "./repo";
 
@@ -23,6 +23,33 @@ export function languageModel(conn: Connection, modelId: string): LanguageModel 
     includeUsage: true,
     fetch,
     headers: conn.preset === "openrouter" ? { "X-Title": "Artel" } : undefined,
+    metadataExtractor: billed,
   });
   return provider.chatModel(modelId);
 }
+
+/** `usage.cost`: what the request cost in the account's currency, as OpenRouter and RouterAI send it. */
+function billOf(body: unknown): number | undefined {
+  const cost = (body as { usage?: { cost?: unknown } } | null)?.usage?.cost;
+  return typeof cost === "number" && Number.isFinite(cost) && cost >= 0 ? cost : undefined;
+}
+
+/**
+ * The provider's own bill for a request, kept as `providerMetadata.artel.billed`. Seen live: by the catalog's prices
+ * Artel counted 126 ₽ where RouterAI took 80 ₽ (its cache costs less than its catalog says).
+ */
+const billed: MetadataExtractor = {
+  extractMetadata: async ({ parsedBody }) => {
+    const cost = billOf(parsedBody);
+    return cost === undefined ? undefined : { artel: { billed: cost } };
+  },
+  createStreamExtractor: () => {
+    let cost: number | undefined;
+    return {
+      processChunk: (chunk) => {
+        cost = billOf(chunk) ?? cost;
+      },
+      buildMetadata: () => (cost === undefined ? undefined : { artel: { billed: cost } }),
+    };
+  },
+};

@@ -6,7 +6,8 @@ import { isCli } from "../cli/kinds";
 import { WEB_HINT, webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
-import { costOf, usageOf } from "../providers/pricing";
+import { billedUsd, costOf, usageOf } from "../providers/pricing";
+import { usdRub } from "../rates";
 import { describeError } from "../providers/errors";
 import { nowLine } from "../now";
 import { languageModel } from "../providers/model";
@@ -60,6 +61,8 @@ export async function reply(i: ReplyInput): Promise<void> {
   let reasoning = "";
   let error: ProviderError | null = null;
   let usage: Parameters<typeof usageOf>[0];
+  /** The provider's own bill in its currency, summed over the steps, when it sends one. */
+  let billed: number | null = null;
 
   // Some hosted models sit in a queue or hang; every streamed part resets the clock.
   const silence = new AbortController();
@@ -108,6 +111,10 @@ export async function reply(i: ReplyInput): Promise<void> {
         await i.emit({ type: "reasoning", text: part.text });
       } else if (part.type === "error") {
         error = describeError(part.error);
+      } else if (part.type === "finish-step") {
+        // Each step's own bill, when the provider sends one: an answer with searches takes several steps.
+        const step = billedUsd(part.providerMetadata, 1);
+        if (step !== null) billed = (billed ?? 0) + step;
       } else if (part.type === "finish") {
         usage = part.totalUsage;
       }
@@ -130,7 +137,12 @@ export async function reply(i: ReplyInput): Promise<void> {
     status: stopped ? "stopped" : error ? "error" : "done",
     inputTokens,
     outputTokens,
-    costUsd: inputTokens !== null && outputTokens !== null ? costOf(price, i.conn.preset, usageOf(usage)) : null,
+    costUsd:
+      billed !== null
+        ? billed / (i.conn.currency === "RUB" ? await usdRub() : 1)
+        : inputTokens !== null && outputTokens !== null
+          ? costOf(price, i.conn.preset, usageOf(usage))
+          : null,
     error: stopped ? null : error,
   });
   if (!stopped) await i.emit({ type: "done", message });
