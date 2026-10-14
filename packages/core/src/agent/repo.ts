@@ -80,6 +80,7 @@ export interface TaskRow {
   design_review: string | null;
   design_reviewed: number;
   step_rounds: number;
+  step_red: number | null;
 }
 
 export class ProjectRepo {
@@ -155,6 +156,7 @@ export type TaskPatch = Partial<
     | "design_review"
     | "design_reviewed"
     | "step_rounds"
+    | "step_red"
   >
 >;
 
@@ -218,6 +220,7 @@ export class TaskRepo {
       design_review: null,
       design_reviewed: 0,
       step_rounds: 0,
+      step_red: null,
       ...extra,
       status_reason: null,
       cost_usd: 0,

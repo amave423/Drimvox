@@ -196,7 +196,7 @@ export class AgentRunner {
     }
     if (row.status_reason === "budget") this.o.tasks.update(id, { budget_usd: row.budget_usd + this.o.budgetUsd() });
     // The user's word to go on: the task may again pass the step limit by itself a few times.
-    this.o.tasks.update(id, { step_rounds: 0 });
+    this.o.tasks.update(id, { step_rounds: 0, step_red: null });
     if (row.status_reason === "stuck") this.o.tasks.update(id, { attempts: 0 });
     if (row.status_reason === "visual_failed") this.o.tasks.update(id, { visual_attempts: 0 });
     const again =

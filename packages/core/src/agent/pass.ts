@@ -17,6 +17,7 @@ import { planInstructions, planTools, type PlanProposal } from "./plan";
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { done, lastSummary } from "./landing";
 import { MAX_STEPS, runAgent } from "./run";
+import { escalate, pastStepLimit } from "./progress";
 import { isCli } from "../cli/kinds";
 import { runCliTurn } from "../cli/turn";
 import { webTools } from "../internet/tools";
@@ -79,7 +80,7 @@ export function stepAfterSpec(stages: TaskStages, checks: string[]): TaskPhase {
 }
 
 export function enterPhase(ctx: PassContext, id: string, phase: TaskPhase): void {
-  ctx.tasks.update(id, { phase, attempts: 0 });
+  ctx.tasks.update(id, { phase, attempts: 0, step_red: null });
   ctx.event("phase", { phase });
 }
 
@@ -203,11 +204,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   if (outcome.kind === "stopped") return finish(ctx, "stopped", "user");
   if (outcome.kind === "error") return finish(ctx, "failed", outcome.error.code, outcome.error.detail);
   // The step limit means nothing to the user: the stops worth making are the spec and the stages, and the budget limits money.
-  if (outcome.kind === "steps" && row.step_rounds < MAX_STEP_ROUNDS) {
-    ctx.tasks.update(id, { step_rounds: row.step_rounds + 1 });
-    ctx.event("text", { text: `Artel continues on its own after ${MAX_STEPS} steps; the budget still limits the spending.` });
-    return "Continue the task.";
-  }
+  if (outcome.kind === "steps" && row.step_rounds < MAX_STEP_ROUNDS) return pastStepLimit(ctx, id, ctx.tasks.row(id)!, MAX_STEPS);
   if (outcome.kind === "budget" || outcome.kind === "steps") return finish(ctx, "waiting", outcome.kind);
 
   // A question, not a task: the answer is the result and there is nothing to review.
@@ -347,13 +344,8 @@ async function codeGate(
     return `Artel ran the checks and they fail:\n\n${report}\n\nFix the cause (not the tests), run the checks, then call finish.`;
   }
 
-  const strong = ctx.strongModel();
-  const strongConn = strong ? ctx.providers.connection(strong.providerId) : null;
-  if (!row.escalated && strong && strongConn && strong.model !== row.model) {
-    ctx.tasks.update(id, { provider_id: strong.providerId, model: strong.model, escalated: 1, attempts: 0 });
-    ctx.event("escalation", { from: row.model, to: strong.model });
-    return `You are taking over this task from a weaker model that failed ${MAX_ATTEMPTS} times. The checks still fail:\n\n${report}\n\nFind the real cause, fix it, run the checks, then call finish.`;
-  }
+  const handOver = escalate(ctx, id, row, `failed ${MAX_ATTEMPTS} times`, report);
+  if (handOver) return handOver;
   ctx.tasks.update(id, { attempts });
   return finish(ctx, "waiting", "stuck", report.slice(0, 4000));
 }

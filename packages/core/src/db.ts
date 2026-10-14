@@ -174,6 +174,8 @@ const migrations: string[] = [
    alter table tasks add column design_reviewed integer not null default 0;`,
   // How many times a task on its own went past the step limit without asking.
   `alter table tasks add column step_rounds integer not null default 0;`,
+  // How red the checks were at the last step limit, to tell progress from going in circles.
+  `alter table tasks add column step_red integer;`,
 ];
 
 export interface Database {
