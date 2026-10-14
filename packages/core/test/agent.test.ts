@@ -163,8 +163,8 @@ describe("a task", () => {
     expect(result.data.output).toMatch(/denied/i);
   });
 
-  // Seen live: a task "on its own" stopped at every 60 steps and asked to go on; only the budget should stop it.
-  it("goes past the step limit by itself when the task runs on its own", async () => {
+  // Seen live: a task stopped at every 60 steps and asked to go on, with stops or on its own; only the budget should stop it.
+  it("goes past the step limit by itself", async () => {
     const look = { toolCalls: [{ name: "list_files", args: { path: "." } }] };
     setupResult = setup([...Array(65).fill(look), { toolCalls: [finish()] }]);
     const { id } = await startTask();
