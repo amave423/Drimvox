@@ -146,7 +146,7 @@ const CUT_NOTE = /\[(?:… )?\d+ (?:more )?characters of [^\]]*cut by Artel/;
 function refuseCutNotes(...texts: string[]): void {
   if (texts.some((t) => CUT_NOTE.test(t))) {
     throw new Error(
-      `This text holds a note Artel left in your history in place of something it cut ("${MARK}"), not real content. Read the file with read_file and write its real text.`,
+      `This holds a note Artel left in your history in place of text it cut ("${MARK}"), not the text itself. Write the real text in full; for a file, read it with read_file first.`,
     );
   }
 }

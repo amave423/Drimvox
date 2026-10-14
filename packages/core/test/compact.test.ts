@@ -79,6 +79,20 @@ describe("compactHistory", () => {
     expect(JSON.stringify(compactHistory(compacted))).toBe(JSON.stringify(compacted));
   });
 
+  // Seen live: with its old commands folded to notes, an agent sent such a note as its next command.
+  it("keeps the agent's commands as they were, folding only very long ones", () => {
+    const messages: ModelMessage[] = [{ role: "user", content: "Сделай задачу" }];
+    for (let i = 0; i < 150; i++) {
+      const command = i === 0 ? `node -e "${"x".repeat(3_000)}"` : `npm run typecheck 2>&1 | Select-String -Pattern "error TS" | Select-Object -First 25; npm run test -- tests/part-${i}.test.ts tests/sky tests/time 2>&1 | Select-String -Pattern "Test Files|Tests |×"`;
+      messages.push({ role: "assistant", content: [{ type: "tool-call", toolCallId: `c${i}`, toolName: "run_command", input: { command } }] });
+      messages.push({ role: "tool", content: [{ type: "tool-result", toolCallId: `c${i}`, toolName: "run_command", output: { type: "text", value: "y".repeat(3_000) } }] });
+    }
+    const compacted = compactHistory(messages);
+    const command = (m: ModelMessage) => ((m.content as any[])[0].input.command as string);
+    expect(command(compacted[3]!)).toBe(command(messages[3]!));
+    expect(command(compacted[1]!)).toMatch(/cut by Artel/);
+  });
+
   it("changes nothing when given its own result again", () => {
     const once = compactHistory(history(20));
     expect(JSON.stringify(compactHistory(once))).toBe(JSON.stringify(once));

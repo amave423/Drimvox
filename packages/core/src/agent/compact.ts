@@ -19,6 +19,20 @@ const FAR = 30;
 const FAR_CHUNK = 15;
 /** What is left of a folded output. */
 const LINE = 80;
+/**
+ * A command stays as the agent wrote it up to this length, even far back: the agent learns from its own calls how to
+ * make the next one (seen live: with its commands folded to notes, it sent such a note as its next command).
+ */
+const COMMAND_KEPT = 1_000;
+/** Inputs that are text going into a file; any other long input is a command or a query. */
+const FILE_TEXT = new Set(["content", "new", "old"]);
+
+/** The note left in place of a cut input: file text points at the file, anything else says it ran as sent. */
+function inputNote(key: string, value: string, path: unknown): string {
+  return FILE_TEXT.has(key)
+    ? `[${value.length} characters of ${key}${typeof path === "string" ? ` written to ${path}` : ""} were ${MARK} from this history; read the file for its current text]`
+    : `[${value.length} characters of ${key} ${MARK} from this history; it ran as written then]`;
+}
 export const MARK = "cut by Artel";
 
 /** The conversation as the model gets it for the next step; the same array when nothing needs cutting. */
@@ -55,9 +69,11 @@ function foldMessage(m: ModelMessage): ModelMessage {
       content: m.content.map((part) => {
         if (part.type !== "tool-call" || !part.input || typeof part.input !== "object") return part;
         const input = part.input as Record<string, unknown>;
-        const long = Object.entries(input).filter(([, v]) => typeof v === "string" && v.length > LINE && !(v.includes(MARK) && v.length < 200));
+        const long = Object.entries(input).filter(
+          ([k, v]) => typeof v === "string" && v.length > (FILE_TEXT.has(k) ? LINE : COMMAND_KEPT) && !(v.includes(MARK) && v.length < 200),
+        );
         if (long.length === 0) return part;
-        return { ...part, input: { ...input, ...Object.fromEntries(long.map(([k, v]) => [k, `[${(v as string).length} characters of ${k} ${MARK}]`])) } };
+        return { ...part, input: { ...input, ...Object.fromEntries(long.map(([k, v]) => [k, inputNote(k, v as string, input.path)])) } };
       }),
     };
   }
@@ -85,13 +101,13 @@ function cutMessage(m: ModelMessage): ModelMessage {
         if (part.type === "reasoning") return part.text.length <= HEAD || part.text.includes(MARK) ? part : { ...part, text: `[earlier reasoning ${MARK}]` };
         if (part.type !== "tool-call" || !part.input || typeof part.input !== "object") return part;
         const input = part.input as Record<string, unknown>;
-        const long = Object.entries(input).filter(([, v]) => typeof v === "string" && v.length > HEAD * 2 && !v.includes(MARK));
+        const long = Object.entries(input).filter(
+          ([k, v]) => typeof v === "string" && v.length > (FILE_TEXT.has(k) ? HEAD * 2 : COMMAND_KEPT) && !v.includes(MARK),
+        );
         if (long.length === 0) return part;
         // What the agent wrote goes whole, with no beginning left: seen live, an agent copied a cut write back into
         // the file as if it were the file. The file itself is on disk.
-        const where = typeof input.path === "string" ? ` to ${input.path}` : "";
-        const note = (k: string, v: string) => `[${v.length} characters of ${k} written${where} were ${MARK} from this history; read the file for its current text]`;
-        return { ...part, input: { ...input, ...Object.fromEntries(long.map(([k, v]) => [k, note(k, v as string)])) } };
+        return { ...part, input: { ...input, ...Object.fromEntries(long.map(([k, v]) => [k, inputNote(k, v as string, input.path)])) } };
       }),
     };
   }
