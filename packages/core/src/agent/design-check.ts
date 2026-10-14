@@ -2,6 +2,7 @@ import type { DesignBrief, DesignReview, StyleReference, VisualCheck } from "@ar
 import { askAboutPictures, mayLookAt, type Picture } from "../visual/look";
 import { reachable, type VisualDeps } from "../visual/tools";
 import { parseReview, polishMessage, reviewQuestion, STYLE_QUESTION } from "./design";
+import { pagesUpTo } from "./landing";
 import type { PassContext } from "./pass";
 
 export const DESKTOP = { width: 1280, height: 800 };
@@ -30,7 +31,9 @@ export async function designRound(ctx: PassContext, id: string, visual: VisualDe
   if (!row.design || row.design_reviewed) return { kind: "pass" };
   ctx.tasks.update(id, { design_reviewed: 1 });
   const brief = JSON.parse(row.design) as DesignBrief;
-  const pages = (JSON.parse(row.visual) as VisualCheck[]).filter((p) => mayLookAt(p.url)).slice(0, MAX_REVIEW_PAGES);
+  const pages = pagesUpTo(JSON.parse(row.visual) as VisualCheck[], row.milestone)
+    .filter((p) => mayLookAt(p.url))
+    .slice(0, MAX_REVIEW_PAGES);
   const skip = (why: string): DesignRound => {
     ctx.event("text", { text: `Artel skipped the design review: ${why}.` });
     return { kind: "pass" };

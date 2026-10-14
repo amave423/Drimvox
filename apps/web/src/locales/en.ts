@@ -668,4 +668,5 @@ export const en: Record<keyof typeof ru, string> = {
   "update.restart": "Restart to update",
   "update.manual": "Version {version} is out",
   "update.get": "Download",
+  "spec.visualStage": "Stage {stage}",
 };

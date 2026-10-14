@@ -68,7 +68,10 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[], o: 
         "If the project has no tests yet, plan to add the smallest fitting test runner first (node --test for plain Node,",
         "vitest for Vite projects, pytest for Python) and include its command in the checks.",
         "If the work has a visible interface (a page, a screen), add visual_checks: how to start it, the address and what",
-        "must be visible. Artel looks at the page with a model that sees pictures after the checks pass.",
+        "must be visible. Artel opens the page, takes a screenshot of it as it loads (no clicks, no scrolling inside elements)",
+        "and asks a model that sees pictures, after the checks pass: describe only what such a screenshot can show.",
+        "In a task with stages give every visual check the stage that brings it: a stage is looked at only with its own pages",
+        "and the earlier stages' pages.",
         "List the requirements: numbered, checkable statements about the result (R1, R2…), covering everything the user asked for",
         "and nothing they did not. For each say how it is verified: a check command, a visual check, or review by hand.",
         "A separate reviewer checks every requirement before the work reaches the user. Under decisions list the choices you",
@@ -224,9 +227,10 @@ export const pagesInput = z
       start: z.string().min(1).max(500).optional().describe("Command that starts the app, such as npm run dev; omit for a running one"),
       url: z.string().min(1).max(2000).describe("Address to open, such as http://localhost:5173/"),
       expect: z.string().min(1).max(2000).describe("What must be visible on the page"),
+      stage: z.number().int().min(1).max(10).optional().describe("For a task in stages: the stage that brings this page"),
     }),
   )
-  .max(5)
+  .max(8)
   .default([]);
 
 /** Pages with a web address; anything else cannot be opened. */

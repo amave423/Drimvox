@@ -76,6 +76,8 @@ export const visualCheckSchema = z.object({
   start: z.string().trim().min(1).max(500).optional(),
   url: z.string().trim().url().max(2000),
   expect: z.string().trim().min(1).max(2000),
+  /** For a big task: the stage that brings this page; earlier stages are not checked against it. */
+  stage: z.number().int().min(1).max(10).optional(),
 });
 export type VisualCheck = z.infer<typeof visualCheckSchema>;
 

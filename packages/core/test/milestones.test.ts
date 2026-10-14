@@ -111,6 +111,61 @@ describe("a big task in stages", () => {
     expect(lastCoderMessage()).toContain("stage 2");
   });
 
+  // Seen live: the spec's pages described the whole site; stage 1 failed on the sky map of stage 2 and burned the budget.
+  it("looks at each stage's pages only, not at what later stages will add", async () => {
+    const shots: string[] = [];
+    env.setScreenshot(async (url) => {
+      shots.push(url);
+      return Buffer.from("89504e470d0a1a0a", "hex");
+    });
+    const coder = [
+      call("propose_spec", {
+        spec: "# Сайт",
+        checks: ["node --test"],
+        plan: ["Главная", "Карта"],
+        stages: [{ title: "Главная" }, { title: "Карта неба" }],
+        requirements: [
+          { id: "R1", text: "Главная", verify: "visual", how: "главная", stage: 1 },
+          { id: "R2", text: "Карта", verify: "visual", how: "карта", stage: 2 },
+        ],
+        visual_checks: [
+          { url: "http://localhost:5173/", expect: "Главная с заголовком", stage: 1 },
+          { url: "http://localhost:5173/#map", expect: "Карта неба с созвездиями", stage: 2 },
+        ],
+      }),
+      stage1,
+      stage2,
+    ];
+    const acceptor = [verdict(["R1"]), verdict(["R1", "R2"])];
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [{ id: "coder" }, { id: "eyes", architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } }],
+      respond: (body) => {
+        if (body.model === "eyes") return { text: "PASS: всё на месте" };
+        return (isAcceptor(body) ? acceptor.shift() : coder.shift()) ?? { text: "Done." };
+      },
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    await env.call("PATCH", "/api/settings", { visionModel: { providerId: provider.id, model: "eyes" } });
+    const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
+    const res = await env.call("POST", `/api/projects/${project.id}/tasks`, {
+      task: "Сделай сайт",
+      providerId: provider.id,
+      model: "coder",
+      stages: { interview: false, spec: true, approveSpec: false, testsFirst: false },
+    });
+    const id = (await res.json()).id as string;
+    expect(await waitFor(id, settled)).toMatchObject({ status: "review" });
+    expect((await (await env.call("GET", `/api/tasks/${id}`)).json()).visualChecks.map((v: any) => v.stage)).toEqual([1, 2]);
+
+    // Stage 1 looked at its own page; stage 2 at both.
+    const feed = await events(id);
+    const milestone = feed.findIndex((e) => e.kind === "milestone");
+    const looked = (from: number, to: number) => feed.slice(from, to).filter((e) => e.kind === "check" && e.data.phase === "visual").map((e) => e.data.command.split(" — ")[0]);
+    expect(looked(0, milestone)).toEqual(["http://localhost:5173/"]);
+    expect(looked(milestone, feed.length)).toEqual(["http://localhost:5173/", "http://localhost:5173/#map"]);
+  });
+
   it("waits after each stage when the task runs with stops", async () => {
     const id = await start([spec, stage1, stage2], [verdict(["R1"]), verdict(["R1", "R2"])], true);
     const between = await waitFor(id, settled);

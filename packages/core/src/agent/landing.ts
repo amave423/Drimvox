@@ -9,6 +9,11 @@ import { requirementsUpTo, stageNote } from "./phases";
 import type { TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
 
+/** The pages of a stage and of every stage before it. */
+export function pagesUpTo(pages: VisualCheck[], stage: number): VisualCheck[] {
+  return pages.filter((p) => (p.stage ?? 1) <= stage);
+}
+
 /** Visual checks this many times in a row fail before the task waits for the user. */
 export const MAX_VISUAL_ATTEMPTS = 2;
 
@@ -30,7 +35,8 @@ export async function done(
   summary: string | null,
   commitMessage: string | null,
 ): Promise<string | null> {
-  const pages = JSON.parse(row.visual) as VisualCheck[];
+  // A stage is looked at with its own pages and the earlier stages', never with what later stages will add.
+  const pages = pagesUpTo(JSON.parse(row.visual) as VisualCheck[], row.milestone);
   if (pages.length > 0 && (!visual.vision || !visual.kit.screenshot)) {
     ctx.event("text", {
       text: "Artel skipped the visual checks: there is no model that sees pictures (pick one in the settings) or no way to take screenshots here.",

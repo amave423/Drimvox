@@ -667,4 +667,5 @@ export const ru = {
   "update.restart": "Перезапустить и обновить",
   "update.manual": "Вышла версия {version}",
   "update.get": "Скачать",
+  "spec.visualStage": "Этап {stage}",
 } as const;

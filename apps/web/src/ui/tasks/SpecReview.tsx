@@ -73,6 +73,7 @@ export function SpecReview({ task }: { task: TaskView }) {
                 <span className="mono">{v.url}</span>
                 <span>{v.expect}</span>
                 {v.start && <span className="mono muted">{t("spec.visualStart", { command: v.start })}</span>}
+                {v.stage && task.milestones.length > 1 && <span className="muted">{t("spec.visualStage", { stage: v.stage })}</span>}
                 <button className="link is-pencil" onClick={() => setVisual(visual.filter((_, j) => j !== i))}>
                   {t("spec.removeCheck")}
                 </button>
