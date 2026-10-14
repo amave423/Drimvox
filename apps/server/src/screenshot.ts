@@ -1,4 +1,8 @@
+import { PAGE_HEIGHT_SCRIPT } from "@artel/shared";
 import type { Browser } from "playwright-core";
+
+/** As tall as the desktop app photographs. */
+const MAX_SHOT_HEIGHT = 8000;
 
 let browser: Promise<Browser> | null = null;
 
@@ -20,7 +24,13 @@ export async function screenshot(url: string, size: { width: number; height: num
     await page.goto(url, { waitUntil: "load", timeout: 60_000 });
     // Let fonts and the first animation frame settle.
     await page.waitForTimeout(500);
-    // The whole page, as on the desktop: a check of a long page needs what is further down too.
+    // The whole page, as on the desktop: a check of a long page needs what is further down too. A page that scrolls
+    // inside its own full-screen container shows all of it only in a window that tall.
+    const height = Math.min(Number(await page.evaluate(PAGE_HEIGHT_SCRIPT)), MAX_SHOT_HEIGHT);
+    if (height > size.height) {
+      await page.setViewportSize({ width: size.width, height });
+      await page.waitForTimeout(300);
+    }
     return await page.screenshot({ type: "png", fullPage: true });
   } finally {
     await page.close();

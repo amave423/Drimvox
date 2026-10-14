@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { InitMessage } from "./core-process";
+import { PAGE_HEIGHT_SCRIPT } from "@artel/shared";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
 
@@ -142,7 +143,7 @@ async function photograph(url: string, width: number, height: number): Promise<B
     await new Promise((r) => setTimeout(r, 1000));
     // The whole page, not only its first screen: a check of a long page needs what is further down too.
     const full = Number(
-      await shot.webContents.executeJavaScript("Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)"),
+      await shot.webContents.executeJavaScript(PAGE_HEIGHT_SCRIPT),
     );
     if (full > height) {
       shot.setContentSize(width, Math.min(full, MAX_SHOT_HEIGHT));

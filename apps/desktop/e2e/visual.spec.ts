@@ -33,14 +33,15 @@ test.afterEach(async () => {
 });
 
 /** The app the agent "built": a page on this computer. */
-async function serveSite(): Promise<string> {
+/** A long page: what is below the first screen must be in the picture too. */
+const LONG_PAGE =
+  '<body style="margin:0;background:#c0392b"><h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Artel</h1>' +
+  '<div style="height:2200px"></div><footer style="color:white;font:32px sans-serif">Контакты внизу</footer></body>';
+
+async function serveSite(html = LONG_PAGE): Promise<string> {
   site = createServer((_req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    // A long page: what is below the first screen must be in the picture too.
-    res.end(
-      '<body style="margin:0;background:#c0392b"><h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Artel</h1>' +
-        '<div style="height:2200px"></div><footer style="color:white;font:32px sans-serif">Контакты внизу</footer></body>',
-    );
+    res.end(html);
   });
   await new Promise<void>((r) => site!.listen(0, "127.0.0.1", r));
   const address = site.address();
@@ -48,8 +49,9 @@ async function serveSite(): Promise<string> {
   return `http://localhost:${address.port}/`;
 }
 
-test("an agent looks at its page: a real screenshot goes to the model and into the feed", async () => {
-  const url = await serveSite();
+/** An agent looks at the page; returns the screenshot the model got. */
+async function lookAt(html?: string): Promise<Buffer> {
+  const url = await serveSite(html);
   // The coder sees pictures itself, so it also checks its own screenshots.
   const coder: FakeTurn[] = [
     { toolCalls: [{ name: "look_at_page", args: { url, question: "Виден заголовок «Привет, Artel»?" } }] },
@@ -88,12 +90,26 @@ test("an agent looks at its page: a real screenshot goes to the model and into t
   await expect(shot).toBeVisible();
   expect(await shot.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(600);
 
-  // The model got a real PNG of the page, not an empty picture.
   const sent = fake.requests.find((r) => JSON.stringify(r.body?.messages ?? "").includes("data:image/png;base64,"))!;
   const dataUrl = JSON.stringify(sent.body.messages).match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)![1]!;
-  const png = Buffer.from(dataUrl, "base64");
+  return Buffer.from(dataUrl, "base64");
+}
+
+test("an agent looks at its page: a real screenshot goes to the model and into the feed", async () => {
+  const png = await lookAt();
+  // The model got a real PNG of the page, not an empty picture.
   expect(png.subarray(1, 4).toString()).toBe("PNG");
   expect(png.length).toBeGreaterThan(5000);
   // The whole page, not only its first screen (PNG height sits at byte 20).
+  expect(png.readUInt32BE(20)).toBeGreaterThan(2000);
+});
+
+// Seen live: a site scrolled inside a full-screen container; the screenshot showed its first screen only.
+test("a page that scrolls inside its own container is photographed whole", async () => {
+  const png = await lookAt(
+    '<body style="margin:0;overflow:hidden"><main style="height:100vh;overflow-y:auto;background:#1f2a24">' +
+      '<h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Artel</h1><div style="height:2200px"></div>' +
+      '<footer style="color:white;font:32px sans-serif">Подвал</footer></main></body>',
+  );
   expect(png.readUInt32BE(20)).toBeGreaterThan(2000);
 });
