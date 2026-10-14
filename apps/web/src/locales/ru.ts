@@ -668,4 +668,6 @@ export const ru = {
   "update.manual": "Вышла версия {version}",
   "update.get": "Скачать",
   "spec.visualStage": "Этап {stage}",
+  "model.groupFree": "Бесплатные · {count}",
+  "model.groupPaid": "Платные",
 } as const;

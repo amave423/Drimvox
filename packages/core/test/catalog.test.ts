@@ -13,6 +13,16 @@ afterEach(async () => {
 });
 
 describe("normalizeModels", () => {
+  // Seen on RouterAI: Lyria costs nothing per token but 4 ₽ per request; it must not look free.
+  it("does not take a model paid per request for a free one", () => {
+    const [lyria, free] = normalizeModels("openrouter", [
+      { id: "google/lyria-3-clip-preview", pricing: { prompt: "0", completion: "0", request: "0.05" }, architecture: { output_modalities: ["text", "audio"] } },
+      { id: "liquid/lfm-2.5-2.6b:free", pricing: { prompt: "0", completion: "0", request: "0" } },
+    ]);
+    expect([lyria!.priceIn, lyria!.priceOut]).toEqual([null, null]);
+    expect([free!.priceIn, free!.priceOut]).toEqual([0, 0]);
+  });
+
   it("reads OpenRouter prices, context and tool support", () => {
     const [model] = normalizeModels("openrouter", [
       {

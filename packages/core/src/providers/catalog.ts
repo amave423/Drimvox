@@ -47,6 +47,12 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     let priceOut = perMillion((raw.pricing as Raw | undefined)?.completion, toUsd);
     let priceCacheRead = perMillion((raw.pricing as Raw | undefined)?.input_cache_read, toUsd);
     let priceEstimated = false;
+    // Paid per request (music, some search models) with no token price: not free, and its token price says nothing.
+    const perRequest = perMillion((raw.pricing as Raw | undefined)?.request, toUsd);
+    if (perRequest && priceIn === 0 && priceOut === 0) {
+      priceIn = null;
+      priceOut = null;
+    }
     const table = preset === "deepseek" ? deepseekPrices[raw.id] : undefined;
     if (priceIn === null && table) {
       [priceIn, priceOut, priceCacheRead] = table;

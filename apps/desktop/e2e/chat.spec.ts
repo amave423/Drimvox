@@ -75,6 +75,25 @@ test("connects a provider, streams an answer and counts tokens and money", async
   await expect(page.getByText(/Сегодня потрачено/)).toBeVisible();
 });
 
+test("free models come first in the list, under their own heading", async () => {
+  fake = await startFakeProvider({
+    key: KEY,
+    models: [
+      { id: "paid-model", name: "Paid Model", pricing: { prompt: "0.000001", completion: "0.000002" } },
+      { id: "free-model:free", name: "Free Model", pricing: { prompt: "0", completion: "0" } },
+    ],
+  });
+  const page = await launch();
+  await connect(page);
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  const list = page.getByRole("listbox");
+  await expect(list.getByText("Бесплатные · 1")).toBeVisible();
+  // Raw text: the headings are drawn in capitals by the stylesheet.
+  const order = await list.locator(".picker-group, .picker-name").allTextContents();
+  expect(order.map((s) => s.replace(/(free|paid)-model(:free)?$/, ""))).toEqual(["Бесплатные · 1", "Free Model", "Платные", "Paid Model"]);
+});
+
 test("thinks in a small window, then draws formulas, a chart and highlighted code", async () => {
   const answer =
     "Энергия: $E = mc^2$, а площадь \\(S = \\pi r^2\\).\n\n" +

@@ -669,4 +669,6 @@ export const en: Record<keyof typeof ru, string> = {
   "update.manual": "Version {version} is out",
   "update.get": "Download",
   "spec.visualStage": "Stage {stage}",
+  "model.groupFree": "Free · {count}",
+  "model.groupPaid": "Paid",
 };

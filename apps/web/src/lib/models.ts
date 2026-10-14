@@ -28,3 +28,18 @@ export function loadModels(api: Api, providerId: string, fresh = false): Promise
 export function forgetModels(providerId: string): void {
   cache.delete(providerId);
 }
+
+/** A model that costs nothing per token on a provider that charges for others. */
+export function isFree(model: Pick<ModelInfo, "priceIn" | "priceOut">): boolean {
+  return model.priceIn === 0 && model.priceOut === 0;
+}
+
+/**
+ * A list split into free models and the rest, free first, when it has both; otherwise one group. Free models stay among
+ * their own kind (text, pictures), so it is still clear what each one does.
+ */
+export function freeFirst<T>(items: T[], free: (item: T) => boolean): { free: T[]; paid: T[] } | null {
+  const freeOnes = items.filter(free);
+  if (freeOnes.length === 0 || freeOnes.length === items.length) return null;
+  return { free: freeOnes, paid: items.filter((i) => !free(i)) };
+}

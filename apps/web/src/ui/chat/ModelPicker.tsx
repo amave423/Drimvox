@@ -4,7 +4,7 @@ import { useApp } from "../../context";
 import { formatPrice, formatTokens } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
 import { loadMediaModels } from "../../lib/media";
-import { forgetModels, loadModels, type ModelsResult } from "../../lib/models";
+import { forgetModels, freeFirst, isFree, loadModels, type ModelsResult } from "../../lib/models";
 import { ErrorNote } from "../ErrorNote";
 
 const LIMIT = 200;
@@ -70,6 +70,8 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
     return list.slice(0, LIMIT);
   }, [result, media, kind, query]);
   const loading = kind === "text" ? result === null : media === null;
+  // Free models first, under their own heading, inside the kind they belong to.
+  const groups = kind === "text" ? freeFirst(shown, (m) => !!m.info && isFree(m.info)) : null;
 
   const providerName = providers.find((p) => p.id === value?.providerId)?.name;
   // A CLI's "default" is whatever the program itself is set to.
@@ -77,6 +79,31 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
     model === "default" && providers.find((p) => p.id === pid)?.billing === "subscription";
   const label =
     value && providerName ? `${providerName} / ${isCliDefault(value.providerId, value.model) ? t("model.cliDefault") : value.model}` : t("model.pick");
+
+  const item = (m: Listed) => (
+    <li key={m.id} role="option" aria-selected={value?.providerId === providerId && value?.model === m.id}>
+      <button
+        onClick={() => {
+          if (!providerId) return;
+          onChange({ providerId, model: m.id, kind });
+          setOpen(false);
+        }}
+      >
+        {isCliDefault(providerId, m.id) ? (
+          <span className="picker-name">
+            {t("model.cliDefault")}
+            <small>{m.info?.resolved ? t("model.cliDefaultNow", { model: m.info.resolved }) : t("model.cliDefaultHint")}</small>
+          </span>
+        ) : (
+          <span className="picker-name">
+            {m.name}
+            {m.name !== m.id && <small className="mono">{m.id}</small>}
+          </span>
+        )}
+        {m.info && <ModelFacts model={m.info} billing={providers.find((p) => p.id === providerId)?.billing} />}
+      </button>
+    </li>
+  );
 
   return (
     <div className="picker" ref={root}>
@@ -118,30 +145,20 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
             <p className="muted">{kind !== "text" && media?.length === 0 ? t("model.noMedia") : t("model.nothing")}</p>
           )}
           <ul className="picker-list" role="listbox">
-            {shown.map((m) => (
-              <li key={m.id} role="option" aria-selected={value?.providerId === providerId && value?.model === m.id}>
-                <button
-                  onClick={() => {
-                    if (!providerId) return;
-                    onChange({ providerId, model: m.id, kind });
-                    setOpen(false);
-                  }}
-                >
-                  {isCliDefault(providerId, m.id) ? (
-                    <span className="picker-name">
-                      {t("model.cliDefault")}
-                      <small>{m.info?.resolved ? t("model.cliDefaultNow", { model: m.info.resolved }) : t("model.cliDefaultHint")}</small>
-                    </span>
-                  ) : (
-                    <span className="picker-name">
-                      {m.name}
-                      {m.name !== m.id && <small className="mono">{m.id}</small>}
-                    </span>
-                  )}
-                  {m.info && <ModelFacts model={m.info} billing={providers.find((p) => p.id === providerId)?.billing} />}
-                </button>
-              </li>
-            ))}
+            {groups ? (
+              <>
+                <li role="presentation" className="picker-group">
+                  {t("model.groupFree", { count: groups.free.length })}
+                </li>
+                {groups.free.map(item)}
+                <li role="presentation" className="picker-group">
+                  {t("model.groupPaid")}
+                </li>
+                {groups.paid.map(item)}
+              </>
+            ) : (
+              shown.map(item)
+            )}
           </ul>
         </div>
       )}
