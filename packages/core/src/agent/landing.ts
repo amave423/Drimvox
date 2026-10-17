@@ -1,6 +1,6 @@
 import type { AcceptanceReport, Milestone, Requirement, TaskStages, VisualCheck } from "@artel/shared";
 import { findModel } from "../providers/catalog";
-import { runVisualChecks, visualTools, type VisualDeps } from "../visual/tools";
+import { runVisualChecks, visualTools, type LookLimit, type VisualDeps } from "../visual/tools";
 import { accepted, MAX_ACCEPTANCE_ROUNDS, reworkMessage, runAcceptance } from "./acceptance";
 import { designRound } from "./design-check";
 import { discardChanges } from "./git";
@@ -8,6 +8,19 @@ import type { PassContext } from "./pass";
 import { requirementsUpTo, stageNote } from "./phases";
 import type { TaskRow } from "./repo";
 import { hasChanges, snapshot } from "./review";
+
+/** The acceptance agent checks every requirement, so it looks more than the coder (seen live: four ran out at fourteen). */
+const ACCEPTANCE_LOOKS: LookLimit = { looks: 10, then: "Give your verdict with what you have seen; say what you could not check." };
+
+/** The stages after the current one, with their requirements: what the acceptance agent is not to ask for yet. */
+function laterStages(row: TaskRow): { title: string; requirements: string[] }[] {
+  const milestones = JSON.parse(row.milestones) as Milestone[];
+  const requirements = JSON.parse(row.requirements) as Requirement[];
+  return milestones.slice(row.milestone).map((m, i) => ({
+    title: m.title,
+    requirements: requirements.filter((r) => (r.stage ?? 1) === row.milestone + i + 1).map((r) => r.text),
+  }));
+}
 
 /** The pages of a stage and of every stage before it. */
 export function pagesUpTo(pages: VisualCheck[], stage: number): VisualCheck[] {
@@ -161,7 +174,8 @@ async function acceptOnce(
     requirements,
     decisions: JSON.parse(row.decisions) as string[],
     round,
-    ownTools: visualTools(visual),
+    ownTools: visualTools(visual, ACCEPTANCE_LOOKS),
+    later: laterStages(row),
     spentUsd: row.cost_usd,
     budgetUsd: row.budget_usd,
     signal: ctx.signal,

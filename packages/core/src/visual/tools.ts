@@ -26,8 +26,18 @@ export interface VisualDeps {
 }
 
 const SIZE = { width: 1280, height: 800 };
+/** A window of this width, as tall as a desktop or a phone screen. */
+const sizeOf = (width?: number) => (width ? { width, height: width < 768 ? 844 : 800 } : SIZE);
 /** Looks per turn: enough to check a page and its fix; the polish comes from Artel's design review. */
 export const MAX_LOOKS = 4;
+const CODER_LIMIT = `Finish with what you have: Artel's design review looks at the screens after acceptance and sends concrete notes.`;
+
+/** Who looks: the coder by default; the acceptance agent checks every requirement and gets more looks. */
+export interface LookLimit {
+  looks: number;
+  /** What the agent is told when it is out of looks. */
+  then: string;
+}
 
 export const VISUAL_HINT =
   "To see an interface you built, start it with start_background (for example npm run dev), read its output with " +
@@ -40,9 +50,9 @@ const sleep = (ms: number, signal?: AbortSignal) =>
   });
 
 /** Takes a screenshot, keeps it and asks the vision model; the answer is what the agent or the gate gets. */
-async function look(d: VisualDeps, url: string, question: string, signal?: AbortSignal): Promise<{ shot: string; answer: string }> {
+async function look(d: VisualDeps, url: string, question: string, signal?: AbortSignal, width?: number): Promise<{ shot: string; answer: string }> {
   if (!d.kit.screenshot || !d.vision) throw new Error("No way to look at pages here");
-  const png = await d.kit.screenshot(url, SIZE);
+  const png = await d.kit.screenshot(url, sizeOf(width));
   const shot = d.kit.shots.save(png);
   d.event("screenshot", { id: shot, url });
   const { text, costUsd } = await askAboutPicture(d.vision, png, question, signal);
@@ -50,7 +60,7 @@ async function look(d: VisualDeps, url: string, question: string, signal?: Abort
   return { shot, answer: text };
 }
 
-export function visualTools(d: VisualDeps): ToolSet {
+export function visualTools(d: VisualDeps, limit: LookLimit = { looks: MAX_LOOKS, then: CODER_LIMIT }): ToolSet {
   const run = async (callId: string, name: string, input: unknown, work: () => Promise<string>) => {
     d.hooks.onCall({ callId, name, input });
     let ok = true;
@@ -97,17 +107,18 @@ export function visualTools(d: VisualDeps): ToolSet {
 
   let looks = 0;
   tools.look_at_page = tool({
-    description: "Open a page in a browser, take a screenshot and ask a model that sees pictures about it.",
-    inputSchema: z.object({ url: z.string().min(1).max(2000), question: z.string().min(1).max(2000) }),
-    execute: ({ url, question }, o: Options) =>
-      run(o.toolCallId, "look_at_page", { url, question }, async () => {
+    description:
+      "Open a page in a browser, take a screenshot and ask a model that sees pictures about it. The window is 1280 px wide; give a width such as 390 to see the phone layout.",
+    inputSchema: z.object({
+      url: z.string().min(1).max(2000),
+      question: z.string().min(1).max(2000),
+      width: z.number().int().min(320).max(1920).optional().describe("Window width in pixels; 390 is a phone"),
+    }),
+    execute: ({ url, question, width }, o: Options) =>
+      run(o.toolCallId, "look_at_page", { url, question, width }, async () => {
         if (!mayLookAt(url)) throw new Error("Only this computer (localhost) and public addresses can be opened");
-        if (++looks > MAX_LOOKS) {
-          throw new Error(
-            `You have looked at pages ${MAX_LOOKS} times in this turn. Finish with what you have: Artel's design review looks at the screens after acceptance and sends concrete notes.`,
-          );
-        }
-        return (await look(d, url, question, o.abortSignal)).answer;
+        if (++looks > limit.looks) throw new Error(`You have looked at pages ${limit.looks} times in this turn. ${limit.then}`);
+        return (await look(d, url, question, o.abortSignal, width)).answer;
       }),
   });
   return tools;

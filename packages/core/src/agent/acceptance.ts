@@ -34,7 +34,8 @@ function systemPrompt(root: string, platform = process.platform): string {
 }
 
 /** What the acceptance agent is asked: the task as the user put it, the spec and the requirements. */
-function brief(task: string, spec: string | null, requirements: Requirement[], decisions: string[], round: number): string {
+function brief(i: AcceptanceInput): string {
+  const { task, spec, requirements, decisions, round } = i;
   return [
     `Accept the work on this task (acceptance round ${round}).`,
     "",
@@ -45,9 +46,21 @@ function brief(task: string, spec: string | null, requirements: Requirement[], d
     "Requirements:",
     requirementsText(requirements),
     decisions.length ? `\nChoices the coder made on its own (not requirements):\n${decisions.map((d) => `- ${d}`).join("\n")}` : "",
+    // Seen live: stage 1 was sent back for the detail pages of stage 2.
+    i.later.length ? `\n${laterText(i.later)}` : "",
   ]
     .filter((line) => line !== "")
     .join("\n");
+}
+
+/** The stages still to come: the spec describes them, but they are no reason to send this stage back. */
+function laterText(later: AcceptanceInput["later"]): string {
+  const stages = later.map((s) => [`- ${s.title}`, ...s.requirements.map((r) => `  - ${r}`)].join("\n"));
+  return [
+    "Later stages, not expected yet: the work goes in stages and these come after this one is accepted.",
+    "Do not mark a requirement partial or missing for what they will add (a button may lead nowhere yet).",
+    ...stages,
+  ].join("\n");
 }
 
 function verdictTools(requirements: Requirement[], onReport: (r: { results: AcceptanceResult[]; summary: string }) => void): ToolSet {
@@ -94,6 +107,8 @@ export interface AcceptanceInput {
   round: number;
   /** Background processes and page screenshots, as the coder has them. */
   ownTools: ToolSet;
+  /** The stages after this one, for a task in stages. */
+  later: { title: string; requirements: string[] }[];
   spentUsd: number;
   budgetUsd: number;
   signal: AbortSignal;
@@ -115,7 +130,7 @@ export type AcceptanceOutcome =
 /** One acceptance round: a separate agent reads, runs and looks, then gives a verdict per requirement. */
 export async function runAcceptance(i: AcceptanceInput): Promise<AcceptanceOutcome> {
   let verdict: { results: AcceptanceResult[]; summary: string } | null = null;
-  const messages: RunInput["messages"] = [{ role: "user", content: brief(i.task, i.spec, i.requirements, i.decisions, i.round) }];
+  const messages: RunInput["messages"] = [{ role: "user", content: brief(i) }];
   for (let attempt = 0; attempt < 2 && !verdict; attempt++) {
     if (attempt > 0) messages.push({ role: "user", content: VERDICT_REMINDER });
     const input: RunInput = {

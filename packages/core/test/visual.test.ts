@@ -10,12 +10,15 @@ let env: TestEnv;
 let fake: FakeProvider | undefined;
 let repo: string;
 const shots: string[] = [];
+const widths: number[] = [];
 
 beforeEach(() => {
   env = createTestEnv();
   shots.length = 0;
-  env.setScreenshot(async (url) => {
+  widths.length = 0;
+  env.setScreenshot(async (url, size) => {
     shots.push(url);
+    widths.push(size.width);
     return PNG;
   });
   repo = makeRepo({ "index.html": "<h1>Привет</h1>\n" });
@@ -29,16 +32,21 @@ afterEach(async () => {
 });
 
 /** The coder follows its script; the vision model "eyes" answers from its own list. */
-async function start(coder: FakeTurn[], eyes: string[], o: { spec?: boolean; visionSetting?: boolean } = {}) {
+async function start(coder: FakeTurn[], eyes: string[], o: { spec?: boolean; visionSetting?: boolean; acceptor?: FakeTurn[] } = {}) {
   const coderQueue = [...coder];
   const eyesQueue = [...eyes];
+  const acceptorQueue = [...(o.acceptor ?? [])];
+  const isAcceptor = (body: any) => /acceptance agent/i.test(JSON.stringify(body.messages?.[0]?.content ?? ""));
   fake = await startFakeProvider({
     key: KEY,
     models: [
       { id: "coder", architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
       { id: "eyes", architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } },
     ],
-    respond: (body) => (body.model === "eyes" ? { text: eyesQueue.shift() ?? "PASS" } : (coderQueue.shift() ?? { text: "Done." })),
+    respond: (body) =>
+      body.model === "eyes"
+        ? { text: eyesQueue.shift() ?? "PASS" }
+        : ((isAcceptor(body) ? acceptorQueue.shift() : coderQueue.shift()) ?? { text: "Done." }),
   });
   const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
   if (o.visionSetting !== false) await env.call("PATCH", "/api/settings", { visionModel: { providerId: provider.id, model: "eyes" } });
@@ -89,6 +97,33 @@ describe("look_at_page", () => {
     const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
     expect(results.map((r) => r.data.ok)).toEqual([true, true, true, true, false]);
     expect(results.at(-1).data.output).toMatch(/design review/);
+  });
+
+  // Seen live: a requirement asked for the phone layout and the acceptance agent had no way to look at it.
+  it("photographs a page at the width asked for, a desktop one by default", async () => {
+    const id = await start([
+      call("look_at_page", { url: "http://localhost:5173/", question: "Как на телефоне?", width: 390 }),
+      call("look_at_page", { url: "http://localhost:5173/", question: "А на компьютере?" }),
+      finish,
+    ], []);
+    await waitTask(id, (t) => t.status === "done_empty");
+    expect(widths).toEqual([390, 1280]);
+  });
+
+  // Seen live: checking fourteen requirements, the acceptance agent ran out of the coder's four looks.
+  it("lets the acceptance agent look more than the coder", async () => {
+    const look = call("look_at_page", { url: "http://localhost:5173/", question: "Что видно?" });
+    const report = call("report_acceptance", { results: [{ id: "R1", status: "done", evidence: "видно", problem: "" }], summary: "Принято" });
+    const spec = call("propose_spec", {
+      spec: "# Страница",
+      checks: [],
+      plan: ["Страница"],
+      requirements: [{ id: "R1", text: "Есть заголовок", verify: "review", how: "главная" }],
+    });
+    const id = await start([spec, finish], [], { spec: true, acceptor: [look, look, look, look, look, look, report] });
+    await waitTask(id, (t) => !["running", "queued"].includes(t.status));
+    const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
+    expect(results.map((r) => r.data.ok)).toEqual([true, true, true, true, true, true]);
   });
 
   it("opens only this computer and the public internet", async () => {

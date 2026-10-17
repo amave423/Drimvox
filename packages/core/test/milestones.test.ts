@@ -107,6 +107,9 @@ describe("a big task in stages", () => {
     expect(first).toContain("R1");
     expect(first).not.toContain("R2");
     expect(second).toContain("R2");
+    // Seen live: stage 1 was sent back for detail pages that stage 2 makes.
+    expect(first).toMatch(/not expected yet[\s\S]*Документация[\s\S]*README описывает subtract/);
+    expect(second).not.toMatch(/not expected yet/);
     expect((await events(id)).filter((e) => e.kind === "milestone").map((e) => e.data.stage)).toEqual([1]);
     expect(lastCoderMessage()).toContain("stage 2");
   });
