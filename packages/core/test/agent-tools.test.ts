@@ -53,6 +53,29 @@ describe("workspace", () => {
     expect(readFileSync(join(root, "crlf.ts"), "utf8")).toBe("const a = 10;\r\nconst b = 20;\r\n");
   });
 
+  // Seen live: 478 edits, many missing by an indent; each miss sent the agent back to read the file in pieces.
+  it("finds a fragment whose indentation or trailing spaces differ, when that is the only difference", () => {
+    writeFileSync(join(root, "ui.ts"), "function draw() {\n    if (ready) {\n        paint();\n    }\n}\n");
+    ws.editFile("ui.ts", "if (ready) {\n  paint();  \n}", "if (ready) {\n  paint();\n  glow();\n}");
+    expect(readFileSync(join(root, "ui.ts"), "utf8")).toBe("function draw() {\n    if (ready) {\n      paint();\n      glow();\n    }\n}\n");
+  });
+
+  it("shows the file around the nearest likely place when a fragment is not there", () => {
+    const lines = Array.from({ length: 80 }, (_, i) => `const v${i} = ${i};`);
+    lines[50] = "function total(items) {";
+    writeFileSync(join(root, "big.ts"), `${lines.join("\n")}\n`);
+    let message = "";
+    try {
+      ws.editFile("big.ts", "function total(list) {\n  return 0;\n}", "x");
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message).toMatch(/not found/);
+    expect(message).toContain("51\tfunction total(items) {");
+    expect(message).toContain("45\tconst v44 = 44;");
+    expect(message).not.toContain("\tconst v10 = 10;");
+  });
+
   it("searches file contents", () => {
     expect(ws.search("const b")).toEqual(["src/app.ts:2: const b = 2;"]);
   });

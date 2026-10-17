@@ -120,6 +120,23 @@ describe("a task", () => {
     expect(system.content).toContain(process.platform === "win32" ? "PowerShell" : "sh");
   });
 
+  it("starts every request with the project's AGENTS.md and lets the agent keep its notes there", async () => {
+    writeFileSync(join(repo, "AGENTS.md"), "# Правила\nТолько TypeScript.\n");
+    git(repo, "add", "AGENTS.md");
+    git(repo, "commit", "-q", "-m", "Rules");
+    setupResult = setup([
+      { toolCalls: [{ name: "update_notes", args: { notes: "Приветствие в src/app.ts. Проверка: node --test." } }] },
+      { toolCalls: [finish()] },
+    ]);
+    const { id } = await startTask("Запиши заметки");
+    await waitFor(id, ["review"]);
+    const systems = fake!.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => r.body.messages[0].content as string);
+    expect(systems[0]).toContain("Только TypeScript.");
+    expect(systems[1]).toContain("Приветствие в src/app.ts.");
+    const diff = await (await env.call("GET", `/api/tasks/${id}/diff`)).json();
+    expect(diff.map((f: any) => f.path)).toContain("AGENTS.md");
+  });
+
   it("runs commands inside the copy", async () => {
     setupResult = setup([
       { toolCalls: [{ name: "run_command", args: { command: `node -e "require('fs').writeFileSync('built.txt','ok')"` } }] },
@@ -196,29 +213,6 @@ describe("a task", () => {
     await env.call("POST", `/api/tasks/${id}/continue`, {});
     expect(await waitFor(id, ["waiting", "done_empty", "failed"], 60_000)).toMatchObject({ status: "done_empty" });
   }, 120_000);
-
-  // Seen live: an agent rewrote a file from its own earlier write, already cut in the history, and saved the cut note
-  // ("[… 3710 more characters … cut by Artel]") in place of 3 700 characters of code.
-  it("refuses to write the history's cut-out notes into files", async () => {
-    const cut = "export const sun = 1;\n[… 3710 more characters of this content cut by Artel to save space; read or run it again if you need them]";
-    setupResult = setup([
-      { toolCalls: [{ name: "write_file", args: { path: "src/sun.ts", content: cut } }] },
-      { toolCalls: [{ name: "edit_file", args: { path: "src/app.ts", old: "'hi'", new: cut } }] },
-      { toolCalls: [{ name: "run_command", args: { command: `Set-Content src/sun.ts @'
-${cut}
-'@` } }] },
-      // Looking for such notes is fine.
-      { toolCalls: [{ name: "run_command", args: { command: 'Select-String -Path src/*.ts -Pattern "cut by Artel"' } }] },
-      { toolCalls: [finish()] },
-    ]);
-    const { id } = await startTask();
-    await waitFor(id, ["done_empty", "review"]);
-    const results = (await events(id)).filter((e) => e.kind === "tool_result").map((e) => e.data);
-    expect(results.map((r) => r.ok)).toEqual([false, false, false, true, true]);
-    expect(results[0].output).toMatch(/read_file/);
-    const task = await (await env.call("GET", `/api/tasks/${id}`)).json();
-    expect(task.status).toBe("done_empty");
-  });
 
   // Seen live: an answer given after two minutes failed the task with "timeout", as if the model had gone silent.
   it("waits for the user's answer longer than a model may stay silent", async () => {
@@ -354,22 +348,6 @@ describe("review", () => {
     expect(git(repo, "branch", "--list", branch)).toBe("");
     expect(readFileSync(join(repo, "src", "app.ts"), "utf8")).toBe("export const greeting = 'hi';\n");
     expect((await (await env.call("GET", `/api/tasks/${id}`)).json()).status).toBe("discarded");
-  });
-});
-
-describe("cost", () => {
-  it("does not send every old file read again and again: the request stays bounded", async () => {
-    writeFileSync(join(repo, "big.txt"), "строка большого файла\n".repeat(1500));
-    git(repo, "add", "big.txt");
-    git(repo, "commit", "-q", "-m", "Big file");
-    const reads = Array.from({ length: 14 }, () => ({ toolCalls: [{ name: "read_file", args: { path: "big.txt" } }] }));
-    setupResult = setup([...reads, { toolCalls: [finish()] }]);
-    const { id } = await startTask();
-    await waitFor(id, ["review", "done_empty"]);
-    const sent = fake!.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => JSON.stringify(r.body.messages));
-    // Each read is about 50 000 characters: fourteen of them whole would be some 700 000.
-    expect(sent.at(-1)!.length).toBeLessThan(450_000);
-    expect(sent.at(-1)).toContain("cut by Artel");
   });
 });
 

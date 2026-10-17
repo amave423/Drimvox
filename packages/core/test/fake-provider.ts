@@ -121,6 +121,23 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
           res.end(JSON.stringify({ error: { message: turn.fail.message } }));
           return;
         }
+        // A request without streaming (a summary, say) gets the whole answer at once.
+        if (!parsed.stream) {
+          const usage = turn.usage ?? { prompt_tokens: 100, completion_tokens: 20 };
+          const toolCalls = (turn.toolCalls ?? []).map((call, index) => ({
+            id: `call_${scriptIndex}_${index}`,
+            type: "function",
+            function: { name: call.name, arguments: JSON.stringify(call.args) },
+          }));
+          return json(200, {
+            id: "c",
+            object: "chat.completion",
+            created: 1,
+            model: "m",
+            choices: [{ index: 0, message: { role: "assistant", content: turn.text ?? null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) }, finish_reason: toolCalls.length ? "tool_calls" : "stop" }],
+            usage: { ...usage, total_tokens: usage.prompt_tokens + usage.completion_tokens },
+          });
+        }
         res.writeHead(200, { "content-type": "text/event-stream" });
         if (turn.text) res.write(chunk({ role: "assistant", content: turn.text }));
         (turn.toolCalls ?? []).forEach((call, index) => {

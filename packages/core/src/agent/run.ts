@@ -7,7 +7,8 @@ import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
-import { compactHistory } from "./compact";
+import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory } from "./memory";
+import { notesBlock } from "./notes";
 import { Workspace } from "./workspace";
 
 export const MAX_STEPS = 60;
@@ -27,6 +28,9 @@ export interface RunInput {
   ownTools?: ToolSet;
   /** Calling any of these ends the pass, like finish does. */
   stopTools?: string[];
+  /** What the agent remembers of its older work; with onMemory, a new summary replaces the older part when it grows. */
+  memory?: Memory | null;
+  onMemory?(memory: Memory, usage: { inputTokens: number; outputTokens: number; costUsd: number }): void;
   /** The one tool the model may and must call now, such as the acceptance verdict once looking is over. */
   only?: string;
   /** The current step's instructions, added to the system prompt. */
@@ -60,6 +64,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let lastText = "";
   let spent = i.spentUsd;
   let steps = 0;
+  let memory = i.memory ?? null;
 
   // The provider's own bill when it sends one (in rubles for RouterAI), else the catalog's prices.
   const usdPerUnit = i.conn.currency === "RUB" ? 1 / (await usdRub()) : 1;
@@ -98,20 +103,43 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
     },
   });
 
+  // The project's notes (AGENTS.md) start every request, read afresh: the agent's own update shows at the next step.
+  const system = () => [i.system ?? systemPrompt(i.worktree), i.system ? "" : i.instructions, notesBlock(i.worktree)].filter(Boolean).join("\n\n");
+
   resetClock();
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
-      system: i.system ?? (i.instructions ? `${systemPrompt(i.worktree)}\n\n${i.instructions}` : systemPrompt(i.worktree)),
+      system: system(),
       messages: i.messages,
       tools,
       ...(i.only ? { activeTools: [i.only], toolChoice: "required" as const } : {}),
       // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
       providerOptions: i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : undefined,
-      // Old file reads and command outputs are cut once the conversation is big; see compact.ts.
-      prepareStep: ({ messages }) => {
-        const compacted = compactHistory(messages);
-        return compacted === messages ? {} : { messages: compacted };
+      // Near the model's context, the older work becomes one summary; see memory.ts.
+      prepareStep: async ({ messages }) => {
+        let sent = withMemory(messages, memory);
+        const limit = memoryLimit(i.price);
+        const upTo = i.onMemory && sizeOf(sent) > limit ? cutPoint(messages, memory, limit) : null;
+        if (upTo !== null) {
+          running++;
+          clearTimeout(timer);
+          try {
+            const r = await remember(i.conn, i.model, i.worktree, messages, memory, upTo, i.signal);
+            const cost = costOf(i.price, i.conn.preset, usageOf({ inputTokens: r.inputTokens, outputTokens: r.outputTokens })) ?? 0;
+            spent += cost;
+            memory = r.memory;
+            i.onMemory!(memory, { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd: cost });
+            sent = withMemory(messages, memory);
+          } catch {
+            // Without a summary the whole conversation goes; the next step tries again.
+          } finally {
+            running--;
+            resetClock();
+          }
+        }
+        // The same text as long as the notes stay the same: the provider's cache holds.
+        return { system: system(), ...(sent === messages ? {} : { messages: sent }) };
       },
       stopWhen: [hasToolCall("finish"), ...(i.stopTools ?? []).map((name) => hasToolCall(name)), isStepCount(MAX_STEPS), overBudget],
       // Busy providers (429, 5xx) are tried again after 2, 4, 8 and 16 seconds: an agent is in no hurry,

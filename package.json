@@ -17,6 +17,7 @@
     "e2e": "npm run build && playwright test",
     "verify": "npm run typecheck && npm run test && npm run e2e",
     "live-check": "node scripts/live-check.mjs",
+    "bench": "node scripts/bench.mjs",
     "server": "npm run build -w @artel/web && npm run build -w @artel/server && node apps/server/dist/server.mjs",
     "server:install": "bash scripts/install-server.sh"
   },

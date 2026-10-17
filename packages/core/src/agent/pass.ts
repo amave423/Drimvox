@@ -1,3 +1,4 @@
+import type { Memory } from "./memory";
 import type { DesignBrief, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { findModel } from "../providers/catalog";
@@ -168,6 +169,16 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     price: await findModel(conn, row.model),
     worktree: row.worktree,
     messages,
+    memory: row.memory ? (JSON.parse(row.memory) as Memory) : null,
+    onMemory: (memory, usage) => {
+      if (ctx.closed()) return;
+      cost += usage.costUsd;
+      input += usage.inputTokens;
+      output += usage.outputTokens;
+      ctx.tasks.update(id, { memory: JSON.stringify(memory), cost_usd: cost, input_tokens: input, output_tokens: output });
+      ctx.tasks.addUsage(id, usage.inputTokens, usage.outputTokens, usage.costUsd, true);
+      ctx.event("text", { text: "Artel summarized the older work to keep the conversation within the model's memory." });
+    },
     mode,
     extraTools,
     ownTools,

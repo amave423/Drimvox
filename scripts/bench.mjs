@@ -1,0 +1,22 @@
+// Bundles scripts/bench.ts (it imports the TypeScript core) and runs it. The bundle sits in node_modules/.cache so
+// that playwright-core, left out of it, still resolves.
+import { build } from "esbuild";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const root = fileURLToPath(new URL("..", import.meta.url));
+mkdirSync(join(root, "node_modules", ".cache"), { recursive: true });
+const outfile = join(root, "node_modules", ".cache", "bench.mjs");
+await build({
+  entryPoints: [join(root, "scripts", "bench.ts")],
+  outfile,
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  logLevel: "warning",
+  external: ["playwright-core", "electron"],
+  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+});
+await import(pathToFileURL(outfile).href);

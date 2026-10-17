@@ -176,6 +176,8 @@ const migrations: string[] = [
   `alter table tasks add column step_rounds integer not null default 0;`,
   // How red the checks were at the last step limit, to tell progress from going in circles.
   `alter table tasks add column step_red integer;`,
+  // The summary that stands for the agent's older work once its conversation nears the model's context (memory.ts).
+  `alter table tasks add column memory text;`,
 ];
 
 export interface Database {

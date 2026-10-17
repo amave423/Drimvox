@@ -81,6 +81,8 @@ export interface TaskRow {
   design_reviewed: number;
   step_rounds: number;
   step_red: number | null;
+  /** JSON Memory: the summary of the older conversation, or null. */
+  memory: string | null;
 }
 
 export class ProjectRepo {
@@ -157,6 +159,7 @@ export type TaskPatch = Partial<
     | "design_reviewed"
     | "step_rounds"
     | "step_red"
+    | "memory"
   >
 >;
 
@@ -221,6 +224,7 @@ export class TaskRepo {
       design_reviewed: 0,
       step_rounds: 0,
       step_red: null,
+      memory: null,
       ...extra,
       status_reason: null,
       cost_usd: 0,

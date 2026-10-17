@@ -1,6 +1,6 @@
+import { writeNotes } from "./notes";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import { MARK } from "./compact";
 import { classifyCommand, runCommand, type CommandVerdict } from "./commands";
 import type { Workspace } from "./workspace";
 
@@ -83,8 +83,6 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
     "Run a shell command in the project folder, e.g. tests or a build. Returns the exit code and the end of the output.",
     z.object({ command: z.string().min(1), timeout_seconds: z.number().int().min(1).max(600).default(120) }),
     async ({ command, timeout_seconds }, signal) => {
-      // A command can write files too (Set-Content with the text inside).
-      refuseCutNotes(command);
       const verdict = classifyCommand(command, ws.root);
       if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal))) {
         return { ok: false, output: "The user denied this command. Do not retry it; find another way or explain in finish." };
@@ -104,7 +102,6 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
       "Create or overwrite a file with the full content. Creates missing folders.",
       z.object({ path: z.string(), content: z.string() }),
       async ({ path, content }) => {
-        refuseCutNotes(content);
         ws.writeFile(path, content);
         return ok(`Wrote ${path}`);
       },
@@ -114,12 +111,20 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
       "Replace one exact fragment of a file. `old` must appear exactly once; include surrounding lines to make it unique.",
       z.object({ path: z.string(), old: z.string().min(1), new: z.string() }),
       async ({ path, old, new: replacement }) => {
-        refuseCutNotes(old, replacement);
         ws.editFile(path, old, replacement);
         return ok(`Edited ${path}`);
       },
     ),
     run_command,
+    update_notes: wrap(
+      "update_notes",
+      "Rewrite your section of the project's AGENTS.md: what any agent working here next must know (the goal, decisions, how to build, test and run, what is done and what is next, pitfalls). Short and current, not a diary; it starts every request.",
+      z.object({ notes: z.string().min(1) }),
+      async ({ notes }) => {
+        writeNotes(ws.root, notes);
+        return ok("Notes saved in AGENTS.md.");
+      },
+    ),
     finish: wrap(
       "finish",
       "Call once when the task is done (or cannot be done).",
@@ -134,19 +139,4 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
 
 function clip(text: string): string {
   return text.length > OUTPUT_FOR_EVENTS ? `${text.slice(0, OUTPUT_FOR_EVENTS)}\n…` : text;
-}
-
-/**
- * The notes compaction leaves in place of what it cut, in full: "[… 3710 more characters of this content cut by Artel"
- * or "[4010 characters of content written to x were cut by Artel". A search for the words alone is fine.
- */
-const CUT_NOTE = /\[(?:… )?\d+ (?:more )?characters of [^\]]*cut by Artel/;
-
-/** Text the history compaction left in place of what was cut is not code: it must never land in a file. */
-function refuseCutNotes(...texts: string[]): void {
-  if (texts.some((t) => CUT_NOTE.test(t))) {
-    throw new Error(
-      `This holds a note Artel left in your history in place of text it cut ("${MARK}"), not the text itself. Write the real text in full; for a file, read it with read_file first.`,
-    );
-  }
 }

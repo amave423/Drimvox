@@ -70,9 +70,10 @@ export class Workspace {
     const content = crlf ? raw.replace(/\r\n/g, "\n") : raw;
     const find = oldText.replace(/\r\n/g, "\n");
     const count = find ? content.split(find).length - 1 : 0;
-    if (count === 0) throw new Error(`Fragment not found in ${path}; read the file and copy the text exactly`);
     if (count > 1) throw new Error(`Fragment occurs ${count} times in ${path}; include more surrounding lines`);
-    const edited = content.replace(find, () => newText.replace(/\r\n/g, "\n"));
+    // Seen live: many edits missed by an indent, and every miss sent the agent back to read the file in pieces.
+    const edited = count === 1 ? content.replace(find, () => newText.replace(/\r\n/g, "\n")) : looseEdit(content, find, newText.replace(/\r\n/g, "\n"));
+    if (edited === null) throw new Error(`Fragment not found in ${path}. ${nearby(content, find)}`);
     writeFileSync(file, crlf ? edited.replace(/\n/g, "\r\n") : edited);
   }
 
@@ -114,4 +115,52 @@ export class Workspace {
     walk(start);
     return results;
   }
+}
+
+const indentOf = (line: string) => line.match(/^\s*/)![0];
+
+/**
+ * The fragment matched line by line with indentation and trailing spaces ignored, when exactly one place matches;
+ * the new text takes the file's indentation there. Null when no place or several do.
+ */
+function looseEdit(content: string, find: string, replacement: string): string | null {
+  const want = find.replace(/\n+$/, "").split("\n");
+  if (want.every((l) => l.trim() === "")) return null;
+  const lines = content.split("\n");
+  const same = (a: string, b: string) => a.trim() === b.trim();
+  const starts: number[] = [];
+  for (let i = 0; i + want.length <= lines.length; i++) if (want.every((w, j) => same(w, lines[i + j]!))) starts.push(i);
+  if (starts.length !== 1) return null;
+  const at = starts[0]!;
+  const first = want.findIndex((l) => l.trim() !== "");
+  const theirs = indentOf(want[first]!);
+  const ours = indentOf(lines[at + first]!);
+  const placed = replacement
+    .replace(/\n+$/, "")
+    .split("\n")
+    .map((l) => (l.trim() === "" ? "" : ours + (l.startsWith(theirs) ? l.slice(theirs.length) : l.trimStart())));
+  return [...lines.slice(0, at), ...placed, ...lines.slice(at + want.length)].join("\n");
+}
+
+/** The file around the line most like the fragment, numbered as read_file shows it, so the next edit can hit. */
+function nearby(content: string, find: string): string {
+  const words = (s: string) => new Set(s.toLowerCase().split(/\W+/).filter((w) => w.length > 1));
+  const wanted = find.split("\n").map(words).filter((w) => w.size > 0);
+  const lines = content.split("\n");
+  let best = -1;
+  let bestScore = 0;
+  lines.forEach((line, i) => {
+    const have = words(line);
+    if (have.size === 0) return;
+    for (const w of wanted) {
+      const shared = [...w].filter((x) => have.has(x)).length;
+      const score = shared / (w.size + have.size - shared);
+      if (score > bestScore) [best, bestScore] = [i, score];
+    }
+  });
+  if (best < 0 || bestScore < 0.3) return "Read the file and copy the text exactly.";
+  const from = Math.max(0, best - 8);
+  const to = Math.min(lines.length, best + 9);
+  const shown = lines.slice(from, to).map((l, i) => `${from + i + 1}\t${l}`).join("\n");
+  return `Lines ${from + 1}-${to} as they are now, nearest to what you looked for:\n${shown}`;
 }
