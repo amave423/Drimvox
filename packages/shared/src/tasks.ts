@@ -182,7 +182,7 @@ export type TaskReason = string;
 export interface PendingApproval {
   id: string;
   command: string;
-  /** push, global, outside, system, download, media_cost, mcp */
+  /** push, global, outside, system, download, browser, media_cost, mcp */
   reason: string;
 }
 

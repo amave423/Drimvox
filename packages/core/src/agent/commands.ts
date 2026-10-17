@@ -2,7 +2,10 @@ import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "n
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" };
+export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" };
+
+/** A browser of the user's: with a window it opens on the user's screen, with the user's profile. */
+const BROWSER = /(^|[\s;&|("'\\/])(chrome|msedge|firefox|brave|opera|vivaldi)(\.exe)?(?=["'\s;]|$)/i;
 
 const rules: [RegExp, Exclude<CommandVerdict, { action: "allow" }>["reason"]][] = [
   [/\bgit\s+push\b/i, "push"],
@@ -22,6 +25,8 @@ const rules: [RegExp, Exclude<CommandVerdict, { action: "allow" }>["reason"]][] 
  */
 export function classifyCommand(command: string, root: string): CommandVerdict {
   for (const [pattern, reason] of rules) if (pattern.test(command)) return { action: "ask", reason };
+  // Seen live: `chrome --version` opened the user's browser instead of printing a version. A headless one is fine.
+  if (BROWSER.test(command) && !/--headless\b/i.test(command)) return { action: "ask", reason: "browser" };
   if (/(^|[\s;&|(])(cd|chdir|set-location|pushd|sl)\s+["']?\.\.(?=[\\/\s"']|$)/i.test(command)) return { action: "ask", reason: "outside" };
   const home = realName(root);
   // Running an installed program (a browser for a headless look, say) touches nothing outside; moving or deleting it does.
@@ -133,6 +138,9 @@ export function killTree(child: ChildProcess): void {
   }
 }
 
+/** How long the output may stay open after the shell has exited. */
+const LINGER_MS = 2_000;
+
 /** Runs a shell command in `cwd`; keeps the tail of the output and kills the whole tree on timeout. */
 export function runCommand(command: string, cwd: string, timeoutMs: number, signal?: AbortSignal): Promise<CommandResult> {
   return new Promise((done) => {
@@ -147,19 +155,32 @@ export function runCommand(command: string, cwd: string, timeoutMs: number, sign
     child.stderr.on("data", append);
 
     let timedOut = false;
-    const kill = () => killTree(child);
+    let settled = false;
+    const finish = (exitCode: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", kill);
+      child.stdout.destroy();
+      child.stderr.destroy();
+      const tail = output.length > OUTPUT_LIMIT ? `…\n${output.slice(-OUTPUT_LIMIT)}` : output;
+      done({ exitCode, output: tail.trimEnd(), timedOut });
+    };
+    // A program the command started can outlive it and hold its output open (seen live: `chrome --version` on Windows
+    // opened the browser and the command never ended, not even at its timeout). Once the shell is gone, or killed,
+    // the output is taken as complete a moment later.
+    const soon = (exitCode: number | null) => setTimeout(() => finish(exitCode), LINGER_MS).unref();
+    const kill = () => {
+      killTree(child);
+      soon(null);
+    };
     const timer = setTimeout(() => {
       timedOut = true;
       kill();
     }, timeoutMs);
     signal?.addEventListener("abort", kill, { once: true });
 
-    const finish = (exitCode: number | null) => {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", kill);
-      const tail = output.length > OUTPUT_LIMIT ? `…\n${output.slice(-OUTPUT_LIMIT)}` : output;
-      done({ exitCode, output: tail.trimEnd(), timedOut });
-    };
+    child.on("exit", (code) => soon(code));
     child.on("close", (code) => finish(code));
     child.on("error", (err) => {
       output += String(err);

@@ -113,6 +113,16 @@ describe("classifyCommand", () => {
     expect(classifyCommand('Copy-Item dist\\app.exe "C:\\Program Files\\Some App\\app.exe"', root)).toEqual({ action: "ask", reason: "outside" });
   });
 
+  // Seen live: `chrome --version` opened the user's own browser, with the user's profile, on the user's screen.
+  it("asks before opening a browser with a window; a headless one may run", () => {
+    expect(classifyCommand('& "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --version', root)).toEqual({ action: "ask", reason: "browser" });
+    expect(classifyCommand("Start-Process msedge http://localhost:5173/", root)).toEqual({ action: "ask", reason: "browser" });
+    expect(classifyCommand("firefox.exe http://localhost:5173/", root)).toEqual({ action: "ask", reason: "browser" });
+    const headless = '& "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --headless=new --dump-dom http://localhost:5173/';
+    expect(classifyCommand(headless, root)).toEqual({ action: "allow" });
+    expect(classifyCommand("npx playwright test --project=chromium", root)).toEqual({ action: "allow" });
+  });
+
   // Seen live: with a Cyrillic user name Windows gives short 8.3 paths (C:\Users\12C2~1\…), and the agent's
   // `cd` into its own copy by the long name was taken for a step outside.
   it("knows the copy under its short and its long name", () => {
@@ -136,6 +146,16 @@ describe("runCommand", () => {
     const result = await runCommand(`node -e "setTimeout(() => {}, 60000)"`, root, 500);
     expect(result.timedOut).toBe(true);
   });
+
+  // Seen live: the browser that `chrome --version` opened kept the command's output open; the command never ended,
+  // not even at its timeout, and the task hung for twenty minutes.
+  it("ends at its timeout, though a program it started lives on and holds the output", async () => {
+    const started = Date.now();
+    const lingering = `node -e "require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'inherit', detached: true, cwd: require('os').tmpdir() }).unref(); console.log('started')"`;
+    const result = await runCommand(lingering, root, 2_000);
+    expect(result.timedOut).toBe(true);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  }, 20_000);
 
   it.runIf(process.platform === "win32")("prints PowerShell errors as plain text", async () => {
     const result = await runCommand("Get-Item does-not-exist.txt", root, 30_000);

@@ -180,6 +180,7 @@ export const ru = {
   "approval.reason.outside": "Действие за пределами копии проекта",
   "approval.reason.system": "Системная команда",
   "approval.reason.download": "Запуск скрипта из интернета",
+  "approval.reason.browser": "Открыть браузер в окне (с твоим профилем)",
   "approval.allow": "Разрешить",
   "approval.deny": "Запретить",
   "approval.allowed": "Разрешено",

@@ -181,6 +181,7 @@ export const en: Record<keyof typeof ru, string> = {
   "approval.reason.outside": "Acting outside the project copy",
   "approval.reason.system": "A system command",
   "approval.reason.download": "Running a script from the internet",
+  "approval.reason.browser": "Opening a browser window (with your profile)",
   "approval.allow": "Allow",
   "approval.deny": "Deny",
   "approval.allowed": "Allowed",
