@@ -17,7 +17,7 @@ import { planInstructions, planTools, type PlanProposal } from "./plan";
 import type { ProjectRepo, TaskRepo, TaskRow } from "./repo";
 import { done, lastSummary } from "./landing";
 import { MAX_STEPS, runAgent } from "./run";
-import { escalate, pastStepLimit } from "./progress";
+import { escalate, GREEN, pastStepLimit } from "./progress";
 import { isCli } from "../cli/kinds";
 import { runCliTurn } from "../cli/turn";
 import { webTools } from "../internet/tools";
@@ -204,7 +204,12 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   if (outcome.kind === "stopped") return finish(ctx, "stopped", "user");
   if (outcome.kind === "error") return finish(ctx, "failed", outcome.error.code, outcome.error.detail);
   // The step limit means nothing to the user: the stops worth making are the spec and the stages, and the budget limits money.
-  if (outcome.kind === "steps" && row.step_rounds < MAX_STEP_ROUNDS) return pastStepLimit(ctx, id, ctx.tasks.row(id)!, MAX_STEPS);
+  if (outcome.kind === "steps" && row.step_rounds < MAX_STEP_ROUNDS) {
+    const next = await pastStepLimit(ctx, id, ctx.tasks.row(id)!, MAX_STEPS);
+    if (next !== GREEN) return next;
+    ctx.event("text", { text: `The checks pass after ${MAX_STEPS} more steps: Artel takes the work as done and reviews it.` });
+    return done(ctx, id, ctx.tasks.row(id)!, visual, lastSummary(ctx, id), null);
+  }
   if (outcome.kind === "budget" || outcome.kind === "steps") return finish(ctx, "waiting", outcome.kind);
 
   // A question, not a task: the answer is the result and there is nothing to review.

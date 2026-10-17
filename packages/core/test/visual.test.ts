@@ -135,6 +135,15 @@ describe("visual checks from the spec", () => {
     call("propose_spec", { spec: "# Страница", checks: [], plan: ["Сверстать"], visual_checks: visual });
   const page = { url: "http://localhost:5173/", expect: "Крупный заголовок «Привет»" };
 
+  // Seen live: one page passed and failed by turns on a language switch the screenshot did not show.
+  it("asks the model to judge the substance, not what a still screenshot cannot show", async () => {
+    const id = await start([call("propose_spec", { spec: "# Страница", checks: [], plan: ["Страница"], visual_checks: [{ url: "http://localhost:5173/", expect: "Заголовок Привет" }] }), finish], ["PASS: заголовок есть"], { spec: true });
+    await waitTask(id, (t) => !["running", "queued"].includes(t.status));
+    const asked = JSON.stringify(visionRequests()[0]!.body.messages);
+    expect(asked).toMatch(/substance/);
+    expect(asked).toMatch(/cannot show/);
+  });
+
   it("checks the page after the code and sends a failure back once", async () => {
     const id = await start([spec([page]), call("write_file", { path: "index.html", content: "<h1>Привет</h1>" }), finish, finish], [
       "FAIL: заголовка не видно, белая страница.",

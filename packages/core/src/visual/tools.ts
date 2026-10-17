@@ -132,7 +132,13 @@ export async function runVisualChecks(d: VisualDeps, checks: VisualCheck[], sign
       // A server Artel just started needs time to come up; one that already runs is photographed at once.
       else if (check.start && !(await reachable(check.url, signal))) answer = `${check.url} did not answer within a minute.`;
       else {
-        const question = `Does the page meet this: "${check.expect}"? Start the answer with PASS or FAIL, then say what you see.`;
+        // Seen live: one page passed and failed by turns over a language switch the screenshot did not show.
+        const question = [
+          `Does the page meet this, in substance: "${check.expect}"?`,
+          "FAIL only when something important is missing or broken: an error, an empty or half-drawn page, a missing part.",
+          "Wording that differs a little, and what a still screenshot cannot show (motion, sound, hover, what opens on a click),",
+          "are no reasons to fail. Start the answer with PASS or FAIL, then say what you see.",
+        ].join(" ");
         answer = (await look(d, check.url, question, signal)).answer;
         ok = /^\W*PASS\b/i.test(answer);
       }

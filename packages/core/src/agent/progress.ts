@@ -23,13 +23,17 @@ export function escalate(ctx: PassContext, id: string, row: TaskRow, why: string
   return `You are taking over this task from a weaker model that ${why}. The checks still fail:\n\n${report}\n\nFind the real cause, fix it, run the checks, then call finish.`;
 }
 
+/** The checks pass at the step limit: the work is taken as done. */
+export const GREEN = Symbol("green");
+
 /**
  * At the step limit Artel looks before it goes on (seen live: an agent patched a big file in circles for hundreds of
  * steps while its type errors grew). It runs the checks and tells the agent where they stand; when sixty more steps
  * brought them no closer, the strong model takes over, or the task waits for the user with the report.
- * Returns the message that goes on, or null when the task now waits.
+ * Returns the message that goes on, GREEN when the checks pass (the work goes on to its review), or null when the
+ * task now waits.
  */
-export async function pastStepLimit(ctx: PassContext, id: string, row: TaskRow, steps: number): Promise<string | null> {
+export async function pastStepLimit(ctx: PassContext, id: string, row: TaskRow, steps: number): Promise<string | null | typeof GREEN> {
   const going = `Artel continues on its own after ${steps} steps; the budget still limits the spending.`;
   const checks = JSON.parse(row.checks) as string[];
   if (row.phase !== "code" || checks.length === 0) {
@@ -41,11 +45,9 @@ export async function pastStepLimit(ctx: PassContext, id: string, row: TaskRow, 
   const results = await runChecks(checks, row.worktree, ctx.signal);
   for (const r of results) ctx.event("check", { phase: "code", ...r });
   if (ctx.signal.aborted) return null;
-  if (results.every((r) => r.ok)) {
-    ctx.tasks.update(id, { step_rounds: row.step_rounds + 1, step_red: 0 });
-    ctx.event("text", { text: going });
-    return "Continue the task. The checks pass now: once the work is done, call finish.";
-  }
+  // Green: the work is taken as done and goes on to its review (seen live: told to call finish, the agent kept
+  // polishing until the budget ran out).
+  if (results.every((r) => r.ok)) return GREEN;
 
   const red = redness(results);
   const report = failureReport(results);

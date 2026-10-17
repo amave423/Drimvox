@@ -70,6 +70,7 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[], o: 
         "If the work has a visible interface (a page, a screen), add visual_checks: how to start it, the address and what",
         "must be visible. Artel opens the page, takes a screenshot of it as it loads (no clicks, no scrolling inside elements)",
         "and asks a model that sees pictures, after the checks pass: describe only what such a screenshot can show.",
+        "That browser has no location, sound or camera: describe the page as it opens without them.",
         "In a task with stages give every visual check the stage that brings it: a stage is looked at only with its own pages",
         "and the earlier stages' pages.",
         "List the requirements: numbered, checkable statements about the result (R1, R2…), covering everything the user asked for",
