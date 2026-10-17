@@ -5,7 +5,21 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" };
 
 /** A browser of the user's: with a window it opens on the user's screen, with the user's profile. */
-const BROWSER = /(^|[\s;&|("'\\/])(chrome|msedge|firefox|brave|opera|vivaldi)(\.exe)?(?=["'\s;]|$)/i;
+const BROWSER_NAME = String.raw`(?:chrome|msedge|firefox|brave|opera|vivaldi)(?:\.exe)?`;
+const BROWSER = new RegExp(String.raw`(^|[\s;&|("'\\/])${BROWSER_NAME}(?=["'\s;)]|$)`, "i");
+/** Run straight: as a command of its own, after `&`, or through Start-Process, by name or by its path. */
+const RUNS_BROWSER = new RegExp(
+  String.raw`(^|[;|]|&&?)\s*(?:(?:start-process|start|saps|invoke-item|ii)\s+(?:-filepath\s+)?)?["']?(?:[^"';|]*[\\/])?${BROWSER_NAME}["']?(?=[\s;|]|$)`,
+  "i",
+);
+/** Run through a variable that holds its path: `$chrome = "…\chrome.exe"; & $chrome`. */
+const RUNS_VARIABLE = /(^|[;|&])\s*(?:&|start-process\s+(?:-filepath\s+)?)\s*\$\w+/i;
+
+/** Seen live: `chrome --version` opened the user's browser instead of printing a version. Looking for one is fine. */
+function opensBrowser(command: string): boolean {
+  if (/--headless\b/i.test(command)) return false;
+  return RUNS_BROWSER.test(command) || (BROWSER.test(command) && RUNS_VARIABLE.test(command));
+}
 
 const rules: [RegExp, Exclude<CommandVerdict, { action: "allow" }>["reason"]][] = [
   [/\bgit\s+push\b/i, "push"],
@@ -25,8 +39,7 @@ const rules: [RegExp, Exclude<CommandVerdict, { action: "allow" }>["reason"]][] 
  */
 export function classifyCommand(command: string, root: string): CommandVerdict {
   for (const [pattern, reason] of rules) if (pattern.test(command)) return { action: "ask", reason };
-  // Seen live: `chrome --version` opened the user's browser instead of printing a version. A headless one is fine.
-  if (BROWSER.test(command) && !/--headless\b/i.test(command)) return { action: "ask", reason: "browser" };
+  if (opensBrowser(command)) return { action: "ask", reason: "browser" };
   if (/(^|[\s;&|(])(cd|chdir|set-location|pushd|sl)\s+["']?\.\.(?=[\\/\s"']|$)/i.test(command)) return { action: "ask", reason: "outside" };
   const home = realName(root);
   // Running an installed program (a browser for a headless look, say) touches nothing outside; moving or deleting it does.

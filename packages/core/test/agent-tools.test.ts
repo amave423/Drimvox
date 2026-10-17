@@ -120,6 +120,12 @@ describe("classifyCommand", () => {
     expect(classifyCommand("firefox.exe http://localhost:5173/", root)).toEqual({ action: "ask", reason: "browser" });
     const headless = '& "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --headless=new --dump-dom http://localhost:5173/';
     expect(classifyCommand(headless, root)).toEqual({ action: "allow" });
+    // Seen live: the very command that opened the browser, through a variable.
+    const viaVariable = '$chrome = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"; & $chrome --version';
+    expect(classifyCommand(viaVariable, root)).toEqual({ action: "ask", reason: "browser" });
+    // Looking for a browser is not opening it (seen live: this was asked about).
+    const lookFor = '$paths = @("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"); foreach ($p in $paths) { if (Test-Path $p) { $p } }';
+    expect(classifyCommand(lookFor, root)).toEqual({ action: "allow" });
     expect(classifyCommand("npx playwright test --project=chromium", root)).toEqual({ action: "allow" });
   });
 
