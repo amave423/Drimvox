@@ -118,10 +118,10 @@ export interface Question {
 }
 
 /** Which step a task is on. Null for tasks that skip straight to the code. */
-export type TaskPhase = "interview" | "spec" | "tests" | "code" | "orchestrate";
+export type TaskPhase = "interview" | "spec" | "tests" | "code" | "orchestrate" | "list";
 
-/** A one-agent task, a team goal, or one subtask of a goal. */
-export type TaskKind = "solo" | "goal" | "subtask";
+/** A one-agent task, a team goal, one subtask of a goal, the interview that lists a project's tasks (plan), or one task of that list (item). */
+export type TaskKind = "solo" | "goal" | "subtask" | "plan" | "item";
 
 /** A subtask as the goal's board shows it. */
 export interface SubtaskCard {
@@ -266,7 +266,8 @@ export type TaskEventKind =
   | "acceptance"
   | "milestone"
   | "reference"
-  | "design_review";
+  | "design_review"
+  | "backlog";
 
 export interface TaskEvent {
   seq: number;

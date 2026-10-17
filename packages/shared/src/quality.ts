@@ -20,7 +20,8 @@ export interface Milestone {
 }
 export type Requirement = z.infer<typeof requirementSchema>;
 
-export const acceptanceStatuses = ["done", "partial", "missing"] as const;
+/** "unchecked": the reviewer gave no verdict on it; not a reason to redo the work. */
+export const acceptanceStatuses = ["done", "partial", "missing", "unchecked"] as const;
 
 export interface AcceptanceResult {
   /** The requirement's id, such as R2. */

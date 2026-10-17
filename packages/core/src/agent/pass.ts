@@ -1,3 +1,5 @@
+import type { BacklogRepo } from "../backlog/repo";
+import { LIST_NOW, listInstructions, listTools, saveList, type ListProposal } from "../backlog/plan";
 import type { Memory } from "./memory";
 import type { DesignBrief, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
 import type { ModelMessage, ToolSet } from "ai";
@@ -41,6 +43,8 @@ export interface PassContext {
   tasks: TaskRepo;
   projects: ProjectRepo;
   providers: ProviderRepo;
+  /** The project's task list, which a plan's interview fills. */
+  backlog: BacklogRepo;
   idleTimeoutMs: number;
   strongModel(): { providerId: string; model: string } | null;
   /** The user writes code: the interview may ask about technology. */
@@ -104,6 +108,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   let proposal: SpecProposal | null = null;
   let teamPlan: PlanProposal | null = null;
   let answered: string | null = null;
+  let listed: ListProposal | null = null;
   const planning = row.kind === "goal" && phase === "spec";
   let extraTools: ToolSet | undefined;
   let stopTools: string[] | undefined;
@@ -113,6 +118,9 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   } else if (planning) {
     extraTools = planTools((p) => (teamPlan = p));
     stopTools = ["propose_plan"];
+  } else if (phase === "list") {
+    extraTools = listTools((l) => (listed = l));
+    stopTools = ["propose_tasks"];
   } else if (phase === "spec") {
     extraTools = specTools((p) => (proposal = p));
     stopTools = ["propose_spec"];
@@ -131,7 +139,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     onResult: (result: { callId: string; name: string; ok: boolean; output: string }) => ctx.event("tool_result", result),
     askApproval: ctx.askApproval,
   };
-  const mode = phase === "interview" || phase === "spec" ? "read" : "write";
+  const mode = phase === "interview" || phase === "spec" || phase === "list" ? "read" : "write";
   // Pictures and screenshots cost money outside the model's own usage: they go into the task's spending at once.
   const spend = (usd: number) => {
     if (usd <= 0) return;
@@ -158,7 +166,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   // The look: asked about in the interview, written down with the spec, followed while coding.
   const brief = row.design ? (JSON.parse(row.design) as DesignBrief) : null;
   const designNote =
-    phase === "interview" ? lookInstructions() : phase === "spec" && !planning ? briefInstructions() : phase === "code" && brief ? designInstructions(brief) : "";
+    phase === "interview" ? lookInstructions() : (phase === "spec" && !planning) || phase === "list" ? briefInstructions() : phase === "code" && brief ? designInstructions(brief) : "";
   // Claude Code, Codex and Gemini CLI work with their own tools; Artel's own (web, skills, MCP, pictures) are for API models.
   const run = isCli(conn.preset) ? runCliTurn : runAgent;
   const outcome = await run({
@@ -184,7 +192,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     ownTools,
     stopTools,
     instructions: [
-      planning ? planInstructions() : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),
+      planning ? planInstructions() : phase === "list" ? listInstructions(ctx.developer()) : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),
       designNote,
       skillsInstructions(skills),
     ]
@@ -242,6 +250,10 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       ctx.event("questions", { questions: asked.questions, understood: asked.understood, unknown: asked.unknown, round: row.interview_round + 1 });
       return finish(ctx, "waiting", "questions");
     }
+    if (row.kind === "plan") {
+      enterPhase(ctx, id, "list");
+      return LIST_NOW;
+    }
     if (stages.spec) {
       enterPhase(ctx, id, "spec");
       return "Nothing to ask. Write the spec now and call propose_spec.";
@@ -276,6 +288,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     ctx.startTeam();
     return null;
   }
+
+  if (phase === "list") return saveList(ctx, id, row, listed as ListProposal | null, messages);
 
   if (phase === "spec") {
     if (!proposed) {

@@ -82,11 +82,12 @@ function verdictTools(requirements: Requirement[], onReport: (r: { results: Acce
         summary: z.string().min(1).max(4000),
       }),
       execute: async ({ results, summary }) => {
-        // A requirement the agent did not mention is not accepted.
+        // A requirement the agent did not mention is unchecked: not accepted, and no reason to redo the work (seen live:
+        // a forced verdict named three of fourteen, and the coder was about to redo eleven that were done).
         const byId = new Map(results.map((r) => [r.id.trim(), r]));
         const full = requirements.map(
           (req): AcceptanceResult =>
-            byId.get(req.id) ?? { id: req.id, status: "missing", evidence: "", problem: "The acceptance agent gave no verdict on this requirement." },
+            byId.get(req.id) ?? { id: req.id, status: "unchecked", evidence: "", problem: "The reviewer did not check this." },
         );
         onReport({ results: full, summary });
         return "Verdict recorded.";
@@ -174,10 +175,14 @@ export function accepted(report: AcceptanceReport): boolean {
   return report.results.every((r) => r.status === "done");
 }
 
+/** What the coder has to redo: partly done or missing, not what went unchecked. */
+export function problems(report: AcceptanceReport): AcceptanceResult[] {
+  return report.results.filter((r) => r.status === "partial" || r.status === "missing");
+}
+
 /** What goes back to the coder after a round that found unmet requirements. */
 export function reworkMessage(report: AcceptanceReport, requirements: Requirement[]): string {
-  const lines = report.results
-    .filter((r) => r.status !== "done")
+  const lines = problems(report)
     .map((r) => {
       const req = requirements.find((q) => q.id === r.id);
       return `- ${r.id} (${r.status}): ${req?.text ?? ""}\n  Problem: ${r.problem || "—"}${r.evidence ? `\n  Seen: ${r.evidence}` : ""}`;

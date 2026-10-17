@@ -539,6 +539,7 @@ export const ru = {
   "acceptance.status.done": "сделано",
   "acceptance.status.partial": "частично",
   "acceptance.status.missing": "не сделано",
+  "acceptance.status.unchecked": "не проверено",
   "acceptance.evidence": "Что проверил приёмщик",
   "acceptance.partial": "Приёмщик за три круга не принял всё. Ниже — что не сделано и почему; можно вернуть на доработку или принять как есть.",
   "feed.phase.acceptance": "Приёмщик проверяет работу по требованиям (круг {round})",

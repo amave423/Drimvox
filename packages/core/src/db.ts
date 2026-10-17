@@ -178,6 +178,23 @@ const migrations: string[] = [
   `alter table tasks add column step_red integer;`,
   // The summary that stands for the agent's older work once its conversation nears the model's context (memory.ts).
   `alter table tasks add column memory text;`,
+  // The project's task list and what its tasks share (docs/specs/backlog-loop.md).
+  `create table backlog (
+     id text primary key,
+     project_id text not null references projects(id) on delete cascade,
+     position integer not null,
+     title text not null,
+     done text not null default '[]',
+     size text not null,
+     status text not null default 'open',
+     task_id text,
+     created_at integer not null
+   ) strict;
+   create index backlog_project on backlog(project_id, position);
+   create table project_plans (
+     project_id text primary key references projects(id) on delete cascade,
+     data text not null
+   ) strict;`,
 ];
 
 export interface Database {

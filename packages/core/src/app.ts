@@ -1,3 +1,6 @@
+import { BacklogService } from "./backlog/service";
+import { backlogRoutes } from "./routes/backlog";
+import { BacklogRepo } from "./backlog/repo";
 import { zValidator } from "@hono/zod-validator";
 import { settingsPatchSchema, type PresetId } from "@artel/shared";
 import { Hono } from "hono";
@@ -96,10 +99,12 @@ export function createCore(o: AppOptions) {
   const chats = new ChatRepo(o.db, media);
   const projects = new ProjectRepo(o.db);
   const tasks = new TaskRepo(o.db);
+  const backlog = new BacklogRepo(o.db);
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
   const web = o.web ?? duckDuckGo;
   const runner = new AgentRunner({
     tasks,
+    backlog,
     projects,
     providers,
     dataDir: o.dataDir,
@@ -116,6 +121,7 @@ export function createCore(o: AppOptions) {
     skillsDir: join(o.dataDir, "skills"),
     idleTimeoutMs,
   });
+  const backlogService = new BacklogService(backlog, tasks, runner);
   const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });
   studio.resume();
 
@@ -143,7 +149,8 @@ export function createCore(o: AppOptions) {
     .route("/skills", skillRoutes(join(o.dataDir, "skills")))
     .route("/usage", usageRoutes(chats))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
-    .route("/tasks", taskRoutes(tasks, runner, shots));
+    .route("/projects", backlogRoutes(projects, backlog, backlogService))
+    .route("/tasks", taskRoutes(tasks, runner, shots, backlogService));
 
   const hosts = new Set(o.allowedHosts ?? defaultHosts);
   const auth = new AuthStore(o.db);

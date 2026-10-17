@@ -1,3 +1,4 @@
+import type { BacklogRepo } from "../backlog/repo";
 import type { Milestone, ModelRef, PlannedSubtask, Question, Requirement, StyleReference, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -24,6 +25,7 @@ export class TaskBusy extends Error {}
 
 export interface RunnerOptions extends ExtrasOptions {
   tasks: TaskRepo;
+  backlog: BacklogRepo;
   projects: ProjectRepo;
   providers: ProviderRepo;
   dataDir: string;
@@ -69,7 +71,7 @@ export class AgentRunner {
 
   async start(
     projectId: string,
-    input: { task: string; providerId: string; model: string; stages: TaskStages; team?: ModelRef },
+    input: { task: string; providerId: string; model: string; stages: TaskStages; team?: ModelRef; kind?: "plan" | "item"; extra?: { checks?: string; design?: string | null; requirements?: string } },
   ): Promise<TaskView> {
     const project = this.o.projects.get(projectId);
     if (!project) throw new Error("Unknown project");
@@ -97,7 +99,7 @@ export class AgentRunner {
         budget_usd: this.o.budgetUsd(),
       },
       stages,
-      input.team ? { kind: "goal", team: JSON.stringify(input.team) } : {},
+      input.team ? { kind: "goal", team: JSON.stringify(input.team) } : input.kind ? { kind: input.kind, ...input.extra } : {},
     );
     const first: TaskPhase = stages.interview ? "interview" : stages.spec ? "spec" : "code";
     enterPhase(this.context(id, new AbortController()), id, first);
@@ -344,6 +346,7 @@ export class AgentRunner {
   private context(id: string, controller: AbortController, live?: Live): PassContext {
     return {
       tasks: this.o.tasks,
+      backlog: this.o.backlog,
       projects: this.o.projects,
       providers: this.o.providers,
       idleTimeoutMs: this.o.idleTimeoutMs,

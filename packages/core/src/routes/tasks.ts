@@ -1,3 +1,4 @@
+import type { BacklogService } from "../backlog/service";
 import { zValidator } from "@hono/zod-validator";
 import {
   approvalAnswerSchema,
@@ -30,7 +31,7 @@ function refusal(err: unknown) {
   throw err;
 }
 
-export function taskRoutes(tasks: TaskRepo, runner: AgentRunner, shots: Shots) {
+export function taskRoutes(tasks: TaskRepo, runner: AgentRunner, shots: Shots, backlog: BacklogService) {
   return new Hono()
     .get("/", (c) => c.json(tasks.list().map((t) => runner.view(t.id)!)))
     .get("/:id", (c) => {
@@ -198,6 +199,7 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner, shots: Shots) {
       if (!runner.view(id)) return c.json(notFound, 404);
       try {
         const commit = await runner.accept(id, c.req.valid("json").message);
+        backlog.closed(id, true);
         return c.json({ commit, task: runner.view(id)! }, 200);
       } catch (err) {
         return c.json(refusal(err), 409);
@@ -208,6 +210,7 @@ export function taskRoutes(tasks: TaskRepo, runner: AgentRunner, shots: Shots) {
       if (!runner.view(id)) return c.json(notFound, 404);
       try {
         await runner.discard(id);
+        backlog.closed(id, false);
         return c.json(runner.view(id)!, 200);
       } catch (err) {
         return c.json(refusal(err), 409);

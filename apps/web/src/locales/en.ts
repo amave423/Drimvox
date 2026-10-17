@@ -540,6 +540,7 @@ export const en: Record<keyof typeof ru, string> = {
   "acceptance.status.done": "done",
   "acceptance.status.partial": "partial",
   "acceptance.status.missing": "not done",
+  "acceptance.status.unchecked": "not checked",
   "acceptance.evidence": "What the acceptance agent checked",
   "acceptance.partial": "The acceptance agent did not accept everything in three rounds. Below is what is not done and why; send it back or accept it as is.",
   "feed.phase.acceptance": "The acceptance agent checks the work against the requirements (round {round})",

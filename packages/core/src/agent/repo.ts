@@ -186,7 +186,7 @@ export class TaskRepo {
   create(
     row: Pick<TaskRow, "id" | "project_id" | "title" | "task" | "provider_id" | "model" | "status" | "branch" | "worktree" | "base_commit" | "budget_usd">,
     stages: TaskStages,
-    extra: Partial<Pick<TaskRow, "kind" | "parent_id" | "plan_id" | "depends_on" | "team" | "checks" | "spec" | "milestone" | "design" | "visual">> = {},
+    extra: Partial<Pick<TaskRow, "kind" | "parent_id" | "plan_id" | "depends_on" | "team" | "checks" | "spec" | "milestone" | "design" | "visual" | "requirements">> = {},
   ): TaskRow {
     const now = Date.now();
     const full: TaskRow = {
