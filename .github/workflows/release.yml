@@ -27,7 +27,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        # A fixed Ubuntu: the AppImage runs on systems no older than the one it was built on.
+        os: [windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

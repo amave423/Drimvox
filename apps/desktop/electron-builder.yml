@@ -34,6 +34,8 @@ linux:
   target:
     - AppImage
     - deb
+  # The package name (@artel/desktop) cannot name a file.
+  executableName: artel
   category: Development
   maintainer: amave423 <artem123antropov@mail.ru>
   synopsis: A team of AI agents writes code under your review
