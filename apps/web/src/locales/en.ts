@@ -68,13 +68,17 @@ export const en: Record<keyof typeof ru, string> = {
 
   "error.bad_key": "The key does not work. Check it or replace it.",
   "error.no_funds": "The provider account is out of money.",
-  "error.rate_limited": "The provider is limiting requests. Wait a little and try again.",
+  "error.rate_limited": "The provider is limiting requests to the model. Free models hit this often: the limit is shared by everyone. Wait a little or pick another.",
   "error.model_not_found": "The model is unavailable: the provider removed it or has not enabled it for your account. Pick another one.",
   "error.timeout": "The model has been silent for too long. Try again or pick another one.",
   "error.provider_error": "The provider returned an error.",
   "error.unreachable": "Could not reach the provider. Check the internet connection or the address.",
   "error.no_key": "This provider needs a key.",
   "error.invalid": "Check the form fields.",
+  "error.cut_off": "The answer was cut off: the model ran out of room. Write \"go on\", or start a new chat: local models remember only a short conversation.",
+  "error.forbidden": "The key works, but the provider does not let it use this model: it is closed to the account or only for certain apps. Pick another.",
+  "error.overloaded": "The model is overloaded at the provider right now. Try again a bit later or pick another.",
+  "error.region": "The provider does not serve your country. Turn on “Through the proxy” for it in Keys and models (the proxy is set in the settings).",
   "error.unknown": "Something went wrong.",
 
   "chat.untitled": "New chat",
@@ -672,4 +676,7 @@ export const en: Record<keyof typeof ru, string> = {
   "spec.visualStage": "Stage {stage}",
   "model.groupFree": "Free · {count}",
   "model.groupPaid": "Paid",
+  "model.checking": "Checking which free models answer…",
+  "model.hidden": "{count} hidden: not answering now",
+  "model.busy": "busy",
 };

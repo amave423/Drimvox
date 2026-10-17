@@ -197,6 +197,16 @@ describe("sending a message", () => {
     expect(answer).toMatchObject({ status: "stopped", content: "Часть" });
   });
 
+  // Seen live: a local model with a small context stopped mid-answer, and the answer looked finished.
+  it("says when the model ran out of room, and keeps the answer in the conversation so it can go on", async () => {
+    const { chat } = await setup({ chunks: [{ text: "Начало кода" }], finishReason: "length" });
+    const events = await readEvents(await send(chat.id, "Напиши сайт"));
+    expect(events.at(-1).message).toMatchObject({ status: "done", content: "Начало кода", error: { code: "cut_off" } });
+    await readEvents(await send(chat.id, "Продолжи"));
+    const sent = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)?.body.messages.slice(1);
+    expect(sent).toContainEqual({ role: "assistant", content: "Начало кода" });
+  });
+
   it("gives up on a model that stays silent", async () => {
     const { chat } = await setup({ chunks: [{ text: "Начал" }, { text: " и замолчал" }], delayMs: 400 });
     env.setIdleTimeout(150);

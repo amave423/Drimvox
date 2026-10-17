@@ -25,6 +25,31 @@ export function loadModels(api: Api, providerId: string, fresh = false): Promise
   return pending;
 }
 
+const checking = new Map<string, Promise<ModelsResult>>();
+
+/**
+ * Asks the provider's free models a word each, once per list, and adds what came back: the picker hides the ones that
+ * are gone and marks the busy ones. Paid models are never asked. Never rejects.
+ */
+export function checkFree(api: Api, providerId: string, result: ModelsResult): Promise<ModelsResult> {
+  if ("error" in result || !result.models.some((m) => isFree(m) && !m.available)) return Promise.resolve(result);
+  const running = checking.get(providerId);
+  if (running) return running;
+  const pending = api.providers[":id"].models.check
+    .$post({ param: { id: providerId } })
+    .then(async (res): Promise<ModelsResult> => {
+      if (!res.ok) return result;
+      const states = (await res.json()) as Record<string, ModelInfo["available"]>;
+      const checked = { models: result.models.map((m) => (states[m.id] ? { ...m, available: states[m.id] } : m)) };
+      cache.set(providerId, Promise.resolve(checked));
+      return checked;
+    })
+    .catch(() => result)
+    .finally(() => checking.delete(providerId));
+  checking.set(providerId, pending);
+  return pending;
+}
+
 export function forgetModels(providerId: string): void {
   cache.delete(providerId);
 }

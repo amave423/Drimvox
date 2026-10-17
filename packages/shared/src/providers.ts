@@ -235,7 +235,12 @@ export interface ModelInfo {
   vision: boolean | null;
   /** For a CLI's "default": the model it actually ran last time, when Artel has seen one. */
   resolved?: string | null;
+  /** Whether a free model answers, when Artel has asked it or chatted with it lately. */
+  available?: Availability;
 }
+
+/** A model answers, is busy right now (a queue, a limit), or is gone (no longer served, or closed to the key). */
+export type Availability = "ok" | "busy" | "gone";
 
 /** Problems talking to a provider, as codes the UI translates. */
 export const providerErrorCodes = [
@@ -257,6 +262,14 @@ export const providerErrorCodes = [
   "cli_limit",
   /** The provider should go through a proxy, but none is set in the settings. */
   "no_proxy",
+  /** The answer stopped where the model ran out of room (its context or its answer limit). */
+  "cut_off",
+  /** The key works, but may not use this model. */
+  "forbidden",
+  /** The model is overloaded right now. */
+  "overloaded",
+  /** The provider does not serve the user's country. */
+  "region",
   "unknown",
 ] as const;
 export type ProviderErrorCode = (typeof providerErrorCodes)[number];

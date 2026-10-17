@@ -9,12 +9,18 @@ export class ProviderFailure extends Error {
 }
 
 export function codeForStatus(status: number): ProviderErrorCode {
-  if (status === 401 || status === 403) return "bad_key";
+  if (status === 401) return "bad_key";
+  // A key that works but may not use this model: closed to the account, or only for some apps (seen on OpenRouter).
+  if (status === 403) return "forbidden";
+  if (status === 502 || status === 503 || status === 529) return "overloaded";
   if (status === 402) return "no_funds";
   if (status === 429) return "rate_limited";
   if (status === 404) return "model_not_found";
   return "provider_error";
 }
+
+/** The provider does not serve the user's country (Google's Gemini API from Russia, say); a proxy helps. */
+const REGION = /location is not supported|unsupported_country|country, region,? or territory|not available in your (country|region)/i;
 
 /** Pulls the human-readable message out of an OpenAI-style error body. */
 export function detailFromBody(body: unknown): string | undefined {
@@ -43,7 +49,8 @@ export function describeError(err: unknown): ProviderError {
   if (err instanceof ProviderFailure) return err.info;
   if (APICallError.isInstance(err)) {
     if (err.statusCode === undefined) return withDetail("unreachable", causeText(err.cause) ?? err.message);
-    return withDetail(codeForStatus(err.statusCode), detailFromBody(err.data ?? err.responseBody) ?? err.message);
+    const detail = detailFromBody(err.data ?? err.responseBody) ?? err.message;
+    return withDetail(REGION.test(detail) ? "region" : codeForStatus(err.statusCode), detail);
   }
   if (err instanceof TypeError) return withDetail("unreachable", causeText(err.cause) ?? err.message);
   if (err instanceof Error && err.name === "TimeoutError") return withDetail("unreachable", "timeout");

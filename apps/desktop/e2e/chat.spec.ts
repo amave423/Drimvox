@@ -94,6 +94,37 @@ test("free models come first in the list, under their own heading", async () => 
   expect(order.map((s) => s.replace(/(free|paid)-model(:free)?$/, ""))).toEqual(["Бесплатные · 1", "Free Model", "Платные", "Paid Model"]);
 });
 
+// Seen live: free models that a provider lists but no longer serves, or that answer "busy", failed every chat; and
+// OpenRouter's free models past the first two hundred names were cut off the list.
+test("asks the free models a word, hides those that are gone and marks the busy ones", async () => {
+  const paid = Array.from({ length: 250 }, (_, i) => ({ id: `a-paid-${String(i).padStart(3, "0")}`, pricing: { prompt: "0.000001", completion: "0.000002" } }));
+  fake = await startFakeProvider({
+    key: KEY,
+    models: [
+      ...paid,
+      { id: "z-works:free", name: "Z Works", pricing: { prompt: "0", completion: "0" } },
+      { id: "z-gone:free", name: "Z Gone", pricing: { prompt: "0", completion: "0" } },
+      { id: "z-busy:free", name: "Z Busy", pricing: { prompt: "0", completion: "0" } },
+    ],
+    respond: (body) =>
+      body.model === "z-gone:free"
+        ? { fail: { status: 404, message: "No endpoints found" } }
+        : body.model === "z-busy:free"
+          ? { fail: { status: 429, message: "Provider returned error" } }
+          : { text: "hi" },
+  });
+  const page = await launch();
+  await connect(page);
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  const list = page.getByRole("listbox");
+  await expect(list.getByText("Бесплатные · 2")).toBeVisible();
+  await expect(list.getByRole("option", { name: /Z Works/ })).toBeVisible();
+  await expect(list.getByRole("option", { name: /Z Busy/ })).toContainText("перегружена");
+  await expect(list.getByRole("option", { name: /Z Gone/ })).toHaveCount(0);
+  await expect(page.getByText("Скрыто 1: сейчас не отвечают")).toBeVisible();
+});
+
 test("thinks in a small window, then draws formulas, a chart and highlighted code", async () => {
   const answer =
     "Энергия: $E = mc^2$, а площадь \\(S = \\pi r^2\\).\n\n" +
@@ -165,6 +196,50 @@ test("keeps keys and chats after a restart", async () => {
   await say(page, "Второй");
   await expect(page.getByText("Ответ", { exact: true })).toHaveCount(2);
   expect(fake.requests.at(-1)?.auth).toBe(`Bearer ${KEY}`);
+});
+
+// Seen live: a local model's page of HTML ran past the sheet, the sheet stayed 900 px on any screen, and a long model
+// name squeezed the internet switch into two lines.
+test("fits code to the sheet, widens the sheet with the window and keeps the composer pills one line high", async () => {
+  const long = "a-very-long-provider-model-name-that-goes-on-and-on-v2.5-instruct-preview-q4_K_M";
+  const css = `.calculator { background: linear-gradient(135deg, rgba(30, 30, 60, 0.95), rgba(60, 20, 90, 0.95)); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1); }`;
+  fake = await startFakeProvider({
+    key: KEY,
+    models: [{ id: long, name: "Long Model" }],
+    chunks: [{ text: `Вот сайт:\n\n\`\`\`html\n<style>\n${css}\n${css}\n</style>\n\`\`\`\n\nГотово.` }],
+  });
+  const page = await launch();
+  await connect(page);
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("option", { name: /Long Model/ }).click();
+  await say(page, "Сделай калькулятор");
+  await expect(page.getByText("Готово.")).toBeVisible();
+
+  const resize = (width: number, height: number) =>
+    app!.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0]!.setSize(w!, h!), [width, height]);
+  const sheetWidth = async () => (await page.locator(".sheet.chat").boundingBox())!.width;
+
+  await resize(1280, 860);
+  await page.waitForTimeout(300);
+  const narrow = await sheetWidth();
+  // The code scrolls inside its box instead of running past the sheet.
+  const fits = await page.evaluate(() => {
+    const pre = document.querySelector(".md pre")!.getBoundingClientRect();
+    const sheet = document.querySelector(".sheet.chat")!.getBoundingClientRect();
+    return pre.right <= sheet.right + 1 && document.documentElement.scrollWidth <= window.innerWidth;
+  });
+  expect(fits).toBe(true);
+
+  // Both pills stay one line high, the model's name cut short rather than squeezing the switch.
+  const pills = page.locator(".composer-bar .picker-button");
+  const heights = await pills.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+  expect(heights.length).toBe(2);
+  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2);
+
+  await resize(2400, 1300);
+  await page.waitForTimeout(300);
+  expect(await sheetWidth()).toBeGreaterThan(narrow * 1.3);
 });
 
 test("keeps the model picker and chat actions within reach in a long chat", async () => {

@@ -13,13 +13,13 @@ afterEach(async () => {
 });
 
 describe("normalizeModels", () => {
-  // Seen on RouterAI: Lyria costs nothing per token but 4 ₽ per request; it must not look free.
+  // Seen on RouterAI: models that cost nothing per token but money per request; they must not look free.
   it("does not take a model paid per request for a free one", () => {
-    const [lyria, free] = normalizeModels("openrouter", [
-      { id: "google/lyria-3-clip-preview", pricing: { prompt: "0", completion: "0", request: "0.05" }, architecture: { output_modalities: ["text", "audio"] } },
+    const [free, perRequest] = normalizeModels("openrouter", [
+      { id: "perplexity/sonar-search", pricing: { prompt: "0", completion: "0", request: "0.05" } },
       { id: "liquid/lfm-2.5-2.6b:free", pricing: { prompt: "0", completion: "0", request: "0" } },
     ]);
-    expect([lyria!.priceIn, lyria!.priceOut]).toEqual([null, null]);
+    expect([perRequest!.priceIn, perRequest!.priceOut]).toEqual([null, null]);
     expect([free!.priceIn, free!.priceOut]).toEqual([0, 0]);
   });
 
@@ -73,6 +73,24 @@ describe("normalizeModels", () => {
       { id: "z-ai/glm-5.3-flash" },
     ]).map((m) => m.id);
     expect(ids).toEqual(["moonshotai/kimi-k3", "z-ai/glm-5.3-flash"]);
+  });
+
+  // Seen live: OpenRouter lists Lyria (music) and a safety classifier among its free models; a chat with them fails.
+  it("leaves out models that make music or sound, judge safety or rank search results", () => {
+    const ids = normalizeModels("openrouter", [
+      { id: "google/lyria-3-pro-preview", pricing: { prompt: "0", completion: "0" }, architecture: { output_modalities: ["text", "audio"] } },
+      { id: "nvidia/nemotron-3.5-content-safety:free", pricing: { prompt: "0", completion: "0" } },
+      { id: "meta-llama/llama-guard-4-12b", pricing: { prompt: "0.0000002", completion: "0.0000002" } },
+      { id: "cohere/rerank-4-fast", pricing: { prompt: "0", completion: "0" } },
+      { id: "nvidia/nemotron-3-super-120b-a12b:free", pricing: { prompt: "0", completion: "0" } },
+      { id: "openai/gpt-4o-audio-preview", pricing: { prompt: "0.0000025", completion: "0.00001" }, architecture: { output_modalities: ["text", "audio"] } },
+    ]).map((m) => m.id);
+    expect(ids).toEqual(["nvidia/nemotron-3-super-120b-a12b:free"]);
+  });
+
+  // Google's OpenAI-style address lists "models/gemini-…" and documents the name without "models/" for requests.
+  it("names Google's models the way its chat requests take them", () => {
+    expect(normalizeModels("custom", [{ id: "models/gemini-3-flash", object: "model" }]).map((m) => m.id)).toEqual(["gemini-3-flash"]);
   });
 
   it("prices local models at zero", () => {

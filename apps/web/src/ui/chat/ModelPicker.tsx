@@ -4,7 +4,7 @@ import { useApp } from "../../context";
 import { formatPrice, formatTokens } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
 import { loadMediaModels } from "../../lib/media";
-import { forgetModels, freeFirst, isFree, loadModels, type ModelsResult } from "../../lib/models";
+import { checkFree, forgetModels, freeFirst, isFree, loadModels, type ModelsResult } from "../../lib/models";
 import { ErrorNote } from "../ErrorNote";
 
 const LIMIT = 200;
@@ -28,17 +28,30 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<ModelsResult | null>(null);
   const [media, setMedia] = useState<MediaModel[] | null>(null);
+  const [checking, setChecking] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open || !providerId) return;
     setResult(null);
     setMedia(null);
+    setChecking(false);
     let live = true;
     // A CLI's list shows what its default turned out to be on the last run: always the current one.
     if (providers.find((p) => p.id === providerId)?.billing === "subscription") forgetModels(providerId);
-    if (kind === "text") void loadModels(api, providerId).then((r) => live && setResult(r));
-    else void loadMediaModels(api, providerId, kind).then((m) => live && setMedia(m));
+    if (kind === "text") {
+      void loadModels(api, providerId).then(async (r) => {
+        if (!live) return;
+        setResult(r);
+        const unknown = "models" in r && r.models.some((m) => isFree(m) && !m.available);
+        if (!unknown) return;
+        setChecking(true);
+        const checked = await checkFree(api, providerId, r);
+        if (!live) return;
+        setResult(checked);
+        setChecking(false);
+      });
+    } else void loadMediaModels(api, providerId, kind).then((m) => live && setMedia(m));
     return () => {
       live = false;
     };
@@ -58,7 +71,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
     };
   }, [open]);
 
-  const shown = useMemo((): Listed[] => {
+  const { shown, groups, hidden } = useMemo(() => {
     const all: Listed[] =
       kind === "text"
         ? result && "models" in result
@@ -66,12 +79,19 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
           : []
         : (media ?? []).map((m) => ({ id: m.id, name: m.name, info: null }));
     const q = query.trim().toLowerCase();
-    const list = q ? all.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : all;
-    return list.slice(0, LIMIT);
+    const found = q ? all.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : all;
+    // Models that do not answer are left out: a chat with them only fails.
+    const list = found.filter((m) => m.info?.available !== "gone");
+    // Free models first, under their own heading, inside the kind they belong to; the limit cuts the paid ones, so a
+    // free model far down the alphabet is not lost (seen live on OpenRouter's 470 models).
+    const split = kind === "text" ? freeFirst(list, (m) => !!m.info && isFree(m.info)) : null;
+    return {
+      shown: list.slice(0, LIMIT),
+      groups: split && { free: split.free, paid: split.paid.slice(0, Math.max(0, LIMIT - split.free.length)) },
+      hidden: found.length - list.length,
+    };
   }, [result, media, kind, query]);
   const loading = kind === "text" ? result === null : media === null;
-  // Free models first, under their own heading, inside the kind they belong to.
-  const groups = kind === "text" ? freeFirst(shown, (m) => !!m.info && isFree(m.info)) : null;
 
   const providerName = providers.find((p) => p.id === value?.providerId)?.name;
   // A CLI's "default" is whatever the program itself is set to.
@@ -140,6 +160,8 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
             autoFocus
           />
           {loading && <p className="muted">{t("model.loading")}</p>}
+          {checking && <p className="muted">{t("model.checking")}</p>}
+          {hidden > 0 && <p className="muted">{t("model.hidden", { count: hidden })}</p>}
           {kind === "text" && result && "error" in result && <ErrorNote error={result.error} />}
           {!loading && shown.length === 0 && !(kind === "text" && result && "error" in result) && (
             <p className="muted">{kind !== "text" && media?.length === 0 ? t("model.noMedia") : t("model.nothing")}</p>
@@ -176,6 +198,7 @@ function ModelFacts({ model, billing }: { model: ModelInfo; billing: ProviderVie
         : `${model.priceEstimated ? "≈" : ""}${formatPrice(model.priceIn)} / ${formatPrice(model.priceOut)}`;
   return (
     <span className="picker-facts mono">
+      {model.available === "busy" && <span className="picker-busy">{t("model.busy")}</span>}
       <span>{price}</span>
       {model.contextLength && <span>{formatTokens(model.contextLength, settings.locale)}</span>}
     </span>

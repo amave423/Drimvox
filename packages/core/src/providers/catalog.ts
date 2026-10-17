@@ -24,6 +24,9 @@ const deepseekPrices: Record<string, [number, number, number]> = {
 /** NVIDIA lists embedding, safety, parsing and vision-detection models next to chat models. */
 const nvidiaNonChat = /embed|retriever|reward|guard|safety|parse|clip|detector|calibration|deplot|kosmos|riva-translate/i;
 
+/** Listed among chat models by every catalog, but they do not chat: safety classifiers and search rankers. */
+const notChat = /content-safety|guard|-guard-|rerank/i;
+
 type Raw = Record<string, unknown>;
 
 /**
@@ -39,9 +42,13 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     if (!item || typeof item !== "object") continue;
     const raw = item as Raw;
     if (typeof raw.id !== "string" || !raw.id) continue;
+    // Google's OpenAI-style address lists "models/gemini-…"; its chat requests take the name alone.
+    const id = raw.id.replace(/^models\//, "");
     if (preset === "nvidia" && nvidiaNonChat.test(raw.id)) continue;
+    if (notChat.test(raw.id)) continue;
+    // Music and speech models list text among their outputs too; a chat with them fails.
     const out = (raw.architecture as { output_modalities?: unknown } | undefined)?.output_modalities;
-    if (Array.isArray(out) && !out.includes("text")) continue;
+    if (Array.isArray(out) && (!out.includes("text") || out.includes("audio"))) continue;
 
     let priceIn = perMillion((raw.pricing as Raw | undefined)?.prompt, toUsd);
     let priceOut = perMillion((raw.pricing as Raw | undefined)?.completion, toUsd);
@@ -66,8 +73,8 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     const params = raw.supported_parameters;
     const inputs = (raw.architecture as { input_modalities?: unknown } | undefined)?.input_modalities;
     models.push({
-      id: raw.id,
-      name: typeof raw.name === "string" && raw.name ? raw.name : raw.id,
+      id,
+      name: typeof raw.name === "string" && raw.name ? raw.name : id,
       contextLength: numberOrNull(raw.context_length ?? raw.context_window ?? raw.max_model_len),
       priceIn,
       priceOut,

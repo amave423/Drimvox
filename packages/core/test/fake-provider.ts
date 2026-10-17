@@ -21,6 +21,8 @@ export interface FakeTurn {
   usage?: FakeUsage;
   /** Wait before answering, ms. */
   delayMs?: number;
+  /** Answer with this status and an OpenAI-style error body instead. */
+  fail?: { status: number; message: string };
 }
 
 export interface FakeProviderOptions {
@@ -38,6 +40,8 @@ export interface FakeProviderOptions {
   usage?: FakeUsage;
   /** Delay between streamed chunks, ms. */
   delayMs?: number;
+  /** Why the streamed answer ends; "stop" by default, "length" when the model ran out of room. */
+  finishReason?: string;
   /** Answer chat requests with this status and an OpenAI-style error body. */
   failWith?: { status: number; message: string };
   routes?: Record<string, unknown>;
@@ -101,7 +105,6 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
     }
     if (path === "/v1/chat/completions") {
       if (o.failWith) return json(o.failWith.status, { error: { message: o.failWith.message } });
-      res.writeHead(200, { "content-type": "text/event-stream" });
       res.on("close", () => {
         if (!res.writableEnded) markAborted();
       });
@@ -113,6 +116,12 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
         scriptIndex++;
         if (turn.delayMs) await new Promise((r) => setTimeout(r, turn.delayMs));
         if (res.destroyed) return;
+        if (turn.fail) {
+          res.writeHead(turn.fail.status, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: { message: turn.fail.message } }));
+          return;
+        }
+        res.writeHead(200, { "content-type": "text/event-stream" });
         if (turn.text) res.write(chunk({ role: "assistant", content: turn.text }));
         (turn.toolCalls ?? []).forEach((call, index) => {
           const id = `call_${scriptIndex}_${index}`;
@@ -124,6 +133,7 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
         res.end("data: [DONE]\n\n");
         return;
       }
+      res.writeHead(200, { "content-type": "text/event-stream" });
       for (const c of o.chunks ?? [{ text: "Hello" }]) {
         if (res.destroyed) return;
         res.write(chunk(c.reasoning ? { reasoning_content: c.reasoning } : { content: c.text }));
@@ -131,7 +141,7 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
       }
       if (res.destroyed) return;
       const usage = o.usage ?? { prompt_tokens: 12, completion_tokens: 3 };
-      res.write(chunk({}, { usage: { ...usage, total_tokens: usage.prompt_tokens + usage.completion_tokens } }, "stop"));
+      res.write(chunk({}, { usage: { ...usage, total_tokens: usage.prompt_tokens + usage.completion_tokens } }, o.finishReason ?? "stop"));
       res.end("data: [DONE]\n\n");
       return;
     }

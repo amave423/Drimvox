@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { listMediaModels, mediaModel } from "../media/catalog";
 import { fetchBalance } from "../providers/balance";
+import { checkFree, withAvailability } from "../providers/availability";
 import { listModels } from "../providers/catalog";
 import { describeError } from "../providers/errors";
 import { InvalidInput, type ProviderRepo } from "../providers/repo";
@@ -38,7 +39,7 @@ export function providerRoutes(providers: ProviderRepo) {
       const conn = providers.connection(c.req.param("id"));
       if (!conn) return c.json(notFound, 404);
       try {
-        return c.json(await listModels(conn, c.req.valid("query").fresh === "1"), 200);
+        return c.json(withAvailability(conn, await listModels(conn, c.req.valid("query").fresh === "1")), 200);
       } catch (err) {
         const error = describeError(err);
         // A pasted address often lacks the /v1 that OpenAI-style APIs live under: try it once and keep it if it works.
@@ -47,12 +48,22 @@ export function providerRoutes(providers: ProviderRepo) {
           try {
             const models = await listModels({ ...conn, baseUrl: withV1, cacheKey: `${conn.cacheKey}:v1` }, true);
             providers.update(conn.id, { baseUrl: withV1 });
-            return c.json(models, 200);
+            return c.json(withAvailability(conn, models), 200);
           } catch {
             return c.json({ error: { ...error, detail: `${conn.baseUrl}/models: 404. ${error.detail ?? ""}`.trim() } }, 502);
           }
         }
         return c.json({ error }, 502);
+      }
+    })
+    // Asks the free models a word each; paid ones are never asked.
+    .post("/:id/models/check", async (c) => {
+      const conn = providers.connection(c.req.param("id"));
+      if (!conn) return c.json(notFound, 404);
+      try {
+        return c.json(await checkFree(conn, await listModels(conn)), 200);
+      } catch (err) {
+        return c.json({ error: describeError(err) }, 502);
       }
     })
     .get("/:id/media-models", zValidator("query", z.object({ kind: z.enum(["image", "video"]) })), async (c) => {

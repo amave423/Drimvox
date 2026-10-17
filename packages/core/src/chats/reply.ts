@@ -1,3 +1,4 @@
+import { availabilityFromError, canCheck, noteAvailability } from "../providers/availability";
 import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
 import type { WebMode } from "@artel/shared";
 import { isStepCount, streamText, type ToolSet } from "ai";
@@ -61,6 +62,7 @@ export async function reply(i: ReplyInput): Promise<void> {
   let reasoning = "";
   let error: ProviderError | null = null;
   let usage: Parameters<typeof usageOf>[0];
+  let finishReason: string | undefined;
   /** The provider's own bill in its currency, summed over the steps, when it sends one. */
   let billed: number | null = null;
 
@@ -117,6 +119,7 @@ export async function reply(i: ReplyInput): Promise<void> {
         if (step !== null) billed = (billed ?? 0) + step;
       } else if (part.type === "finish") {
         usage = part.totalUsage;
+        finishReason = part.finishReason;
       }
     }
   } catch (err) {
@@ -127,6 +130,12 @@ export async function reply(i: ReplyInput): Promise<void> {
 
   const stopped = i.signal.aborted;
   if (!stopped && silence.signal.aborted) error = { code: "timeout" };
+  // The model ran out of room (seen live: a local model with a small context stopped mid-answer, as if it had
+  // finished). The answer stays a done one, so "go on" brings it back to the model, with a note under it.
+  const cutOff = !stopped && !error && finishReason === "length" && text !== "";
+  // What this answer says about the model: the picker hides free models that are gone.
+  const learned = stopped ? null : error ? availabilityFromError(error.code) : "ok";
+  if (learned && canCheck(i.conn)) noteAvailability(i.conn, i.model, learned);
   const inputTokens = usage?.inputTokens ?? null;
   const outputTokens = usage?.outputTokens ?? null;
   const price = inputTokens !== null && outputTokens !== null ? await findModel(i.conn, i.model) : undefined;
@@ -143,7 +152,7 @@ export async function reply(i: ReplyInput): Promise<void> {
         : inputTokens !== null && outputTokens !== null
           ? costOf(price, i.conn.preset, usageOf(usage))
           : null,
-    error: stopped ? null : error,
+    error: stopped ? null : (error ?? (cutOff ? { code: "cut_off" } : null)),
   });
   if (!stopped) await i.emit({ type: "done", message });
 }
