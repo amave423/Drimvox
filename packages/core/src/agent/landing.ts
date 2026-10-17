@@ -206,7 +206,10 @@ async function acceptOnce(
   const report = outcome.report;
   ctx.tasks.update(id, { acceptance: JSON.stringify(report), acceptance_rounds: round });
   ctx.event("acceptance", report);
-  if (accepted(report) || round >= MAX_ACCEPTANCE_ROUNDS) return report;
+  // The round accepted before a design polish is no rework: it does not take one of the rounds (seen live: the round
+  // after the polish was the last, and one note there would have ended a task with three stages still to do).
+  const rounds = MAX_ACCEPTANCE_ROUNDS + (ctx.tasks.row(id)!.design_reviewed ? 1 : 0);
+  if (accepted(report) || round >= rounds) return report;
   ctx.tasks.update(id, { attempts: 0 });
   return { message: reworkMessage(report, requirements), design: false };
 }

@@ -269,6 +269,20 @@ describe("the design review", () => {
     expect((await events(id)).filter((e) => e.kind === "design_review")).toHaveLength(1);
   });
 
+  // Seen live: accepted on round 2, then polished, the work went to its last round; one note there would have ended a
+  // task with three stages still to do.
+  it("does not count the accepted round before a polish against the rework rounds", async () => {
+    const partial = call("report_acceptance", { results: [{ id: "R1", status: "partial", evidence: "скриншот", problem: "мелко" }], summary: "Почти" });
+    const id = await start({
+      coder: [specWith({ design: BRIEF, visual_checks: [PAGE] }), page, finish, finish, finish, finish],
+      acceptor: [partial, judge("Принято"), partial, judge("Принято снова")],
+      design: [POLISH],
+    });
+    const task = await waitFor(id, settled);
+    expect(task).toMatchObject({ status: "review", statusReason: null });
+    expect(task.acceptance.summary).toBe("Принято снова");
+  });
+
   it("sends the work on when the review finds it good", async () => {
     const id = await start({
       coder: [specWith({ design: BRIEF, visual_checks: [PAGE] }), page, finish],
