@@ -143,6 +143,9 @@ export async function runAcceptance(i: AcceptanceInput): Promise<AcceptanceOutco
       extraTools: verdictTools(i.requirements, (v) => (verdict = v)),
       ownTools: i.ownTools,
       stopTools: ["report_acceptance"],
+      // Seen live: reminded, the agent went on looking until its steps ran out again. The second time it has the
+      // verdict only, and must give it.
+      ...(attempt > 0 ? { only: "report_acceptance" } : {}),
       system: systemPrompt(i.worktree),
       spentUsd: i.spentUsd,
       budgetUsd: i.budgetUsd,
@@ -157,6 +160,8 @@ export async function runAcceptance(i: AcceptanceInput): Promise<AcceptanceOutco
     };
     const outcome = isCli(i.conn.preset) ? await runCliTurn({ ...input, session: null, onSession: () => {} }) : await runAgent(input);
     if (outcome.kind === "stopped") return { kind: "stopped" };
+    // Told to give the verdict and nothing else, a model that still only talks gives none: the next model accepts.
+    if (outcome.kind === "error" && attempt > 0 && /tool choice was required/i.test(outcome.error.detail ?? "")) break;
     if (outcome.kind === "error") return { kind: "error", error: outcome.error };
     if (outcome.kind === "budget") return { kind: "budget" };
   }

@@ -27,6 +27,8 @@ export interface RunInput {
   ownTools?: ToolSet;
   /** Calling any of these ends the pass, like finish does. */
   stopTools?: string[];
+  /** The one tool the model may and must call now, such as the acceptance verdict once looking is over. */
+  only?: string;
   /** The current step's instructions, added to the system prompt. */
   instructions?: string;
   /** A system prompt of its own instead of the coding agent's, for agents that do not code (acceptance). */
@@ -103,6 +105,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       system: i.system ?? (i.instructions ? `${systemPrompt(i.worktree)}\n\n${i.instructions}` : systemPrompt(i.worktree)),
       messages: i.messages,
       tools,
+      ...(i.only ? { activeTools: [i.only], toolChoice: "required" as const } : {}),
       // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
       providerOptions: i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : undefined,
       // Old file reads and command outputs are cut once the conversation is big; see compact.ts.

@@ -59,7 +59,12 @@ const verdict = (r2: "done" | "missing"): FakeTurn =>
 
 /** The coder and the acceptance agent answer from their own scripts: the acceptance agent is told it accepts work. */
 /** `silent` models, as the acceptance agent, only talk and never give a verdict. */
-async function start(coder: FakeTurn[], acceptor: FakeTurn[], acceptanceModel?: string, o: { silent?: string[]; strongModel?: string } = {}) {
+async function start(
+  coder: FakeTurn[],
+  acceptor: FakeTurn[],
+  acceptanceModel?: string,
+  o: { silent?: string[]; strongModel?: string; explorer?: string[] } = {},
+) {
   const coderQueue = [...coder];
   const acceptorQueue = [...acceptor];
   fake = await startFakeProvider({
@@ -68,6 +73,8 @@ async function start(coder: FakeTurn[], acceptor: FakeTurn[], acceptanceModel?: 
     respond: (body) => {
       if (!/acceptance agent/i.test(JSON.stringify(body.messages?.[0]?.content ?? ""))) return coderQueue.shift() ?? { text: "Done." };
       if (o.silent?.includes(body.model)) return { text: "Смотрю файлы." };
+      // Looks around for as long as it may; gives the verdict only when that is all it can do.
+      if (o.explorer?.includes(body.model)) return body.tools?.length === 1 ? verdict("done") : call("list_files", { path: "." });
       return acceptorQueue.shift() ?? { text: "Done." };
     },
   });
@@ -169,6 +176,17 @@ describe("acceptance", () => {
     const feed = await events(id);
     expect(feed.some((e) => e.kind === "text" && e.data.text === "Смотрю файлы.")).toBe(true);
   });
+
+  // Seen live: the acceptance agent spent its steps looking, then spent the reminder's steps looking too.
+  it("makes an acceptance agent that ran out of steps give its verdict", async () => {
+    const id = await start([spec, code("# Math\n\nsubtract\n")], [], "judge", { explorer: ["judge"] });
+    const task = await waitFor(id, settled, 60_000);
+    expect(task).toMatchObject({ status: "review", statusReason: null });
+    expect(task.acceptance).toMatchObject({ round: 1, model: "judge" });
+    const forced = acceptorRequests().at(-1)!.body;
+    expect(forced.tools.map((t: any) => t.function.name)).toEqual(["report_acceptance"]);
+    expect(forced.tool_choice).toBe("required");
+  }, 90_000);
 
   it("waits for the user when no model gives a verdict, without sending the coder after phantoms", async () => {
     const id = await start([spec, code("# Math\n\nsubtract\n")], [], "judge", { silent: ["judge", "coder"] });
