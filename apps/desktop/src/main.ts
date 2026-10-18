@@ -1,3 +1,4 @@
+import { attachContextMenu } from "./context-menu";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
@@ -251,6 +252,7 @@ async function createWindow() {
     },
   });
 
+  attachContextMenu(win.webContents);
   win.once("ready-to-show", () => win?.show());
   win.on("closed", () => (win = null));
   win.on("focus", () => win?.flashFrame(false));

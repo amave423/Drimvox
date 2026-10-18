@@ -16,6 +16,8 @@ import { chromium, type Browser } from "playwright-core";
 interface BenchTask {
   name: string;
   task: string;
+  /** For the new flow: a task put straight into the list, without the interview. */
+  item?: { title: string; done: string[] };
   /** Files of the project before the task. */
   files: Record<string, string>;
   /** Whether the result does what was asked, checked in the project folder after the task is accepted. */
@@ -32,6 +34,7 @@ const tasks: BenchTask[] = [
   {
     name: "bugfix",
     task: "Тесты в проекте падают (`node --test`). Найди и исправь ошибку в коде, тесты не меняй.",
+    item: { title: "Почини падающие тесты", done: ["`node --test` проходит", "Сами тесты не изменены, исправлен код"] },
     files: { "package.json": '{ "type": "module" }\n', "stats.js": BUGGY, "stats.test.js": AVERAGE_TEST },
     // The original test, not one the agent may have changed, passes.
     done: (dir) => {
@@ -60,6 +63,8 @@ const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`
 const model = arg("model") ?? "deepseek/deepseek-v4.1-flash";
 const budgetUsd = Number(arg("budget") ?? "2");
 const only = arg("only");
+/** "new" (default): the task list and one agent loop; "old": a task through the old pipeline, for the baseline. */
+const flow = arg("flow") === "old" ? "old" : "new";
 
 const env = { ...readDotEnv(join(process.cwd(), ".env")), ...process.env };
 const key = env.ROUTERAI_API_KEY;
@@ -120,14 +125,54 @@ async function run(t: BenchTask, providerId: string): Promise<string> {
   const before = await balance();
   const started = Date.now();
   const project = (await api("POST", "/projects", { path: dir })).body;
-  const created = await api("POST", `/projects/${project.id}/tasks`, { task: t.task, providerId, model });
-  if (created.status !== 201) throw new Error(`${t.name}: ${JSON.stringify(created.body)}`);
-  const id = (created.body as TaskView).id;
-  log(`\n=== ${t.name} (${id})`);
+  log(`
+=== ${t.name} (${flow} flow)`);
+  const tasks: { task: TaskView; events: TaskEvent[] }[] = [];
+  const until = started + t.minutes * 60_000;
 
-  let task: TaskView = created.body;
+  if (flow === "old") {
+    const created = await api("POST", `/projects/${project.id}/tasks`, { task: t.task, providerId, model });
+    if (created.status !== 201) throw new Error(`${t.name}: ${JSON.stringify(created.body)}`);
+    tasks.push(await drive((created.body as TaskView).id, until));
+  } else {
+    // docs/specs/backlog-loop.md: a small fix goes straight into the list; a project is planned, then its MVP is done.
+    let itemId: string;
+    if (t.item) {
+      itemId = (await api("POST", `/projects/${project.id}/backlog`, { ...t.item, size: "S" })).body.id;
+    } else {
+      const plan = await api("POST", `/projects/${project.id}/backlog/plan`, { task: t.task, providerId, model });
+      if (plan.status !== 201) throw new Error(`${t.name}: ${JSON.stringify(plan.body)}`);
+      tasks.push(await drive((plan.body as TaskView).id, until));
+      const items = (await api("GET", `/projects/${project.id}/backlog`)).body.items as { id: string; title: string }[];
+      log(`  list: ${items.map((i) => i.title).join(" | ")}`);
+      if (!items[0]) throw new Error(`${t.name}: no task list`);
+      itemId = items[0].id;
+    }
+    const run = await api("POST", `/projects/${project.id}/backlog/run`, { ids: [itemId], providerId, model });
+    if (run.status !== 201) throw new Error(`${t.name}: ${JSON.stringify(run.body)}`);
+    tasks.push(await drive((run.body as TaskView).id, until));
+  }
+
+  const last = tasks.at(-1)!.task;
+  writeFileSync(join(out, `${t.name}-${flow}-${new Date(started).toISOString().replace(/[:.]/g, "-")}.json`), redact(JSON.stringify({ model, tasks })));
+  const failed = tasks.reduce((n, x) => n + x.events.filter((e) => e.kind === "tool_result" && !(e.data as { ok: boolean }).ok).length, 0);
+  const steps = tasks.reduce((n, x) => n + x.task.steps, 0);
+  const reachedReview = last.status === "review";
+  if (last.status === "running" || last.status === "waiting") await api("POST", `/tasks/${last.id}/stop`, {});
+  const accepted = reachedReview && (await api("POST", `/tasks/${last.id}/accept`, {})).status === 200;
+  const done = accepted && t.done(dir);
+  const after = await balance();
+  const rub = before !== null && after !== null ? (before - after).toFixed(1) : "?";
+  const minutes = ((Date.now() - started) / 60_000).toFixed(1);
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  return `| ${t.name} | ${flow} | ${done ? "yes" : "no"} | ${last.status}${last.statusReason ? `/${last.statusReason}` : ""} | ${steps} | ${failed} | ${minutes} | ${rub} |`;
+}
+
+/** Answers like a user who trusts the recommendations, until the task needs nothing more or the time is up. */
+async function drive(id: string, until: number): Promise<{ task: TaskView; events: TaskEvent[] }> {
+  let task = (await api("GET", `/tasks/${id}`)).body as TaskView;
   let seen = 0;
-  for (const until = started + t.minutes * 60_000; Date.now() < until; ) {
+  while (Date.now() < until) {
     await new Promise((r) => setTimeout(r, 2000));
     task = (await api("GET", `/tasks/${id}`)).body;
     const events = (await api("GET", `/tasks/${id}/events`)).body as TaskEvent[];
@@ -144,19 +189,7 @@ async function run(t: BenchTask, providerId: string): Promise<string> {
       await api("POST", `/tasks/${id}/continue`, {});
     } else break;
   }
-
-  const events = (await api("GET", `/tasks/${id}/events`)).body as TaskEvent[];
-  writeFileSync(join(out, `${t.name}-${new Date(started).toISOString().replace(/[:.]/g, "-")}.json`), redact(JSON.stringify({ model, task, events })));
-  const failed = events.filter((e) => e.kind === "tool_result" && !(e.data as { ok: boolean }).ok).length;
-  const reachedReview = task.status === "review";
-  if (task.status === "running" || task.status === "waiting") await api("POST", `/tasks/${id}/stop`, {});
-  const accepted = reachedReview && (await api("POST", `/tasks/${id}/accept`, {})).status === 200;
-  const done = accepted && t.done(dir);
-  const after = await balance();
-  const rub = before !== null && after !== null ? (before - after).toFixed(1) : "?";
-  const minutes = ((Date.now() - started) / 60_000).toFixed(1);
-  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  return `| ${t.name} | ${done ? "yes" : "no"} | ${task.status}${task.statusReason ? `/${task.statusReason}` : ""} | ${task.steps} | ${failed} | ${minutes} | ${rub} |`;
+  return { task, events: (await api("GET", `/tasks/${id}/events`)).body as TaskEvent[] };
 }
 
 function makeProject(files: Record<string, string>): string {
