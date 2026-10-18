@@ -1,3 +1,4 @@
+import logo from "../assets/logo.svg";
 import { useApp } from "../context";
 
 export function TopBar() {
@@ -11,6 +12,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       <button className="logo" onClick={() => navigate({ kind: "home" })} title={t("top.home")}>
+        <img src={logo} alt="" width={22} height={22} />
         Artel
       </button>
       {crumb && (
