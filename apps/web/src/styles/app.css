@@ -57,7 +57,8 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
   min-height: 0;
 }
 .side > * { flex: none; }
-.side .side-projects { max-height: 30%; overflow-y: auto; }
+/* The list reaches 8px past the column for its highlight: room for it inside the scroller, or a sideways scrollbar appears. */
+.side .side-projects { max-height: 30%; overflow-y: auto; overflow-x: hidden; margin-inline: -8px; padding-inline: 8px; }
 .side .side-chats-group { flex: 1 1 0; min-height: 96px; display: flex; flex-direction: column; }
 .side .side-chats { overflow-y: auto; min-height: 0; flex: 1 1 auto; align-content: start; }
 .side-h { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
