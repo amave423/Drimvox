@@ -51,10 +51,15 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
   padding: 18px 14px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  gap: 18px;
+  /* The chat list scrolls on its own; the sections around it keep their place (seen: they ran over the chats). */
+  overflow: hidden;
+  min-height: 0;
 }
+.side > * { flex: none; }
+.side .side-projects { max-height: 30%; overflow-y: auto; }
+.side .side-chats-group { flex: 1 1 0; min-height: 96px; display: flex; flex-direction: column; }
+.side .side-chats { overflow-y: auto; min-height: 0; flex: 1 1 auto; align-content: start; }
 .side-h { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
 .side-empty { margin: 0; font-size: 14px; color: var(--muted); }
 .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }

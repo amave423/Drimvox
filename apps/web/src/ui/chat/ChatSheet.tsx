@@ -26,7 +26,7 @@ import { ModelPicker } from "./ModelPicker";
 import { loadModels } from "../../lib/models";
 import { readWebMode, WebSwitch } from "./WebSwitch";
 import { FolderSwitch } from "./FolderSwitch";
-import { MAX_BYTES, MAX_FILES, SentFiles, toBase64, type PendingFile } from "./Attachments";
+import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 
 /** Tools of a chat with a folder, each with its own line in the answer. */
 const FOLDER_TOOLS = ["list_files", "read_file", "search", "write_file", "edit_file", "run_command", "update_notes"];
@@ -127,16 +127,30 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   }, [chatId, choice, providers]);
 
   // A new message always brings the view down; a growing answer is followed only while the reader is at the
-  // bottom, so scrolling up to read is not undone with every word.
+  // bottom, so scrolling up to read is not undone with every word. The desk itself scrolls to its very end: aligning
+  // the last line with the window's edge hid it under the composer (seen: the bottom could not be reached).
+  const following = useRef(true);
+  const desk = () => end.current?.closest<HTMLElement>(".desk") ?? null;
+  const toBottom = () => {
+    const d = desk();
+    if (d) d.scrollTop = d.scrollHeight;
+  };
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" });
+    const d = desk();
+    if (!d) return;
+    const onScroll = () => {
+      following.current = d.scrollHeight - d.scrollTop - d.clientHeight < 80;
+    };
+    d.addEventListener("scroll", onScroll, { passive: true });
+    return () => d.removeEventListener("scroll", onScroll);
+  }, [chat?.id]);
+  useEffect(() => {
+    following.current = true;
+    toBottom();
   }, [chat?.messages.length, draft?.user]);
   useEffect(() => {
-    const marker = end.current;
-    if (!marker) return;
-    const frame = requestAnimationFrame(() => {
-      if (marker.getBoundingClientRect().top < window.innerHeight + 160) marker.scrollIntoView({ block: "end" });
-    });
+    if (!following.current) return;
+    const frame = requestAnimationFrame(toBottom);
     return () => cancelAnimationFrame(frame);
   }, [draft?.text, draft?.reasoning, draft?.activity.length]);
 
@@ -168,9 +182,12 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
     await load(chat.id);
   }
 
-  function addFiles(added: File[]) {
+  async function addFiles(added: File[]) {
     setAttachError(null);
-    const next = [...files, ...added.map((file) => ({ key: `${file.name}-${file.size}-${Math.random()}`, file }))];
+    const prepared = await Promise.all(added.map(prepareFile));
+    if (prepared.some((f) => f === null)) setAttachError("format");
+    const ready = prepared.filter((f): f is File => f !== null);
+    const next = [...files, ...ready.map((file) => ({ key: `${file.name}-${file.size}-${Math.random()}`, file }))];
     if (next.length > MAX_FILES) return setAttachError("too_many");
     if (next.reduce((sum, f) => sum + f.file.size, 0) > MAX_BYTES) return setAttachError("too_big");
     setFiles(next);
@@ -201,6 +218,9 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         const created = await ok<ChatView>(await api.chats.$post({ json: target }));
         id = created.id;
         setChat({ ...created, messages: [] });
+        // In the list at once: going elsewhere while the model answers must not lose the chat (seen: it showed up
+        // only when the answer was done).
+        void reloadChats();
         if (folder && !(await saveFolder(id, folder))) return;
         navigate({ kind: "chat", chatId: id, key: viewKey });
       } else if (chat && (chat.providerId !== choice.providerId || chat.model !== choice.model || chat.kind !== kind)) {
@@ -225,6 +245,8 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         // The price was on the button the user pressed; that is the confirmation.
         kind === "text" ? { content, web: webMode, attachments: attached.map((a) => a.id) } : { content, options, confirm },
         (e) => {
+          // The core named the chat after the question: the list shows the name before the answer is done.
+          if (e.type === "start") void reloadChats();
           if (e.type === "text") setDraft((d) => d && { ...d, text: d.text + e.text });
           if (e.type === "reasoning") setDraft((d) => d && { ...d, reasoning: d.reasoning + e.text });
           if (e.type === "tool") {
@@ -337,7 +359,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           streaming={!!draft}
           onSend={(text) => void send(text)}
           onStop={() => abort.current?.abort()}
-          attach={kind === "text" ? { files, onAdd: addFiles, onRemove: (key) => setFiles(files.filter((f) => f.key !== key)) } : undefined}
+          attach={kind === "text" ? { files, onAdd: (added) => void addFiles(added), onRemove: (key) => setFiles(files.filter((f) => f.key !== key)) } : undefined}
           tools={
             <>
               <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />

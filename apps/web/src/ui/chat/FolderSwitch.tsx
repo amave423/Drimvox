@@ -8,6 +8,14 @@ interface Props {
   noTools?: boolean;
 }
 
+function FolderIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+    </svg>
+  );
+}
+
 const nameOf = (path: string) => path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
 
 /**
@@ -52,7 +60,8 @@ export function FolderSwitch({ value, onChange, noTools = false }: Props) {
         aria-label={value ? t("folder.connected", { name: nameOf(value) }) : t("folder.label")}
         onClick={() => (value ? setOpen(!open) : void pick())}
       >
-        <span className="mono">{value ? nameOf(value) : t("folder.label")}</span>
+        <FolderIcon />
+        <span className="folder-name">{value ? nameOf(value) : t("folder.label")}</span>
         <span aria-hidden>▾</span>
       </button>
       {open && (

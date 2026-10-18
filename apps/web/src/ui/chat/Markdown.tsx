@@ -1,9 +1,10 @@
-import { isValidElement, memo, type ReactElement, type ReactNode } from "react";
+import { isValidElement, memo, useState, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { useApp } from "../../context";
 import { normalizeMath } from "../../lib/markdown";
 import { Diagram } from "./Diagram";
 
@@ -28,7 +29,7 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: Prop
           pre: ({ node: _node, children, ...props }) => {
             const code = mermaidCode(children);
             if (code !== null && !streaming) return <Diagram code={code} />;
-            return <pre {...props}>{children}</pre>;
+            return <CodeBlock props={props}>{children}</CodeBlock>;
           },
         }}
       >
@@ -37,6 +38,33 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: Prop
     </div>
   );
 });
+
+/** A code block with its language and a button that copies the code. */
+function CodeBlock({ props, children }: { props: ComponentProps<"pre">; children: ReactNode }) {
+  const { t } = useApp();
+  const [copied, setCopied] = useState(false);
+  const child = Array.isArray(children) ? children[0] : children;
+  const language = isValidElement(child) ? /\blanguage-([\w+#-]+)/.exec((child as ReactElement<{ className?: string }>).props.className ?? "")?.[1] : undefined;
+  return (
+    <div className="code-block">
+      <div className="code-head">
+        <span className="mono muted">{language ?? ""}</span>
+        <button
+          type="button"
+          className="code-copy"
+          onClick={() => {
+            void navigator.clipboard?.writeText(textOf(children).replace(/\n$/, ""));
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {t(copied ? "code.copied" : "code.copy")}
+        </button>
+      </div>
+      <pre {...props}>{children}</pre>
+    </div>
+  );
+}
 
 /** The source of a ```mermaid block, or null for any other code. */
 function mermaidCode(children: ReactNode): string | null {

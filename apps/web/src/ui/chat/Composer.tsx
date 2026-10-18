@@ -14,7 +14,7 @@ interface Props {
   /** Replaces "Send", e.g. with the price of a clip. */
   sendLabel?: string;
   placeholder?: string;
-  /** Files may be attached: the 📎 button, dropping them on the field, pasting a picture. */
+  /** Files may be attached: the paperclip button, dropping them on the field, pasting a picture. */
   attach?: { files: PendingFile[]; onAdd(files: File[]): void; onRemove(key: string): void };
 }
 
@@ -88,7 +88,9 @@ export function Composer({ disabled, streaming, onSend, onStop, tools, extra, se
         {attach && (
           <>
             <button type="button" className="attach-button" aria-label={t("attach.add")} title={t("attach.add")} disabled={disabled || streaming} onClick={() => picker.current?.click()}>
-              📎
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" />
+              </svg>
             </button>
             <input
               ref={picker}

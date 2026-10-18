@@ -1,18 +1,18 @@
 import { useApp } from "../context";
 import { AddProject } from "./projects/AddProject";
+import { SideChats } from "./SideChats";
 import { StatusDot } from "./tasks/StatusDot";
 
 const FINISHED = new Set(["accepted", "discarded"]);
 
 export function Sidebar() {
-  const { t, status, view, navigate, openNewChat, chats, providers, projects, tasks } = useApp();
-  const currentChat = view.kind === "chat" ? view.chatId : undefined;
+  const { t, status, view, navigate, providers, projects, tasks } = useApp();
   const currentProject = view.kind === "project" ? view.projectId : undefined;
   const currentTask = view.kind === "task" ? view.taskId : undefined;
 
   return (
     <aside className="side">
-      <section className="side-group">
+      <section className="side-group side-projects">
         <div className="side-row">
           <h2 className="side-h">{t("side.projects")}</h2>
           <AddProject />
@@ -54,34 +54,9 @@ export function Sidebar() {
         )}
       </section>
 
-      <section className="side-group">
-        <div className="side-row">
-          <h2 className="side-h">{t("side.chats")}</h2>
-          <button className="side-new" onClick={openNewChat}>
-            + {t("side.newChat")}
-          </button>
-        </div>
-        {chats.length === 0 ? (
-          <p className="side-empty">{t("side.chatsEmpty")}</p>
-        ) : (
-          <ul className="side-list">
-            {chats.map((chat) => (
-              <li key={chat.id}>
-                <button
-                  className={`side-item${chat.id === currentChat ? " is-on" : ""}`}
-                  onClick={() => navigate({ kind: "chat", chatId: chat.id, key: chat.id })}
-                  aria-current={chat.id === currentChat ? "page" : undefined}
-                >
-                  <span className="side-item-title">{chat.title ?? t("chat.untitled")}</span>
-                  {chat.model && <small className="mono">{chat.model}</small>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <SideChats />
 
-      <section>
+      <section className="side-system">
         <h2 className="side-h">{t("side.system")}</h2>
         <ul className="checks">
           <li>

@@ -71,7 +71,7 @@ test("connects a provider, streams an answer and counts tokens and money", async
 
   await expect(page.getByText("Привет! Я тестовая модель.")).toBeVisible();
   await expect(page.getByText("Токены: 12 → 3, 0,001 ₽")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Привет fake-model/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Привет$/ })).toBeVisible();
   await expect(page.getByText("Размышления модели")).toBeVisible();
   await expect(page.getByText(/Сегодня потрачено/)).toBeVisible();
 });

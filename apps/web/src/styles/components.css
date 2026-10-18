@@ -93,3 +93,18 @@ a { color: var(--ink); }
 
 /* Read by screen readers only. */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Chats in the sidebar: rename and delete on hover, several at once when picking. */
+.side-row-actions { display: inline-flex; gap: 10px; align-items: baseline; }
+.side-new.is-quiet { color: var(--muted); }
+.side-new.is-pencil { color: var(--pencil); }
+.side-new:disabled { opacity: 0.5; }
+.side-chat { position: relative; }
+.side-chat .side-item { padding-right: 60px; }
+.side-chat-actions { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; align-items: center; background: var(--sheet); border-radius: 6px; }
+.side-chat:hover .side-chat-actions, .side-chat:focus-within .side-chat-actions, .side-chat-actions.is-shown { display: inline-flex; }
+.side-chat-actions.is-shown { gap: 8px; padding: 0 4px; font-size: 13px; }
+.icon-button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; color: var(--muted); }
+.icon-button:hover { color: var(--fg); background: var(--paper); }
+.side-pick { display: flex !important; align-items: center; gap: 8px; cursor: pointer; }
+.side-rename .field-input { width: 100%; padding: 5px 8px; font-size: 14px; }

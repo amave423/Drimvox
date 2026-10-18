@@ -30,7 +30,8 @@ test("opens with a working core and remembers theme and language", async () => {
   await expect(page.getByRole("heading", { name: "Добро пожаловать в Artel" })).toBeVisible();
   await expect(page.getByText("Ядро запущено")).toBeVisible();
   await expect(page.getByText(/База данных, схема \d+/)).toBeVisible();
-  await expect(page.getByText("Artel 0.1.0")).toBeVisible();
+  // The bottom bar names the version the app was built as.
+  await expect(page.getByText(/^Artel \d+\.\d+\.\d+$/)).toBeVisible();
 
   await page.getByRole("button", { name: "Настройки" }).first().click();
   await page.getByRole("radio", { name: "Тёмное" }).click();

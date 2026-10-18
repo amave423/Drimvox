@@ -20,6 +20,51 @@ export function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** Pictures go to models at most this big: providers refuse larger ones (seen: a 4.5 MB photo was "too heavy"). */
+const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
+const MAX_IMAGE_SIDE = 2048;
+const SENT_AS_IS = /^image\/(png|jpeg|webp|gif)$/;
+
+/**
+ * A picture as models take it: other formats (BMP, TIFF, AVIF…) and big photos are redrawn as WebP, at most 2048 px on
+ * the long side. Null when the picture cannot be read here (HEIC from a phone, say). Other files go as they are.
+ */
+export async function prepareFile(file: File): Promise<File | null> {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
+  if (SENT_AS_IS.test(file.type) && file.size <= MAX_IMAGE_BYTES) {
+    const size = await imageSize(file);
+    if (size && Math.max(size.width, size.height) <= MAX_IMAGE_SIDE) return file;
+  }
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return null;
+  }
+  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  for (const quality of [0.9, 0.8, 0.65]) {
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/webp", quality));
+    if (blob && (blob.size <= MAX_IMAGE_BYTES || quality === 0.65)) return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
+  }
+  return null;
+}
+
+async function imageSize(file: File): Promise<{ width: number; height: number } | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return size;
+  } catch {
+    return null;
+  }
+}
+
 /** The file's bytes as base64, for the upload. */
 export async function toBase64(file: File): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());

@@ -113,5 +113,5 @@ test("a browser sets the password with the setup code, chats, signs out and back
   await page.getByLabel("Пароль").fill(PASSWORD);
   await page.getByRole("button", { name: "Войти" }).click();
   await expect(page.getByText("Ядро запущено")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Привет fake-model/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Привет$/ })).toBeVisible();
 });
