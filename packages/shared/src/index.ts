@@ -12,3 +12,4 @@ export * from "./design";
 export * from "./local";
 export * from "./page";
 export * from "./backlog";
+export * from "./github";

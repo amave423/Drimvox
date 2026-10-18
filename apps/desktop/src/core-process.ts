@@ -67,6 +67,8 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     proxyCheckUrl: process.env.ARTEL_TEST_PROXY_CHECK_URL,
     // Tests: a fake Ollama program, fixed hardware and fake catalogs, as JSON of LocalOptions.
     local: process.env.ARTEL_TEST_LOCAL ? JSON.parse(process.env.ARTEL_TEST_LOCAL) : undefined,
+    // Tests: a fake GitHub, as JSON of GithubOptions.
+    github: process.env.ARTEL_TEST_GITHUB ? JSON.parse(process.env.ARTEL_TEST_GITHUB) : undefined,
   })
     .then((server) => {
       running = server;

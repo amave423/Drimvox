@@ -8,6 +8,7 @@ import { ModelNote } from "../chat/ModelNote";
 import { ProjectSkills } from "../SkillsSection";
 import { StatusChip } from "../tasks/StatusDot";
 import { Backlog } from "./Backlog";
+import { GithubPublish } from "./GithubPublish";
 
 type GitProblem = "no_identity" | "no_git" | null;
 /** What the catalog says about a picked model; null while loading or when unknown. */
@@ -101,6 +102,8 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
             ))}
           </ul>
         )}
+
+        {project.gitState === "ready" && <GithubPublish project={project} />}
 
         <div className="actions project-remove">
           {confirmRemove ? (

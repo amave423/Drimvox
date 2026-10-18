@@ -30,6 +30,8 @@ import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { localRoutes } from "./routes/local";
 import { proxyRoutes } from "./routes/proxy";
+import { githubRoutes } from "./routes/github";
+import { GitHub, type GithubOptions } from "./github/github";
 import { ProxyStore } from "./proxy";
 import { taskRoutes } from "./routes/tasks";
 import { setPriceCatalogUrl } from "./providers/native";
@@ -76,6 +78,8 @@ export interface AppOptions {
   proxyCheckUrl?: string;
   /** Ollama and its catalogs; tests give a fake program, fixed hardware and fake catalogs. */
   local?: LocalOptions;
+  /** GitHub's addresses; tests give a fake. */
+  github?: GithubOptions;
 }
 
 const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
@@ -91,6 +95,7 @@ export function createCore(o: AppOptions) {
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
   const local = new LocalModels(providers, providers.urlOf("ollama"), o.local);
   providers.setWaker(local.ollama);
+  const github = new GitHub(o.db, cipher, o.github);
   const mcpRepo = new McpRepo(o.db, cipher);
   const mcp = new McpHub(mcpRepo);
   const approvals = new ChatApprovals();
@@ -151,7 +156,8 @@ export function createCore(o: AppOptions) {
     .route("/usage", usageRoutes(chats))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
-    .route("/tasks", taskRoutes(tasks, runner, shots, backlogService));
+    .route("/tasks", taskRoutes(tasks, runner, shots, backlogService))
+    .route("/github", githubRoutes(github, projects));
 
   const hosts = new Set(o.allowedHosts ?? defaultHosts);
   const auth = new AuthStore(o.db);

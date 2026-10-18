@@ -8,6 +8,7 @@ import type { WebAccess } from "../src/internet/web";
 import type { Screenshotter } from "../src/visual/look";
 import type { CliId } from "../src/cli/kinds";
 import type { LocalOptions } from "../src/local/service";
+import type { GithubOptions } from "../src/github/github";
 
 export const TOKEN = "test-token";
 export const BASE = "http://127.0.0.1";
@@ -44,6 +45,8 @@ export interface TestEnv {
   setProxyCheckUrl(url: string): void;
   /** Ollama and its catalogs: by default nothing is installed and no catalog answers. */
   setLocal(o: LocalOptions): void;
+  /** GitHub: by default an address where nothing answers. */
+  setGithub(o: GithubOptions): void;
   close(): void;
   /** Stops running agents first; use when a test may leave one running. */
   closeAsync(): Promise<void>;
@@ -68,6 +71,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
     registryUrl: "http://127.0.0.1:9",
     hfUrl: "http://127.0.0.1:9",
   };
+  let github: GithubOptions = { webUrl: "http://127.0.0.1:9", apiUrl: "http://127.0.0.1:9" };
   let web: WebAccess = {
     search: async () => {
       throw new Error("No internet in tests");
@@ -94,6 +98,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
       cliCommands,
       proxyCheckUrl,
       local,
+      github,
       ...(o.setupCode ? { password: { setupCode: o.setupCode } } : {}),
     };
     if (webDir) return createCore({ ...options, webDir });
@@ -140,6 +145,10 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
     },
     setLocal(next) {
       local = { ...local, ...next };
+      void dropCore();
+    },
+    setGithub(next) {
+      github = next;
       void dropCore();
     },
     setCliCommand(id, argv) {
