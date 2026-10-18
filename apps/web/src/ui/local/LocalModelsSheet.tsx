@@ -2,10 +2,10 @@ import type { LocalPull, LocalStatus } from "@artel/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
+import { InstallOllama } from "./InstallOllama";
 import { LocalCatalogView } from "./LocalCatalog";
 import { useSize } from "./size";
 
-const OLLAMA_DOWNLOAD = "https://ollama.com/download";
 
 /** Models on this computer through Ollama: its state, what is downloaded and downloading, the catalog. */
 export function LocalModelsSheet() {
@@ -33,8 +33,8 @@ export function LocalModelsSheet() {
   useEffect(() => {
     void load();
   }, [load]);
-  // While something downloads, progress is read every second.
-  const downloading = !!status?.pulls.some((p) => !p.done);
+  // While something downloads (a model, or Ollama itself), progress is read every second.
+  const downloading = !!status?.pulls.some((p) => !p.done) || status?.install.state === "downloading" || status?.install.state === "installing";
   useEffect(() => {
     if (!downloading) return;
     const timer = setInterval(() => void load(), 1000);
@@ -69,19 +69,7 @@ export function LocalModelsSheet() {
 
         {failed && <p className="note is-pencil">{t("local.failed")}</p>}
         {!status && !failed && <p className="muted">{t("local.checking")}</p>}
-        {status && !status.installed && (
-          <div className="note is-pencil local-missing">
-            <p>{t("local.notInstalled")}</p>
-            <p className="actions">
-              <a className="btn is-primary" href={OLLAMA_DOWNLOAD} target="_blank" rel="noreferrer">
-                {t("local.download")}
-              </a>
-              <button type="button" className="btn" onClick={() => void load()}>
-                {t("local.checkAgain")}
-              </button>
-            </p>
-          </div>
-        )}
+        {status && !status.installed && <InstallOllama status={status} onChange={() => void load()} />}
         {status?.installed && !status.running && <p className="note is-pencil">{t("local.notRunning")}</p>}
         {status?.running && (
           <p className="note is-ok">

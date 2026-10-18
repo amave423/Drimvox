@@ -1,3 +1,6 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { OLLAMA_LINUX_COMMAND, OLLAMA_SETUP_URL, OllamaInstaller, runSetup } from "./install";
 import { presets, type HfRepo, type HfVariant, type LocalHardware, type LocalPick, type LocalPull, type LocalStatus } from "@artel/shared";
 import type { ProviderRepo } from "../providers/repo";
 import { LocalCatalog } from "./catalog";
@@ -14,6 +17,8 @@ export interface LocalOptions {
   hardware?: LocalHardware;
   registryUrl?: string;
   hfUrl?: string;
+  /** Tests: where the setup comes from, what runs it, and whether Ollama is there afterwards. */
+  install?: { url?: string; skipRun?: boolean; command?: string[]; can?: boolean };
 }
 
 /** Local models: Ollama on this computer, the catalog sized for it, and the chat provider that uses it. */
@@ -21,6 +26,8 @@ export class LocalModels {
   readonly ollama: OllamaManager;
   private readonly catalog: LocalCatalog;
   private readonly hardware: () => Promise<LocalHardware>;
+  readonly installer: OllamaInstaller;
+  private readonly canInstall: boolean;
 
   constructor(
     private readonly providers: ProviderRepo,
@@ -36,6 +43,18 @@ export class LocalModels {
       idleMs: o.idleMs ?? 10 * 60_000,
       hardware: this.hardware,
       onPulled: () => this.afterPull(),
+    });
+    const test = o.install;
+    this.canInstall = test?.can ?? process.platform === "win32";
+    this.installer = new OllamaInstaller({
+      url: test?.url ?? OLLAMA_SETUP_URL,
+      dir: join(tmpdir(), "artel-ollama-setup"),
+      run: test?.skipRun ? async () => {} : runSetup,
+      found: () => {
+        const command = test?.command ?? findOllama();
+        if (command) this.ollama.setCommand(command);
+        return !!command;
+      },
     });
     this.catalog = new LocalCatalog({ registryUrl: o.registryUrl ?? "https://registry.ollama.ai", hfUrl: o.hfUrl ?? "https://huggingface.co" });
   }
@@ -57,7 +76,15 @@ export class LocalModels {
 
   async status(): Promise<LocalStatus> {
     const s = await this.ollama.status();
-    return { ...s, hardware: await this.hardware(), providerId: this.providerId() };
+    return {
+      ...s,
+      ...(this.installer.state().state === "done" ? { installed: true } : {}),
+      hardware: await this.hardware(),
+      providerId: this.providerId(),
+      install: this.installer.state(),
+      canInstall: this.canInstall,
+      installCommand: process.platform === "linux" ? OLLAMA_LINUX_COMMAND : null,
+    };
   }
 
   private async installed(): Promise<string[]> {

@@ -62,6 +62,11 @@ export class OllamaManager {
 
   constructor(private readonly o: OllamaOptions) {}
 
+  /** Ollama was installed while Artel ran: from now on Artel starts this program. */
+  setCommand(command: string[]): void {
+    this.o.command = command;
+  }
+
   /** Whether a provider's address is this Ollama: then its requests wake it up. */
   handles(baseUrl: string): boolean {
     const norm = (url: string) => {
@@ -113,7 +118,10 @@ export class OllamaManager {
       stdio: "ignore",
       windowsHide: true,
     });
-    child.on("error", () => {});
+    // A program that cannot start (a wrong path) gives an error and no exit: the wait must end on it too.
+    child.on("error", () => {
+      if (this.child === child) this.child = null;
+    });
     child.on("exit", () => {
       if (this.child === child) this.child = null;
     });

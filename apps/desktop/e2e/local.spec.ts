@@ -110,3 +110,31 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   app = undefined;
   await expect.poll(() => answers(port), { timeout: 10_000 }).toBe(false);
 });
+
+// docs/specs/local-models.md: without Ollama the sheet offers to install it, with the size of the download first.
+test("installs Ollama from the sheet: the size first, then Artel finds it", async () => {
+  const setup = Buffer.alloc(3 * 1024 * 1024, 1);
+  registry = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "application/octet-stream", "content-length": String(setup.length) });
+    res.end(req.method === "HEAD" ? undefined : setup);
+  });
+  await new Promise<void>((r) => registry!.listen(0, "127.0.0.1", r));
+  const port = await freePort();
+  const local = {
+    command: null,
+    hardware: { ramBytes: 16 * GB, gpu: null, unified: false },
+    registryUrl: "http://127.0.0.1:9",
+    hfUrl: "http://127.0.0.1:9",
+    // After the setup, the fake Ollama is the one found.
+    install: { url: `http://127.0.0.1:${(registry.address() as { port: number }).port}/OllamaSetup.exe`, skipRun: true, command: [process.execPath, FAKE_OLLAMA], can: true },
+  };
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, ARTEL_TEST_LOCAL: JSON.stringify(local) } });
+  const page: Page = await app.firstWindow();
+  await expect(page.getByText("Ядро запущено")).toBeVisible();
+
+  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await expect(page.getByText(/Ollama не установлена/)).toBeVisible();
+  await page.getByRole("button", { name: "Установить Ollama · 3 МБ" }).click();
+  await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Artel/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Ollama не установлена/)).toHaveCount(0);
+});

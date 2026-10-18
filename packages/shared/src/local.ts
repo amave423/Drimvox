@@ -28,6 +28,15 @@ export interface LocalPull {
   error: string | null;
 }
 
+/** Installing Ollama from Artel: the download, then the official setup. */
+export interface OllamaInstall {
+  state: "idle" | "downloading" | "installing" | "done" | "failed";
+  received: number;
+  total: number | null;
+  /** "download": it did not come; "not_found": the setup ran but Ollama is still not there. */
+  error: "download" | "not_found" | null;
+}
+
 export interface LocalStatus {
   /** Ollama's program was found on this computer, or it answers anyway. */
   installed: boolean;
@@ -40,6 +49,11 @@ export interface LocalStatus {
   pulls: LocalPull[];
   /** The provider that talks to this Ollama, if there is one. */
   providerId: string | null;
+  /** Ollama installed from Artel, as far as it got. */
+  install: OllamaInstall;
+  /** Artel can install Ollama here (Windows); elsewhere it shows the command. */
+  canInstall: boolean;
+  installCommand: string | null;
 }
 
 /** What a model is good for, as the catalog shows it. */

@@ -12,6 +12,13 @@ export function localRoutes(local: LocalModels) {
   return new Hono()
     .get("/", async (c) => c.json(await local.status()))
     .post("/connect", (c) => c.json({ providerId: local.connect() }, 200))
+    // Ollama from Artel: the size first, then the download and the official setup (Windows).
+    .get("/install", async (c) => c.json({ size: await local.installer.size(), ...local.installer.state() }, 200))
+    .post("/install", async (c) => {
+      if (!(await local.status()).canInstall) return c.json({ error: { code: "unsupported" as const } }, 409);
+      local.installer.start();
+      return c.json(local.installer.state(), 202);
+    })
     .get("/picks", async (c) => c.json(await local.picks()))
     .get("/search", zValidator("query", z.object({ q: z.string().trim().min(1).max(200) })), async (c) => {
       try {
