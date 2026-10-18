@@ -1,3 +1,4 @@
+import { toModelMessages } from "./history";
 import { notesBlock } from "../agent/notes";
 import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
 import { FOLDER_STEPS, folderHint } from "./folder";
@@ -39,6 +40,10 @@ export interface ReplyInput {
   extraTools?: ToolSet;
   /** Where command-line agents keep a folder per chat. */
   cliDir?: string;
+  /** Files uploaded for this message. */
+  attachments?: string[];
+  /** The model sees pictures: attached ones go to it as pictures, not as a note. */
+  vision?: boolean;
   /** The chat's folder: the model works in it, and it is snapshotted before the answer so the answer can be undone. */
   folder?: string | null;
   emit(event: StreamEvent): Promise<void>;
@@ -50,9 +55,11 @@ export interface ReplyInput {
  */
 export async function reply(i: ReplyInput): Promise<void> {
   if (isCli(i.conn.preset) && i.cliDir) return cliReply(i, i.cliDir, FORMAT_HINT);
-  const userMessage = i.chats.addMessage({ chatId: i.chatId, role: "user", content: i.content, status: "done" });
+  const added = i.chats.addMessage({ chatId: i.chatId, role: "user", content: i.content, status: "done" });
+  if (i.attachments?.length) i.chats.attachments.attach(i.chatId, added.id, i.attachments);
+  const userMessage = i.chats.message(added.id)!;
   i.chats.nameIfUntitled(i.chatId, i.content);
-  const history = i.chats.history(i.chatId);
+  const history = toModelMessages(i.chats.history(i.chatId), i.chats.attachments, i.vision !== false);
   const answer = i.chats.addMessage({
     chatId: i.chatId,
     role: "assistant",

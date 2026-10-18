@@ -35,8 +35,22 @@ export const messageSendSchema = z
     confirm: z.boolean().default(false),
     /** Internet for this answer: none, Artel's free search tools, or the provider's paid web search. */
     web: z.enum(webModes).default("off"),
+    /** Files uploaded to the chat for this message (docs/specs/chat-attachments.md). */
+    attachments: z.array(z.string().min(1)).max(10).default([]),
   })
   .strict();
+
+/** A file to attach, as the window reads it. */
+export const attachmentUploadSchema = z.object({ name: z.string().trim().min(1).max(260), type: z.string().max(200).default(""), data: z.string().min(1) }).strict();
+
+/** An attached file: a picture the model sees, text it reads, or a file it only knows by name. */
+export interface AttachmentView {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  kind: "image" | "text" | "none";
+}
 
 /** Connects a folder to a chat, or disconnects it with null. */
 export const chatFolderSchema = z.object({ folder: z.string().trim().min(1).max(1000).nullable() }).strict();
@@ -76,6 +90,8 @@ export interface MessageView {
   media: MediaItem[];
   /** The answer changed the chat's folder and can be undone. */
   canUndo: boolean;
+  /** Files the user attached to this message. */
+  attachments: AttachmentView[];
   createdAt: number;
 }
 

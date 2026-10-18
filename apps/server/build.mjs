@@ -17,7 +17,8 @@ await build({
   target: "node24",
   external: ["playwright-core"],
   define: { __ARTEL_VERSION__: JSON.stringify(version) },
-  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+  // A name of its own: bundled code (pdf.js in unpdf) declares its own createRequire.
+  banner: { js: "import { createRequire as artelCreateRequire } from 'node:module'; const require = artelCreateRequire(import.meta.url);" },
   sourcemap: true,
   logLevel: "info",
 });

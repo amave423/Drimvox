@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import {
   approvalDecisionSchema,
   chatCreateSchema,
+  attachmentUploadSchema,
   chatFolderSchema,
   chatUpdateSchema,
   estimateCost,
@@ -15,6 +16,7 @@ import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import { extract, imageType } from "../chats/attachments";
 import { restore } from "../chats/checkpoint";
 import { folderTools } from "../chats/folder";
 import { reply } from "../chats/reply";
@@ -28,6 +30,8 @@ import type { Studio } from "../media/studio";
 import type { ProviderRepo } from "../providers/repo";
 
 const notFound = { error: { code: "not_found" } } as const;
+/** One attached file at most; the window sends ten at most. */
+const MAX_ATTACHMENT = 20 * 1024 * 1024;
 
 export function chatRoutes(
   chats: ChatRepo,
@@ -71,6 +75,22 @@ export function chatRoutes(
       if (conn && chat.model && (await findModel(conn, chat.model))?.tools === false) return c.json({ error: { code: "no_tools" as const } }, 409);
       return c.json(chats.setFolder(chat.id, folder)!, 200);
     })
+    // A file for the next message: kept, and read out at once (docs/specs/chat-attachments.md).
+    .post("/:id/attachments", zValidator("json", attachmentUploadSchema), async (c) => {
+      const chat = chats.get(c.req.param("id"));
+      if (!chat) return c.json(notFound, 404);
+      const { name, type, data } = c.req.valid("json");
+      const bytes = Buffer.from(data, "base64");
+      if (bytes.length > MAX_ATTACHMENT) return c.json({ error: { code: "too_big" as const } }, 413);
+      const read = await extract(name, type, bytes);
+      return c.json(chats.attachments.add(chat.id, { name, type, data: bytes, ...read }), 201);
+    })
+    .get("/:id/attachments/:attachmentId", (c) => {
+      const file = chats.attachments.get(c.req.param("attachmentId"));
+      if (!file || file.chatId !== c.req.param("id")) return c.json(notFound, 404);
+      const type = file.kind === "image" ? imageType(file.type, file.name) : "application/octet-stream";
+      return c.body(new Uint8Array(chats.attachments.file(file.id)), 200, { "content-type": type, "cache-control": "private, max-age=86400" });
+    })
     // Puts the folder back as it was before this answer.
     .post("/:id/messages/:messageId/undo", async (c) => {
       const chat = chats.get(c.req.param("id"));
@@ -92,7 +112,9 @@ export function chatRoutes(
       const conn = chat.providerId ? providers.connection(chat.providerId) : null;
       if (!conn || !chat.model) return c.json({ error: { code: "invalid", detail: "Choose a model first" } }, 400);
       if (!conn.apiKey && presets[conn.preset].keyRequired) return c.json({ error: { code: "no_key" } }, 400);
-      const { content, options, confirm, web: webMode } = c.req.valid("json");
+      const { content, options, confirm, web: webMode, attachments } = c.req.valid("json");
+      const files = attachments.map((id) => chats.attachments.get(id));
+      if (files.some((f) => !f || f.chatId !== chat.id)) return c.json(notFound, 404);
 
       if (chat.kind !== "text") {
         const model = await mediaModel(conn, chat.kind, chat.model);
@@ -115,7 +137,10 @@ export function chatRoutes(
       }
 
       // A model that cannot call tools gets none: no free search, no MCP. The provider's own search needs no tools.
-      const toolsOk = (await findModel(conn, chat.model))?.tools !== false;
+      const info = await findModel(conn, chat.model);
+      const toolsOk = info?.tools !== false;
+      const vision = info?.vision !== false;
+      if (!vision && files.some((f) => f!.kind === "image")) return c.json({ error: { code: "no_vision" as const } }, 409);
       return streamSSE(c, async (stream) => {
         const controller = new AbortController();
         stream.onAbort(() => controller.abort());
@@ -143,12 +168,17 @@ export function chatRoutes(
           extraTools: {
             ...mcpTools,
             ...(chat.folder && toolsOk
-              ? folderTools(chat.folder, emit, async (command, reason, signal) =>
-                  (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, signal })) !== false,
+              ? folderTools(
+                  chat.folder,
+                  emit,
+                  async (command, reason, signal) => (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, signal })) !== false,
+                  { list: () => chats.attachments.ofChat(chat.id), file: (id) => chats.attachments.file(id) },
                 )
               : {}),
           },
           folder: toolsOk ? chat.folder : null,
+          attachments,
+          vision,
           cliDir,
           emit,
         });

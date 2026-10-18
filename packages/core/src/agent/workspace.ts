@@ -52,6 +52,13 @@ export class Workspace {
     return rest > 0 ? `${body}\n… ${rest} more lines; read again with offset ${from + slice.length}` : body;
   }
 
+  /** A file of bytes, such as a picture, inside the folder. */
+  writeBytes(path: string, data: Buffer): void {
+    const file = this.resolve(path);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, data);
+  }
+
   writeFile(path: string, content: string): void {
     const file = this.resolve(path);
     mkdirSync(dirname(file), { recursive: true });

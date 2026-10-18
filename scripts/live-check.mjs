@@ -14,6 +14,7 @@ await build({
   format: "esm",
   target: "node22",
   logLevel: "warning",
-  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+  // A name of its own: bundled code (pdf.js in unpdf) declares its own createRequire.
+  banner: { js: "import { createRequire as artelCreateRequire } from 'node:module'; const require = artelCreateRequire(import.meta.url);" },
 });
 await import(pathToFileURL(outfile).href);

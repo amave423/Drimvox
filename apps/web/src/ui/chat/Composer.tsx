@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useApp } from "../../context";
+import { PendingFiles, type PendingFile } from "./Attachments";
 
 interface Props {
   disabled: boolean;
@@ -13,12 +14,16 @@ interface Props {
   /** Replaces "Send", e.g. with the price of a clip. */
   sendLabel?: string;
   placeholder?: string;
+  /** Files may be attached: the 📎 button, dropping them on the field, pasting a picture. */
+  attach?: { files: PendingFile[]; onAdd(files: File[]): void; onRemove(key: string): void };
 }
 
-export function Composer({ disabled, streaming, onSend, onStop, tools, extra, sendLabel, placeholder }: Props) {
+export function Composer({ disabled, streaming, onSend, onStop, tools, extra, sendLabel, placeholder, attach }: Props) {
   const { t } = useApp();
   const [text, setText] = useState("");
   const area = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const hasFiles = !!attach && attach.files.length > 0;
 
   function grow() {
     const el = area.current;
@@ -29,7 +34,8 @@ export function Composer({ disabled, streaming, onSend, onStop, tools, extra, se
   }
 
   function submit() {
-    const value = text.trim();
+    // A file alone is a message too: the model is asked to look at it.
+    const value = text.trim() || (hasFiles ? t("attach.default") : "");
     if (!value || disabled || streaming) return;
     onSend(value);
     setText("");
@@ -50,7 +56,14 @@ export function Composer({ disabled, streaming, onSend, onStop, tools, extra, se
         e.preventDefault();
         submit();
       }}
+      onDragOver={(e) => attach && e.dataTransfer.types.includes("Files") && e.preventDefault()}
+      onDrop={(e) => {
+        if (!attach || e.dataTransfer.files.length === 0) return;
+        e.preventDefault();
+        attach.onAdd([...e.dataTransfer.files]);
+      }}
     >
+      {attach && <PendingFiles files={attach.files} onRemove={attach.onRemove} />}
       <textarea
         ref={area}
         rows={2}
@@ -62,10 +75,33 @@ export function Composer({ disabled, streaming, onSend, onStop, tools, extra, se
           grow();
         }}
         onKeyDown={onKeyDown}
+        onPaste={(e) => {
+          const files = [...e.clipboardData.files];
+          if (!attach || files.length === 0) return;
+          e.preventDefault();
+          attach.onAdd(files);
+        }}
         disabled={disabled}
       />
       {extra}
       <div className="composer-bar">
+        {attach && (
+          <>
+            <button type="button" className="attach-button" aria-label={t("attach.add")} title={t("attach.add")} disabled={disabled || streaming} onClick={() => picker.current?.click()}>
+              📎
+            </button>
+            <input
+              ref={picker}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                attach.onAdd([...(e.target.files ?? [])]);
+                e.target.value = "";
+              }}
+            />
+          </>
+        )}
         {tools}
         <span className="spacer" />
         {streaming ? (
@@ -73,7 +109,7 @@ export function Composer({ disabled, streaming, onSend, onStop, tools, extra, se
             {t("chat.stop")}
           </button>
         ) : (
-          <button className="btn is-primary" disabled={disabled || !text.trim()}>
+          <button className="btn is-primary" disabled={disabled || (!text.trim() && !hasFiles)}>
             {sendLabel ?? t("chat.send")}
           </button>
         )}

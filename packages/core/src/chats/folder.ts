@@ -1,24 +1,49 @@
-import type { StreamEvent } from "@artel/shared";
-import type { ToolSet } from "ai";
+import type { AttachmentView, StreamEvent } from "@artel/shared";
+import { tool, type ToolSet } from "ai";
+import { z } from "zod";
 import { buildTools, type ToolHooks } from "../agent/tools";
 import { Workspace } from "../agent/workspace";
 
 /** Steps one answer may take in a folder: enough to read, change, run and check; then "go on" continues. */
 export const FOLDER_STEPS = 40;
 
+/** The files attached in the chat, for save_attachment. */
+export interface ChatFiles {
+  list(): AttachmentView[];
+  file(id: string): Buffer;
+}
+
 /**
  * The agent's tools for a chat with a folder (docs/specs/chat-folder.md): the model reads, writes and runs commands
  * right in the user's folder, never outside it; risky commands ask in the answer. There is no "finish": the answer ends
  * when the model stops calling tools.
  */
-export function folderTools(folder: string, emit: (event: StreamEvent) => Promise<void>, askApproval: ToolHooks["askApproval"]): ToolSet {
+export function folderTools(folder: string, emit: (event: StreamEvent) => Promise<void>, askApproval: ToolHooks["askApproval"], files?: ChatFiles): ToolSet {
   const hooks: ToolHooks = {
     onCall: (call) => void emit({ type: "tool", name: call.name, input: describe(call.input) }),
     onResult: () => {},
     onFinish: () => {},
     askApproval,
   };
-  const { finish: _finish, ...tools } = buildTools(new Workspace(folder), hooks, "write");
+  const ws = new Workspace(folder);
+  const { finish: _finish, ...tools } = buildTools(ws, hooks, "write");
+  if (!files) return tools;
+  // "Here is a picture, put it on the site": the files the user attached go into the folder on request.
+  tools.save_attachment = tool({
+    description: "Save a file the user attached in this chat into the folder, at a path inside it.",
+    inputSchema: z.object({ name: z.string().min(1).describe("The attached file's name"), path: z.string().min(1).describe("Where to put it, inside the folder") }),
+    execute: async ({ name, path }) => {
+      void emit({ type: "tool", name: "save_attachment", input: path });
+      const found = [...files.list()].reverse().find((a) => a.name === name);
+      if (!found) return `No attached file named ${name}. Attached: ${files.list().map((a) => a.name).join(", ") || "none"}.`;
+      try {
+        ws.writeBytes(path, files.file(found.id));
+        return `Saved ${name} as ${path}.`;
+      } catch (err) {
+        return `Error: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    },
+  });
   return tools;
 }
 

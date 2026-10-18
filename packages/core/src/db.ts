@@ -198,6 +198,19 @@ const migrations: string[] = [
   // A chat working in a folder, and the snapshot of that folder before each answer (docs/specs/chat-folder.md).
   `alter table chats add column folder text;
    alter table messages add column checkpoint text;`,
+  // Files attached to chat messages and what was read out of them (docs/specs/chat-attachments.md).
+  `create table attachments (
+     id text primary key,
+     chat_id text not null references chats(id) on delete cascade,
+     message_id text,
+     name text not null,
+     type text not null,
+     size integer not null,
+     kind text not null,
+     text text,
+     created_at integer not null
+   ) strict;
+   create index attachments_message on attachments(message_id);`,
 ];
 
 export interface Database {

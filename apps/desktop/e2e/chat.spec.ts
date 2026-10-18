@@ -270,6 +270,21 @@ test("works in a connected folder and undoes an answer", async () => {
   rmSync(folder, { recursive: true, force: true });
 });
 
+// docs/specs/chat-attachments.md: a file goes with the message, the model reads it, the chat shows it.
+test("attaches a file: the model gets its content and the chat shows it under the question", async () => {
+  fake = await startFakeProvider({ key: KEY, models, script: [{ text: "В заметках — купить молоко." }] });
+  const page = await launch();
+  await connect(page);
+  await startChat(page);
+  await page.locator('.composer input[type="file"]').setInputFiles({ name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from("# План\nкупить молоко\n") });
+  await expect(page.locator(".attachments.is-pending")).toContainText("notes.md");
+  await say(page, "Что в заметках?");
+  await expect(page.getByText("В заметках — купить молоко.")).toBeVisible();
+  await expect(page.locator(".msg-user .attachments")).toContainText("notes.md");
+  const asked = JSON.stringify(fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!.body.messages);
+  expect(asked).toContain("купить молоко");
+});
+
 test("keeps the model picker and chat actions within reach in a long chat", async () => {
   fake = await startFakeProvider({
     key: KEY,

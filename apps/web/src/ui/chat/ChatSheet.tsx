@@ -9,6 +9,7 @@ import {
   type MediaModel,
   type MediaOptions as Options,
   type StreamEvent,
+  type AttachmentView,
 } from "@artel/shared";
 import { useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
@@ -25,6 +26,7 @@ import { ModelPicker } from "./ModelPicker";
 import { loadModels } from "../../lib/models";
 import { readWebMode, WebSwitch } from "./WebSwitch";
 import { FolderSwitch } from "./FolderSwitch";
+import { MAX_BYTES, MAX_FILES, SentFiles, toBase64, type PendingFile } from "./Attachments";
 
 /** Tools of a chat with a folder, each with its own line in the answer. */
 const FOLDER_TOOLS = ["list_files", "read_file", "search", "write_file", "edit_file", "run_command", "update_notes"];
@@ -40,6 +42,8 @@ interface Draft {
   activity: string[];
   /** MCP tools waiting for, or given, the user's permission. */
   approvals: ChatApproval[];
+  /** Files sent with the question. */
+  attachments: AttachmentView[];
 }
 
 /** Answers still being made on the provider's side, such as clips, are checked this often. */
@@ -60,6 +64,10 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   // The folder the model works in; kept locally until the chat exists.
   const [folder, setFolder] = useState<string | null>(null);
   const [folderError, setFolderError] = useState<string | null>(null);
+  // Files for the next message (docs/specs/chat-attachments.md).
+  const [files, setFiles] = useState<PendingFile[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [noVision, setNoVision] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const kind = choice?.kind ?? "text";
@@ -68,7 +76,12 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
     setNoTools(false);
     if (!choice || kind !== "text") return;
     let live = true;
-    void loadModels(api, choice.providerId).then((r) => live && setNoTools("models" in r && r.models.find((m) => m.id === choice.model)?.tools === false));
+    void loadModels(api, choice.providerId).then((r) => {
+      if (!live) return;
+      const info = "models" in r ? r.models.find((m) => m.id === choice.model) : undefined;
+      setNoTools(info?.tools === false);
+      setNoVision(info?.vision === false);
+    });
     return () => {
       live = false;
     };
@@ -155,9 +168,32 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
     await load(chat.id);
   }
 
+  function addFiles(added: File[]) {
+    setAttachError(null);
+    const next = [...files, ...added.map((file) => ({ key: `${file.name}-${file.size}-${Math.random()}`, file }))];
+    if (next.length > MAX_FILES) return setAttachError("too_many");
+    if (next.reduce((sum, f) => sum + f.file.size, 0) > MAX_BYTES) return setAttachError("too_big");
+    setFiles(next);
+  }
+
+  /** Sends the waiting files to the chat; null when one of them could not go. */
+  async function upload(id: string): Promise<AttachmentView[] | null> {
+    const sent: AttachmentView[] = [];
+    for (const f of files) {
+      const res = await api.chats[":id"].attachments
+        .$post({ param: { id }, json: { name: f.file.name, type: f.file.type, data: await toBase64(f.file) } })
+        .catch(() => null);
+      if (!res?.ok) return null;
+      sent.push((await res.json()) as AttachmentView);
+    }
+    return sent;
+  }
+
   async function send(content: string) {
     if (!choice) return;
     setFailed(false);
+    setAttachError(null);
+    if (noVision && files.some((f) => /^image\//.test(f.file.type))) return setAttachError("no_vision");
     let id = chat?.id;
     const target = { providerId: choice.providerId, model: choice.model, kind };
     try {
@@ -175,16 +211,19 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
       return;
     }
     rememberLastModel(choice);
+    const attached = files.length && kind === "text" ? await upload(id) : [];
+    if (attached === null) return setAttachError("failed");
+    setFiles([]);
 
     const controller = new AbortController();
     abort.current = controller;
-    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text", activity: [], approvals: [] });
+    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text", activity: [], approvals: [], attachments: attached });
     try {
       await postStream<StreamEvent>(
         `/api/chats/${id}/messages`,
         token,
         // The price was on the button the user pressed; that is the confirmation.
-        kind === "text" ? { content, web: webMode } : { content, options, confirm },
+        kind === "text" ? { content, web: webMode, attachments: attached.map((a) => a.id) } : { content, options, confirm },
         (e) => {
           if (e.type === "text") setDraft((d) => d && { ...d, text: d.text + e.text });
           if (e.type === "reasoning") setDraft((d) => d && { ...d, reasoning: d.reasoning + e.text });
@@ -262,14 +301,14 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         <div className="messages">
           {messages.map((m) =>
             m.role === "user" ? (
-              <UserMessage key={m.id} content={m.content} />
+              <UserMessage key={m.id} content={m.content} files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null} />
             ) : (
               <AssistantMessage key={m.id} content={m.content} reasoning={m.reasoning} model={m.model} message={m} onUndo={draft ? undefined : () => void undo(m.id)} />
             ),
           )}
           {draft && (
             <>
-              <UserMessage content={draft.user} />
+              <UserMessage content={draft.user} files={chat ? <SentFiles chatId={chat.id} files={draft.attachments} /> : null} />
               <AssistantMessage
                 content={draft.text}
                 reasoning={draft.reasoning || null}
@@ -291,12 +330,14 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         </div>
 
         {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
+        {attachError && <p className="error-note">{t(`attach.${attachError}` as MessageKey, { max: MAX_FILES })}</p>}
         {folderError && <p className="error-note">{t(folderError === "no_tools" ? "folder.noTools" : folderError === "not_found" ? "folder.notFound" : "folder.failed")}</p>}
         <Composer
           disabled={!choice || (kind !== "text" && !mediaModel)}
           streaming={!!draft}
           onSend={(text) => void send(text)}
           onStop={() => abort.current?.abort()}
+          attach={kind === "text" ? { files, onAdd: addFiles, onRemove: (key) => setFiles(files.filter((f) => f.key !== key)) } : undefined}
           tools={
             <>
               <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />

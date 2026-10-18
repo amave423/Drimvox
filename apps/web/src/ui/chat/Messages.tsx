@@ -1,5 +1,6 @@
 import type { MessageKey } from "../../i18n";
 import type { ChatKind, MessageView } from "@artel/shared";
+import type { ReactNode } from "react";
 import { useApp } from "../../context";
 import { formatTokens, formatUsd } from "../../lib/format";
 import { ErrorNote } from "../ErrorNote";
@@ -7,11 +8,12 @@ import { Markdown } from "./Markdown";
 import { MediaView } from "./MediaView";
 import { Reasoning } from "./Reasoning";
 
-export function UserMessage({ content }: { content: string }) {
+export function UserMessage({ content, files }: { content: string; files?: ReactNode }) {
   const { t } = useApp();
   return (
     <div className="msg msg-user">
       <span className="visually-hidden">{t("chat.you")}</span>
+      {files}
       <p>{content}</p>
     </div>
   );

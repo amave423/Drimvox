@@ -1,7 +1,8 @@
-import type { ChatKind, ChatUpdate, ChatView, ChatWithMessages, MessageStatus, MessageView, ProviderError, UsageSummary } from "@artel/shared";
+import type { AttachmentView, ChatKind, ChatUpdate, ChatView, ChatWithMessages, MessageStatus, MessageView, ProviderError, UsageSummary } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
 import type { MediaRepo } from "../media/repo";
+import type { AttachmentRepo } from "./attachment-repo";
 
 interface ChatRow {
   id: string;
@@ -34,6 +35,13 @@ interface MessageRow {
 }
 
 /** A clip the provider is still rendering for an answer. */
+/** One turn of the conversation as the model gets it. */
+export interface HistoryTurn {
+  role: "user" | "assistant";
+  content: string;
+  attachments?: (AttachmentView & { text: string | null })[];
+}
+
 export interface PendingJob {
   messageId: string;
   chatId: string;
@@ -67,6 +75,7 @@ export class ChatRepo {
   constructor(
     private readonly db: Database,
     private readonly media: MediaRepo,
+    readonly attachments: AttachmentRepo,
   ) {}
 
   list(): ChatView[] {
@@ -80,7 +89,8 @@ export class ChatRepo {
       .prepare("select * from messages where chat_id = ? order by created_at, rowid")
       .all(id) as unknown as MessageRow[];
     const media = this.media.forMessages(messages.map((m) => m.id));
-    return { ...toChat(row), messages: messages.map((m) => toMessage(m, media.get(m.id) ?? [])) };
+    const files = this.attachments.forMessages(messages.map((m) => m.id));
+    return { ...toChat(row), messages: messages.map((m) => toMessage(m, media.get(m.id) ?? [], files.get(m.id) ?? [])) };
   }
 
   create(providerId: string, model: string, kind: ChatKind = "text"): ChatView {
@@ -162,7 +172,7 @@ export class ChatRepo {
       .prepare(`insert into messages (${cols.join(", ")}) values (${cols.map((c) => `:${c}`).join(", ")})`)
       .run({ ...row });
     this.db.sql.prepare("update chats set updated_at = ? where id = ?").run(row.created_at, m.chatId);
-    return toMessage(row, []);
+    return toMessage(row, [], []);
   }
 
   /** Remembers the provider's job for a clip, so waiting survives a restart. */
@@ -221,7 +231,7 @@ export class ChatRepo {
 
   message(id: string): MessageView | null {
     const row = this.db.sql.prepare("select * from messages where id = ?").get(id) as unknown as MessageRow | undefined;
-    return row ? toMessage(row, this.media.forMessages([id]).get(id) ?? []) : null;
+    return row ? toMessage(row, this.media.forMessages([id]).get(id) ?? [], this.attachments.forMessages([id]).get(id) ?? []) : null;
   }
 
   /** The command-line agent's session this chat continues, as `storeSession` wrote it. */
@@ -234,16 +244,17 @@ export class ChatRepo {
     this.db.sql.prepare("update chats set cli_session = ? where id = ?").run(session, chatId);
   }
 
-  /** What the model sees: finished turns only. Failed and empty answers are left out. */
-  history(chatId: string): { role: "user" | "assistant"; content: string }[] {
+  /** What the model sees: finished turns only, with the user's attachments. Failed and empty answers are left out. */
+  history(chatId: string): HistoryTurn[] {
     const rows = this.db.sql
       .prepare(
-        `select role, content from messages where chat_id = ?
+        `select id, role, content from messages where chat_id = ?
          and (role = 'user' or (status in ('done', 'stopped') and content <> ''))
          order by created_at, rowid`,
       )
-      .all(chatId) as { role: "user" | "assistant"; content: string }[];
-    return rows.map(({ role, content }) => ({ role, content }));
+      .all(chatId) as { id: string; role: "user" | "assistant"; content: string }[];
+    const files = this.attachments.forMessages(rows.filter((r) => r.role === "user").map((r) => r.id));
+    return rows.map(({ id, role, content }) => (files.has(id) ? { role, content, attachments: files.get(id)! } : { role, content }));
   }
 
   usageSince(since: number): UsageSummary {
@@ -281,7 +292,7 @@ function toChat(r: ChatRow): ChatView {
   };
 }
 
-function toMessage(r: MessageRow, media: MessageView["media"]): MessageView {
+function toMessage(r: MessageRow, media: MessageView["media"], attachments: MessageView["attachments"]): MessageView {
   return {
     id: r.id,
     role: r.role,
@@ -296,6 +307,7 @@ function toMessage(r: MessageRow, media: MessageView["media"]): MessageView {
     error: r.error_code ? ({ code: r.error_code, ...(r.error_detail ? { detail: r.error_detail } : {}) } as ProviderError) : null,
     media,
     canUndo: !!r.checkpoint,
+    attachments: attachments.map(({ id, name, type, size, kind }) => ({ id, name, type, size, kind })),
     createdAt: r.created_at,
   };
 }

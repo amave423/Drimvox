@@ -1,3 +1,4 @@
+import { AttachmentRepo } from "./chats/attachment-repo";
 import { BacklogService } from "./backlog/service";
 import { backlogRoutes } from "./routes/backlog";
 import { BacklogRepo } from "./backlog/repo";
@@ -96,7 +97,7 @@ export function createCore(o: AppOptions) {
   const shots = new Shots(join(o.dataDir, "screenshots"));
   const visualKit = { background: new Background(), screenshot: o.screenshot ?? null, shots };
   const media = new MediaRepo(o.db, o.dataDir);
-  const chats = new ChatRepo(o.db, media);
+  const chats = new ChatRepo(o.db, media, new AttachmentRepo(o.db, o.dataDir));
   const projects = new ProjectRepo(o.db);
   const tasks = new TaskRepo(o.db);
   const backlog = new BacklogRepo(o.db);
