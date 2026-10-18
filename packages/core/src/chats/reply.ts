@@ -1,3 +1,6 @@
+import { notesBlock } from "../agent/notes";
+import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
+import { FOLDER_STEPS, folderHint } from "./folder";
 import { availabilityFromError, canCheck, noteAvailability } from "../providers/availability";
 import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
 import type { WebMode } from "@artel/shared";
@@ -36,6 +39,8 @@ export interface ReplyInput {
   extraTools?: ToolSet;
   /** Where command-line agents keep a folder per chat. */
   cliDir?: string;
+  /** The chat's folder: the model works in it, and it is snapshotted before the answer so the answer can be undone. */
+  folder?: string | null;
   emit(event: StreamEvent): Promise<void>;
 }
 
@@ -57,6 +62,9 @@ export async function reply(i: ReplyInput): Promise<void> {
     model: i.model,
   });
   await i.emit({ type: "start", userMessage, assistantMessageId: answer.id });
+  // The folder as it was before this answer: "Undo" brings it back. No git, no snapshot.
+  const ref = `refs/artel/chat/${i.chatId}/${answer.id}`;
+  const snapshot = i.folder ? await checkpoint(i.folder, ref).catch(() => null) : null;
 
   let text = "";
   let reasoning = "";
@@ -86,6 +94,8 @@ export async function reply(i: ReplyInput): Promise<void> {
         nowLine(),
         FORMAT_HINT,
         i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
+        i.folder ? folderHint(i.folder) : "",
+        i.folder ? notesBlock(i.folder) : "",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -94,7 +104,7 @@ export async function reply(i: ReplyInput): Promise<void> {
         ? {
             tools,
             // Search, read a page or two, call a tool or two, answer.
-            stopWhen: isStepCount(8),
+            stopWhen: isStepCount(i.folder ? FOLDER_STEPS : 8),
           }
         : {}),
       // OpenRouter and RouterAI search on their side for a fee; the plugin goes into the request body.
@@ -140,6 +150,11 @@ export async function reply(i: ReplyInput): Promise<void> {
   const outputTokens = usage?.outputTokens ?? null;
   const price = inputTokens !== null && outputTokens !== null ? await findModel(i.conn, i.model) : undefined;
 
+  // Undo only for an answer that changed something.
+  if (snapshot && i.folder) {
+    if (await changedSince(i.folder, snapshot).catch(() => false)) i.chats.setCheckpoint(answer.id, snapshot);
+    else await dropCheckpoint(i.folder, ref).catch(() => {});
+  }
   const message = i.chats.finishAnswer(answer.id, {
     content: text,
     reasoning: reasoning || null,

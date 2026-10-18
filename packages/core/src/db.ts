@@ -195,6 +195,9 @@ const migrations: string[] = [
      project_id text primary key references projects(id) on delete cascade,
      data text not null
    ) strict;`,
+  // A chat working in a folder, and the snapshot of that folder before each answer (docs/specs/chat-folder.md).
+  `alter table chats add column folder text;
+   alter table messages add column checkpoint text;`,
 ];
 
 export interface Database {

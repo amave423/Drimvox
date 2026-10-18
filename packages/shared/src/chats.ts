@@ -38,6 +38,9 @@ export const messageSendSchema = z
   })
   .strict();
 
+/** Connects a folder to a chat, or disconnects it with null. */
+export const chatFolderSchema = z.object({ folder: z.string().trim().min(1).max(1000).nullable() }).strict();
+
 export type ChatCreate = z.infer<typeof chatCreateSchema>;
 export type ChatUpdate = z.infer<typeof chatUpdateSchema>;
 
@@ -48,6 +51,8 @@ export interface ChatView {
   providerId: string | null;
   model: string | null;
   kind: ChatKind;
+  /** The folder the model works in; null for a chat without one. */
+  folder: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -69,6 +74,8 @@ export interface MessageView {
   error: ProviderError | null;
   /** Pictures and clips of the answer. A clip still being made keeps the answer "streaming". */
   media: MediaItem[];
+  /** The answer changed the chat's folder and can be undone. */
+  canUndo: boolean;
   createdAt: number;
 }
 
@@ -92,6 +99,7 @@ export type StreamEvent =
   /** The model searched or opened a page with Artel's internet tools, or called an MCP tool ("server/tool"). */
   | { type: "tool"; name: string; input: string }
   /** An MCP tool waits for the user's permission; answered with POST /api/chats/:id/approvals/:id. */
-  | { type: "approval"; id: string; server: string; tool: string; input: unknown }
+  /** A tool asks first: an MCP server's tool, or (with reason) a command in the chat's folder. */
+  | { type: "approval"; id: string; server: string; tool: string; input: unknown; reason?: string }
   | { type: "approved"; id: string; allowed: boolean }
   | { type: "done"; message: MessageView };

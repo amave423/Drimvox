@@ -1,3 +1,4 @@
+import type { MessageKey } from "../../i18n";
 import type { ChatKind, MessageView } from "@artel/shared";
 import { useApp } from "../../context";
 import { formatTokens, formatUsd } from "../../lib/format";
@@ -29,6 +30,8 @@ interface AssistantProps {
   /** MCP tools asking for permission in this answer. */
   approvals?: ChatApproval[];
   onApprove?(id: string, allow: boolean, always: boolean): void;
+  /** Puts the chat's folder back as it was before this answer. */
+  onUndo?(): void;
 }
 
 export interface ChatApproval {
@@ -36,6 +39,8 @@ export interface ChatApproval {
   server: string;
   tool: string;
   input: unknown;
+  /** A command in the chat's folder: why it asks (approval.reason.*); none for an MCP tool. */
+  reason?: string;
   state: "open" | "allowed" | "denied";
 }
 
@@ -49,6 +54,7 @@ export function AssistantMessage({
   activity = [],
   approvals = [],
   onApprove,
+  onUndo,
 }: AssistantProps) {
   const { t, settings } = useApp();
   const tokens = (n: number) => formatTokens(n, settings.locale);
@@ -81,10 +87,8 @@ export function AssistantMessage({
       {approvals.map((a) => (
         <div key={a.id} className="approval" role={a.state === "open" ? "alert" : undefined}>
           <strong>{t("approval.title")}</strong>
-          <span>{t("approval.reason.mcp")}</span>
-          <code className="mono">
-            {a.server}: {a.tool} {JSON.stringify(a.input)}
-          </code>
+          <span>{t(`approval.reason.${a.reason ?? "mcp"}` as MessageKey)}</span>
+          <code className="mono">{a.reason ? a.tool : `${a.server}: ${a.tool} ${JSON.stringify(a.input)}`}</code>
           {a.state === "open" && onApprove ? (
             <div className="actions">
               <button className="btn is-primary" onClick={() => onApprove(a.id, true, false)}>
@@ -115,6 +119,13 @@ export function AssistantMessage({
       {message?.status === "stopped" && <p className="msg-flag">{t("chat.stopped")}</p>}
       {message?.error && <ErrorNote error={message.error} />}
       {meta && <p className="msg-meta mono">{meta}</p>}
+      {message?.canUndo && onUndo && (
+        <div className="actions">
+          <button className="btn" onClick={onUndo} title={t("folder.undoHint")}>
+            {t("folder.undo")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

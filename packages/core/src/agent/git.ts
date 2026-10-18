@@ -24,9 +24,9 @@ const BUSY = /index\.lock': File exists|could not lock config file|unable to acc
 const RETRY_MS = [150, 400, 900, 1800];
 
 /** Runs git and resolves even on a non-zero exit; only a missing git binary rejects. */
-export async function runGit(cwd: string, args: string[], allowFail = false): Promise<GitResult> {
+export async function runGit(cwd: string, args: string[], allowFail = false, env?: Record<string, string>): Promise<GitResult> {
   for (let attempt = 0; ; attempt++) {
-    const result = await runOnce(cwd, args);
+    const result = await runOnce(cwd, args, env);
     if (result.code !== 0 && BUSY.test(result.stderr) && attempt < RETRY_MS.length) {
       await new Promise((r) => setTimeout(r, RETRY_MS[attempt]));
       continue;
@@ -36,11 +36,11 @@ export async function runGit(cwd: string, args: string[], allowFail = false): Pr
   }
 }
 
-function runOnce(cwd: string, args: string[]): Promise<GitResult> {
+function runOnce(cwd: string, args: string[], env?: Record<string, string>): Promise<GitResult> {
   // Deep folders (a dependency's cache, say) pass Windows' 260-character limit; git handles them only when told to.
   const full = process.platform === "win32" ? ["-c", "core.longpaths=true", ...args] : args;
   return new Promise((resolve, reject) => {
-    execFile("git", full, { cwd, maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+    execFile("git", full, { cwd, maxBuffer: 64 * 1024 * 1024, windowsHide: true, env: env ? { ...process.env, ...env } : undefined }, (err, stdout, stderr) => {
       const code = err ? (typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : -1) : 0;
       if (err && (err as { code?: unknown }).code === "ENOENT") {
         reject(new GitError("no_git", "Git is not installed"));
@@ -111,8 +111,8 @@ export async function removeWorktree(repo: string, path: string, branch: string)
  * Installed dependencies and tool caches: never part of an agent's work, even in a project without a .gitignore.
  * A project that keeps one of them in git keeps getting its changes.
  */
-const NEVER_ADDED = ["node_modules", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".next", ".nuxt", ".turbo", ".parcel-cache"];
-const anywhere = (name: string) => `:(glob)**/${name}/**`;
+export const NEVER_ADDED = ["node_modules", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".next", ".nuxt", ".turbo", ".parcel-cache"];
+export const anywhere = (name: string) => `:(glob)**/${name}/**`;
 
 export async function commitAll(worktree: string, message: string): Promise<boolean> {
   const tracked = lines(await out(worktree, ["ls-files", "--", ...NEVER_ADDED.map(anywhere)])).map((p) => p.split("/"));

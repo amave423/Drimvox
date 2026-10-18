@@ -1,5 +1,6 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,8 +26,8 @@ test.afterEach(async () => {
   rmSync(userData, { recursive: true, force: true });
 });
 
-async function launch(): Promise<Page> {
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData } });
+async function launch(env: Record<string, string> = {}): Promise<Page> {
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ...env } });
   const page = await app.firstWindow();
   await expect(page.getByText("Ядро запущено")).toBeVisible();
   return page;
@@ -231,15 +232,42 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
   });
   expect(fits).toBe(true);
 
-  // Both pills stay one line high, the model's name cut short rather than squeezing the switch.
+  // The pills (model, internet, folder) stay one line high, the model's name cut short rather than squeezing the others.
   const pills = page.locator(".composer-bar .picker-button");
   const heights = await pills.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-  expect(heights.length).toBe(2);
+  expect(heights.length).toBe(3);
   expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2);
 
   await resize(2400, 1300);
   await page.waitForTimeout(300);
   expect(await sheetWidth()).toBeGreaterThan(narrow * 1.3);
+});
+
+// docs/specs/chat-folder.md: a chat with a folder works right in it, and one button undoes an answer.
+test("works in a connected folder and undoes an answer", async () => {
+  const folder = mkdtempSync(join(tmpdir(), "artel-e2e-folder-"));
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: folder });
+  writeFileSync(join(folder, "README.md"), "# Демо\n");
+  fake = await startFakeProvider({
+    key: KEY,
+    models,
+    script: [{ toolCalls: [{ name: "write_file", args: { path: "hello.txt", content: "привет\n" } }] }, { text: "Создал hello.txt." }],
+  });
+  const page = await launch({ ARTEL_TEST_PICK_FOLDER: folder });
+  await connect(page);
+  await startChat(page);
+  await page.getByRole("button", { name: "Папка" }).click();
+  await expect(page.getByRole("button", { name: /Папка: artel-e2e-folder-/ })).toBeVisible();
+
+  await say(page, "Создай hello.txt");
+  await expect(page.getByText("Создал hello.txt.")).toBeVisible();
+  await expect(page.getByText("Пишет hello.txt")).toBeVisible();
+  expect(readFileSync(join(folder, "hello.txt"), "utf8")).toBe("привет\n");
+
+  await page.getByRole("button", { name: "Откатить" }).click();
+  await expect(page.getByRole("button", { name: "Откатить" })).toHaveCount(0);
+  expect(existsSync(join(folder, "hello.txt"))).toBe(false);
+  rmSync(folder, { recursive: true, force: true });
 });
 
 test("keeps the model picker and chat actions within reach in a long chat", async () => {

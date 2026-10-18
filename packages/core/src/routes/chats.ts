@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import {
   approvalDecisionSchema,
   chatCreateSchema,
+  chatFolderSchema,
   chatUpdateSchema,
   estimateCost,
   messageSendSchema,
@@ -12,6 +13,10 @@ import {
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
+import { existsSync, statSync } from "node:fs";
+import { resolve } from "node:path";
+import { restore } from "../chats/checkpoint";
+import { folderTools } from "../chats/folder";
 import { reply } from "../chats/reply";
 import type { ChatRepo } from "../chats/repo";
 import { mediaModel } from "../media/catalog";
@@ -54,6 +59,28 @@ export function chatRoutes(
       return chat ? c.json(chat, 200) : c.json(notFound, 404);
     })
     .delete("/:id", (c) => (chats.remove(c.req.param("id")) ? c.body(null, 204) : c.json(notFound, 404)))
+    // A folder the model works in (docs/specs/chat-folder.md); null disconnects it.
+    .patch("/:id/folder", zValidator("json", chatFolderSchema), async (c) => {
+      const chat = chats.get(c.req.param("id"));
+      if (!chat) return c.json(notFound, 404);
+      const asked = c.req.valid("json").folder;
+      if (asked === null) return c.json(chats.setFolder(chat.id, null)!, 200);
+      const folder = resolve(asked);
+      if (!existsSync(folder) || !statSync(folder).isDirectory()) return c.json({ error: { code: "not_found" as const } }, 400);
+      const conn = chat.providerId ? providers.connection(chat.providerId) : null;
+      if (conn && chat.model && (await findModel(conn, chat.model))?.tools === false) return c.json({ error: { code: "no_tools" as const } }, 409);
+      return c.json(chats.setFolder(chat.id, folder)!, 200);
+    })
+    // Puts the folder back as it was before this answer.
+    .post("/:id/messages/:messageId/undo", async (c) => {
+      const chat = chats.get(c.req.param("id"));
+      const message = chat?.messages.find((m) => m.id === c.req.param("messageId"));
+      const snapshot = message ? chats.checkpoint(message.id) : null;
+      if (!chat?.folder || !message || !snapshot) return c.json(notFound, 404);
+      await restore(chat.folder, snapshot);
+      chats.setCheckpoint(message.id, null);
+      return c.json({ ok: true as const }, 200);
+    })
     .post("/:id/approvals/:approvalId", zValidator("json", approvalDecisionSchema), (c) => {
       const { allow, always } = c.req.valid("json");
       const known = approvals.answer(c.req.param("id"), c.req.param("approvalId"), allow, always);
@@ -112,7 +139,16 @@ export function chatRoutes(
           idleTimeoutMs,
           web: !toolsOk && webMode === "free" ? "off" : webMode,
           webAccess: web,
-          extraTools: mcpTools,
+          // With a folder the model reads, writes and runs commands in it; risky commands ask in the answer.
+          extraTools: {
+            ...mcpTools,
+            ...(chat.folder && toolsOk
+              ? folderTools(chat.folder, emit, async (command, reason, signal) =>
+                  (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, signal })) !== false,
+                )
+              : {}),
+          },
+          folder: toolsOk ? chat.folder : null,
           cliDir,
           emit,
         });

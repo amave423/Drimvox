@@ -1,3 +1,4 @@
+import type { MessageKey } from "../../i18n";
 import {
   estimateCost,
   needsConfirmation,
@@ -23,6 +24,10 @@ import { ModelNote } from "./ModelNote";
 import { ModelPicker } from "./ModelPicker";
 import { loadModels } from "../../lib/models";
 import { readWebMode, WebSwitch } from "./WebSwitch";
+import { FolderSwitch } from "./FolderSwitch";
+
+/** Tools of a chat with a folder, each with its own line in the answer. */
+const FOLDER_TOOLS = ["list_files", "read_file", "search", "write_file", "edit_file", "run_command", "update_notes"];
 
 interface Draft {
   user: string;
@@ -52,6 +57,9 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const [web, setWeb] = useState(readWebMode);
   // Small local models cannot call tools: they chat without Artel's search.
   const [noTools, setNoTools] = useState(false);
+  // The folder the model works in; kept locally until the chat exists.
+  const [folder, setFolder] = useState<string | null>(null);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const kind = choice?.kind ?? "text";
@@ -70,6 +78,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
     const loaded = await api.chats[":id"].$get({ param: { id } }).then((r) => ok<ChatWithMessages>(r)).catch(() => null);
     if (!loaded) return;
     setChat(loaded);
+    setFolder(loaded.folder);
     if (loaded.providerId && loaded.model) setChoice({ providerId: loaded.providerId, model: loaded.model, kind: loaded.kind });
   }
 
@@ -126,6 +135,26 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const webMode = noTools && asked === "free" ? "off" : asked;
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
 
+  async function saveFolder(id: string, next: string | null): Promise<boolean> {
+    const res = await api.chats[":id"].folder.$patch({ param: { id }, json: { folder: next } }).catch(() => null);
+    if (res?.ok) return true;
+    const body = (await res?.json().catch(() => null)) as { error?: { code?: string } } | null;
+    setFolderError(body?.error?.code ?? "unknown");
+    return false;
+  }
+
+  async function changeFolder(next: string | null) {
+    setFolderError(null);
+    if (chat && !(await saveFolder(chat.id, next))) return;
+    setFolder(next);
+  }
+
+  async function undo(messageId: string) {
+    if (!chat) return;
+    await api.chats[":id"].messages[":messageId"].undo.$post({ param: { id: chat.id, messageId } }).catch(() => null);
+    await load(chat.id);
+  }
+
   async function send(content: string) {
     if (!choice) return;
     setFailed(false);
@@ -136,6 +165,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         const created = await ok<ChatView>(await api.chats.$post({ json: target }));
         id = created.id;
         setChat({ ...created, messages: [] });
+        if (folder && !(await saveFolder(id, folder))) return;
         navigate({ kind: "chat", chatId: id, key: viewKey });
       } else if (chat && (chat.providerId !== choice.providerId || chat.model !== choice.model || chat.kind !== kind)) {
         await ok(await api.chats[":id"].$patch({ param: { id }, json: target }));
@@ -164,11 +194,13 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
                 ? t("web.searching", { query: e.input })
                 : e.name === "open_page"
                   ? t("web.reading", { url: e.input })
-                  : t("chat.mcpCall", { name: e.name });
+                  : FOLDER_TOOLS.includes(e.name)
+                    ? t(`folder.tool.${e.name}` as MessageKey, { input: e.input })
+                    : t("chat.mcpCall", { name: e.name });
             setDraft((d) => d && { ...d, activity: [...d.activity, line] });
           }
           if (e.type === "approval") {
-            const card: ChatApproval = { id: e.id, server: e.server, tool: e.tool, input: e.input, state: "open" };
+            const card: ChatApproval = { id: e.id, server: e.server, tool: e.tool, input: e.input, reason: e.reason, state: "open" };
             setDraft((d) => d && { ...d, approvals: [...d.approvals, card] });
           }
           if (e.type === "approved") {
@@ -232,7 +264,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
             m.role === "user" ? (
               <UserMessage key={m.id} content={m.content} />
             ) : (
-              <AssistantMessage key={m.id} content={m.content} reasoning={m.reasoning} model={m.model} message={m} />
+              <AssistantMessage key={m.id} content={m.content} reasoning={m.reasoning} model={m.model} message={m} onUndo={draft ? undefined : () => void undo(m.id)} />
             ),
           )}
           {draft && (
@@ -259,6 +291,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         </div>
 
         {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
+        {folderError && <p className="error-note">{t(folderError === "no_tools" ? "folder.noTools" : folderError === "not_found" ? "folder.notFound" : "folder.failed")}</p>}
         <Composer
           disabled={!choice || (kind !== "text" && !mediaModel)}
           streaming={!!draft}
@@ -268,6 +301,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
             <>
               <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />
               {kind === "text" && choice && <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} />}
+              {kind === "text" && choice && <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} />}
             </>
           }
           extra={mediaModel && <MediaOptions model={mediaModel} value={options} onChange={setOptions} estimateUsd={estimateUsd} />}

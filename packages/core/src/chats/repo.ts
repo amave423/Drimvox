@@ -9,6 +9,7 @@ interface ChatRow {
   provider_id: string | null;
   model: string | null;
   kind: ChatKind;
+  folder: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -29,6 +30,7 @@ interface MessageRow {
   error_detail: string | null;
   created_at: number;
   media_job: string | null;
+  checkpoint: string | null;
 }
 
 /** A clip the provider is still rendering for an answer. */
@@ -83,13 +85,13 @@ export class ChatRepo {
 
   create(providerId: string, model: string, kind: ChatKind = "text"): ChatView {
     const now = Date.now();
-    const row: ChatRow = { id: randomUUID(), title: null, provider_id: providerId, model, kind, created_at: now, updated_at: now };
+    const row = { id: randomUUID(), title: null, provider_id: providerId, model, kind, created_at: now, updated_at: now };
     this.db.sql
       .prepare(
         "insert into chats (id, title, provider_id, model, kind, created_at, updated_at) values (:id, :title, :provider_id, :model, :kind, :created_at, :updated_at)",
       )
       .run({ ...row });
-    return toChat(row);
+    return toChat({ ...row, folder: null });
   }
 
   update(id: string, patch: ChatUpdate): ChatView | null {
@@ -113,6 +115,20 @@ export class ChatRepo {
 
   remove(id: string): boolean {
     return Number(this.db.sql.prepare("delete from chats where id = ?").run(id).changes) > 0;
+  }
+
+  setFolder(id: string, folder: string | null): ChatView | null {
+    if (Number(this.db.sql.prepare("update chats set folder = ?, updated_at = ? where id = ?").run(folder, Date.now(), id).changes) === 0) return null;
+    return toChat(this.chatRow(id)!);
+  }
+
+  /** The snapshot of the folder taken before an answer; null once there is nothing to undo. */
+  checkpoint(messageId: string): string | null {
+    return (this.db.sql.prepare("select checkpoint from messages where id = ?").get(messageId) as { checkpoint: string | null } | undefined)?.checkpoint ?? null;
+  }
+
+  setCheckpoint(messageId: string, commit: string | null): void {
+    this.db.sql.prepare("update messages set checkpoint = ? where id = ?").run(commit, messageId);
   }
 
   /** Names a chat after its first message: first line, at most 60 characters. */
@@ -139,6 +155,7 @@ export class ChatRepo {
       error_detail: null,
       created_at: Date.now(),
       media_job: null,
+      checkpoint: null,
     };
     const cols = Object.keys(row);
     this.db.sql
@@ -258,6 +275,7 @@ function toChat(r: ChatRow): ChatView {
     providerId: r.provider_id,
     model: r.model,
     kind: r.kind,
+    folder: r.folder ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -277,6 +295,7 @@ function toMessage(r: MessageRow, media: MessageView["media"]): MessageView {
     status: r.status,
     error: r.error_code ? ({ code: r.error_code, ...(r.error_detail ? { detail: r.error_detail } : {}) } as ProviderError) : null,
     media,
+    canUndo: !!r.checkpoint,
     createdAt: r.created_at,
   };
 }
