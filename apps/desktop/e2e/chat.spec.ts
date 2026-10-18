@@ -308,6 +308,11 @@ test("keeps the model picker and chat actions within reach in a long chat", asyn
   await picker.click();
   await page.getByRole("option", { name: /Other Model/ }).click();
   await expect(page.getByRole("button", { name: /Тестовый \/ other-model/ })).toBeInViewport();
+
+  // Only the conversation scrolls, never the window (seen: hidden labels of the questions stretched it, a second
+  // scrollbar appeared and the whole app could be scrolled out of sight).
+  const page_ = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, window: innerHeight }));
+  expect(page_.height).toBeLessThanOrEqual(page_.window);
 });
 
 test("an MCP server from the settings gives the chat a tool that asks first", async () => {

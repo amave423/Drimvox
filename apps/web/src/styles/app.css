@@ -75,7 +75,8 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .side-link:hover { background: var(--sheet); }
 .side-link small { color: var(--muted); font-size: 12px; }
 
-.desk { overflow: auto; padding: 28px 40px 0; display: flex; justify-content: center; align-items: flex-start; }
+/* Positioned: hidden labels inside it stay within the scroller instead of stretching the window. */
+.desk { position: relative; overflow: auto; padding: 28px 40px 0; display: flex; justify-content: center; align-items: flex-start; }
 .desk.is-alone { height: 100%; }
 
 .bottombar {
