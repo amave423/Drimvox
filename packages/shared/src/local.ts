@@ -80,6 +80,8 @@ export interface HfRepo {
   /** Parameters, when Hugging Face knows them. */
   params: number | null;
   updatedAt: string | null;
+  /** The author says it answers without refusals (by its name or tags); Artel cannot check it. */
+  unfiltered: boolean;
 }
 
 /** One quantization of a repository: the file Ollama pulls as hf.co/<repo>:<quant>. */

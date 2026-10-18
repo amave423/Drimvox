@@ -125,6 +125,11 @@ function HfSearch({ status, onPull, busy }: Props & { busy(model: string): boole
           <li key={r.repo} className="local-repo">
             <button type="button" className="local-repo-head" aria-expanded={open === r.repo} onClick={() => setOpen(open === r.repo ? null : r.repo)}>
               <span className="mono">{r.repo}</span>
+              {r.unfiltered && (
+                <span className="local-unfiltered" title={t("local.unfilteredHint")}>
+                  {t("local.unfiltered")}
+                </span>
+              )}
               <span className="muted">
                 {r.params ? `${t("local.params", { n: compact.format(r.params) })} · ` : ""}
                 {t("local.downloads", { n: compact.format(r.downloads) })}

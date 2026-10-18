@@ -664,6 +664,8 @@ export const ru = {
   "local.installNotFound": "Установщик отработал, но Ollama не нашлась. Попробуй установить её с сайта.",
   "local.copy": "Скопировать",
   "local.copied": "Скопировано",
+  "local.unfiltered": "без фильтров — по словам автора",
+  "local.unfilteredHint": "Автор заявляет, что модель отвечает без отказов (в названии или метках: abliterated, uncensored). Artel это не проверяет, на деле такие модели иногда всё равно отказывают.",
   "local.checkAgain": "Проверить снова",
   "local.notRunning": "Ollama установлена, но не запустилась. Попробуй открыть её вручную.",
   "local.runningManaged": "Ollama {version} запущена Artel и закроется сама, когда модели долго не нужны.",

@@ -229,6 +229,8 @@ describe("catalog", () => {
           { id: "unsloth/gemma-4-12b-it-GGUF", downloads: 1654466, likes: 903, lastModified: "2026-07-17T12:52:56.000Z", gguf: { total: 11_907_350_576 } },
           { id: "someone/gemma-4-120b-GGUF", downloads: 10, likes: 1, gguf: { total: 120_000_000_000 } },
           { id: "someone/gemma-tiny-GGUF", downloads: 5, likes: 0 },
+          { id: "mlabonne/gemma-4-12b-abliterated-GGUF", downloads: 900, likes: 40, gguf: { total: 11_907_350_576 } },
+          { id: "someone/gemma-chat-GGUF", downloads: 30, likes: 2, tags: ["gguf", "uncensored"] },
         ];
       }
       if (path === "/api/models/unsloth/gemma-4-12b-it-GGUF/tree/main") {
@@ -245,8 +247,11 @@ describe("catalog", () => {
     setup({ hf: await hf() });
     const found = await (await env.call("GET", "/api/local/search?q=gemma")).json();
     expect(found).toEqual([
-      { repo: "unsloth/gemma-4-12b-it-GGUF", downloads: 1654466, likes: 903, params: 11_907_350_576, updatedAt: "2026-07-17T12:52:56.000Z" },
-      { repo: "someone/gemma-tiny-GGUF", downloads: 5, likes: 0, params: null, updatedAt: null },
+      { repo: "unsloth/gemma-4-12b-it-GGUF", downloads: 1654466, likes: 903, params: 11_907_350_576, updatedAt: "2026-07-17T12:52:56.000Z", unfiltered: false },
+      { repo: "someone/gemma-tiny-GGUF", downloads: 5, likes: 0, params: null, updatedAt: null, unfiltered: false },
+      // What the author says, by the name or the tags: Artel cannot check it.
+      { repo: "mlabonne/gemma-4-12b-abliterated-GGUF", downloads: 900, likes: 40, params: 11_907_350_576, updatedAt: null, unfiltered: true },
+      { repo: "someone/gemma-chat-GGUF", downloads: 30, likes: 2, params: null, updatedAt: null, unfiltered: true },
     ]);
   });
 

@@ -665,6 +665,8 @@ export const en: Record<keyof typeof ru, string> = {
   "local.installNotFound": "The setup ran, but Ollama was not found. Try installing it from the site.",
   "local.copy": "Copy",
   "local.copied": "Copied",
+  "local.unfiltered": "unfiltered, the author says",
+  "local.unfilteredHint": "The author says the model answers without refusals (abliterated, uncensored in its name or tags). Artel does not check it; such models still refuse at times.",
   "local.checkAgain": "Check again",
   "local.notRunning": "Ollama is installed but did not start. Try opening it by hand.",
   "local.runningManaged": "Ollama {version} was started by Artel and closes by itself when models are not needed for a while.",

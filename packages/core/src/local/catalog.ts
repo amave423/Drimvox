@@ -72,6 +72,9 @@ export interface CatalogOptions {
 export class CatalogError extends Error {}
 
 /** Ollama's registry and Hugging Face, sized for this computer. */
+/** Names and tags by which an author says the model answers without refusals: told as the author's word, not checked. */
+const UNFILTERED = /abliterat|uncensor|unfiltered|heretic|dolphin/i;
+
 export class LocalCatalog {
   private readonly sizes = new Map<string, { at: number; bytes: number | null }>();
   constructor(private readonly o: CatalogOptions) {}
@@ -113,7 +116,7 @@ export class LocalCatalog {
   /** GGUF repositories on Hugging Face, most downloaded first; those too big for this computer are left out. */
   async search(query: string, hw: LocalHardware): Promise<HfRepo[]> {
     const q = new URLSearchParams({ search: query, filter: "gguf", sort: "downloads", limit: "30" });
-    for (const field of ["gguf", "downloads", "likes", "lastModified"]) q.append("expand[]", field);
+    for (const field of ["gguf", "downloads", "likes", "lastModified", "tags"]) q.append("expand[]", field);
     let res: Response;
     try {
       res = await this.get(`${this.o.hfUrl}/api/models?${q}`);
@@ -121,11 +124,12 @@ export class LocalCatalog {
       throw new CatalogError(`Hugging Face did not answer: ${err instanceof Error ? err.message : String(err)}`);
     }
     if (!res.ok) throw new CatalogError(`Hugging Face answered ${res.status}`);
-    const items = (await res.json()) as { id: string; downloads?: number; likes?: number; lastModified?: string; gguf?: { total?: number } }[];
+    const items = (await res.json()) as { id: string; downloads?: number; likes?: number; lastModified?: string; gguf?: { total?: number }; tags?: string[] }[];
     return items.flatMap((m) => {
       const params = typeof m.gguf?.total === "number" ? m.gguf.total : null;
       if (params && !fitOf(params * SMALLEST_BYTES_PER_PARAM, hw)) return [];
-      return [{ repo: m.id, downloads: m.downloads ?? 0, likes: m.likes ?? 0, params, updatedAt: m.lastModified ?? null }];
+      const unfiltered = UNFILTERED.test(m.id) || (m.tags ?? []).some((t) => UNFILTERED.test(t));
+      return [{ repo: m.id, downloads: m.downloads ?? 0, likes: m.likes ?? 0, params, updatedAt: m.lastModified ?? null, unfiltered }];
     });
   }
 
