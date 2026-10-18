@@ -232,10 +232,10 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
   });
   expect(fits).toBe(true);
 
-  // The pills (model, internet, folder) stay one line high, the model's name cut short rather than squeezing the others.
+  // The pills (model, internet, thinking, folder) stay one line high, the model's name cut short rather than squeezing the others.
   const pills = page.locator(".composer-bar .picker-button");
   const heights = await pills.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-  expect(heights.length).toBe(3);
+  expect(heights.length).toBe(4);
   expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2);
 
   await resize(2400, 1300);

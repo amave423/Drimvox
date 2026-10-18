@@ -9,6 +9,10 @@ export type ChatKind = (typeof chatKinds)[number];
 export const webModes = ["off", "free", "provider"] as const;
 export type WebMode = (typeof webModes)[number];
 
+/** How much the model thinks before it answers; "auto" leaves it to the provider. */
+export const thinkingLevels = ["auto", "off", "low", "medium", "high"] as const;
+export type ThinkingLevel = (typeof thinkingLevels)[number];
+
 export const chatCreateSchema = z
   .object({
     providerId: z.string().min(1),
@@ -35,6 +39,7 @@ export const messageSendSchema = z
     confirm: z.boolean().default(false),
     /** Internet for this answer: none, Artel's free search tools, or the provider's paid web search. */
     web: z.enum(webModes).default("off"),
+    thinking: z.enum(thinkingLevels).default("auto"),
     /** Files uploaded to the chat for this message (docs/specs/chat-attachments.md). */
     attachments: z.array(z.string().min(1)).max(10).default([]),
   })

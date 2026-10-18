@@ -1,10 +1,11 @@
+import { mergeOptions, thinkingOptions } from "./thinking";
 import { toModelMessages } from "./history";
 import { notesBlock } from "../agent/notes";
 import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
 import { FOLDER_STEPS, folderHint } from "./folder";
 import { availabilityFromError, canCheck, noteAvailability } from "../providers/availability";
 import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
-import type { WebMode } from "@artel/shared";
+import type { ThinkingLevel, WebMode } from "@artel/shared";
 import { isStepCount, streamText, type ToolSet } from "ai";
 import { cliReply } from "../cli/chat";
 import { isCli } from "../cli/kinds";
@@ -40,6 +41,8 @@ export interface ReplyInput {
   extraTools?: ToolSet;
   /** Where command-line agents keep a folder per chat. */
   cliDir?: string;
+  /** How much the model thinks before it answers. */
+  thinking?: ThinkingLevel;
   /** Files uploaded for this message. */
   attachments?: string[];
   /** The model sees pictures: attached ones go to it as pictures, not as a note. */
@@ -115,7 +118,11 @@ export async function reply(i: ReplyInput): Promise<void> {
           }
         : {}),
       // OpenRouter and RouterAI search on their side for a fee; the plugin goes into the request body.
-      ...(i.web === "provider" ? { providerOptions: { [i.conn.preset]: { plugins: [{ id: "web", max_results: 5 }] } } } : {}),
+      // How much the model thinks, and the provider's own search, go into the request body.
+      providerOptions: mergeOptions(
+        i.web === "provider" ? { [i.conn.preset]: { plugins: [{ id: "web", max_results: 5 }] } } : undefined,
+        thinkingOptions(i.conn.preset, i.thinking ?? "auto"),
+      ),
       maxRetries: 1,
       abortSignal: AbortSignal.any([i.signal, silence.signal]),
       onError: () => {},
@@ -147,6 +154,8 @@ export async function reply(i: ReplyInput): Promise<void> {
 
   const stopped = i.signal.aborted;
   if (!stopped && silence.signal.aborted) error = { code: "timeout" };
+  // Seen live: a model thought 90 000 characters and wrote nothing; an empty "done" answer said nothing of it.
+  if (!stopped && !error && !text.trim() && reasoning.trim()) error = { code: "no_answer" };
   // The model ran out of room (seen live: a local model with a small context stopped mid-answer, as if it had
   // finished). The answer stays a done one, so "go on" brings it back to the model, with a note under it.
   const cutOff = !stopped && !error && finishReason === "length" && text !== "";

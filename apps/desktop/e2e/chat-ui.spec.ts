@@ -159,3 +159,19 @@ test("a big photo is made smaller before it goes", async () => {
   const size = await page.locator(".attachments.is-pending .attachment .mono").first().textContent();
   expect(size).toMatch(/KB|1\.\d MB/);
 });
+
+// Seen live: left to itself, a model thought for minutes and wrote nothing; the user can now say how much it thinks.
+test("the thinking switch goes with the question, and an answer of thoughts only says so", async () => {
+  const page = await launch([{ reasoning: "Думаю…" }]);
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("option", { name: /Fake Model/ }).click();
+  await page.getByRole("button", { name: "Мышление: авто" }).click();
+  await page.getByRole("option", { name: /без/ }).click();
+  const box = page.getByRole("textbox", { name: /Сообщение/ });
+  await box.fill("Что это за игра?");
+  await box.press("Enter");
+  await expect(page.getByText(/Модель долго думала, но так и не ответила/)).toBeVisible();
+  const body = fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body;
+  expect(body.reasoning).toEqual({ enabled: false });
+});

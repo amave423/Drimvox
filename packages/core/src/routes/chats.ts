@@ -112,7 +112,7 @@ export function chatRoutes(
       const conn = chat.providerId ? providers.connection(chat.providerId) : null;
       if (!conn || !chat.model) return c.json({ error: { code: "invalid", detail: "Choose a model first" } }, 400);
       if (!conn.apiKey && presets[conn.preset].keyRequired) return c.json({ error: { code: "no_key" } }, 400);
-      const { content, options, confirm, web: webMode, attachments } = c.req.valid("json");
+      const { content, options, confirm, web: webMode, attachments, thinking } = c.req.valid("json");
       const files = attachments.map((id) => chats.attachments.get(id));
       if (files.some((f) => !f || f.chatId !== chat.id)) return c.json(notFound, 404);
 
@@ -163,6 +163,7 @@ export function chatRoutes(
           signal: controller.signal,
           idleTimeoutMs,
           web: !toolsOk && webMode === "free" ? "off" : webMode,
+          thinking,
           webAccess: web,
           // With a folder the model reads, writes and runs commands in it; risky commands ask in the answer.
           extraTools: {

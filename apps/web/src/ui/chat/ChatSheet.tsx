@@ -26,6 +26,7 @@ import { ModelPicker } from "./ModelPicker";
 import { loadModels } from "../../lib/models";
 import { readWebMode, WebSwitch } from "./WebSwitch";
 import { FolderSwitch } from "./FolderSwitch";
+import { readThinking, ThinkingSwitch } from "./ThinkingSwitch";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 
 /** Tools of a chat with a folder, each with its own line in the answer. */
@@ -59,6 +60,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const [mediaModel, setMediaModel] = useState<MediaModel | null>(null);
   const [options, setOptions] = useState<Options>({});
   const [web, setWeb] = useState(readWebMode);
+  const [thinking, setThinking] = useState(readThinking);
   // Small local models cannot call tools: they chat without Artel's search.
   const [noTools, setNoTools] = useState(false);
   // The folder the model works in; kept locally until the chat exists.
@@ -160,6 +162,8 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const searchProvider = providerSearch && preset ? presets[preset].name : null;
   const asked = web === "provider" && !providerSearch ? "free" : web;
   const webMode = noTools && asked === "free" ? "off" : asked;
+  // Command-line agents and local models think their own way: no switch for them.
+  const thinks = !!preset && !["claude-code", "codex", "gemini-cli", "ollama", "lmstudio"].includes(preset);
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
 
   async function saveFolder(id: string, next: string | null): Promise<boolean> {
@@ -243,7 +247,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         `/api/chats/${id}/messages`,
         token,
         // The price was on the button the user pressed; that is the confirmation.
-        kind === "text" ? { content, web: webMode, attachments: attached.map((a) => a.id) } : { content, options, confirm },
+        kind === "text" ? { content, web: webMode, thinking: thinks ? thinking : "auto", attachments: attached.map((a) => a.id) } : { content, options, confirm },
         (e) => {
           // The core named the chat after the question: the list shows the name before the answer is done.
           if (e.type === "start") void reloadChats();
@@ -364,6 +368,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
             <>
               <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />
               {kind === "text" && choice && <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} />}
+              {kind === "text" && choice && thinks && <ThinkingSwitch value={thinking} onChange={setThinking} />}
               {kind === "text" && choice && <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} />}
             </>
           }
