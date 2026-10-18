@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
+import { memoryLimit } from "../src/agent/memory";
 
 vi.setConfig({ testTimeout: 60_000 });
 
@@ -79,6 +80,31 @@ describe("the agent's memory", () => {
     expect(new Set(after.map(head)).size).toBe(1);
     expect(JSON.stringify(after[0]![1])).toContain("Запиши заметки");
     expect(JSON.stringify(after[0]![2])).toContain(SUMMARY);
+  });
+
+  // Seen live: the time to the minute in the system prompt changed the start of every request each minute, so the
+  // provider's cache never held over a long task (16.7M input tokens at full price for one small site).
+  it("keeps the system prompt the same from step to step: the date, not the time", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-18T10:00:00Z") });
+    try {
+      // The first answer comes late: the next request goes out after the clock moved on.
+      const id = await start([{ ...call("read_file", { path: "src/app.ts" }), delayMs: 800 }]);
+      await vi.waitFor(() => expect(coderRequests().length).toBeGreaterThan(0));
+      vi.setSystemTime(new Date("2026-10-18T10:07:00Z"));
+      await settle(id);
+      const systems = new Set(coderRequests().map((m) => JSON.stringify(m[0])));
+      expect(systems.size).toBe(1);
+      expect([...systems][0]).toContain("2026");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sums up before a request grows past 400 000 characters, however large the model's context", () => {
+    const model = (contextLength: number) => ({ id: "m", name: "m", contextLength, priceIn: 0, priceOut: 0, priceEstimated: false, tools: true, vision: null });
+    expect(memoryLimit(model(1_000_000))).toBe(400_000);
+    expect(memoryLimit(model(32_000))).toBe(67_200);
+    expect(memoryLimit(undefined)).toBe(200_000);
   });
 
   it("leaves a short conversation as it is", async () => {

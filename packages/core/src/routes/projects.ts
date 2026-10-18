@@ -29,6 +29,9 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
       if (!existsSync(path) || !statSync(path).isDirectory()) return c.json({ error: { code: "not_found" as const } }, 400);
       const existing = projects.findByPath(path);
       if (existing) return c.json(await withGit(existing), 200);
+      // A plain folder gets git at once: the copy, the review and the acceptance work through it. Without git
+      // installed the project stays "not_repo" and the page says what to do.
+      if (!(await isRepoRoot(path).catch(() => true))) await initWithCommit(path).catch(() => {});
       try {
         return c.json(await withGit(projects.create(basename(path) || path, path)), 201);
       } catch (err) {

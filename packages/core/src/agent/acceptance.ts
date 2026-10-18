@@ -4,7 +4,7 @@ import { z } from "zod";
 import { isCli } from "../cli/kinds";
 import { runCliTurn } from "../cli/turn";
 import type { Connection } from "../providers/repo";
-import { nowLine } from "../now";
+import { todayLine } from "../now";
 import { requirementsText } from "./phases";
 import { runAgent, type RunInput } from "./run";
 
@@ -18,7 +18,7 @@ function systemPrompt(root: string, platform = process.platform): string {
   return [
     "You are the acceptance agent in Artel. Another agent wrote the code; you did not, and you must not change it.",
     `The work is in a copy of the project at: ${root}`,
-    nowLine(),
+    todayLine(),
     `Commands run with ${shell} in that folder.`,
     "",
     "Check every requirement against what was actually built:",

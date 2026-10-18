@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { userInfo } from "node:os";
 
 export interface GitResult {
   code: number;
@@ -80,10 +81,18 @@ export async function ensureIdentity(dir: string): Promise<void> {
   if (res.code !== 0) throw new GitError("no_identity", "git user.name and user.email are not set");
 }
 
+/**
+ * Starts git in a plain folder with one commit of what is there, dependency folders left out. Without a name and email
+ * in git, this repository alone gets the computer's user name: the user need not know about git to start.
+ */
 export async function initWithCommit(dir: string): Promise<void> {
-  await ensureIdentity(dir);
   await runGit(dir, ["init", "-q"]);
-  await runGit(dir, ["add", "-A"]);
+  if ((await runGit(dir, ["var", "GIT_AUTHOR_IDENT"], true)).code !== 0) {
+    const name = userInfo().username || "Artel user";
+    await runGit(dir, ["config", "user.name", name]);
+    await runGit(dir, ["config", "user.email", `${name.replace(/[^\w.-]/g, "") || "user"}@localhost`]);
+  }
+  await runGit(dir, ["add", "-A", "--", ".", ...withoutDependencies()]);
   await runGit(dir, ["commit", "-q", "--allow-empty", "-m", "Initial commit"]);
 }
 
@@ -113,6 +122,8 @@ export async function removeWorktree(repo: string, path: string, branch: string)
  */
 export const NEVER_ADDED = ["node_modules", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".next", ".nuxt", ".turbo", ".parcel-cache"];
 export const anywhere = (name: string) => `:(glob)**/${name}/**`;
+/** Pathspecs that leave dependency folders out of `git add`, wherever they are. */
+export const withoutDependencies = () => NEVER_ADDED.map((name) => `:(exclude,glob)**/${name}/**`);
 
 export async function commitAll(worktree: string, message: string): Promise<boolean> {
   const tracked = lines(await out(worktree, ["ls-files", "--", ...NEVER_ADDED.map(anywhere)])).map((p) => p.split("/"));

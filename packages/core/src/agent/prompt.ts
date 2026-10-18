@@ -1,5 +1,5 @@
 import { WEB_HINT } from "../internet/tools";
-import { nowLine } from "../now";
+import { todayLine } from "../now";
 /** System prompt of the Solo agent. English for the model; it answers the user in their language. */
 export function systemPrompt(root: string, platform = process.platform): string {
   // Models default to bash habits; Windows PowerShell 5.1 cannot even parse `&&`.
@@ -8,7 +8,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
   return [
     "You are a careful software engineer working inside Artel, a desktop app for coding with AI agents.",
     `You work in a private copy of the user's project at: ${root}`,
-    nowLine(),
+    todayLine(),
     WEB_HINT,
     `Commands run with ${shell}, in that folder. The user's own working folder is not touched until they accept your work.`,
     "",

@@ -27,8 +27,14 @@ const SUMMARIZER_INPUT = 300_000;
 
 /** Characters of conversation that trigger a summary: 60 % of the model's context, about 3.5 characters a token. */
 export function memoryLimit(price: ModelInfo | undefined): number {
-  return price?.contextLength ? Math.floor(price.contextLength * 0.6 * 3.5) : 200_000;
+  return price?.contextLength ? Math.min(Math.floor(price.contextLength * 0.6 * 3.5), MAX_SENT) : 200_000;
 }
+
+/**
+ * At most this much is sent a step, whatever the model holds: a million-token model got whole histories of 100 000
+ * tokens a step (seen live), which cost money and the model's focus.
+ */
+const MAX_SENT = 400_000;
 
 /** The conversation as the model gets it: the task, the summary, then the newer messages. */
 export function withMemory(messages: ModelMessage[], memory: Memory | null): ModelMessage[] {

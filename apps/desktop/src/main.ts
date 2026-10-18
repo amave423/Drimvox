@@ -1,3 +1,4 @@
+import { coreGitEnv } from "./git-env";
 import { attachContextMenu } from "./context-menu";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
@@ -76,6 +77,11 @@ function webDir(): string {
   return app.isPackaged ? join(process.resourcesPath, "web") : join(__dirname, "..", "..", "web", "dist");
 }
 
+/** The bundled git: in the installed app beside the interface, while developing where npm put it. */
+function gitDir(): string {
+  return app.isPackaged ? join(process.resourcesPath, "git") : join(__dirname, "..", "..", "..", "node_modules", "dugite", "git");
+}
+
 function startCore(): Promise<number> {
   const dataDir = app.getPath("userData");
   const init: InitMessage = {
@@ -89,7 +95,9 @@ function startCore(): Promise<number> {
   };
 
   return new Promise((resolve, reject) => {
-    const child = utilityProcess.fork(join(__dirname, "core.cjs"), [], { serviceName: "Artel core" });
+    // The git the app carries, when the system has none (git-env.ts).
+    const env = { ...process.env, ...coreGitEnv(gitDir()) } as Record<string, string>;
+    const child = utilityProcess.fork(join(__dirname, "core.cjs"), [], { serviceName: "Artel core", env });
     child.postMessage(init);
     child.once("message", (msg: { type: string; port?: number; error?: string }) => {
       if (msg.type === "ready" && msg.port) resolve(msg.port);

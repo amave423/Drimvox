@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, rmSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { anywhere, isRepoRoot, NEVER_ADDED, runGit } from "../agent/git";
+import { isRepoRoot, runGit, withoutDependencies } from "../agent/git";
 
 /**
  * Snapshots of a chat's folder before each answer, so one button undoes what the model did (docs/specs/chat-folder.md).
@@ -16,7 +16,7 @@ async function treeOf(folder: string): Promise<string> {
   const index = join(tmpdir(), `artel-index-${randomUUID()}`);
   const env = { GIT_INDEX_FILE: index };
   try {
-    await runGit(folder, ["add", "-A", "--", ".", ...NEVER_ADDED.map((n) => `:(exclude)${anywhere(n)}`)], false, env);
+    await runGit(folder, ["add", "-A", "--", ".", ...withoutDependencies()], false, env);
     return (await runGit(folder, ["write-tree"], false, env)).stdout.trim();
   } finally {
     rmSync(index, { force: true });

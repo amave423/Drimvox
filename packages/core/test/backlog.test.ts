@@ -80,6 +80,34 @@ describe("the task list", () => {
     expect(shared).toMatchObject({ context: "Сайт-таймер помодоро для себя: тёмный, простой.", pages: [{ url: "http://localhost:5173/" }] });
   });
 
+  // Seen live: the planner wrote what to check in words; Artel ran them in PowerShell, they failed, and the coder spent
+  // half an hour building a browser harness to make "the checks" pass.
+  it("keeps only real commands among the project's checks", async () => {
+    const wordy = call("propose_tasks", {
+      context: "Таймер.",
+      tasks: TASKS,
+      checks: ["Кнопка «Старт» запускает отсчёт", "Open the page and see the timer", "npm test", "node --test", "./check.sh", ".\\check.ps1"],
+    });
+    const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), wordy]);
+    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
+    expect((await backlog(projectId)).plan.checks).toEqual(["npm test", "node --test", "./check.sh", ".\\check.ps1"]);
+  });
+
+  // Seen live: the MVP was "a working timer", the look a later task; the coder spent its time measuring the ring in a
+  // browser it started itself.
+  it("tells the coder to do this task only and to stop once its points hold", async () => {
+    const write = call("write_file", { path: "index.html", content: "<button>Старт</button>\n" });
+    const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list, write, finish], [verdict(["R1", "R2"])]);
+    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
+    const { items } = await backlog(projectId);
+    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/run`, { ids: [items[0].id], providerId, model: "coder" })).json()).id);
+    const coder = fake!.requests.find((r) => r.path === "/v1/chat/completions" && !isAcceptor(r.body) && JSON.stringify(r.body.messages).includes("Кнопка «Старт»"))!;
+    const system = coder.body.messages[0].content as string;
+    expect(system).toMatch(/one task of the project's list/i);
+    expect(system).toMatch(/do not polish/i);
+    expect(system).not.toMatch(/approved spec/i);
+  });
+
   it("refuses a batch heavier than three points", async () => {
     const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list]);
     await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);

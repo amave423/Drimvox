@@ -18,7 +18,12 @@ export async function startTask(page: Page, s: Start): Promise<void> {
   await page.evaluate(async ({ task, model, stages, team }) => {
     const token = await (window as unknown as { artel: { getToken(): Promise<string> } }).artel.getToken();
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-    const projects = (await (await fetch("/api/projects", { headers })).json()) as { id: string }[];
+    // Adding a folder starts git in it first: the project appears a moment after the click.
+    let projects: { id: string }[] = [];
+    for (let i = 0; i < 100 && projects.length === 0; i++) {
+      projects = (await (await fetch("/api/projects", { headers })).json()) as { id: string }[];
+      if (projects.length === 0) await new Promise((r) => setTimeout(r, 100));
+    }
     const providers = (await (await fetch("/api/providers", { headers })).json()) as { id: string }[];
     const providerId = providers[0]!.id;
     const body = { task, providerId, model, stages, ...(team ? { team: { providerId, model: team.model } } : {}) };

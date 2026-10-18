@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { userInfo } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -64,17 +65,41 @@ describe("projects", () => {
     expect(await res.json()).toMatchObject({ path: repo, gitState: "ready" });
   });
 
-  it("offers to start git in a plain folder and does it on request", async () => {
+  // The user need not know about git: a plain folder gets it when added, dependencies left out.
+  it("starts git in a plain folder on its own when it is added", async () => {
     const plain = mkdtempSync(join(tmpdir(), "artel-plain-"));
     writeFileSync(join(plain, "notes.txt"), "hello");
+    mkdirSync(join(plain, "node_modules", "x"), { recursive: true });
+    writeFileSync(join(plain, "node_modules", "x", "index.js"), "x");
     const project = await (await env.call("POST", "/api/projects", { path: plain })).json();
-    expect(project.gitState).toBe("not_repo");
-
-    const ready = await (await env.call("POST", `/api/projects/${project.id}/init-git`)).json();
-    expect(ready.gitState).toBe("ready");
+    expect(project.gitState).toBe("ready");
     expect(git(plain, "log", "--format=%s")).toBe("Initial commit");
     expect(git(plain, "show", "--name-only", "--format=")).toBe("notes.txt");
     rmSync(plain, { recursive: true, force: true });
+  });
+
+  it("commits under the computer's user name when git has none set", async () => {
+    const plain = mkdtempSync(join(tmpdir(), "artel-plain-"));
+    writeFileSync(join(plain, "notes.txt"), "hello");
+    const empty = join(plain, "..", `artel-empty-gitconfig-${Date.now()}`);
+    writeFileSync(empty, "");
+    const keys = ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"];
+    const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+    for (const k of keys.slice(2)) delete process.env[k];
+    process.env.GIT_CONFIG_GLOBAL = empty;
+    process.env.GIT_CONFIG_NOSYSTEM = "1";
+    try {
+      const project = await (await env.call("POST", "/api/projects", { path: plain })).json();
+      expect(project.gitState).toBe("ready");
+      expect(git(plain, "log", "--format=%an")).toBe(userInfo().username);
+    } finally {
+      for (const k of keys) {
+        if (saved[k] === undefined) delete process.env[k];
+        else process.env[k] = saved[k];
+      }
+      rmSync(empty, { force: true });
+      rmSync(plain, { recursive: true, force: true });
+    }
   });
 
   it("refuses a folder that does not exist", async () => {

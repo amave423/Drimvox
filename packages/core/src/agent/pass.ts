@@ -1,5 +1,5 @@
 import type { BacklogRepo } from "../backlog/repo";
-import { LIST_NOW, listInstructions, listTools, saveList, type ListProposal } from "../backlog/plan";
+import { itemInstructions, LIST_NOW, listInstructions, listTools, saveList, type ListProposal } from "../backlog/plan";
 import type { Memory } from "./memory";
 import type { DesignBrief, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
 import type { ModelMessage, ToolSet } from "ai";
@@ -192,7 +192,13 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     ownTools,
     stopTools,
     instructions: [
-      planning ? planInstructions() : phase === "list" ? listInstructions(ctx.developer()) : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),
+      planning
+        ? planInstructions()
+        : phase === "list"
+          ? listInstructions(ctx.developer())
+          : row.kind === "item"
+            ? itemInstructions(JSON.parse(row.checks) as string[])
+            : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),
       designNote,
       skillsInstructions(skills),
     ]

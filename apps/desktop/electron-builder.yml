@@ -14,6 +14,9 @@ files:
 extraResources:
   - from: ../web/dist
     to: web
+  # Git for users without one (src/git-env.ts): dugite's build for this system.
+  - from: ../../node_modules/dugite/git
+    to: git
 asar: true
 npmRebuild: false
 nodeGypRebuild: false
