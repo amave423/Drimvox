@@ -118,7 +118,7 @@ try {
   if (opened) await (await opened).close();
   rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
-log(`\nmodel ${model}, budget $${budgetUsd}\n| task | done | status | steps | failed calls | minutes | ₽ |\n|---|---|---|---|---|---|---|\n${rows.join("\n")}`);
+log(`\nmodel ${model}, budget $${budgetUsd}\n| task | flow | done | status | steps | failed calls | minutes | ₽ |\n|---|---|---|---|---|---|---|---|\n${rows.join("\n")}`);
 
 async function run(t: BenchTask, providerId: string): Promise<string> {
   const dir = makeProject(t.files);
