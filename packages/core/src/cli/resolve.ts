@@ -1,5 +1,6 @@
 import { presets } from "@artel/shared";
 import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { delimiter, dirname, extname, isAbsolute, join } from "node:path";
 import type { CliId } from "./kinds";
 import { forgetDefaults } from "./models";
@@ -21,7 +22,7 @@ export function resolveCli(id: CliId): string[] | null {
   if (given) return isAbsolute(given[0]!) && !existsSync(given[0]!) ? null : given;
   const name = presets[id].cli!.command;
   if (process.platform !== "win32") {
-    const found = onPath(name)[0];
+    const found = onPath(name)[0] ?? installedAt(id);
     return found ? [found] : null;
   }
   const found = onPath(name);
@@ -31,7 +32,21 @@ export function resolveCli(id: CliId): string[] | null {
     const target = fromShim(cmd);
     if (target) return target;
   }
-  return null;
+  const own = installedAt(id);
+  return own ? [own] : null;
+}
+
+/**
+ * Where a CLI's own installer puts it, for when PATH does not have it yet: Artel started before the install sees the
+ * old PATH. Antigravity CLI goes to %LOCALAPPDATA%\agy\bin on Windows and ~/.local/bin elsewhere.
+ */
+function installedAt(id: CliId): string | null {
+  if (id !== "antigravity") return null;
+  const file =
+    process.platform === "win32"
+      ? join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "agy", "bin", "agy.exe")
+      : join(process.env.HOME ?? homedir(), ".local", "bin", "agy");
+  return existsSync(file) ? file : null;
 }
 
 /** What an npm .cmd wrapper starts: a native program, or a script for Node. */

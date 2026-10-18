@@ -8,6 +8,7 @@ export interface CoreStatus {
   dataDir: string;
   schemaVersion: number;
   node: string;
+  platform: string;
 }
 
 /**

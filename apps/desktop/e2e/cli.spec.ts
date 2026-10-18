@@ -96,3 +96,10 @@ test("says how to install a CLI that is missing", async () => {
   await expect(page.getByText("Программа не установлена или не найдена. Установи её командой ниже и проверь снова.")).toBeVisible();
   await expect(page.locator(".error-note-detail", { hasText: "npm install -g @openai/codex" })).toBeVisible();
 });
+
+test("offers Antigravity CLI with Google's own install command for this computer", async () => {
+  const page = await launch();
+  await page.getByRole("region", { name: "По подписке" }).getByRole("radio", { name: /Antigravity/ }).click();
+  const command = process.platform === "win32" ? "irm https://antigravity.google/cli/install.ps1 | iex" : "curl -fsSL https://antigravity.google/cli/install.sh | bash";
+  await expect(page.locator("code.cli-install", { hasText: command })).toBeVisible();
+});

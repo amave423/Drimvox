@@ -32,7 +32,7 @@ export interface Preset {
   /** How usage is billed: real money, provider credits, the user's subscription to a CLI, or nothing (local). */
   billing: "paid" | "credits" | "subscription" | "free";
   /** A command-line agent Artel runs instead of calling an API: its program and how to install it. */
-  cli?: { command: string; install: string };
+  cli?: { command: string; install: string; /** When Windows installs it another way. */ installWindows?: string };
   /** What the provider's prices and costs are in. Artel converts rubles to dollars internally. */
   currency: "USD" | "RUB";
 }
@@ -46,6 +46,13 @@ export interface SubscriptionLimit {
   /** When the window starts over, in milliseconds; null when not said. */
   resetsAt: number | null;
   status: "ok" | "warning" | "reached";
+}
+
+/** How to install a CLI on the computer the core runs on (`process.platform` there); null for presets without one. */
+export function installCommand(id: PresetId, platform: string): string | null {
+  const cli = presets[id].cli;
+  if (!cli) return null;
+  return platform === "win32" && cli.installWindows ? cli.installWindows : cli.install;
 }
 
 export const presets: Record<PresetId, Preset> = {
@@ -107,7 +114,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "subscription",
     currency: "USD",
-    cli: { command: "agy", install: "https://antigravity.google/download" },
+    // Google's own installers (antigravity.google/docs/getting-started, CLI tab).
+    cli: { command: "agy", install: "curl -fsSL https://antigravity.google/cli/install.sh | bash", installWindows: "irm https://antigravity.google/cli/install.ps1 | iex" },
   },
   anthropic: {
     id: "anthropic",

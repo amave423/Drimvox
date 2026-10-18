@@ -1,4 +1,4 @@
-import { presets, type ModelInfo } from "@artel/shared";
+import { installCommand, type ModelInfo } from "@artel/shared";
 import { ProviderFailure } from "../providers/errors";
 import { catalogItems } from "../providers/native";
 import type { Connection } from "../providers/repo";
@@ -88,7 +88,7 @@ function info(id: string, name: string, resolved?: string | null): ModelInfo {
  */
 export async function cliModels(conn: Connection & { preset: CliId }): Promise<ModelInfo[]> {
   const id = conn.preset;
-  if (!resolveCli(id)) throw new ProviderFailure({ code: "cli_missing", detail: presets[id].cli!.install });
+  if (!resolveCli(id)) throw new ProviderFailure({ code: "cli_missing", detail: installCommand(id, process.platform)! });
   const vendor = VENDOR[id];
   if (id === "antigravity") {
     const own = await listByCli(resolveCli(id)!);

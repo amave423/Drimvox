@@ -52,7 +52,8 @@
 
 ## Antigravity CLI and subscription limits
 - Google stopped serving Gemini CLI to personal accounts on 2026-06-18; its successor `agy` (Antigravity CLI) is a
-  fourth CLI. Headless: `--output-format stream-json --input-format stream-json`, the prompt as one
+  fourth CLI, installed with Google's own one-line installer (`irm …/install.ps1 | iex` on Windows, `curl …/install.sh | bash`
+  elsewhere); Artel also looks where that installer puts it, since a running Artel keeps its old PATH. Headless: `--output-format stream-json --input-format stream-json`, the prompt as one
   `{"event":"user",...}` line on stdin, `--conversation <id>` to continue, `--model <slug>` from `agy models`.
   Chats and read steps run without `--dangerously-skip-permissions` (agy then refuses what needs approval); writing
   steps get it together with `--sandbox`, inside Artel's copy of the project.

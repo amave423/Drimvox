@@ -141,6 +141,8 @@ export function createCore(o: AppOptions) {
         dataDir: o.dataDir,
         schemaVersion: o.db.schemaVersion(),
         node: process.versions.node,
+        // Install commands differ between Windows and the rest; this is the computer the programs run on.
+        platform: process.platform,
       }),
     )
     .get("/rates", async (c) => c.json({ usdRub: await usdRub() }))

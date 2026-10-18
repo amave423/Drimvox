@@ -1,3 +1,4 @@
+import { presets } from "@artel/shared";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider } from "./fake-provider";
@@ -58,7 +59,9 @@ describe("connecting providers", () => {
   it("allows local servers without a key", async () => {
     const res = await env.call("POST", "/api/providers", { preset: "ollama" });
     expect(res.status).toBe(201);
-    expect(await res.json()).toMatchObject({ hasKey: false, billing: "free", baseUrl: "http://127.0.0.1:11434/v1" });
+    // Tests point Ollama at a dead address so this computer's own Ollama stays out; the real default is Ollama's port.
+    expect(await res.json()).toMatchObject({ hasKey: false, billing: "free", baseUrl: "http://127.0.0.1:9/v1" });
+    expect(presets.ollama.baseUrl).toBe("http://127.0.0.1:11434/v1");
   });
 
   it("requires an address for a custom provider", async () => {
