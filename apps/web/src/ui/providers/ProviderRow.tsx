@@ -1,3 +1,4 @@
+import { SubscriptionLimits } from "./SubscriptionLimits";
 import type { Balance, ProviderView } from "@artel/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
@@ -89,6 +90,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
         )}
         {check && "error" in check && <ErrorNote error={check.error} />}
       </div>
+      {provider.billing === "subscription" && check && "models" in check && <SubscriptionLimits providerId={provider.id} />}
       {provider.preset === "google" && <p className="muted provider-note">{t("providers.googleFree")}</p>}
 
       <div className="provider-proxy">
@@ -126,14 +128,16 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
       )}
 
       {mode === "confirmRemove" && (
-        <div className="inline-form">
-          <span>{t("providers.removeConfirm", { name: provider.name })}</span>
-          <button className="btn is-pencil" disabled={busy} onClick={() => void remove()}>
-            {t("providers.remove")}
-          </button>
-          <button className="btn" onClick={() => setMode("idle")}>
-            {t("providers.cancel")}
-          </button>
+        <div className="provider-confirm" role="group" aria-label={t("providers.remove")}>
+          <p>{t("providers.removeConfirm", { name: provider.name })}</p>
+          <div className="provider-confirm-actions">
+            <button className="btn is-pencil" disabled={busy} onClick={() => void remove()}>
+              {t("providers.remove")}
+            </button>
+            <button className="btn" onClick={() => setMode("idle")}>
+              {t("providers.cancel")}
+            </button>
+          </div>
         </div>
       )}
 

@@ -6,6 +6,7 @@ export const presetIds = [
   "claude-code",
   "codex",
   "gemini-cli",
+  "antigravity",
   "anthropic",
   "openai",
   "google",
@@ -34,6 +35,17 @@ export interface Preset {
   cli?: { command: string; install: string };
   /** What the provider's prices and costs are in. Artel converts rubles to dollars internally. */
   currency: "USD" | "RUB";
+}
+
+/** How much of a subscription's window is used, as its CLI reported it on the last run. */
+export interface SubscriptionLimit {
+  /** "five_hour", "seven_day", or another window the CLI names. */
+  window: string;
+  /** 0..1; null when the CLI only said whether it is allowed. */
+  usedShare: number | null;
+  /** When the window starts over, in milliseconds; null when not said. */
+  resetsAt: number | null;
+  status: "ok" | "warning" | "reached";
 }
 
 export const presets: Record<PresetId, Preset> = {
@@ -86,6 +98,16 @@ export const presets: Record<PresetId, Preset> = {
     billing: "subscription",
     currency: "USD",
     cli: { command: "gemini", install: "npm install -g @google/gemini-cli" },
+  },
+  antigravity: {
+    id: "antigravity",
+    name: "Antigravity CLI",
+    baseUrl: "",
+    keyRequired: false,
+    editableUrl: false,
+    billing: "subscription",
+    currency: "USD",
+    cli: { command: "agy", install: "https://antigravity.google/download" },
   },
   anthropic: {
     id: "anthropic",

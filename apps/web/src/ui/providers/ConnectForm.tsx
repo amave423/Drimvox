@@ -93,7 +93,13 @@ export function ConnectForm({ kind }: { kind: "key" | "subscription" }) {
           {p.cli ? (
             <div className="cli-note">
               <p>{t("providers.cli.needs", { command: p.cli.command })}</p>
-              <code className="mono cli-install">{p.cli.install}</code>
+              {/^https:/.test(p.cli.install) ? (
+                <a className="cli-install" href={p.cli.install} target="_blank" rel="noreferrer">
+                  {p.cli.install}
+                </a>
+              ) : (
+                <code className="mono cli-install">{p.cli.install}</code>
+              )}
               <p>{t("providers.cli.login", { command: p.cli.command })}</p>
               {preset === "gemini-cli" && <p className="is-pencil-text">{t("providers.cli.geminiRetired")}</p>}
             </div>

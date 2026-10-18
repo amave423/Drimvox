@@ -7,6 +7,11 @@ import { dirname, join } from "node:path";
 
 const [kind, ...args] = process.argv.slice(2);
 const dir = process.env.FAKE_CLI_DIR;
+// `agy models` lists the slugs, one per line, under a header.
+if (kind === "agy" && args[0] === "models") {
+  process.stdout.write(["Available models:", "  gemini-4-argon        Gemini 4 Argon", "  gemini-3.8-flash      Gemini 3.8 Flash", "  claude-sonnet-5-5     Claude Sonnet 5.5", ""].join("\n"));
+  process.exit(0);
+}
 const stdin = await new Promise((resolve) => {
   let data = "";
   process.stdin.setEncoding("utf8");
@@ -35,6 +40,8 @@ if (kind === "claude") {
     out({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: `tu${i}`, content: t.output ?? "ok", is_error: !!t.error }] } });
   }
   out({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text }] } });
+  // Claude Code tells how much of the subscription's window is used (seen live: seven_day, utilization 0.35).
+  for (const l of turn.limits ?? []) out({ type: "rate_limit_event", rate_limit_info: l });
   out({
     type: "result",
     subtype: turn.error ? "error_during_execution" : "success",
@@ -59,8 +66,33 @@ if (kind === "claude") {
   if (turn.error) out({ type: "turn.failed", error: { message: turn.error } });
   else {
     out({ type: "item.completed", item: { id: "final", type: "agent_message", text } });
+    if (turn.rateLimits) out({ type: "token_count", rate_limits: turn.rateLimits });
     out({ type: "turn.completed", usage: { input_tokens: 120, cached_input_tokens: 0, output_tokens: 30 } });
   }
+} else if (kind === "agy") {
+  // Antigravity CLI: every line names its event; text comes in deltas, tools as steps.
+  const step = (o) => out({ event: "step_update", step_update: { conversation_id: session, ...o } });
+  out({ event: "init", conversation_id: session, init: { cwd: process.cwd(), tools: ["read_file", "write_file", "command"], permission_mode: "request-review" } });
+  step({ step_index: 0, state: "DONE", step_type: "user_input" });
+  for (const [i, t] of (turn.tools ?? []).entries()) {
+    step({ step_index: i + 1, state: "ACTIVE", step_type: "tool", tool_name: t.name, tool_info: { name: t.name, parameters: t.input } });
+    step({ step_index: i + 1, state: "DONE", step_type: "tool", tool_name: t.name, tool_info: { name: t.name, parameters: t.input, output: t.output ?? "ok", ...(t.error ? { error: { type: "Error", message: "failed" } } : {}) } });
+  }
+  const n = (turn.tools ?? []).length + 1;
+  step({ step_index: n, state: "ACTIVE", step_type: "agent_response", text_delta: text.slice(0, 3) });
+  step({ step_index: n, state: "ACTIVE", step_type: "agent_response", text_delta: text.slice(3) });
+  step({ step_index: n, state: "DONE", step_type: "agent_response" });
+  out({
+    event: "result",
+    result: {
+      conversation_id: session,
+      status: turn.error ? "ERROR" : "SUCCESS",
+      response: turn.error ? "" : text,
+      ...(turn.error ? { error: turn.error } : {}),
+      ...(turn.json ? { structured_output: turn.json } : {}),
+      usage: { input_tokens: 120, output_tokens: 30, thinking_tokens: 5, cache_read_tokens: 0, total_tokens: 155 },
+    },
+  });
 } else {
   out({ type: "init", timestamp: "t", session_id: session, model: "gemini-test" });
   for (const [i, t] of (turn.tools ?? []).entries()) {

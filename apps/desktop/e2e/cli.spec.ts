@@ -54,7 +54,7 @@ async function launch(): Promise<Page> {
 }
 
 test("connects Claude Code without a key, names its models and chats through it", async () => {
-  writeFileSync(join(cliDir, "script.json"), JSON.stringify([{ text: "Привет из Claude Code", session: "s1", initModel: "claude-fable-5-1" }]));
+  writeFileSync(join(cliDir, "script.json"), JSON.stringify([{ text: "Привет из Claude Code", session: "s1", initModel: "claude-fable-5-1", limits: [{ status: "allowed_warning", resetsAt: 1_900_000_000, rateLimitType: "seven_day", utilization: 0.35 }] }]));
   const page = await launch();
   // Subscriptions have their own place, apart from the keys.
   const subscriptions = page.getByRole("region", { name: "По подписке" });
@@ -64,6 +64,7 @@ test("connects Claude Code without a key, names its models and chats through it"
   await expect(page.getByLabel(/Ключ API/)).toHaveCount(0);
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
   await expect(subscriptions.getByText("Моделей: 3")).toBeVisible();
+  await expect(subscriptions.getByText(/Остаток лимита программа сообщает после ответа/)).toBeVisible();
   await expect(page.getByText("По подписке: Artel считает токены, но не деньги")).toBeVisible();
   await expect(page.getByRole("button", { name: "Заменить ключ" })).toHaveCount(0);
 
@@ -78,6 +79,8 @@ test("connects Claude Code without a key, names its models and chats through it"
   await box.press("Enter");
   await expect(page.getByText("Привет из Claude Code")).toBeVisible();
   await expect(page.getByText(/Токены: 120 → 30/)).toBeVisible();
+  // What is left of the subscription, as Claude Code said it, next to the chat.
+  await expect(page.getByRole("list", { name: "Лимит подписки" })).toContainText(/Неделя.*осталось 65%.*обновится/);
 
   // Now Artel knows what "default" turned out to be.
   await page.getByRole("button", { name: /Claude Code \/ По умолчанию/ }).click();

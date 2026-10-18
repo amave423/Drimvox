@@ -37,6 +37,8 @@ const CATALOG = [
 
 interface Turn {
   initModel?: string;
+  limits?: Record<string, unknown>[];
+  rateLimits?: Record<string, unknown>;
   text?: string;
   json?: unknown;
   error?: string;
@@ -51,7 +53,7 @@ beforeEach(async () => {
   env.setPresetUrl("openrouter", catalog.baseUrl);
   dir = mkdtempSync(join(tmpdir(), "artel-fake-cli-"));
   process.env.FAKE_CLI_DIR = dir;
-  for (const [id, kind] of [["claude-code", "claude"], ["codex", "codex"], ["gemini-cli", "gemini"]] as const) {
+  for (const [id, kind] of [["claude-code", "claude"], ["codex", "codex"], ["gemini-cli", "gemini"], ["antigravity", "agy"]] as const) {
     env.setCliCommand(id, [process.execPath, FAKE, kind]);
   }
   repo = makeRepo({ "package.json": '{ "type": "module" }\n', "math.js": MATH, "math.test.js": TEST_ADD });
@@ -163,6 +165,36 @@ describe("chat", () => {
     expect(calls()[0]!.args).toEqual(expect.arrayContaining(["--model", "claude-opus-5-5"]));
   });
 
+  it("shows how much of the subscription's limit is used, as the CLI reports it", async () => {
+    const id = await connect("claude-code");
+    expect(await (await env.call("GET", `/api/providers/${id}/limits`)).json()).toEqual([]);
+    script([
+      {
+        text: "Привет",
+        limits: [
+          { status: "allowed", resetsAt: 1_800_000_000, rateLimitType: "five_hour", utilization: 0.12 },
+          { status: "allowed_warning", resetsAt: 1_800_500_000, rateLimitType: "seven_day", utilization: 0.81 },
+        ],
+      },
+    ]);
+    const chat = await (await env.call("POST", "/api/chats", { providerId: id, model: "default" })).json();
+    await say(chat.id, "Привет");
+    expect(await (await env.call("GET", `/api/providers/${id}/limits`)).json()).toEqual([
+      { window: "five_hour", usedShare: 0.12, resetsAt: 1_800_000_000_000, status: "ok" },
+      { window: "seven_day", usedShare: 0.81, resetsAt: 1_800_500_000_000, status: "warning" },
+    ]);
+
+    // Codex reports the same in percent, with the window in minutes.
+    const codex = await connect("codex");
+    script([{ text: "Привет" }, { text: "Привет", rateLimits:{ primary: { used_percent: 40, window_minutes: 300, resets_at: 1_800_000_000 }, secondary: { used_percent: 100, window_minutes: 10080, resets_at: 1_800_500_000 } } }]);
+    const chat2 = await (await env.call("POST", "/api/chats", { providerId: codex, model: "default" })).json();
+    await say(chat2.id, "Привет");
+    expect(await (await env.call("GET", `/api/providers/${codex}/limits`)).json()).toEqual([
+      { window: "five_hour", usedShare: 0.4, resetsAt: 1_800_000_000_000, status: "ok" },
+      { window: "seven_day", usedShare: 1, resetsAt: 1_800_500_000_000, status: "reached" },
+    ]);
+  });
+
   it("says plainly that Google no longer serves Gemini CLI to personal accounts", async () => {
     script([{ error: "This client is no longer supported for Gemini Code Assist for individuals. Please migrate to Antigravity." }]);
     const id = await connect("gemini-cli");
@@ -191,6 +223,38 @@ describe("chat", () => {
     const chat = await (await env.call("POST", "/api/chats", { providerId: id, model: "flash" })).json();
     expect(await say(chat.id, "Привет")).toMatchObject({ status: "done", content: "Привет из Gemini" });
     expect(calls()[0]!.args).toEqual(expect.arrayContaining(["--output-format", "stream-json", "-m", "flash", "--approval-mode", "default"]));
+  });
+});
+
+describe("Antigravity CLI", () => {
+  it("lists the models agy names, answers through it and continues the conversation", async () => {
+    const id = await connect("antigravity");
+    const models = await (await env.call("GET", `/api/providers/${id}/models`)).json();
+    expect(models.map((m: any) => m.id)).toEqual(["default", "gemini-4-argon", "gemini-3.8-flash", "claude-sonnet-5-5"]);
+
+    script([
+      { text: "Привет из Antigravity", session: "conv-1", tools: [{ name: "read_file", input: { path: "README.md" } }] },
+      { text: "Второй ответ", session: "conv-1" },
+    ]);
+    const chat = await (await env.call("POST", "/api/chats", { providerId: id, model: "gemini-4-argon" })).json();
+    // Thinking counts as output, as agy bills it.
+    expect(await say(chat.id, "Привет")).toMatchObject({ status: "done", content: "Привет из Antigravity", inputTokens: 120, outputTokens: 35, costUsd: 0 });
+    expect(await say(chat.id, "Ещё")).toMatchObject({ content: "Второй ответ" });
+
+    const [first, second] = calls();
+    expect(first!.args).toEqual(expect.arrayContaining(["--output-format", "stream-json", "--input-format", "stream-json", "--model", "gemini-4-argon"]));
+    // Read-only in a chat: nothing is approved on its own.
+    expect(first!.args).not.toContain("--dangerously-skip-permissions");
+    // The prompt goes in as agy's own input line, not as an argument.
+    expect(JSON.parse(first!.prompt.trim())).toMatchObject({ event: "user", message: { content: expect.stringContaining("Привет") } });
+    expect(second!.args).toEqual(expect.arrayContaining(["--conversation", "conv-1"]));
+  });
+
+  it("tells the user to sign in when agy is not signed in", async () => {
+    script([{ error: "authentication required: run agy to sign in" }]);
+    const id = await connect("antigravity");
+    const chat = await (await env.call("POST", "/api/chats", { providerId: id, model: "default" })).json();
+    expect(await say(chat.id, "Привет")).toMatchObject({ status: "error", error: { code: "cli_login" } });
   });
 });
 

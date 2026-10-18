@@ -1,8 +1,7 @@
-import { CONFIRM_ABOVE_USD, currencies, locales, themes, type SettingsPatch } from "@artel/shared";
-import { formatUsd } from "../lib/format";
+import { currencies, locales, themes, type SettingsPatch } from "@artel/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../context";
-import { ModelPicker } from "./chat/ModelPicker";
+import { ProjectModels } from "./ProjectModels";
 import { Segmented } from "./Segmented";
 import { McpSection } from "./McpSection";
 import { ProxySection } from "./ProxySection";
@@ -66,11 +65,17 @@ export function SettingsSheet() {
         >
           {window.artel ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
         </Toggle>
-        {window.artel && (
-          <button type="button" className="btn notify-test" onClick={() => window.artel?.testNotify({ title: t("notice.test"), body: t("notice.testBody") })}>
-            {t("settings.notificationsTest")}
-          </button>
-        )}
+        <p className="muted setting-hint">
+          {t(window.artel ? "settings.notificationsAbout" : "settings.notificationsAboutBrowser")}
+          {window.artel && (
+            <>
+              {" "}
+              <button type="button" className="link" onClick={() => window.artel?.testNotify({ title: t("notice.test"), body: t("notice.testBody") })}>
+                {t("settings.notificationsTest")}
+              </button>
+            </>
+          )}
+        </p>
 
         <h2 className="sheet-h">{t("settings.developerTitle")}</h2>
         <Toggle checked={settings.developer} onChange={(developer) => void save({ developer })}>
@@ -111,53 +116,7 @@ export function SettingsSheet() {
         </form>
         <p className="muted">{t("settings.agentBudgetHint")}</p>
 
-        <h2 className="sheet-h">{t("settings.strongModel")}</h2>
-        <div className="actions">
-          <ModelPicker value={settings.strongModel} onChange={(strongModel) => void save({ strongModel })} />
-          {settings.strongModel && (
-            <button className="link" onClick={() => void save({ strongModel: null })}>
-              {t("settings.clear")}
-            </button>
-          )}
-        </div>
-        <p className="muted">{t("settings.strongModelHint")}</p>
-
-        <h2 className="sheet-h">{t("settings.acceptanceModel")}</h2>
-        <div className="actions">
-          <ModelPicker value={settings.acceptanceModel} onChange={({ providerId, model }) => void save({ acceptanceModel: { providerId, model } })} />
-          {settings.acceptanceModel && (
-            <button className="link" onClick={() => void save({ acceptanceModel: null })}>
-              {t("settings.clear")}
-            </button>
-          )}
-        </div>
-        <p className="muted">{t("settings.acceptanceModelHint")}</p>
-
-        <h2 className="sheet-h">{t("settings.imageModel")}</h2>
-        <div className="actions">
-          <ModelPicker
-            value={settings.imageModel && { ...settings.imageModel, kind: "image" }}
-            kinds={["image"]}
-            onChange={({ providerId, model }) => void save({ imageModel: { providerId, model } })}
-          />
-          {settings.imageModel && (
-            <button className="link" onClick={() => void save({ imageModel: null })}>
-              {t("settings.clear")}
-            </button>
-          )}
-        </div>
-        <p className="muted">{t("settings.imageModelHint", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>
-
-        <h2 className="sheet-h">{t("settings.visionModel")}</h2>
-        <div className="actions">
-          <ModelPicker value={settings.visionModel} onChange={({ providerId, model }) => void save({ visionModel: { providerId, model } })} />
-          {settings.visionModel && (
-            <button className="link" onClick={() => void save({ visionModel: null })}>
-              {t("settings.clear")}
-            </button>
-          )}
-        </div>
-        <p className="muted">{t("settings.visionModelHint")}</p>
+        <ProjectModels save={(patch) => void save(patch)} />
 
         {!window.artel && <AccountSection />}
         <ProxySection />

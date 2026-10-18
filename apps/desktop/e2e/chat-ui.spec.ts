@@ -166,8 +166,12 @@ test("the thinking switch goes with the question, and an answer of thoughts only
   await page.getByRole("button", { name: "+ Новый чат" }).click();
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Fake Model/ }).click();
+  // Internet, thinking and the folder wait behind one button; what differs from the usual shows on it.
+  await page.getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByRole("button", { name: "Мышление: авто" }).click();
   await page.getByRole("option", { name: /без/ }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Параметры: Мышление: без" })).toBeVisible();
   const box = page.getByRole("textbox", { name: /Сообщение/ });
   await box.fill("Что это за игра?");
   await box.press("Enter");

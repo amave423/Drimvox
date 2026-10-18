@@ -1,7 +1,9 @@
+import type { SubscriptionLimit } from "@artel/shared";
 import { realpathSync } from "node:fs";
+import { windowName } from "./limits";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 
-export type CliId = "claude-code" | "codex" | "gemini-cli";
+export type CliId = "claude-code" | "codex" | "gemini-cli" | "antigravity";
 /** read: look only (interview, spec); write: edit the copy and run safe commands; chat: answer, web at most. */
 export type CliMode = "read" | "write" | "chat";
 
@@ -22,10 +24,13 @@ export type CliEvent =
   | { kind: "text"; text: string }
   | { kind: "call"; callId: string; name: string; input: Record<string, unknown> }
   | { kind: "result"; callId: string; ok: boolean; output: string }
+  | { kind: "limit"; limit: SubscriptionLimit }
   | { kind: "done"; text: string | null; structured: unknown; inputTokens: number; outputTokens: number; error: string | null };
 
 export interface CliKind {
   args(l: CliLaunch): string[];
+  /** What goes to its input: the prompt as it is, unless the CLI wants it wrapped. */
+  input?(prompt: string): string;
   /** One parser per run: some CLIs spread the answer over several lines. */
   parser(cwd: string): (line: Record<string, unknown>) => CliEvent[];
 }
@@ -170,6 +175,18 @@ const claude: CliKind = {
           out.push({ kind: "result", callId: String(c.tool_use_id), ok: !c.is_error, output: text(c.content) });
         }
       }
+      if (e.type === "rate_limit_event") {
+        const info = (e.rate_limit_info ?? {}) as { status?: string; resetsAt?: number; rateLimitType?: string; utilization?: number };
+        out.push({
+          kind: "limit",
+          limit: {
+            window: info.rateLimitType ?? "other",
+            usedShare: typeof info.utilization === "number" ? info.utilization : null,
+            resetsAt: typeof info.resetsAt === "number" ? info.resetsAt * 1000 : null,
+            status: info.status === "allowed" ? "ok" : info.status === "allowed_warning" ? "warning" : "reached",
+          },
+        });
+      }
       if (e.type === "result") {
         const usage = (e.usage ?? {}) as Record<string, number>;
         const failed = e.is_error === true || (typeof e.subtype === "string" && e.subtype !== "success");
@@ -186,6 +203,13 @@ const claude: CliKind = {
     };
   },
 };
+
+interface CodexWindow {
+  used_percent?: number;
+  window_minutes?: number;
+  resets_at?: number;
+  resets_in_seconds?: number;
+}
 
 const codex: CliKind = {
   args: (l) => [
@@ -206,6 +230,14 @@ const codex: CliKind = {
       const out: CliEvent[] = [];
       const item = (e.item ?? {}) as Record<string, unknown>;
       if (e.type === "thread.started" && typeof e.thread_id === "string") out.push({ kind: "session", id: e.thread_id });
+      // Codex reports its windows in percent, the window in minutes; where it says so is not stable, so any event counts.
+      const limits = (e.rate_limits ?? (e.msg as { rate_limits?: unknown } | undefined)?.rate_limits) as Record<string, CodexWindow | null> | undefined;
+      for (const w of Object.values(limits ?? {})) {
+        if (!w || typeof w.used_percent !== "number") continue;
+        const resets = typeof w.resets_at === "number" ? w.resets_at * 1000 : typeof w.resets_in_seconds === "number" ? Date.now() + w.resets_in_seconds * 1000 : null;
+        const used = w.used_percent / 100;
+        out.push({ kind: "limit", limit: { window: windowName(w.window_minutes), usedShare: used, resetsAt: resets, status: used >= 1 ? "reached" : used >= 0.8 ? "warning" : "ok" } });
+      }
       if (e.type === "item.started" && item.type === "command_execution") {
         out.push({ kind: "call", callId: String(item.id), name: "run_command", input: { command: String(item.command ?? "") } });
       }
@@ -288,7 +320,69 @@ const gemini: CliKind = {
   },
 };
 
-export const CLI_KINDS: Record<CliId, CliKind> = { "claude-code": claude, codex, "gemini-cli": gemini };
+
+/**
+ * Antigravity CLI (`agy`), Google's successor to Gemini CLI for personal accounts. Headless: the prompt goes in as a
+ * stream-json "user" line (long prompts do not fit an argument on Windows), every output line names its "event".
+ * Without --dangerously-skip-permissions it asks for nothing and quietly refuses what needs approval: chats and read
+ * steps stay read-only that way. Writing steps run in Artel's copy of the project, with agy's terminal sandbox on.
+ */
+const antigravity: CliKind = {
+  args: (l) => [
+    "--output-format",
+    "stream-json",
+    "--input-format",
+    "stream-json",
+    "--print-timeout",
+    "60m",
+    ...(l.model !== "default" ? ["--model", l.model] : []),
+    ...(l.resume ? ["--conversation", l.resume] : []),
+    ...(l.mode === "write" ? ["--dangerously-skip-permissions", "--sandbox"] : []),
+    ...(l.schema ? ["--json-schema", JSON.stringify(l.schema)] : []),
+  ],
+  input: (prompt) => `${JSON.stringify({ event: "user", message: { content: prompt } })}\n`,
+  parser: (cwd) => {
+    let session: string | null = null;
+    // The answer of a step comes in deltas; it goes to the feed whole when the step is done.
+    const answers = new Map<number, string>();
+    return (e) => {
+      const out: CliEvent[] = [];
+      const step = (e.step_update ?? {}) as Record<string, unknown>;
+      const conversation = (e.conversation_id ?? step.conversation_id ?? (e.result as { conversation_id?: unknown } | undefined)?.conversation_id) as unknown;
+      if (!session && typeof conversation === "string") {
+        session = conversation;
+        const model = (e.init as { model?: unknown } | undefined)?.model;
+        out.push({ kind: "session", id: conversation, ...(typeof model === "string" ? { model } : {}) });
+      }
+      if (e.event === "step_update" && step.step_type === "agent_response") {
+        const index = Number(step.step_index);
+        if (typeof step.text_delta === "string") answers.set(index, (answers.get(index) ?? "") + step.text_delta);
+        if (step.state === "DONE" && answers.get(index)?.trim()) out.push({ kind: "text", text: answers.get(index)!.trim() });
+      }
+      if (e.event === "step_update" && step.step_type === "tool") {
+        const info = (step.tool_info ?? {}) as { name?: string; parameters?: Record<string, unknown>; output?: unknown; error?: { message?: string } };
+        const callId = `step-${String(step.step_index)}`;
+        if (step.state === "ACTIVE") out.push({ kind: "call", callId, ...mapTool(String(info.name ?? step.tool_name), info.parameters ?? {}, cwd) });
+        if (step.state === "DONE") out.push({ kind: "result", callId, ok: !info.error, output: text(info.output) || (info.error?.message ?? "") });
+      }
+      if (e.event === "result") {
+        const r = (e.result ?? {}) as { status?: string; response?: string; error?: string; structured_output?: unknown; usage?: Record<string, number> };
+        const failed = r.status !== "SUCCESS";
+        out.push({
+          kind: "done",
+          text: failed ? null : (r.response ?? ""),
+          structured: r.structured_output ?? null,
+          inputTokens: (r.usage?.input_tokens ?? 0) + (r.usage?.cache_read_tokens ?? 0),
+          outputTokens: (r.usage?.output_tokens ?? 0) + (r.usage?.thinking_tokens ?? 0),
+          error: failed ? r.error || `Antigravity CLI ended with ${r.status ?? "no status"}` : null,
+        });
+      }
+      return out;
+    };
+  },
+};
+
+export const CLI_KINDS: Record<CliId, CliKind> = { "claude-code": claude, codex, "gemini-cli": gemini, antigravity };
 
 export function isCli(preset: string): preset is CliId {
   return preset in CLI_KINDS;

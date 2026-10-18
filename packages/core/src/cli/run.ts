@@ -1,3 +1,4 @@
+import { rememberLimit } from "./limits";
 import type { ProviderError } from "@artel/shared";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -70,7 +71,7 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
 
     child.on("error", (err) => (spawnError = err));
     child.stdin.on("error", () => {});
-    child.stdin.end(i.prompt);
+    child.stdin.end(kind.input ? kind.input(i.prompt) : i.prompt);
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk: string) => {
       resetClock();
@@ -87,6 +88,7 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
       if (!parsed || typeof parsed !== "object") return;
       for (const event of parse(parsed as Record<string, unknown>)) {
         if (event.kind === "session") session = event.id;
+        if (event.kind === "limit") rememberLimit(i.id, event.limit);
         if (event.kind === "session" && event.model && i.model === "default") rememberDefault(i.id, event.model);
         if (event.kind === "done") done = event;
         i.onEvent(event);

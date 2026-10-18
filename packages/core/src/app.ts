@@ -37,6 +37,7 @@ import { taskRoutes } from "./routes/tasks";
 import { setPriceCatalogUrl } from "./providers/native";
 import type { CliId } from "./cli/kinds";
 import { setCliCommands } from "./cli/resolve";
+import { forgetLimits } from "./cli/limits";
 import { setRateSource, usdRub, type RateSource } from "./rates";
 import { Shots, type Screenshotter } from "./visual/look";
 import { createCipher } from "./secrets";
@@ -88,6 +89,7 @@ const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
 export function createCore(o: AppOptions) {
   setRateSource(o.usdRub);
   setCliCommands(o.cliCommands);
+  forgetLimits();
   // Prices of vendors' own APIs come from OpenRouter's public catalog (a fake one in tests).
   setPriceCatalogUrl(o.presetUrls?.openrouter);
   const cipher = createCipher(o.secretKey);

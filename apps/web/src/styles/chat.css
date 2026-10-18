@@ -151,3 +151,13 @@
 .code-copy { font-size: 12px; color: var(--ink); padding: 2px 6px; border-radius: 6px; }
 .code-copy:hover { background: var(--sheet); }
 .code-block pre { margin: 0 !important; border: 0 !important; border-radius: 0 !important; }
+/* The chat's options: one button, a panel with a row per option; each option's own list opens to its right. */
+.composer-bar .chat-options { flex: 0 1 auto; min-width: 0; }
+.chat-options .picker-button { gap: 8px; max-width: 320px; }
+.chat-options .picker-button.is-on { border-color: var(--ink); color: var(--ink); background: var(--ink-soft); }
+.chat-options .options-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.options-panel { width: min(340px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }
+.options-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; font-size: 13px; }
+.options-row .picker { justify-self: start; }
+.options-panel .picker-panel.is-above { bottom: auto; top: 0; left: calc(100% + 10px); }
+@media (max-width: 760px) { .options-panel .picker-panel.is-above { left: 0; top: auto; bottom: calc(100% + 6px); } }

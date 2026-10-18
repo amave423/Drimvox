@@ -108,3 +108,9 @@ a { color: var(--ink); }
 .icon-button:hover { color: var(--fg); background: var(--paper); }
 .side-pick { display: flex !important; align-items: center; gap: 8px; cursor: pointer; }
 .side-rename .field-input { width: 100%; padding: 5px 8px; font-size: 14px; }
+.setting-hint { margin: 6px 0 0; }
+.model-setting { display: grid; gap: 4px; margin-top: 14px; }
+.model-setting h3 { margin: 0; font: 600 15px/1.4 var(--font-ui); }
+.model-setting p { margin: 0; }
+.more-settings { margin-top: 16px; }
+.more-settings summary { cursor: pointer; color: var(--ink); font-size: 14px; }

@@ -49,3 +49,13 @@
 - CLI: поддельные CLI в тестах (те же форматы событий) — опрос, спека, код, проверки, продолжение сессии,
   чат, права в аргументах запуска; поиск программы на Windows через `.cmd`-обёртки npm.
 - Живая проверка: Claude Code по подписке (чат и задача). Codex и Gemini — если поставлены.
+
+## Antigravity CLI and subscription limits
+- Google stopped serving Gemini CLI to personal accounts on 2026-06-18; its successor `agy` (Antigravity CLI) is a
+  fourth CLI. Headless: `--output-format stream-json --input-format stream-json`, the prompt as one
+  `{"event":"user",...}` line on stdin, `--conversation <id>` to continue, `--model <slug>` from `agy models`.
+  Chats and read steps run without `--dangerously-skip-permissions` (agy then refuses what needs approval); writing
+  steps get it together with `--sandbox`, inside Artel's copy of the project.
+- What is left of the subscription is shown as the CLI reports it while it runs: Claude Code's `rate_limit_event`
+  (share used, window, reset time), Codex's `rate_limits` (percent, window in minutes). Artel keeps the latest per CLI
+  in memory, shows it on the provider and next to a chat, and knows nothing before the first run.

@@ -14,19 +14,20 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
-import { formatTokens, formatUsd } from "../../lib/format";
+import { formatUsd } from "../../lib/format";
 import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/lastModel";
 import { loadMediaModel } from "../../lib/media";
 import { postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
 import { MediaOptions } from "./MediaOptions";
 import { AssistantMessage, UserMessage, type ChatApproval } from "./Messages";
-import { ModelNote } from "./ModelNote";
 import { ModelPicker } from "./ModelPicker";
 import { loadModels } from "../../lib/models";
 import { readWebMode, WebSwitch } from "./WebSwitch";
 import { FolderSwitch } from "./FolderSwitch";
 import { readThinking, ThinkingSwitch } from "./ThinkingSwitch";
+import { ChatOptions } from "./ChatOptions";
+import { ChatMargin } from "./ChatMargin";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 
 /** Tools of a chat with a folder, each with its own line in the answer. */
@@ -51,12 +52,11 @@ interface Draft {
 const PENDING_POLL_MS = 3000;
 
 export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey: string }) {
-  const { api, token, t, settings, providers, navigate, reloadChats, reloadToday } = useApp();
+  const { api, token, t, providers, navigate, reloadChats, reloadToday } = useApp();
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [failed, setFailed] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [mediaModel, setMediaModel] = useState<MediaModel | null>(null);
   const [options, setOptions] = useState<Options>({});
   const [web, setWeb] = useState(readWebMode);
@@ -163,7 +163,13 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   const asked = web === "provider" && !providerSearch ? "free" : web;
   const webMode = noTools && asked === "free" ? "off" : asked;
   // Command-line agents and local models think their own way: no switch for them.
-  const thinks = !!preset && !["claude-code", "codex", "gemini-cli", "ollama", "lmstudio"].includes(preset);
+  const thinks = !!preset && !["claude-code", "codex", "gemini-cli", "antigravity", "ollama", "lmstudio"].includes(preset);
+  // What differs from the usual shows on the options button itself: no internet, another thinking level, a folder.
+  const changedOptions = [
+    ...(webMode === "off" ? [t("web.off")] : webMode === "provider" && searchProvider ? [t("web.provider", { name: searchProvider })] : []),
+    ...(thinks && thinking !== "auto" ? [t("thinking.short", { level: t(`thinking.${thinking}` as MessageKey) })] : []),
+    ...(folder ? [t("folder.connected", { name: folder.split(/[\\/]/).filter(Boolean).at(-1) ?? folder })] : []),
+  ];
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
 
   async function saveFolder(id: string, next: string | null): Promise<boolean> {
@@ -310,9 +316,6 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
 
   const messages = chat?.messages ?? [];
   const answers = messages.filter((m) => m.role === "assistant");
-  const spent = answers.reduce((sum, m) => sum + (m.costUsd ?? 0), 0);
-  const tokens = answers.reduce((sum, m) => sum + (m.inputTokens ?? 0) + (m.outputTokens ?? 0), 0);
-  const unpriced = answers.some((m) => m.costUsd === null && m.outputTokens !== null);
   const empty = messages.length === 0 && !draft;
 
   return (
@@ -367,9 +370,16 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           tools={
             <>
               <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />
-              {kind === "text" && choice && <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} />}
-              {kind === "text" && choice && thinks && <ThinkingSwitch value={thinking} onChange={setThinking} />}
-              {kind === "text" && choice && <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} />}
+              {kind === "text" && choice && (
+                <ChatOptions
+                  changed={changedOptions}
+                  rows={[
+                    { label: t("web.label"), control: <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} /> },
+                    ...(thinks ? [{ label: t("thinking.label"), control: <ThinkingSwitch value={thinking} onChange={setThinking} /> }] : []),
+                    { label: t("folder.label"), control: <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} /> },
+                  ]}
+                />
+              )}
             </>
           }
           extra={mediaModel && <MediaOptions model={mediaModel} value={options} onChange={setOptions} estimateUsd={estimateUsd} />}
@@ -386,41 +396,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         />
       </div>
 
-      {/* Sticks to the top while the conversation scrolls, so these stay within reach. */}
-      <aside className="margin chat-margin">
-        {choice && <ModelNote choice={choice} />}
-        {answers.length > 0 && (
-          <p className="note">
-            {tokens === 0
-              ? t("chat.totalsCost", { cost: formatUsd(spent) })
-              : t("chat.totals", { cost: formatUsd(spent), tokens: formatTokens(tokens, settings.locale) })}
-            {unpriced && (
-              <>
-                <br />
-                <span className="muted">{t("chat.totalsUnpriced")}</span>
-              </>
-            )}
-          </p>
-        )}
-        {chat &&
-          (confirmDelete ? (
-            <div className="note is-pencil delete-confirm">
-              <p>{t("chat.deleteConfirm")}</p>
-              <div className="actions">
-                <button className="btn is-pencil" onClick={() => void remove()}>
-                  {t("chat.delete")}
-                </button>
-                <button className="btn" onClick={() => setConfirmDelete(false)}>
-                  {t("providers.cancel")}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button className="link is-pencil margin-action" onClick={() => setConfirmDelete(true)}>
-              {t("chat.delete")}
-            </button>
-          ))}
-      </aside>
+      <ChatMargin choice={choice} answers={answers} onDelete={chat ? () => void remove() : null} />
     </article>
   );
 }

@@ -101,6 +101,7 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /qwen3:1\.7b/ }).click();
   // A model this small gets no search: the switch says so instead of offering it.
+  await page.getByRole("button", { name: /^Параметры/ }).click();
   await page.getByRole("button", { name: /^Интернет:/ }).click();
   await expect(page.getByText("Эта модель слишком мала, чтобы искать в интернете: она отвечает сама.")).toBeVisible();
   await expect(page.getByRole("option", { name: /Поиск Artel/ })).toHaveCount(0);

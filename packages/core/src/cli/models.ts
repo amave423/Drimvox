@@ -4,6 +4,7 @@ import { catalogItems } from "../providers/native";
 import type { Connection } from "../providers/repo";
 import type { CliId } from "./kinds";
 import { resolveCli } from "./resolve";
+import { execFile } from "node:child_process";
 
 /**
  * Which of the vendor's catalog models a CLI can be started with, and the name it takes on the command line.
@@ -26,7 +27,30 @@ const VENDOR: Record<CliId, { pattern: RegExp; id(name: string): string; fallbac
     id: (n) => n,
     fallback: ["pro", "flash", "flash-lite"],
   },
+  // Antigravity names its own models (`agy models`); the catalog is only the fallback.
+  antigravity: {
+    pattern: /^google\/(gemini-[\w.-]+)$/,
+    id: (n) => n,
+    fallback: [],
+  },
 };
+
+/** `agy models`: one slug per line, maybe with a name after it; headers and blank lines are skipped. */
+export function parseModelList(output: string): { id: string; name: string }[] {
+  const found: { id: string; name: string }[] = [];
+  for (const line of output.split(/\r?\n/)) {
+    const m = /^\s*[-*•]?\s*([a-z0-9][\w.:/-]*[\w])\s*(.*)$/i.exec(line);
+    if (!m || !/[\d-]/.test(m[1]!) || m[1]!.endsWith(":") || /:\s*$/.test(line)) continue;
+    if (!found.some((f) => f.id === m[1])) found.push({ id: m[1]!, name: m[2]!.replace(/^[-–—:|\s]+/, "").trim() || m[1]! });
+  }
+  return found;
+}
+
+function listByCli(argv: string[]): Promise<{ id: string; name: string }[]> {
+  return new Promise((resolve) => {
+    execFile(argv[0]!, [...argv.slice(1), "models"], { timeout: 20_000, windowsHide: true }, (err, stdout) => resolve(err ? [] : parseModelList(String(stdout))));
+  });
+}
 
 /** Not for writing code: pictures, speech, search and open-weight models a subscription does not include. */
 const NOT_CODE = /image|audio|realtime|tts|transcribe|search|oss|embedding|chat-latest|codex-mini|customtools|nano-banana|robotics|computer-use/i;
@@ -66,6 +90,13 @@ export async function cliModels(conn: Connection & { preset: CliId }): Promise<M
   const id = conn.preset;
   if (!resolveCli(id)) throw new ProviderFailure({ code: "cli_missing", detail: presets[id].cli!.install });
   const vendor = VENDOR[id];
+  if (id === "antigravity") {
+    const own = await listByCli(resolveCli(id)!);
+    if (own.length) {
+      const last = seen.get(id);
+      return [info("default", "Default", last ? (own.find((m) => m.id === last)?.name ?? last) : null), ...own.map((m) => info(m.id, m.name))];
+    }
+  }
   let listed: { id: string; name: string; created: number }[] = [];
   try {
     for (const item of await catalogItems(conn.fetch)) {

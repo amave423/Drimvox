@@ -1,3 +1,5 @@
+import { limitsOf } from "../cli/limits";
+import { isCli } from "../cli/kinds";
 import { zValidator } from "@hono/zod-validator";
 import { presets, providerCreateSchema, providerUpdateSchema } from "@artel/shared";
 import { Hono } from "hono";
@@ -77,6 +79,11 @@ export function providerRoutes(providers: ProviderRepo) {
       const { kind, model } = c.req.valid("query");
       const found = await mediaModel(conn, kind, model);
       return found ? c.json(found, 200) : c.json(notFound, 404);
+    })
+    .get("/:id/limits", (c) => {
+      const conn = providers.connection(c.req.param("id"));
+      if (!conn) return c.json(notFound, 404);
+      return c.json(isCli(conn.preset) ? limitsOf(conn.preset) : [], 200);
     })
     .get("/:id/balance", async (c) => {
       const conn = providers.connection(c.req.param("id"));

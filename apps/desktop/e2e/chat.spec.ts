@@ -27,7 +27,7 @@ test.afterEach(async () => {
 });
 
 async function launch(env: Record<string, string> = {}): Promise<Page> {
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ...env } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_USD_RUB: "80", ...env } });
   const page = await app.firstWindow();
   await expect(page.getByText("Ядро запущено")).toBeVisible();
   return page;
@@ -232,10 +232,10 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
   });
   expect(fits).toBe(true);
 
-  // The pills (model, internet, thinking, folder) stay one line high, the model's name cut short rather than squeezing the others.
-  const pills = page.locator(".composer-bar .picker-button");
+  // Two pills (the model, the options) stay one line high, the model's name cut short rather than squeezing the other.
+  const pills = page.locator(".composer-bar > .picker > .picker-button");
   const heights = await pills.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-  expect(heights.length).toBe(4);
+  expect(heights.length).toBe(2);
   expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2);
 
   await resize(2400, 1300);
@@ -256,8 +256,10 @@ test("works in a connected folder and undoes an answer", async () => {
   const page = await launch({ ARTEL_TEST_PICK_FOLDER: folder });
   await connect(page);
   await startChat(page);
+  await page.getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByRole("button", { name: "Папка" }).click();
-  await expect(page.getByRole("button", { name: /Папка: artel-e2e-folder-/ })).toBeVisible();
+  // A connected folder is never hidden: the options button names it.
+  await expect(page.getByRole("button", { name: /^Параметры: Папка: artel-e2e-folder-/ })).toBeVisible();
 
   await say(page, "Создай hello.txt");
   await expect(page.getByText("Создал hello.txt.")).toBeVisible();

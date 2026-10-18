@@ -1,7 +1,10 @@
 /* Keys and models screen. */
-.provider-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.provider { padding: 14px 0; border-top: 1px solid var(--line); }
-.provider:last-child { border-bottom: 1px solid var(--line); }
+/* Each connected provider is a card: no rules between them, so nothing stray sits above the list of presets. */
+.provider-list { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 10px; }
+.provider { padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.provider-confirm { display: grid; gap: 10px; margin-top: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--pencil); font-size: 14px; }
+.provider-confirm p { margin: 0; }
+.provider-confirm-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .provider-head { display: flex; gap: 12px; align-items: baseline; }
 .provider-head h3 { margin: 0; font: 600 18px var(--font-serif); }
 .provider-head .muted { font-size: 13px; }
@@ -26,3 +29,13 @@
 .cli-note p { margin: 0; color: var(--muted); }
 .cli-install { display: block; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--sheet); user-select: all; overflow-wrap: anywhere; }
 .proxy-address { overflow-wrap: anywhere; }
+.limits { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.limit { display: grid; grid-template-columns: 72px minmax(60px, 120px) 1fr; gap: 10px; align-items: center; }
+.limit-name { color: var(--muted); }
+.limit-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.limit-bar span { display: block; height: 100%; background: var(--ink); }
+.limit.is-warning .limit-bar span, .limit.is-reached .limit-bar span { background: var(--pencil); }
+.limit.is-reached { color: var(--pencil); }
+.limits-unknown { margin: 8px 0 0; font-size: 13px; }
+.note .limits { font-size: 13px; }
+.note .limit { grid-template-columns: 1fr; gap: 2px; }
