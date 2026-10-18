@@ -28,6 +28,9 @@ test("opens with a working core and remembers theme and language", async () => {
   let page = await app.firstWindow();
 
   await expect(page.getByRole("heading", { name: "Добро пожаловать в Artel" })).toBeVisible();
+  // The first page explains how to use the app, part by part.
+  for (const part of ["Модели", "Чат", "Проект", "Разрешения и расходы"]) await expect(page.getByRole("region", { name: part })).toBeVisible();
+  await expect(page.getByText(/«Папка» подключает папку/)).toBeVisible();
   await expect(page.getByText("Ядро запущено")).toBeVisible();
   await expect(page.getByText(/База данных, схема \d+/)).toBeVisible();
   // The bottom bar names the version the app was built as.

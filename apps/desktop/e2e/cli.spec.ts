@@ -56,11 +56,14 @@ async function launch(): Promise<Page> {
 test("connects Claude Code without a key, names its models and chats through it", async () => {
   writeFileSync(join(cliDir, "script.json"), JSON.stringify([{ text: "Привет из Claude Code", session: "s1", initModel: "claude-fable-5-1" }]));
   const page = await launch();
-  await page.getByRole("radio", { name: /Claude Code/ }).click();
+  // Subscriptions have their own place, apart from the keys.
+  const subscriptions = page.getByRole("region", { name: "По подписке" });
+  await expect(page.getByRole("radiogroup", { name: "Подключить провайдера" }).getByRole("radio", { name: /Claude Code/ })).toHaveCount(0);
+  await subscriptions.getByRole("radio", { name: /Claude Code/ }).click();
   await expect(page.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
   await expect(page.getByLabel(/Ключ API/)).toHaveCount(0);
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
-  await expect(page.getByText("Моделей: 3")).toBeVisible();
+  await expect(subscriptions.getByText("Моделей: 3")).toBeVisible();
   await expect(page.getByText("По подписке: Artel считает токены, но не деньги")).toBeVisible();
   await expect(page.getByRole("button", { name: "Заменить ключ" })).toHaveCount(0);
 

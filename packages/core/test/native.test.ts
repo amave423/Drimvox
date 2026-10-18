@@ -96,6 +96,11 @@ describe("Google Gemini", () => {
               models: [
                 { name: "models/gemini-2.5-flash", displayName: "Gemini 2.5 Flash", inputTokenLimit: 1048576, supportedGenerationMethods: ["generateContent", "countTokens"] },
                 { name: "models/text-embedding-004", displayName: "Embedding", supportedGenerationMethods: ["embedContent"] },
+                // Seen live with a real key: these generate content too, but not as a chat; they had no price and showed dashes.
+                ...["lyria-3.5", "gemini-3.5-transcribe", "gemini-3.8-flash-tts", "gemini-robotics-er-2-preview", "deep-research-preview-04-2026", "antigravity-preview-latest", "gemini-2.5-computer-use-preview-10-2025", "gemini-flash-latest", "gemini-pro-latest"].map((m) => ({
+                  name: `models/${m}`,
+                  supportedGenerationMethods: ["generateContent"],
+                })),
               ],
             },
           };

@@ -28,6 +28,10 @@ const CATALOG = [
   { id: "openai/gpt-6-sol", name: "OpenAI: GPT-6 Sol", created: 50 },
   { id: "openai/gpt-image-2", name: "OpenAI: GPT Image 2", created: 60, architecture: { output_modalities: ["image"] } },
   { id: "google/gemini-3.8-flash", name: "Google: Gemini 3.8 Flash", created: 40 },
+  { id: "google/gemini-4-argon", name: "Google: Gemini 4 Argon", created: 70 },
+  { id: "google/gemini-4-argon:batch", name: "Google: Gemini 4 Argon (batch)", created: 70 },
+  { id: "google/gemini-3.1-pro-preview-customtools", name: "Google: Gemini 3.1 Pro Preview Custom Tools", created: 30 },
+  { id: "google/gemma-4-31b-it", name: "Google: Gemma 4 31B", created: 35 },
   { id: "google/gemini-3-pro-image", name: "Google: Nano Banana Pro", created: 45, architecture: { output_modalities: ["image", "text"] } },
 ];
 
@@ -93,7 +97,8 @@ describe("connecting", () => {
     const ids = async (preset: string) =>
       (await (await env.call("GET", `/api/providers/${await connect(preset)}/models`)).json()).map((m: any) => m.id);
     expect(await ids("codex")).toEqual(["default", "gpt-6-sol"]);
-    expect(await ids("gemini-cli")).toEqual(["default", "gemini-3.8-flash"]);
+    // Seen: "Gemini 4 Argon" was missing, its name has no "pro" or "flash".
+    expect(await ids("gemini-cli")).toEqual(["default", "gemini-4-argon", "gemini-3.8-flash"]);
   });
 
   it("falls back to the CLI's own aliases without the catalog", async () => {
@@ -156,6 +161,13 @@ describe("chat", () => {
     expect(await say(chat.id, "Привет")).toMatchObject({ status: "error", error: { code: "cli_update" } });
     expect(await say(chat.id, "Привет")).toMatchObject({ status: "error", error: { code: "cli_limit" } });
     expect(calls()[0]!.args).toEqual(expect.arrayContaining(["--model", "claude-opus-5-5"]));
+  });
+
+  it("says plainly that Google no longer serves Gemini CLI to personal accounts", async () => {
+    script([{ error: "This client is no longer supported for Gemini Code Assist for individuals. Please migrate to Antigravity." }]);
+    const id = await connect("gemini-cli");
+    const chat = await (await env.call("POST", "/api/chats", { providerId: id, model: "default" })).json();
+    expect(await say(chat.id, "Привет")).toMatchObject({ status: "error", error: { code: "cli_retired" } });
   });
 
   it("gives the CLI the proxy when its provider uses one", async () => {

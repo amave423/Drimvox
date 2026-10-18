@@ -10,7 +10,8 @@ interface Problem {
   detail?: string;
 }
 
-export function ConnectForm() {
+/** "key": services reached by an API key or locally; "subscription": programs that run on the user's own subscription. */
+export function ConnectForm({ kind }: { kind: "key" | "subscription" }) {
   const { api, t, reloadProviders } = useApp();
   const [preset, setPreset] = useState<PresetId | null>(null);
   const [name, setName] = useState("");
@@ -48,7 +49,9 @@ export function ConnectForm() {
       await reloadProviders();
       return;
     }
-    const body = (await res?.json().catch(() => null)) as { error?: Problem } | null;
+    const body = (await res?.json().catch(() => null)) as {
+      error?: Problem;
+    } | null;
     setProblem(body?.error?.code === "invalid" ? body.error : { code: res ? "invalid" : "unknown" });
   }
 
@@ -58,19 +61,15 @@ export function ConnectForm() {
 
   return (
     <div className="connect">
-      <div className="preset-grid" role="radiogroup" aria-label={t("providers.add")}>
-        {presetIds.map((id) => (
-          <button
-            key={id}
-            role="radio"
-            aria-checked={preset === id}
-            className={`preset${preset === id ? " is-on" : ""}`}
-            onClick={() => choose(id)}
-          >
-            <span className="preset-name">{presetName(t, id)}</span>
-            <span className="preset-hint">{t(`providers.hint.${id}` as MessageKey)}</span>
-          </button>
-        ))}
+      <div className="preset-grid" role="radiogroup" aria-label={t(kind === "key" ? "providers.add" : "providers.subscriptions")}>
+        {presetIds
+          .filter((id) => (presets[id].billing === "subscription") === (kind === "subscription"))
+          .map((id) => (
+            <button key={id} role="radio" aria-checked={preset === id} className={`preset${preset === id ? " is-on" : ""}`} onClick={() => choose(id)}>
+              <span className="preset-name">{presetName(t, id)}</span>
+              <span className="preset-hint">{t(`providers.hint.${id}` as MessageKey)}</span>
+            </button>
+          ))}
       </div>
 
       {p && preset && (
@@ -88,12 +87,7 @@ export function ConnectForm() {
           {p.editableUrl && (
             <label className="field">
               <span>{t("providers.field.baseUrl")}</span>
-              <input
-                className="field-input mono"
-                value={baseUrl}
-                placeholder="https://example.com/v1"
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
+              <input className="field-input mono" value={baseUrl} placeholder="https://example.com/v1" onChange={(e) => setBaseUrl(e.target.value)} />
             </label>
           )}
           {p.cli ? (
@@ -101,6 +95,7 @@ export function ConnectForm() {
               <p>{t("providers.cli.needs", { command: p.cli.command })}</p>
               <code className="mono cli-install">{p.cli.install}</code>
               <p>{t("providers.cli.login", { command: p.cli.command })}</p>
+              {preset === "gemini-cli" && <p className="is-pencil-text">{t("providers.cli.geminiRetired")}</p>}
             </div>
           ) : (
             <label className="field">
@@ -115,13 +110,7 @@ export function ConnectForm() {
                   </>
                 )}
               </span>
-              <input
-                className="field-input mono"
-                type="password"
-                autoComplete="off"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
+              <input className="field-input mono" type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
             </label>
           )}
           {problem && <ErrorNote error={problem} />}

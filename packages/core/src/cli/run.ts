@@ -112,6 +112,8 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
 /** A CLI that is not logged in says so in its own words; everything else is the provider's error. */
 export function classify(message: string): ProviderError {
   const detail = message.length > 300 ? `${message.slice(0, 300)}…` : message;
+  // Google stopped serving Gemini CLI to personal accounts on June 18, 2026; signing in again does not help.
+  if (/no longer supported for Gemini Code Assist|migrate to Antigravity/i.test(message)) return { code: "cli_retired", detail };
   if (/not logged in|\/login|please log ?in|run .*login|authenticat|unauthori[sz]ed|invalid api key|credentials/i.test(message)) {
     return { code: "cli_login", detail };
   }

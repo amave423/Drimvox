@@ -21,14 +21,15 @@ const VENDOR: Record<CliId, { pattern: RegExp; id(name: string): string; fallbac
     fallback: [],
   },
   "gemini-cli": {
-    pattern: /^google\/(gemini-[\d.]+-(?:pro|flash|flash-lite)(?:-preview)?)$/,
+    // Any Gemini: names stopped following "pro" and "flash" (gemini-4-argon).
+    pattern: /^google\/(gemini-[\w.-]+)$/,
     id: (n) => n,
     fallback: ["pro", "flash", "flash-lite"],
   },
 };
 
 /** Not for writing code: pictures, speech, search and open-weight models a subscription does not include. */
-const NOT_CODE = /image|audio|realtime|tts|transcribe|search|oss|embedding|chat-latest|codex-mini/i;
+const NOT_CODE = /image|audio|realtime|tts|transcribe|search|oss|embedding|chat-latest|codex-mini|customtools|nano-banana|robotics|computer-use/i;
 const NEWEST = 12;
 
 /** The model a CLI picked by itself on its last run, per CLI; shown next to "default". */

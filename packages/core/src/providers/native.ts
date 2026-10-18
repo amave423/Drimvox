@@ -53,6 +53,8 @@ async function priceTable(fetchFn: typeof fetch): Promise<Map<string, ModelInfo>
   return byKey;
 }
 
+const GOOGLE_NOT_CHAT = /embedding|aqa|imagen|veo|tts|lyria|transcribe|robotics|deep-research|antigravity|computer-use|-latest$/i;
+
 interface Listed {
   id: string;
   name: string;
@@ -76,7 +78,8 @@ async function vendorModels(conn: Connection): Promise<Listed[]> {
       models?: { name: string; displayName?: string; inputTokenLimit?: number; supportedGenerationMethods?: string[] }[];
     };
     return (body.models ?? [])
-      .filter((m) => m.supportedGenerationMethods?.includes("generateContent") && !/embedding|aqa|imagen|veo|tts/i.test(m.name))
+      // Music, speech, research and computer agents also "generate content", but not as a chat; "-latest" names repeat a listed model.
+      .filter((m) => m.supportedGenerationMethods?.includes("generateContent") && !GOOGLE_NOT_CHAT.test(m.name))
       .map((m) => ({ id: m.name.replace(/^models\//, ""), name: m.displayName || m.name, contextLength: m.inputTokenLimit ?? null }));
   }
   const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: { id: string }[] };

@@ -258,6 +258,8 @@ export const providerErrorCodes = [
   "cli_login",
   /** The CLI is too old for this model and asks to be updated. */
   "cli_update",
+  /** The vendor no longer serves this CLI to the user's kind of account (Gemini CLI for personal Google accounts). */
+  "cli_retired",
   /** The subscription's limit for this model is used up. */
   "cli_limit",
   /** The provider should go through a proxy, but none is set in the settings. */

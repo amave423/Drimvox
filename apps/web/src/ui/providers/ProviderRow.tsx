@@ -89,6 +89,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
         )}
         {check && "error" in check && <ErrorNote error={check.error} />}
       </div>
+      {provider.preset === "google" && <p className="muted provider-note">{t("providers.googleFree")}</p>}
 
       <div className="provider-proxy">
         <Toggle checked={provider.useProxy} disabled={!proxySet && !provider.useProxy} onChange={(on) => void switchProxy(on)}>
