@@ -1,7 +1,8 @@
 import type { AcceptanceReport, Milestone, Requirement, TaskStages, VisualCheck } from "@artel/shared";
 import { findModel } from "../providers/catalog";
 import { runVisualChecks, visualTools, type LookLimit, type VisualDeps } from "../visual/tools";
-import { accepted, MAX_ACCEPTANCE_ROUNDS, reworkMessage, runAcceptance } from "./acceptance";
+import { accepted, MAX_ACCEPTANCE_ROUNDS, problems, reworkMessage, runAcceptance } from "./acceptance";
+import { designInstructions } from "./design";
 import { designRound } from "./design-check";
 import { discardChanges } from "./git";
 import type { PassContext } from "./pass";
@@ -26,6 +27,13 @@ function laterStages(row: TaskRow): { title: string; requirements: string[] }[] 
 export function pagesUpTo(pages: VisualCheck[], stage: number): VisualCheck[] {
   return pages.filter((p) => (p.stage ?? 1) <= stage);
 }
+
+/**
+ * A task of the list gets one reviewer pass of at most this many steps and one round of rework, then goes to the user
+ * with the report (docs/specs/backlog-loop.md): the user reviews every task anyway.
+ */
+const ITEM_REVIEW_STEPS = 30;
+const ITEM_REVIEW_ROUNDS = 2;
 
 /** Visual checks this many times in a row fail before the task waits for the user. */
 export const MAX_VISUAL_ATTEMPTS = 2;
@@ -170,11 +178,13 @@ async function acceptOnce(
     price: await findModel(conn, model),
     worktree: row.worktree,
     task: row.task,
-    spec: row.spec,
+    // A task of the list has no spec: the reviewer gets the look it must follow instead.
+    spec: row.kind === "item" ? (row.design ? designInstructions(JSON.parse(row.design)) : null) : row.spec,
     requirements,
     decisions: JSON.parse(row.decisions) as string[],
     round,
     ownTools: visualTools(visual, ACCEPTANCE_LOOKS),
+    maxSteps: row.kind === "item" ? ITEM_REVIEW_STEPS : undefined,
     later: laterStages(row),
     spentUsd: row.cost_usd,
     budgetUsd: row.budget_usd,
@@ -208,8 +218,9 @@ async function acceptOnce(
   ctx.event("acceptance", report);
   // The round accepted before a design polish is no rework: it does not take one of the rounds (seen live: the round
   // after the polish was the last, and one note there would have ended a task with three stages still to do).
-  const rounds = MAX_ACCEPTANCE_ROUNDS + (ctx.tasks.row(id)!.design_reviewed ? 1 : 0);
-  if (accepted(report) || round >= rounds) return report;
+  const rounds = row.kind === "item" ? ITEM_REVIEW_ROUNDS : MAX_ACCEPTANCE_ROUNDS + (ctx.tasks.row(id)!.design_reviewed ? 1 : 0);
+  // Only what is partly done or missing goes back; what the reviewer left unchecked goes to the user as it is.
+  if (accepted(report) || round >= rounds || problems(report).length === 0) return report;
   ctx.tasks.update(id, { attempts: 0 });
   return { message: reworkMessage(report, requirements), design: false };
 }

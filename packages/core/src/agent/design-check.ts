@@ -28,7 +28,8 @@ function spend(ctx: PassContext, id: string, usd: number): void {
  */
 export async function designRound(ctx: PassContext, id: string, visual: VisualDeps): Promise<DesignRound> {
   const row = ctx.tasks.row(id)!;
-  if (!row.design || row.design_reviewed) return { kind: "pass" };
+  // A task of the list has the look among its points for the reviewer: no separate round.
+  if (!row.design || row.design_reviewed || row.kind === "item") return { kind: "pass" };
   ctx.tasks.update(id, { design_reviewed: 1 });
   const brief = JSON.parse(row.design) as DesignBrief;
   const pages = pagesUpTo(JSON.parse(row.visual) as VisualCheck[], row.milestone)

@@ -31,6 +31,8 @@ export interface RunInput {
   /** What the agent remembers of its older work; with onMemory, a new summary replaces the older part when it grows. */
   memory?: Memory | null;
   onMemory?(memory: Memory, usage: { inputTokens: number; outputTokens: number; costUsd: number }): void;
+  /** Steps this pass may take; MAX_STEPS when not given. */
+  maxSteps?: number;
   /** The one tool the model may and must call now, such as the acceptance verdict once looking is over. */
   only?: string;
   /** The current step's instructions, added to the system prompt. */
@@ -141,7 +143,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         // The same text as long as the notes stay the same: the provider's cache holds.
         return { system: system(), ...(sent === messages ? {} : { messages: sent }) };
       },
-      stopWhen: [hasToolCall("finish"), ...(i.stopTools ?? []).map((name) => hasToolCall(name)), isStepCount(MAX_STEPS), overBudget],
+      stopWhen: [hasToolCall("finish"), ...(i.stopTools ?? []).map((name) => hasToolCall(name)), isStepCount(i.maxSteps ?? MAX_STEPS), overBudget],
       // Busy providers (429, 5xx) are tried again after 2, 4, 8 and 16 seconds: an agent is in no hurry,
       // and some keys allow one request at a time, which a team of agents runs into.
       maxRetries: 4,
@@ -190,7 +192,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   const done = finished as { summary: string; commitMessage: string } | null;
   if (done) return { kind: "finished", ...done };
   if (spent >= i.budgetUsd) return { kind: "budget" };
-  if (steps >= MAX_STEPS) return { kind: "steps" };
+  if (steps >= (i.maxSteps ?? MAX_STEPS)) return { kind: "steps" };
   // The model ended with plain text instead of calling finish: take its last words as the summary.
   return { kind: "finished", summary: lastText || "—", commitMessage: null };
 }

@@ -89,6 +89,39 @@ describe("the task list", () => {
     expect(await res.json()).toEqual({ error: { code: "too_many_points" } });
   });
 
+  // One reviewer pass and at most one round of rework: then the user sees the work with an honest report.
+  it("sends unmet points back once, then hands the work over, and does not redo what went unchecked", async () => {
+    const partial = call("report_acceptance", {
+      results: [
+        { id: "R1", status: "partial", evidence: "кнопка есть", problem: "отсчёт не идёт" },
+        { id: "R2", status: "done", evidence: "видно", problem: "" },
+      ],
+      summary: "Почти",
+    });
+    const write = call("write_file", { path: "index.html", content: "<button>Старт</button>\n" });
+    const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list, write, finish, finish], [partial, partial]);
+    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
+    const { items } = await backlog(projectId);
+    const task = await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/run`, { ids: [items[0].id], providerId, model: "coder" })).json()).id);
+    expect(task).toMatchObject({ status: "review", statusReason: "acceptance_partial" });
+    expect(task.acceptance.round).toBe(2);
+    // The reviewer is told the pages to look at and has a step limit of its own.
+    const reviewerAsk = JSON.stringify(fake!.requests.find((r) => r.path === "/v1/chat/completions" && isAcceptor(r.body))!.body.messages);
+    expect(reviewerAsk).toContain("http://localhost:5173/");
+  });
+
+  it("does not send the coder back for points the reviewer left unchecked", async () => {
+    const some = call("report_acceptance", { results: [{ id: "R1", status: "done", evidence: "видно", problem: "" }], summary: "Проверил первое" });
+    const write = call("write_file", { path: "index.html", content: "<button>Старт</button>\n" });
+    const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list, write, finish], [some]);
+    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
+    const { items } = await backlog(projectId);
+    const task = await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/run`, { ids: [items[0].id], providerId, model: "coder" })).json()).id);
+    expect(task.status).toBe("review");
+    expect(task.acceptance.results.map((r: any) => r.status)).toEqual(["done", "unchecked"]);
+    expect(task.acceptance.round).toBe(1);
+  });
+
   it("does the batch one task at a time: reviewed, accepted into the folder, then the next on the user's word", async () => {
     const write = call("write_file", { path: "index.html", content: "<button>Старт</button><p>25:00</p>\n" });
     const pause = call("write_file", { path: "pause.js", content: "export const pause = () => {};\n" });

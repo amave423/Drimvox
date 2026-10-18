@@ -110,6 +110,8 @@ export interface AcceptanceInput {
   ownTools: ToolSet;
   /** The stages after this one, for a task in stages. */
   later: { title: string; requirements: string[] }[];
+  /** Steps of one look at the work; the run's default when not given. */
+  maxSteps?: number;
   spentUsd: number;
   budgetUsd: number;
   signal: AbortSignal;
@@ -147,6 +149,7 @@ export async function runAcceptance(i: AcceptanceInput): Promise<AcceptanceOutco
       // Seen live: reminded, the agent went on looking until its steps ran out again. The second time it has the
       // verdict only, and must give it.
       ...(attempt > 0 ? { only: "report_acceptance" } : {}),
+      maxSteps: i.maxSteps,
       system: systemPrompt(i.worktree),
       spentUsd: i.spentUsd,
       budgetUsd: i.budgetUsd,

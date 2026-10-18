@@ -68,7 +68,7 @@ export class BacklogService {
       extra: {
         checks: JSON.stringify(plan?.checks ?? []),
         design: plan?.design ? JSON.stringify(plan.design) : null,
-        requirements: JSON.stringify(item.done.map((text, n) => ({ id: `R${n + 1}`, text, verify: "review" }))),
+        requirements: JSON.stringify(pointsToCheck(item, plan).map((text, n) => ({ id: `R${n + 1}`, text, verify: "review" }))),
       },
     });
     this.backlog.update(item.id, { status: "active", taskId: view.id });
@@ -76,13 +76,20 @@ export class BacklogService {
   }
 }
 
-/** What the agent is given: the task, its points and what the project is about. */
+/** The reviewer's points: the task's own, and the look when the project has a brief (no separate design round). */
+function pointsToCheck(item: BacklogItem, plan: ProjectPlan | null): string[] {
+  return plan?.design ? [...item.done, "Выглядит по дизайн-брифу на компьютере (1280 px) и телефоне (390 px)"] : item.done;
+}
+
+/** What the agent is given: the task, its points, what the project is about and where to look at it. */
 export function itemTask(item: BacklogItem, plan: ProjectPlan | null): string {
+  const pages = (plan?.pages ?? []).map((p) => `- ${p.url}${p.command ? ` (запуск: ${p.command})` : ""}`);
   return [
     item.title,
     "",
     "Готово, когда:",
-    ...item.done.map((d) => `- ${d}`),
+    ...pointsToCheck(item, plan).map((d) => `- ${d}`),
     ...(plan?.context ? ["", `О проекте: ${plan.context}`] : []),
+    ...(pages.length ? ["", "Страницы:", ...pages] : []),
   ].join("\n");
 }
