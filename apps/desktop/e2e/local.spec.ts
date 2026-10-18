@@ -60,7 +60,7 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   const port = await freePort();
   const local = {
     command: [process.execPath, FAKE_OLLAMA],
-    commandEnv: { FAKE_OLLAMA_PULL_MS: "80" },
+    commandEnv: { FAKE_OLLAMA_PULL_MS: "400" },
     idleMs: 600_000,
     hardware: { ramBytes: 32 * GB, gpu: { name: "NVIDIA GeForce RTX 3080", vramBytes: 10 * GB }, unified: false },
     registryUrl: await serveRegistry(),
@@ -85,10 +85,16 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   await expect(page.getByText("qwen3.6:35b")).toHaveCount(0);
 
   await cards.nth(0).getByRole("button", { name: /Скачать · 1,3 ГБ/ }).click();
-  await expect(page.getByRole("progressbar", { name: "Скачивание qwen3:1.7b" })).toBeVisible();
-  await expect(page.getByText("Скачано")).toBeVisible({ timeout: 20_000 });
+  // The progress, pause and going on are at the model itself, not only in the list at the top.
+  await expect(cards.nth(0).getByRole("progressbar", { name: "Скачивание qwen3:1.7b" })).toBeVisible();
+  await cards.nth(0).getByRole("button", { name: "Пауза" }).click();
+  await expect(cards.nth(0)).toContainText("на паузе");
+  await cards.nth(0).getByRole("button", { name: "Продолжить" }).click();
+  await expect(cards.nth(0)).toContainText(/осталось около \d+ с/, { timeout: 10_000 });
+  await expect(cards.nth(0)).toContainText("Скачана", { timeout: 20_000 });
   await expect(page.locator(".local-row", { hasText: "qwen3:1.7b" }).first()).toBeVisible();
-  await expect(cards.nth(0)).toContainText("Скачана");
+  // Deleting is in the same place.
+  await expect(cards.nth(0).getByRole("button", { name: "Удалить" })).toBeVisible();
 
   // The download added the Ollama provider: the model is in the chat and answers.
   await page.getByRole("button", { name: "+ Новый чат" }).click();

@@ -167,6 +167,24 @@ describe("downloads", () => {
     expect(s.models).toEqual([]);
   });
 
+  // Seen: a download could only be cancelled, and nothing told how long it would take.
+  it("tells the speed, can pause a download and goes on with it", async () => {
+    setup({ pullMs: 150 });
+    await env.call("POST", "/api/local/pulls", { model: "qwen3:8b" });
+    const going = await until(status, (s) => s.pulls[0]?.bytesPerSecond > 0);
+    expect(going.pulls[0].paused).toBe(false);
+    expect((await env.call("POST", "/api/local/pulls/pause", { model: "qwen3:8b" })).status).toBe(200);
+    const paused = await status();
+    expect(paused.pulls[0]).toMatchObject({ model: "qwen3:8b", paused: true, done: false, bytesPerSecond: null });
+    expect(paused.pulls[0].completed).toBeGreaterThan(0);
+
+    await env.call("POST", "/api/local/pulls", { model: "qwen3:8b" });
+    const resumed = await status();
+    expect(resumed.pulls[0]).toMatchObject({ paused: false });
+    const done = await until(status, (s) => s.pulls[0]?.done);
+    expect(done.pulls[0]).toMatchObject({ done: true, error: null });
+  });
+
   it("reports a model that does not exist", async () => {
     setup();
     await env.call("POST", "/api/local/pulls", { model: "missing:1b" });
@@ -231,6 +249,9 @@ describe("catalog", () => {
           { id: "someone/gemma-tiny-GGUF", downloads: 5, likes: 0 },
           { id: "mlabonne/gemma-4-12b-abliterated-GGUF", downloads: 900, likes: 40, gguf: { total: 11_907_350_576 } },
           { id: "someone/gemma-chat-GGUF", downloads: 30, likes: 2, tags: ["gguf", "uncensored"] },
+          // Not for chatting: Ollama cannot load a picture generator (seen: qwen-image).
+          { id: "abenzerps/qwen-image-2.1-uncensoried-quantized", downloads: 400, likes: 9 },
+          { id: "city96/gemma-flux-dev-gguf", downloads: 300, likes: 9, pipeline_tag: "text-to-image" },
         ];
       }
       if (path === "/api/models/unsloth/gemma-4-12b-it-GGUF/tree/main") {

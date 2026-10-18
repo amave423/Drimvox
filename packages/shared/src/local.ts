@@ -26,6 +26,10 @@ export interface LocalPull {
   total: number;
   done: boolean;
   error: string | null;
+  /** Stopped by the user; pulling again goes on where it stopped. */
+  paused: boolean;
+  /** How fast it goes now, while it goes. */
+  bytesPerSecond: number | null;
 }
 
 /** Installing Ollama from Artel: the download, then the official setup. */

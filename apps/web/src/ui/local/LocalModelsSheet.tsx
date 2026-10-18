@@ -3,7 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import { InstallOllama } from "./InstallOllama";
+import { forgetModels } from "../../lib/models";
 import { LocalCatalogView } from "./LocalCatalog";
+import { PullControl, type PullActions } from "./PullControl";
 import { useSize } from "./size";
 
 
@@ -23,7 +25,11 @@ export function LocalModelsSheet() {
       setFailed(false);
       // A finished download may have added the Ollama provider: the chat's model list should know.
       const key = `${next.providerId}:${next.models.map((m) => m.name).join()}`;
-      if (known.current !== null && known.current !== key) void reloadProviders();
+      if (known.current !== null && known.current !== key) {
+        // The chat's model list was read before the download: read it again (seen: the new model showed only after a restart).
+        if (next.providerId) forgetModels(next.providerId);
+        void reloadProviders();
+      }
       known.current = key;
     } catch {
       setFailed(true);
@@ -34,13 +40,17 @@ export function LocalModelsSheet() {
     void load();
   }, [load]);
   // While something downloads (a model, or Ollama itself), progress is read every second.
-  const downloading = !!status?.pulls.some((p) => !p.done) || status?.install.state === "downloading" || status?.install.state === "installing";
+  const downloading = !!status?.pulls.some((p) => !p.done && !p.paused) || status?.install.state === "downloading" || status?.install.state === "installing";
   useEffect(() => {
     if (!downloading) return;
     const timer = setInterval(() => void load(), 1000);
     return () => clearInterval(timer);
   }, [downloading, load]);
 
+  const pause = async (model: string) => {
+    await api.local.pulls.pause.$post({ json: { model } }).catch(() => null);
+    await load();
+  };
   const pull = async (model: string) => {
     await api.local.pulls.$post({ json: { model } }).catch(() => null);
     await load();
@@ -60,6 +70,7 @@ export function LocalModelsSheet() {
     await reloadProviders();
   };
 
+  const actions: PullActions = { pull: (m) => void pull(m), pause: (m) => void pause(m), cancel: (m) => void cancel(m), remove: (m) => void remove(m) };
   const hw = status?.hardware;
   return (
     <article className="sheet">
@@ -91,7 +102,10 @@ export function LocalModelsSheet() {
             <h2 className="sheet-h">{t("local.pulls")}</h2>
             <ul className="local-list">
               {status.pulls.map((p) => (
-                <PullRow key={p.model} pull={p} onCancel={() => void cancel(p.model)} />
+                <li key={p.model} className="local-row local-pull">
+                  <span className="mono">{p.model}</span>
+                  <PullControl model={p.model} sizeBytes={p.total} installed={false} pull={p} actions={actions} />
+                </li>
               ))}
             </ul>
           </>
@@ -133,35 +147,11 @@ export function LocalModelsSheet() {
           </>
         )}
 
-        {status?.running && <LocalCatalogView status={status} onPull={(model) => void pull(model)} />}
+        {status?.running && <LocalCatalogView status={status} actions={actions} />}
       </div>
       <aside className="margin">
         <p className="note">{t("local.marginTip")}</p>
       </aside>
     </article>
-  );
-}
-
-function PullRow({ pull, onCancel }: { pull: LocalPull; onCancel(): void }) {
-  const { t } = useApp();
-  const size = useSize();
-  const share = pull.total > 0 ? Math.min(100, Math.round((pull.completed / pull.total) * 100)) : 0;
-  return (
-    <li className="local-row local-pull">
-      <span className="mono">{pull.model}</span>
-      {pull.error ? (
-        <span className="is-pencil-text">{t("local.pullFailed", { error: pull.error })}</span>
-      ) : pull.done ? (
-        <span className="is-ok-text">{t("local.pulled")}</span>
-      ) : (
-        <span className="local-progress">
-          <progress max={100} value={share} aria-label={t("local.progress", { model: pull.model })} />
-          <span className="muted">{pull.total > 0 ? t("local.pullBytes", { done: size(pull.completed), total: size(pull.total), share }) : pull.status}</span>
-        </span>
-      )}
-      <button type="button" className="link" onClick={onCancel}>
-        {pull.done ? t("local.dismiss") : t("local.cancel")}
-      </button>
-    </li>
   );
 }

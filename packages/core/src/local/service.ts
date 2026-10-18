@@ -108,6 +108,10 @@ export class LocalModels {
     return this.ollama.pull(model);
   }
 
+  pause(model: string): boolean {
+    return this.ollama.pause(model);
+  }
+
   cancel(model: string): boolean {
     return this.ollama.cancel(model);
   }

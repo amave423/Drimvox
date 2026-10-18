@@ -248,6 +248,8 @@
 .local-actions { display: inline-flex; gap: 10px; align-items: center; }
 .local-progress { display: inline-flex; align-items: center; gap: 10px; flex: 1 1 200px; min-width: 0; }
 .local-progress progress { flex: 1 1 120px; min-width: 80px; accent-color: var(--ink); }
+.pull-control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; justify-content: flex-end; }
+.local-pull { flex-wrap: wrap; }
 .local-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); margin-top: 10px; }
 .local-card { display: grid; gap: 6px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--sheet); }
 .local-card p { margin: 0; }

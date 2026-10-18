@@ -72,6 +72,16 @@ export interface CatalogOptions {
 export class CatalogError extends Error {}
 
 /** Ollama's registry and Hugging Face, sized for this computer. */
+/** Hugging Face's tasks of models that answer in text, alone or looking at pictures. */
+const TALKING = new Set(["text-generation", "image-text-to-text", "text2text-generation", "conversational", "visual-question-answering"]);
+const NOT_TALKING = /(^|[-_/])(image|img|diffusion|sdxl|sd-?\d|flux|wan\d?|video|tts|whisper|audio|music|embed(ding)?s?)([-_.]|$)/i;
+
+/** A model Ollama can chat with: by its task when Hugging Face knows it, by its name otherwise. */
+function talks(id: string, task: string | undefined): boolean {
+  if (task) return TALKING.has(task);
+  return !NOT_TALKING.test(id.split("/").pop() ?? id);
+}
+
 /** Names and tags by which an author says the model answers without refusals: told as the author's word, not checked. */
 const UNFILTERED = /abliterat|uncensor|unfiltered|heretic|dolphin/i;
 
@@ -116,7 +126,7 @@ export class LocalCatalog {
   /** GGUF repositories on Hugging Face, most downloaded first; those too big for this computer are left out. */
   async search(query: string, hw: LocalHardware): Promise<HfRepo[]> {
     const q = new URLSearchParams({ search: query, filter: "gguf", sort: "downloads", limit: "30" });
-    for (const field of ["gguf", "downloads", "likes", "lastModified", "tags"]) q.append("expand[]", field);
+    for (const field of ["gguf", "downloads", "likes", "lastModified", "tags", "pipeline_tag"]) q.append("expand[]", field);
     let res: Response;
     try {
       res = await this.get(`${this.o.hfUrl}/api/models?${q}`);
@@ -124,8 +134,18 @@ export class LocalCatalog {
       throw new CatalogError(`Hugging Face did not answer: ${err instanceof Error ? err.message : String(err)}`);
     }
     if (!res.ok) throw new CatalogError(`Hugging Face answered ${res.status}`);
-    const items = (await res.json()) as { id: string; downloads?: number; likes?: number; lastModified?: string; gguf?: { total?: number }; tags?: string[] }[];
+    const items = (await res.json()) as {
+      id: string;
+      downloads?: number;
+      likes?: number;
+      lastModified?: string;
+      gguf?: { total?: number };
+      tags?: string[];
+      pipeline_tag?: string;
+    }[];
     return items.flatMap((m) => {
+      // Ollama runs language models: a picture, video or speech generator fails to load (seen: qwen-image).
+      if (!talks(m.id, m.pipeline_tag)) return [];
       const params = typeof m.gguf?.total === "number" ? m.gguf.total : null;
       if (params && !fitOf(params * SMALLEST_BYTES_PER_PARAM, hw)) return [];
       const unfiltered = UNFILTERED.test(m.id) || (m.tags ?? []).some((t) => UNFILTERED.test(t));

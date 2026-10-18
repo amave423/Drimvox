@@ -1,17 +1,17 @@
-import type { HfRepo, HfVariant, LocalFit, LocalPick, LocalStatus } from "@artel/shared";
+import type { HfRepo, HfVariant, LocalFit, LocalPick, LocalPull, LocalStatus } from "@artel/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
-import { useSize } from "./size";
+import { PullControl, type PullActions } from "./PullControl";
 
 interface Props {
   status: LocalStatus;
-  onPull(model: string): void;
+  actions: PullActions;
 }
 
 /** What to download: Artel's picks sized for this computer, and a search on Hugging Face. */
-export function LocalCatalogView({ status, onPull }: Props) {
+export function LocalCatalogView({ status, actions }: Props) {
   const { api, t } = useApp();
   const [picks, setPicks] = useState<LocalPick[] | null>(null);
   const [picksFailed, setPicksFailed] = useState(false);
@@ -27,7 +27,7 @@ export function LocalCatalogView({ status, onPull }: Props) {
       live = false;
     };
   }, [api, installed]);
-  const busy = (model: string) => status.pulls.some((p) => p.model === model && !p.done);
+  const pullOf = (model: string) => status.pulls.find((p) => p.model === model);
 
   return (
     <>
@@ -50,11 +50,11 @@ export function LocalCatalogView({ status, onPull }: Props) {
                 </span>
               ))}
             </p>
-            <Download model={p.model} sizeBytes={p.sizeBytes} installed={p.installed} busy={busy(p.model)} onPull={onPull} />
+            <PullControl model={p.model} sizeBytes={p.sizeBytes} installed={p.installed} pull={pullOf(p.model)} actions={actions} />
           </li>
         ))}
       </ul>
-      <HfSearch status={status} onPull={onPull} busy={busy} />
+      <HfSearch status={status} actions={actions} pullOf={pullOf} />
     </>
   );
 }
@@ -68,18 +68,7 @@ function Fit({ fit }: { fit: LocalFit }) {
   );
 }
 
-function Download(p: { model: string; sizeBytes: number; installed: boolean; busy: boolean; onPull(model: string): void }) {
-  const { t } = useApp();
-  const size = useSize();
-  if (p.installed) return <span className="is-ok-text">{t("local.have", { size: size(p.sizeBytes) })}</span>;
-  return (
-    <button type="button" className="btn" disabled={p.busy} onClick={() => p.onPull(p.model)}>
-      {p.busy ? t("local.downloading") : t("local.get", { size: size(p.sizeBytes) })}
-    </button>
-  );
-}
-
-function HfSearch({ status, onPull, busy }: Props & { busy(model: string): boolean }) {
+function HfSearch({ status, actions, pullOf }: Props & { pullOf(model: string): LocalPull | undefined }) {
   const { api, t, settings } = useApp();
   const [query, setQuery] = useState("");
   const [repos, setRepos] = useState<HfRepo[] | null>(null);
@@ -135,7 +124,7 @@ function HfSearch({ status, onPull, busy }: Props & { busy(model: string): boole
                 {t("local.downloads", { n: compact.format(r.downloads) })}
               </span>
             </button>
-            {open === r.repo && <Variants repo={r.repo} status={status} onPull={onPull} busy={busy} />}
+            {open === r.repo && <Variants repo={r.repo} status={status} actions={actions} pullOf={pullOf} />}
           </li>
         ))}
       </ul>
@@ -143,7 +132,7 @@ function HfSearch({ status, onPull, busy }: Props & { busy(model: string): boole
   );
 }
 
-function Variants({ repo, status, onPull, busy }: { repo: string; status: LocalStatus; onPull(model: string): void; busy(model: string): boolean }) {
+function Variants({ repo, status, actions, pullOf }: { repo: string; status: LocalStatus; actions: PullActions; pullOf(model: string): LocalPull | undefined }) {
   const { api, t } = useApp();
   const [variants, setVariants] = useState<HfVariant[] | null>(null);
   const [error, setError] = useState(false);
@@ -169,7 +158,7 @@ function Variants({ repo, status, onPull, busy }: { repo: string; status: LocalS
           <span className="mono">{v.quant}</span>
           {v.recommended && <span className="option-rec">{t("local.advice")}</span>}
           <Fit fit={v.fit} />
-          <Download model={v.model} sizeBytes={v.sizeBytes} installed={v.installed} busy={busy(v.model)} onPull={onPull} />
+          <PullControl model={v.model} sizeBytes={v.sizeBytes} installed={v.installed} pull={pullOf(v.model)} actions={actions} />
         </li>
       ))}
     </ul>

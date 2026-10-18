@@ -43,6 +43,8 @@ interface Active {
   pull: LocalPull;
   abort: AbortController;
   layers: Map<string, { total: number; completed: number }>;
+  /** The last measure of progress, for the speed. */
+  sample?: { at: number; completed: number };
 }
 
 /** How long Ollama gets to come up after Artel starts it. */
@@ -200,9 +202,11 @@ export class OllamaManager {
   /** Starts a download, or returns the one already going. Progress shows in the status. */
   async pull(model: string): Promise<LocalPull> {
     const going = this.pulls.get(model);
-    if (going && !going.pull.done) return { ...going.pull };
+    if (going && !going.pull.done && !going.pull.paused) return { ...going.pull };
+    // A paused download goes on: Ollama keeps what it has and fetches the rest.
+    const before = going?.pull.paused ? going.pull : null;
     const active: Active = {
-      pull: { model, status: "starting", completed: 0, total: 0, done: false, error: null },
+      pull: { model, status: "starting", completed: before?.completed ?? 0, total: before?.total ?? 0, done: false, error: null, paused: false, bytesPerSecond: null },
       abort: new AbortController(),
       layers: new Map(),
     };
@@ -255,11 +259,35 @@ export class OllamaManager {
       a.layers.set(line.digest, { total: line.total, completed: typeof line.completed === "number" ? line.completed : 0 });
       p.total = [...a.layers.values()].reduce((s, l) => s + l.total, 0);
       p.completed = [...a.layers.values()].reduce((s, l) => s + l.completed, 0);
+      this.measure(a);
     }
     if (line.status === "success") {
       Object.assign(p, { done: true, error: null, completed: p.total });
       this.o.onPulled?.();
     }
+  }
+
+  /** The speed over the last second or so, smoothed: what the time left is told from. */
+  private measure(a: Active): void {
+    const now = Date.now();
+    if (!a.sample) {
+      a.sample = { at: now, completed: a.pull.completed };
+      return;
+    }
+    const seconds = (now - a.sample.at) / 1000;
+    if (seconds < 0.5) return;
+    const rate = Math.max(0, (a.pull.completed - a.sample.completed) / seconds);
+    a.pull.bytesPerSecond = a.pull.bytesPerSecond === null ? rate : a.pull.bytesPerSecond * 0.6 + rate * 0.4;
+    a.sample = { at: now, completed: a.pull.completed };
+  }
+
+  /** Stops a download for now and keeps it listed; pulling the model again goes on where it stopped. */
+  pause(model: string): boolean {
+    const a = this.pulls.get(model);
+    if (!a || a.pull.done) return false;
+    a.abort.abort();
+    Object.assign(a.pull, { paused: true, bytesPerSecond: null, status: "paused" });
+    return true;
   }
 
   /** Stops a download, or forgets a finished one. False when there is no such download. */

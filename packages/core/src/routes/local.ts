@@ -37,6 +37,10 @@ export function localRoutes(local: LocalModels) {
       }
     })
     .post("/pulls", zValidator("json", localPullSchema), async (c) => c.json(await local.pull(c.req.valid("json").model), 202))
+    // Paused, a download stays listed; pulling it again goes on where it stopped.
+    .post("/pulls/pause", zValidator("json", localPullSchema), (c) =>
+      local.pause(c.req.valid("json").model) ? c.json({ ok: true as const }, 200) : c.json({ error: { code: "not_found" as const } }, 404),
+    )
     .delete("/pulls", zValidator("query", z.object({ model: localModelName })), (c) =>
       local.cancel(c.req.valid("query").model) ? c.json({ ok: true }, 200) : c.json({ error: { code: "not_found" } }, 404),
     )
