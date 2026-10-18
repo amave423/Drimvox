@@ -1,3 +1,4 @@
+import { startTask } from "./start-task";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -82,16 +83,12 @@ test("a team: plan review with a removed subtask, the board, a subtask sheet, on
   const page = await launch();
   await page.getByRole("button", { name: "+ Проект" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/artel-repo-/);
-  await page.getByLabel("Новая задача").fill("Добавь модули sub и mul");
-  await page.locator(".mode-switch").getByText("Команда агентов").click();
-  await expect(page.getByLabel("Написать спеку и план для команды")).toBeDisabled();
-  await page.getByLabel("Сначала задать мне вопросы").uncheck();
-  await page.getByLabel("Сначала тесты, потом код").uncheck();
-  await page.getByRole("button", { name: "Выбери модель" }).first().click();
-  await page.getByRole("option", { name: /Lead/ }).click();
-  await page.getByRole("button", { name: "Выбери модель" }).click();
-  await page.getByRole("option", { name: /Coder/ }).click();
-  await page.getByRole("button", { name: "Запустить команду" }).click();
+  await startTask(page, {
+    task: "Добавь модули sub и mul",
+    model: "lead",
+    stages: { interview: false, spec: true, approveSpec: true, testsFirst: false },
+    team: { model: "coder" },
+  });
 
   await expect(page.getByRole("heading", { name: "План команды" })).toBeVisible();
   await expect(page.getByText("после: Модуль sub")).toBeVisible();

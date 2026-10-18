@@ -23,7 +23,7 @@ interface Refusal {
 
 /** The proofreading screen: the agent's summary, its changes, and the decision. */
 export function Review({ task, comments, setComments, partial = false }: Props) {
-  const { api, t } = useApp();
+  const { api, t, navigate } = useApp();
   const [diff, setDiff] = useState<DiffFile[] | null>(null);
   const [note, setNote] = useState("");
   const [message, setMessage] = useState(task.commitMessage ?? task.title);
@@ -83,6 +83,14 @@ export function Review({ task, comments, setComments, partial = false }: Props) 
     return (
       <p className="note is-ok result-note">
         {commit ? t("review.accepted", { commit: commit.slice(0, 7) }) : commit === null ? t("review.acceptedNoCommit") : t("task.status.accepted")}
+        {task.kind === "item" && (
+          <>
+            {" "}
+            <button className="link" onClick={() => navigate({ kind: "project", projectId: task.projectId })}>
+              {t("backlog.toList")}
+            </button>
+          </>
+        )}
       </p>
     );
   }

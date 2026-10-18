@@ -1,3 +1,4 @@
+import { startTask } from "./start-task";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -77,12 +78,7 @@ async function lookAt(html?: string): Promise<Buffer> {
   await expect(page.getByText("Моделей: 1")).toBeVisible();
 
   await page.getByRole("button", { name: "+ Проект" }).click();
-  await page.getByLabel("Новая задача").fill("Проверь, как выглядит страница");
-  await page.getByRole("button", { name: "Выбери модель" }).click();
-  await page.getByRole("option", { name: /Coder/ }).click();
-  await page.getByLabel("Сначала задать мне вопросы").uncheck();
-  await page.getByLabel("Написать спеку и план").uncheck();
-  await page.getByRole("button", { name: "Запустить агента" }).click();
+  await startTask(page, { task: "Проверь, как выглядит страница", model: "coder" });
 
   await expect(page.getByText("Проверил страницу.")).toBeVisible({ timeout: 30_000 });
   await page.getByText("Как агент работал").click();

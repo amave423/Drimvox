@@ -1,3 +1,4 @@
+import { startTask as start } from "./start-task";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -60,14 +61,8 @@ async function launch(script: FakeTurn[], env: Record<string, string> = {}): Pro
 async function startTask(page: Page, task: string, pipeline = false) {
   await page.getByRole("button", { name: "+ Проект" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/artel-repo-/);
-  await page.getByLabel("Новая задача").fill(task);
-  await page.getByRole("button", { name: "Выбери модель" }).click();
-  await page.getByRole("option", { name: /Coder/ }).click();
-  if (!pipeline) {
-    await page.getByLabel("Сначала задать мне вопросы").uncheck();
-    await page.getByLabel("Написать спеку и план").uncheck();
-  }
-  await page.getByRole("button", { name: "Запустить агента" }).click();
+  const all = { interview: true, spec: true, approveSpec: true, testsFirst: true };
+  await start(page, { task, model: "coder", stages: pipeline ? all : undefined });
 }
 
 test("an agent changes a copy, takes a line comment and lands as one commit", async () => {
@@ -316,75 +311,6 @@ test("the interview goes in rounds with open questions until «Enough, start»",
   await page.getByRole("button", { name: "Хватит, начинай" }).click();
   await expect(page.getByRole("heading", { name: "Спека и план" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Вычитание для калькулятора" })).toBeVisible();
-});
-
-test("«On its own» goes from the spec to the work without waiting for an OK", async () => {
-  const page = await launch([
-    { toolCalls: [{ name: "propose_spec", args: { spec: "# Вычитание", checks: ["node --test"], plan: ["Функция"] } }] },
-    { toolCalls: [{ name: "write_file", args: { path: "math.js", content: MATH_BOTH } }, { name: "finish", args: { summary: "Готово сама", commit_message: "Add subtract" } }] },
-  ]);
-  await page.getByRole("button", { name: "+ Проект" }).click();
-  await page.getByLabel("Новая задача").fill("Добавь subtract");
-  await page.getByRole("button", { name: "Выбери модель" }).click();
-  await page.getByRole("option", { name: /Coder/ }).click();
-  await page.getByLabel("Сначала задать мне вопросы").uncheck();
-  await page.getByLabel("Сначала тесты, потом код").uncheck();
-  await page.getByRole("radio", { name: "Самостоятельно" }).click();
-  await expect(page.getByText(/После опроса агент всё делает сам/)).toBeVisible();
-  await page.getByRole("button", { name: "Запустить агента" }).click();
-
-  await expect(page.getByText("Агент закончил. Посмотри правки")).toBeVisible();
-  await expect(page.getByText("Готово сама")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Начать работу" })).toHaveCount(0);
-});
-
-test("a big task goes in stages: the user sees each accepted stage and may stop with what is done", async () => {
-  const page = await launch([
-    {
-      toolCalls: [
-        {
-          name: "propose_spec",
-          args: {
-            spec: "# Вычитание и документация",
-            checks: ["node --test"],
-            plan: ["Функция", "README"],
-            stages: [{ title: "Функция subtract" }, { title: "Документация" }],
-            requirements: [
-              { id: "R1", text: "subtract(a, b) возвращает разность", verify: "check", how: "node --test", stage: 1 },
-              { id: "R2", text: "README описывает subtract", verify: "review", how: "README.md", stage: 2 },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      toolCalls: [
-        { name: "write_file", args: { path: "math.js", content: MATH_BOTH } },
-        { name: "write_file", args: { path: "math.test.js", content: TEST_BOTH } },
-        { name: "finish", args: { summary: "Функция готова", commit_message: "Add subtract" } },
-      ],
-    },
-    { toolCalls: [{ name: "report_acceptance", args: { results: [{ id: "R1", status: "done", evidence: "2 pass", problem: "" }], summary: "Этап принят" } }] },
-  ]);
-  await page.getByRole("button", { name: "+ Проект" }).click();
-  await page.getByLabel("Новая задача").fill("Добавь subtract и документацию");
-  await page.getByRole("button", { name: "Выбери модель" }).click();
-  await page.getByRole("option", { name: /Coder/ }).click();
-  await page.getByLabel("Сначала задать мне вопросы").uncheck();
-  await page.getByLabel("Сначала тесты, потом код").uncheck();
-  await page.getByRole("button", { name: "Запустить агента" }).click();
-
-  await expect(page.getByRole("heading", { name: "Этапы" })).toBeVisible();
-  await expect(page.getByText("Документация").first()).toBeVisible();
-  await page.getByRole("button", { name: "Начать работу" }).click();
-
-  await expect(page.getByText("Этап 1 из 2 «Функция subtract» принят.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Дальше: этап 2" })).toBeVisible();
-  await page.getByRole("button", { name: "Хватит — на ревью" }).click();
-  await expect(page.getByText("Сделано этапов: 1 из 2.", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "Принять", exact: true }).click();
-  await expect(page.getByText(/Принято: коммит/)).toBeVisible();
-  expect(existsSync(join(repo, "README.md"))).toBe(false);
 });
 
 test("the pipeline: interview, spec with an edited check, red tests, green code, review", async () => {

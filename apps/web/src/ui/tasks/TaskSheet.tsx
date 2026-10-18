@@ -29,7 +29,7 @@ const UNFINISHED = new Set(["budget", "steps", "acceptance_error"]);
 const WITH_DETAIL = new Set(["stuck", "integration_red", "subtask_stuck", "visual_failed"]);
 
 export function TaskSheet({ taskId }: { taskId: string }) {
-  const { api, t, settings } = useApp();
+  const { api, t, settings, navigate } = useApp();
   const { task, events } = useTaskStream(taskId);
   const [comments, setComments] = useState<LineComment[]>([]);
 
@@ -42,7 +42,9 @@ export function TaskSheet({ taskId }: { taskId: string }) {
   const stuck = task.status === "waiting" && (task.statusReason === "stuck" || task.statusReason === "visual_failed");
   // A subtask is never reviewed on its own: the goal merges it and the user reviews the goal.
   const answered = task.status === "done_empty" && task.statusReason === "answered";
-  const reviewing = task.kind !== "subtask" && !answered && (REVIEW_STATES.has(task.status) || stuck);
+  // A plan's interview ends in the project's task list: nothing to review here.
+  const listed = task.status === "done_empty" && task.statusReason === "listed";
+  const reviewing = task.kind !== "subtask" && !answered && !listed && (REVIEW_STATES.has(task.status) || stuck);
   const waitingFor = task.status === "waiting" ? task.statusReason : null;
   // Failed, stopped or out of budget: what is done so far can be looked at and taken as it is.
   const unfinished =
@@ -87,9 +89,17 @@ export function TaskSheet({ taskId }: { taskId: string }) {
         {task.subtasks.length > 0 && <SubtaskBoard task={task} />}
 
         {answered && <Answer task={task} />}
-        {answered ? (
+        {listed && (
+          <div className="note is-ok">
+            <p>{t("backlog.listed")}</p>
+            <button className="btn is-primary" onClick={() => navigate({ kind: "project", projectId: task.projectId })}>
+              {t("backlog.toList")}
+            </button>
+          </div>
+        )}
+        {answered || listed ? (
           <details className="worked">
-            <summary>{t("answer.howFound")}</summary>
+            <summary>{t(listed ? "review.howWorked" : "answer.howFound")}</summary>
             <Feed items={feed} taskId={task.id} />
           </details>
         ) : reviewing ? (

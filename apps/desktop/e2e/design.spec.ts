@@ -1,3 +1,4 @@
+import { startTask } from "./start-task";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -117,10 +118,11 @@ test("the look: samples in the interview, the user's own sample, the brief, a de
   await expect(page.getByText("Моделей: 1")).toBeVisible();
 
   await page.getByRole("button", { name: "+ Проект" }).click();
-  await page.getByLabel("Новая задача").fill("Сделай страницу меню для кофейни");
-  await page.getByRole("button", { name: "Выбери модель" }).click();
-  await page.getByRole("option", { name: /Coder/ }).click();
-  await page.getByRole("button", { name: "Запустить агента" }).click();
+  await startTask(page, {
+    task: "Сделай страницу меню для кофейни",
+    model: "coder",
+    stages: { interview: true, spec: true, approveSpec: true, testsFirst: true },
+  });
 
   // The directions come as cards with their colours and fonts, and the user may give a sample of their own.
   await expect(page.getByText("Как должна выглядеть страница?")).toBeVisible({ timeout: 30_000 });

@@ -70,13 +70,23 @@ export function StageSwitches({ value, onChange, team = false }: { value: TaskSt
   );
 }
 
-type Step = "interview" | "spec" | "tests" | "code" | "plan" | "team" | "review";
+type Step = "interview" | "spec" | "tests" | "code" | "plan" | "team" | "list" | "review";
 
 /** Where the task is in its sequence of steps; skipped steps are not shown. */
 export function PhaseSteps({ task }: { task: TaskView }) {
   const { t } = useApp();
   const goal = task.kind === "goal";
   const steps: Step[] = [];
+  // A project's plan: the interview, then the task list; nothing to review.
+  if (task.kind === "plan") {
+    const listing = task.phase === "list" || task.status === "done_empty";
+    return (
+      <ol className="phase-steps">
+        <li className={listing ? "is-done" : "is-now"}>{t("phase.interview")}</li>
+        <li className={listing ? "is-now" : undefined}>{t("phase.list")}</li>
+      </ol>
+    );
+  }
   if (task.stages.interview) steps.push("interview");
   if (goal) steps.push("plan", "team");
   else {
