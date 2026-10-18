@@ -8,6 +8,7 @@ import { ProxySection } from "./ProxySection";
 import { AccountSection } from "./AccountSection";
 import { Toggle } from "./Toggle";
 import { SkillsSection } from "./SkillsSection";
+import { UpdatesSection } from "./UpdatesSection";
 
 const localeNames = { ru: "Русский", en: "English" } as const;
 
@@ -118,6 +119,7 @@ export function SettingsSheet() {
 
         <ProjectModels save={(patch) => void save(patch)} />
 
+        <UpdatesSection />
         {!window.artel && <AccountSection />}
         <ProxySection />
         <McpSection />

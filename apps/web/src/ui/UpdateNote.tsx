@@ -11,7 +11,8 @@ export function UpdateNote() {
     void bridge.updateState().then((s) => s && setUpdate(s));
     return bridge.onUpdate(setUpdate);
   }, []);
-  if (!update) return null;
+  // The bottom bar speaks only of a new version; checking and failures are in the settings.
+  if (!update || !["downloading", "ready", "manual"].includes(update.state)) return null;
   if (update.state === "downloading") {
     return <span className="update-note muted">{t("update.downloading", { version: update.version, percent: update.percent ?? 0 })}</span>;
   }

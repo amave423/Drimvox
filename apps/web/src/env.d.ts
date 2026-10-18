@@ -8,11 +8,13 @@ interface ArtelBridge {
   notify(notice: { title: string; body: string; taskId: string }): void;
   /** A notification right now, even with the window in front: to check that they reach the desktop. */
   testNotify(notice: { title: string; body: string }): void;
-  /** A newer version found on GitHub, as far as it got; null when there is none. */
+  /** Where updating stands: checking, the latest, a newer version coming or ready, or what went wrong. */
   updateState(): Promise<UpdateState | null>;
   onUpdate(listener: (state: UpdateState) => void): () => void;
   /** Restarts into the downloaded version. */
   installUpdate(): void;
+  /** Asks GitHub now instead of at the next check. */
+  checkUpdates(): void;
   /** Opens Artel's shared skills folder in Explorer. */
   openSkillsFolder(): void;
   /** Called when the user clicks a notification; returns a function that stops listening. */
@@ -20,10 +22,12 @@ interface ArtelBridge {
 }
 
 interface UpdateState {
-  state: "downloading" | "ready" | "manual";
+  state: "off" | "idle" | "checking" | "latest" | "error" | "downloading" | "ready" | "manual";
   version: string;
   percent?: number;
   url?: string;
+  message?: string;
+  checkedAt?: number;
 }
 
 interface Window {

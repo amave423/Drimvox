@@ -37,6 +37,9 @@ test("opens with a working core and remembers theme and language", async () => {
   await expect(page.getByText(/^Artel \d+\.\d+\.\d+$/)).toBeVisible();
 
   await page.getByRole("button", { name: "Настройки" }).first().click();
+  // Updating says where it stands; a build that is not installed does not check.
+  await expect(page.getByRole("region", { name: "Обновления" })).toContainText("Обновления проверяет только установленный Artel.");
+  await expect(page.getByRole("button", { name: "Проверить сейчас" })).toBeDisabled();
   await page.getByRole("radio", { name: "Тёмное" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.getByText("Сохранено")).toBeVisible();
@@ -73,7 +76,7 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { artel?: object }).artel ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["getToken", "installUpdate", "notify", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "setTitleBar", "testNotify", "updateState"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "getToken", "installUpdate", "notify", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "setTitleBar", "testNotify", "updateState"] });
 });
 
 test("creates and deletes a shared skill in the settings", async () => {

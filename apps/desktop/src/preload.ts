@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("artel", {
     return () => void ipcRenderer.removeListener("artel:update", handler);
   },
   installUpdate: () => ipcRenderer.send("artel:update-install"),
+  checkUpdates: () => ipcRenderer.send("artel:update-check"),
   onOpenTask: (listener: (taskId: string) => void) => {
     const handler = (_event: unknown, taskId: unknown) => typeof taskId === "string" && listener(taskId);
     ipcRenderer.on("artel:open-task", handler);
