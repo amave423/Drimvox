@@ -10,7 +10,7 @@ export interface ApprovalSlot {
 
 export interface ApprovalReport {
   /** An "approval" event: asked (allowed null), then answered. */
-  event(data: { id: string; command: string; reason: string; allowed: boolean | null; always?: boolean }): void;
+  event(data: { id: string; command: string; reason: string; purpose?: string; allowed: boolean | null; always?: boolean }): void;
   /** The task waits while the request is open and runs again once it is answered. */
   waiting(on: boolean): void;
 }
@@ -22,6 +22,7 @@ export function waitForApproval(
   reason: string,
   report: ApprovalReport,
   signal?: AbortSignal,
+  purpose?: string,
 ): Promise<ApprovalAnswer> {
   return new Promise((resolve) => {
     const id = randomUUID();
@@ -29,13 +30,13 @@ export function waitForApproval(
     const settle = (answer: ApprovalAnswer) => {
       slot.approval = null;
       signal?.removeEventListener("abort", onAbort);
-      report.event({ id, command, reason, allowed: answer !== false, always: answer === "always" });
+      report.event({ id, command, reason, purpose, allowed: answer !== false, always: answer === "always" });
       report.waiting(false);
       resolve(answer);
     };
-    slot.approval = { id, command, reason, resolve: settle };
+    slot.approval = { id, command, reason, ...(purpose ? { purpose } : {}), resolve: settle };
     signal?.addEventListener("abort", onAbort, { once: true });
-    report.event({ id, command, reason, allowed: null });
+    report.event({ id, command, reason, purpose, allowed: null });
     report.waiting(true);
   });
 }

@@ -172,7 +172,8 @@ export function chatRoutes(
               ? folderTools(
                   chat.folder,
                   emit,
-                  async (command, reason, signal) => (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, signal })) !== false,
+                  async (command, reason, signal, purpose) =>
+                    (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, purpose, signal })) !== false,
                   { list: () => chats.attachments.ofChat(chat.id), file: (id) => chats.attachments.file(id) },
                 )
               : {}),

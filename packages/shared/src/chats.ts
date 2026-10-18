@@ -121,6 +121,6 @@ export type StreamEvent =
   | { type: "tool"; name: string; input: string }
   /** An MCP tool waits for the user's permission; answered with POST /api/chats/:id/approvals/:id. */
   /** A tool asks first: an MCP server's tool, or (with reason) a command in the chat's folder. */
-  | { type: "approval"; id: string; server: string; tool: string; input: unknown; reason?: string }
+  | { type: "approval"; id: string; server: string; tool: string; input: unknown; reason?: string; purpose?: string }
   | { type: "approved"; id: string; allowed: boolean }
   | { type: "done"; message: MessageView };

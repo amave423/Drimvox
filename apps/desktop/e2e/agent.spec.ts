@@ -96,7 +96,7 @@ test("an agent changes a copy, takes a line comment and lands as one commit", as
 
 test("the agent asks before git push and respects a refusal", async () => {
   const page = await launch([
-    { toolCalls: [{ name: "run_command", args: { command: "git push origin main" } }] },
+    { toolCalls: [{ name: "run_command", args: { command: "git push origin main", purpose: "Отправлю изменения на GitHub" } }] },
     { toolCalls: [{ name: "finish", args: { summary: "Пуш не разрешили, ничего не менял.", commit_message: "Nothing" } }] },
   ]);
   await startTask(page, "Запушь проект");
@@ -104,7 +104,9 @@ test("the agent asks before git push and respects a refusal", async () => {
   // The question sits at the top, next to Stop, not at the bottom of the feed.
   const ask = page.locator(".task-notice").getByRole("alert");
   await expect(ask.getByText("Агент просит разрешения")).toBeVisible();
-  await expect(ask.getByText("Отправка кода на сервер (git push)")).toBeVisible();
+  // What the command does, in the agent's words, and why Artel asks.
+  await expect(ask.getByText("Отправлю изменения на GitHub")).toBeVisible();
+  await expect(ask.getByText(/Почему спрашиваю: команда отправит код в удалённый репозиторий/)).toBeVisible();
   await page.getByRole("button", { name: "Запретить" }).click();
 
   await expect(page.getByText("Агент закончил, но файлы не изменились.")).toBeVisible();

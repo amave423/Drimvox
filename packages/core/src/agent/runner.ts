@@ -65,7 +65,7 @@ export class AgentRunner {
     const row = this.o.tasks.row(id);
     if (!row) return null;
     const approval = this.live.get(id)?.approval;
-    const pending = approval ? { id: approval.id, command: approval.command, reason: approval.reason } : null;
+    const pending = approval ? { id: approval.id, command: approval.command, reason: approval.reason, ...(approval.purpose ? { purpose: approval.purpose } : {}) } : null;
     return toTaskView(row, pending, row.kind === "goal" ? this.o.tasks.children(id) : []);
   }
 
@@ -359,18 +359,18 @@ export class AgentRunner {
       finish: (status, reason, detail) => this.finish(id, status, reason, detail),
       setStatus: (status, reason) => this.setStatus(id, status, reason),
       publish: () => this.publishTask(id),
-      askApproval: (command, reason, signal) => (live ? this.askApproval(id, live, command, reason, signal) : Promise.resolve(false)),
+      askApproval: (command, reason, signal, purpose) => (live ? this.askApproval(id, live, command, reason, signal, purpose) : Promise.resolve(false)),
       startTeam: () => this.team.start(id),
       ...taskExtras(this.o, id, (command, signal) => (live ? this.askApproval(id, live, command, "mcp", signal) : Promise.resolve(false))),
     };
   }
 
-  private askApproval(id: string, live: Live, command: string, reason: string, signal?: AbortSignal): Promise<ApprovalAnswer> {
+  private askApproval(id: string, live: Live, command: string, reason: string, signal?: AbortSignal, purpose?: string): Promise<ApprovalAnswer> {
     const report = {
       event: (data: object) => this.event(id, "approval", data),
       waiting: (on: boolean) => (on ? this.setStatus(id, "waiting", "approval") : this.setStatus(id, "running", null)),
     };
-    return waitForApproval(live, command, reason, report, signal);
+    return waitForApproval(live, command, reason, report, signal, purpose);
   }
 
   private finish(id: string, status: TaskRow["status"], reason: string | null, detail?: string): void {

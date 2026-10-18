@@ -16,7 +16,7 @@ export class ChatApprovals {
   ask(
     chatId: string,
     emit: (event: StreamEvent) => Promise<void>,
-    call: { server: string; tool: string; input: unknown; reason?: string; signal?: AbortSignal },
+    call: { server: string; tool: string; input: unknown; reason?: string; purpose?: string; signal?: AbortSignal },
   ): Promise<boolean | "always"> {
     const id = randomUUID();
     return new Promise((resolve) => {
@@ -29,7 +29,15 @@ export class ChatApprovals {
       };
       this.pending.set(id, { chatId, settle });
       call.signal?.addEventListener("abort", onAbort, { once: true });
-      void emit({ type: "approval", id, server: call.server, tool: call.tool, input: call.input, ...(call.reason ? { reason: call.reason } : {}) });
+      void emit({
+        type: "approval",
+        id,
+        server: call.server,
+        tool: call.tool,
+        input: call.input,
+        ...(call.reason ? { reason: call.reason } : {}),
+        ...(call.purpose ? { purpose: call.purpose } : {}),
+      });
     });
   }
 

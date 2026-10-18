@@ -184,6 +184,8 @@ export interface PendingApproval {
   command: string;
   /** push, global, outside, system, download, browser, media_cost, mcp */
   reason: string;
+  /** What the command does, in the agent's words for the user. */
+  purpose?: string;
 }
 
 export interface TaskView {

@@ -12,7 +12,7 @@ export interface ToolHooks {
   onResult(result: { callId: string; name: string; ok: boolean; output: string }): void;
   /** Resolves true when the user allows the command. */
   /** Resolves true when the user allows it once, "always" when for good (MCP tools), false when not. */
-  askApproval(command: string, reason: ApprovalReason, signal?: AbortSignal): Promise<boolean | "always">;
+  askApproval(command: string, reason: ApprovalReason, signal?: AbortSignal, purpose?: string): Promise<boolean | "always">;
   onFinish(result: { summary: string; commitMessage: string }): void;
 }
 
@@ -81,10 +81,14 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
   const run_command = wrap(
     "run_command",
     "Run a shell command in the project folder, e.g. tests or a build. Returns the exit code and the end of the output.",
-    z.object({ command: z.string().min(1), timeout_seconds: z.number().int().min(1).max(600).default(120) }),
-    async ({ command, timeout_seconds }, signal) => {
+    z.object({
+      command: z.string().min(1),
+      purpose: z.string().max(300).optional().describe("What the command does and why, one short sentence in the user's language; the user sees it when the command asks for permission"),
+      timeout_seconds: z.number().int().min(1).max(600).default(120),
+    }),
+    async ({ command, purpose, timeout_seconds }, signal) => {
       const verdict = classifyCommand(command, ws.root);
-      if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal))) {
+      if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal, purpose))) {
         return { ok: false, output: "The user denied this command. Do not retry it; find another way or explain in finish." };
       }
       const result = await runCommand(command, ws.root, timeout_seconds * 1000, signal);

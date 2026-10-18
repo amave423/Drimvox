@@ -43,6 +43,8 @@ export interface ChatApproval {
   input: unknown;
   /** A command in the chat's folder: why it asks (approval.reason.*); none for an MCP tool. */
   reason?: string;
+  /** What the command does, in the model's words. */
+  purpose?: string;
   state: "open" | "allowed" | "denied";
 }
 
@@ -89,7 +91,8 @@ export function AssistantMessage({
       {approvals.map((a) => (
         <div key={a.id} className="approval" role={a.state === "open" ? "alert" : undefined}>
           <strong>{t("approval.title")}</strong>
-          <span>{t(`approval.reason.${a.reason ?? "mcp"}` as MessageKey)}</span>
+          {a.purpose && <p className="approval-purpose">{a.purpose}</p>}
+          <span className="muted">{t(`approval.reason.${a.reason ?? "mcp"}` as MessageKey)}</span>
           <code className="mono">{a.reason ? a.tool : `${a.server}: ${a.tool} ${JSON.stringify(a.input)}`}</code>
           {a.state === "open" && onApprove ? (
             <div className="actions">

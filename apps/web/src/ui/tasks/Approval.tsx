@@ -4,7 +4,7 @@ import type { MessageKey } from "../../i18n";
 import { formatUsd } from "../../lib/format";
 
 interface Props {
-  approval: { id: string; command: string; reason: string };
+  approval: { id: string; command: string; reason: string; purpose?: string };
   /** Null while nobody answered. */
   allowed: boolean | null;
   always?: boolean;
@@ -19,7 +19,8 @@ export function ApprovalCard({ approval, allowed, always = false, onAnswer }: Pr
   return (
     <div className={`approval${pending && onAnswer ? " is-asking" : ""}`} role={pending && onAnswer ? "alert" : undefined}>
       <strong>{t("approval.title")}</strong>
-      <span>{t(`approval.reason.${approval.reason}` as MessageKey, { limit: formatUsd(CONFIRM_ABOVE_USD) })}</span>
+      {approval.purpose && <p className="approval-purpose">{approval.purpose}</p>}
+      <span className="muted">{t(`approval.reason.${approval.reason}` as MessageKey, { limit: formatUsd(CONFIRM_ABOVE_USD) })}</span>
       <code className="mono">{approval.command}</code>
       {pending && onAnswer ? (
         <div className="actions">

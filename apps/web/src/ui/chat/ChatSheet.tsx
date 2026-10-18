@@ -265,7 +265,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
             setDraft((d) => d && { ...d, activity: [...d.activity, line] });
           }
           if (e.type === "approval") {
-            const card: ChatApproval = { id: e.id, server: e.server, tool: e.tool, input: e.input, reason: e.reason, state: "open" };
+            const card: ChatApproval = { id: e.id, server: e.server, tool: e.tool, input: e.input, reason: e.reason, purpose: e.purpose, state: "open" };
             setDraft((d) => d && { ...d, approvals: [...d.approvals, card] });
           }
           if (e.type === "approved") {
