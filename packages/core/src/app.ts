@@ -160,6 +160,7 @@ export function createCore(o: AppOptions) {
         plan: (projectId) => backlog.plan(projectId),
         visualKit,
         visionModel: () => readSettings(o.db).visionModel,
+        skillsDir: join(o.dataDir, "skills"),
       }),
     )
     .route("/mcp", mcpRoutes(mcpRepo, mcp))

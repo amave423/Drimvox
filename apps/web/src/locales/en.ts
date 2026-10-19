@@ -353,8 +353,6 @@ export const en: Record<keyof typeof ru, string> = {
   "review.checksGreen": "Artel ran the checks itself: all of them passed.",
   "review.noChecks": "There were no automatic checks.",
 
-  "settings.strongModel": "Stand-in model",
-  "settings.strongModelHint": "If the agent fails a task's checks three times in a row, this model carries on. Without it Artel shows you the report at once.",
   "settings.clear": "Remove",
 
   "stages.plan": "Write the spec and the team plan",
@@ -451,8 +449,6 @@ export const en: Record<keyof typeof ru, string> = {
   "gallery.openTask": "Open the task",
   "gallery.remove": "Delete",
   "gallery.removeConfirm": "Really delete the file",
-  "settings.imageModel": "Pictures for agents",
-  "settings.imageModelHint": "With it an agent can draw an icon, a background or an illustration and put it into the project. Pictures above {limit} only with your permission. Without a model agents draw nothing.",
   "action.generate_image": "Draws {target}",
   "approval.reason.media_cost": "A paid picture above {limit}",
   "media.emptyLede": "Describe what you need and pick the shape. The price shows before you start; video and anything above {limit} starts only from the button with the price.",
@@ -600,8 +596,6 @@ export const en: Record<keyof typeof ru, string> = {
   "settings.notificationsAbout": "When a task is done, waits for an answer, got stuck or failed, and the Artel window is not in front.",
   "settings.notificationsAboutBrowser": "When a task is done, waits for an answer, got stuck or failed, and the Artel tab is not open.",
   "settings.projectModels": "Models for projects",
-  "settings.projectModelsLede": "Optional: without them the model picked in the project does everything.",
-  "settings.moreModels": "More models: pictures and screenshots",
   "settings.notifications": "Notifications",
   "settings.notificationsOn": "Notify in Windows",
 
@@ -745,8 +739,6 @@ export const en: Record<keyof typeof ru, string> = {
   "acceptance.partial": "The acceptance agent did not accept everything in three rounds. Below is what is not done and why; send it back or accept it as is.",
   "feed.phase.acceptance": "The acceptance agent checks the work against the requirements (round {round})",
   "feed.acceptance": "Acceptance: {done} of {total} done",
-  "settings.acceptanceModel": "Reviewer",
-  "settings.acceptanceModelHint": "Before a task reaches you, the reviewer checks that everything asked in it is done. Better a different model from the one that writes the code. If none is set, the task's own model checks.",
   "interview.round": "Round {round} of {max}",
   "interview.understood": "What I understood",
   "interview.unknown": "What I still do not know",

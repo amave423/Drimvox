@@ -33,6 +33,7 @@ import type { BacklogService } from "../backlog/service";
 import { resolveVision } from "../visual/look";
 import { visualTools, type VisualKit } from "../visual/tools";
 import { WORK_STEPS, workRules } from "../work/prompt";
+import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 
 /** What the activity line shows of a tool's input. */
 const describeInput = (input: unknown) => {
@@ -48,6 +49,8 @@ export interface WorkDeps {
   plan(projectId: string): ProjectPlan | null;
   visualKit: VisualKit;
   visionModel(): { providerId: string; model: string } | null;
+  /** Artel's shared skills; a folder's own (.artel/skills, .claude/skills) come first. */
+  skillsDir: string;
 }
 
 /** Looks at pages per answer of a task: the desktop and the phone, then again after a fix. */
@@ -195,10 +198,13 @@ export function chatRoutes(
                 WORK_LOOKS,
               )
             : {};
+        // Skills for a chat with a folder: the folder's own first, then the shared ones.
+        const skills = chat.folder && toolsOk ? findSkills([...projectSkillRoots(chat.folder), { dir: work.skillsDir, scope: "shared" }]) : [];
+        const skillHooks = { onCall: (call: { name: string; input: unknown }) => void emit({ type: "tool", name: call.name, input: describeInput(call.input) }), onResult: () => {} };
         await reply({
           chats,
           chatId: chat.id,
-          work: task ? { system: workRules(work.plan(task.projectId!)), steps: WORK_STEPS } : undefined,
+          work: task || skills.length ? { system: [task ? workRules(work.plan(task.projectId!)) : "", skillsInstructions(skills)].filter(Boolean).join("\n"), steps: task ? WORK_STEPS : 0 } : undefined,
           conn,
           model: chat.model!,
           content,
@@ -211,6 +217,7 @@ export function chatRoutes(
           extraTools: {
             ...mcpTools,
             ...workTools,
+            ...(chat.folder ? skillTools(skills, chat.folder, skillHooks) : {}),
             ...(chat.folder && toolsOk
               ? folderTools(
                   chat.folder,

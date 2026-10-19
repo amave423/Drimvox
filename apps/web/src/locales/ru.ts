@@ -352,8 +352,6 @@ export const ru = {
   "review.checksGreen": "Artel сам запустил проверки — все прошли.",
   "review.noChecks": "Автоматических проверок не было.",
 
-  "settings.strongModel": "Модель на подмену",
-  "settings.strongModelHint": "Если агент трижды подряд не может пройти проверки задачи, работу продолжит эта модель. Без неё Artel сразу покажет тебе отчёт.",
   "settings.clear": "Убрать",
 
   "stages.plan": "Написать спеку и план для команды",
@@ -450,8 +448,6 @@ export const ru = {
   "gallery.openTask": "Открыть задачу",
   "gallery.remove": "Удалить",
   "gallery.removeConfirm": "Точно удалить файл",
-  "settings.imageModel": "Картинки для агентов",
-  "settings.imageModelHint": "С ней агент может сам нарисовать иконку, фон или иллюстрацию и положить в проект. Картинки дороже {limit} — только с твоего разрешения. Без модели агент картинок не рисует.",
   "action.generate_image": "Рисует {target}",
   "approval.reason.media_cost": "Платная картинка дороже {limit}",
   "media.emptyLede": "Опиши, что нужно, и выбери формат. Цена видна до запуска; видео и всё дороже {limit} запускается только по кнопке с ценой.",
@@ -599,8 +595,6 @@ export const ru = {
   "settings.notificationsAbout": "Когда задача готова, ждёт ответа, застряла или упала, а окно Artel не впереди.",
   "settings.notificationsAboutBrowser": "Когда задача готова, ждёт ответа, застряла или упала, а вкладка Artel не открыта.",
   "settings.projectModels": "Модели для проектов",
-  "settings.projectModelsLede": "Необязательно: без них всё делает модель, выбранная в проекте.",
-  "settings.moreModels": "Ещё модели: картинки и скриншоты",
   "settings.notifications": "Уведомления",
   "settings.notificationsOn": "Уведомлять в Windows",
 
@@ -744,8 +738,6 @@ export const ru = {
   "acceptance.partial": "Приёмщик за три круга не принял всё. Ниже — что не сделано и почему; можно вернуть на доработку или принять как есть.",
   "feed.phase.acceptance": "Приёмщик проверяет работу по требованиям (круг {round})",
   "feed.acceptance": "Приёмка: сделано {done} из {total}",
-  "settings.acceptanceModel": "Проверяющий",
-  "settings.acceptanceModelHint": "Перед тем как задача попадёт к тебе, проверяющий смотрит, сделано ли всё, что в ней просили. Лучше, чтобы это была не та модель, что пишет код. Если не выбрать — проверяет модель задачи.",
   "interview.round": "Круг {round} из {max}",
   "interview.understood": "Что я понял",
   "interview.unknown": "Чего ещё не знаю",

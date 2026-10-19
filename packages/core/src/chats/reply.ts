@@ -123,7 +123,7 @@ export async function reply(i: ReplyInput): Promise<void> {
         ? {
             tools,
             // Search, read a page or two, call a tool or two, answer.
-            stopWhen: isStepCount(i.work?.steps ?? (i.folder ? FOLDER_STEPS : 8)),
+            stopWhen: isStepCount(i.work?.steps || (i.folder ? FOLDER_STEPS : 8)),
             // Long work in a folder: once the answer nears the model's context, its older part becomes a summary.
             ...(i.folder ? { prepareStep: memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) } : {}),
           }

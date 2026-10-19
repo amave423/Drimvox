@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -121,6 +121,17 @@ describe("a task of the list as a conversation in the project's folder", () => {
     expect(readFileSync(join(folder, "index.html"), "utf8")).toBe("<h1>Лесопилка</h1>\n");
     expect((await items(project.id)).find((i) => i.id === calc.id)).toMatchObject({ status: "open", chatId: null });
     expect(execFileSync("git", ["log", "--oneline"], { cwd: folder, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);
+  });
+
+  it("offers the project's skills, and the agent can open one", async () => {
+    mkdirSync(join(folder, ".artel", "skills", "style"), { recursive: true });
+    writeFileSync(join(folder, ".artel", "skills", "style", "SKILL.md"), ["---", "name: style", "description: When making pages for this site", "---", "Use the brand green.", ""].join("\n"));
+    const { provider, project, calc } = await setup([call("use_skill", { name: "style" }), { text: "Готово." }]);
+    const started = await (await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id], providerId: provider.id, model: "coder" })).json();
+    await say(started.chatId, started.message);
+    const requests = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
+    expect(JSON.stringify(requests[0]!.body.messages[0])).toContain("style: When making pages for this site");
+    expect(JSON.stringify(requests[1]!.body.messages)).toContain("Use the brand green.");
   });
 
   it("names its project and task in the list of chats, so the sidebar shows it under the project", async () => {
