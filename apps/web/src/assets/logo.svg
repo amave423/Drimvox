@@ -1,12 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- Artel's mark: an ink square, a geometric A, its bar a stroke of the red pencil (docs/DESIGN.md). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="152 134 720 720">
+  <!-- Artel's mark: five petals, the members of the artel, around a spark cut out of the middle (docs/DESIGN.md). -->
   <defs>
-    <linearGradient id="artel-ink" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#3b62a0"/>
-      <stop offset="1" stop-color="#1c3560"/>
+    <linearGradient id="artel-petals" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b6fe0"/>
+      <stop offset="1" stop-color="#3b7bd8"/>
     </linearGradient>
+    <mask id="artel-spark">
+      <rect x="0" y="0" width="1024" height="1024" fill="white"/>
+      <path d="M512 392 C 534 490 534 490 632 512 C 534 534 534 534 512 632 C 490 534 490 534 392 512 C 490 490 490 490 512 392 Z" fill="black"/>
+    </mask>
   </defs>
-  <rect width="1024" height="1024" rx="232" fill="url(#artel-ink)"/>
-  <path d="M300 792 L512 236 L724 792" fill="none" stroke="#fcfcfa" stroke-width="118" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M318 640 L706 586" fill="none" stroke="#f07468" stroke-width="92" stroke-linecap="round"/>
+  <g fill="url(#artel-petals)" mask="url(#artel-spark)">
+    <circle cx="512.0" cy="322.0" r="150"/>
+    <circle cx="692.7" cy="453.3" r="150"/>
+    <circle cx="623.7" cy="665.7" r="150"/>
+    <circle cx="400.3" cy="665.7" r="150"/>
+    <circle cx="331.3" cy="453.3" r="150"/>
+  </g>
 </svg>
