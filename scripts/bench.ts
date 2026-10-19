@@ -5,7 +5,7 @@
 // The interview is answered with the recommended options, specs and stages are approved, risky commands denied.
 // Each run's events go to .bench/<task>-<time>.json for replay tests.
 import { startServer } from "@artel/core";
-import { PAGE_HEIGHT_SCRIPT, type TaskEvent, type TaskView } from "@artel/shared";
+import { PAGE_HEIGHT_SCRIPT, type MessageView, type StreamEvent, type TaskEvent, type TaskView } from "@artel/shared";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -56,6 +56,17 @@ const tasks: BenchTask[] = [
     files: { "README.md": "# Site\n" },
     done: (dir) => existsSync(join(dir, "index.html")),
     minutes: 120,
+  },
+  {
+    // A bigger project: planned into a list, its first task (the MVP) done in one conversation.
+    name: "kanban",
+    task:
+      "Сделай канбан-доску в браузере: колонки «Надо», «В работе», «Готово»; карточки можно добавлять, править, удалять " +
+      "и перетаскивать между колонками; поиск по карточкам; всё сохраняется в localStorage. Простые HTML, CSS и JS без " +
+      "сборки; логику доски (добавить, переместить, найти) вынеси в модуль и покрой тестами на node --test.",
+    files: { "README.md": "# Kanban\n", "package.json": '{ "type": "module" }\n' },
+    done: (dir) => existsSync(join(dir, "index.html")) && passes(dir, process.execPath, ["--test"]),
+    minutes: 60,
   },
 ];
 
@@ -111,7 +122,8 @@ const rows: string[] = [];
 try {
   const provider = (await api("POST", "/providers", { preset: "routerai", apiKey: key })).body;
   await api("PATCH", "/settings", { visionModel: { providerId: provider.id, model }, agentBudgetUsd: budgetUsd });
-  for (const t of tasks.filter((t) => !only || t.name === only)) rows.push(await run(t, provider.id));
+  if (process.argv.includes("--tools")) rows.push(await checkTools(provider.id));
+  else for (const t of tasks.filter((t) => !only || t.name === only)) rows.push(await run(t, provider.id));
 } finally {
   await server.close();
   const opened = browser as Promise<Browser> | null;
@@ -148,9 +160,21 @@ async function run(t: BenchTask, providerId: string): Promise<string> {
       if (!items[0]) throw new Error(`${t.name}: no task list`);
       itemId = items[0].id;
     }
+    // docs/specs/project-work.md: the task is a conversation in the project's folder, then accepted as one commit.
     const run = await api("POST", `/projects/${project.id}/backlog/run`, { ids: [itemId], providerId, model });
     if (run.status !== 201) throw new Error(`${t.name}: ${JSON.stringify(run.body)}`);
-    tasks.push(await drive((run.body as TaskView).id, until));
+    const { chatId, message } = run.body as { chatId: string; message: string };
+    const talk = await converse(chatId, message, until);
+    const item = ((await api("GET", `/projects/${project.id}/backlog`)).body.items as { id: string; status: string }[]).find((i) => i.id === itemId);
+    const accepted = item?.status === "review" && (await api("POST", `/projects/${project.id}/backlog/${itemId}/accept`, {})).status === 200;
+    const done = accepted && t.done(dir);
+    writeFileSync(join(out, `${t.name}-chat-${new Date(started).toISOString().replace(/[:.]/g, "-")}.json`), redact(JSON.stringify({ model, tasks, talk })));
+    const after = await balance();
+    const rub = before !== null && after !== null ? (before - after).toFixed(1) : "?";
+    const minutes = ((Date.now() - started) / 60_000).toFixed(1);
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    const status = talk.answer?.status ?? "no answer";
+    return `| ${t.name} | chat | ${done ? "yes" : "no"} | ${item?.status}/${status}${talk.answer?.error ? ` ${talk.answer.error.code}` : ""} | ${talk.tools} | ${talk.asked} | ${minutes} | ${rub} |`;
   }
 
   const last = tasks.at(-1)!.task;
@@ -166,6 +190,79 @@ async function run(t: BenchTask, providerId: string): Promise<string> {
   const minutes = ((Date.now() - started) / 60_000).toFixed(1);
   rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   return `| ${t.name} | ${flow} | ${done ? "yes" : "no"} | ${last.status}${last.statusReason ? `/${last.statusReason}` : ""} | ${steps} | ${failed} | ${minutes} | ${rub} |`;
+}
+
+/**
+ * `--tools`: a skill and an MCP server in a chat with a folder, as a user sets them up. The answer has to open the skill,
+ * add with the server's tool (asking first) and write the way the skill says.
+ */
+async function checkTools(providerId: string): Promise<string> {
+  const dir = makeProject({ "README.md": "# Tools\n" });
+  const before = await balance();
+  const started = Date.now();
+  await api("POST", "/skills", { name: "report-style", description: "Как писать итог", instructions: "Начинай ответ словами «Готово-готово:», дальше одно предложение." });
+  const server = (await api("POST", "/mcp", { name: "demo", command: process.execPath, args: [join(process.cwd(), "packages", "core", "test", "mcp-server.mjs")] })).body;
+  const status = (await api("GET", `/mcp/${server.id}/status`)).body;
+  log(`=== tools\n  mcp: ${status.ok ? `${status.tools.length} tools` : JSON.stringify(status.error)}`);
+  const chat = (await api("POST", "/chats", { providerId, model })).body;
+  await api("PATCH", `/chats/${chat.id}/folder`, { folder: dir });
+  const talk = await converse(chat.id, "Открой скилл report-style, сложи 17 и 25 инструментом add MCP-сервера demo и ответь по правилам скилла.", started + 5 * 60_000);
+  log(`  answer: ${talk.text.trim().slice(0, 300)}`);
+  const skill = talk.calls.some((c) => c.name === "use_skill");
+  const mcp = talk.calls.some((c) => /demo.*add/.test(c.name));
+  const styled = /Готово-готово/.test(talk.text) && /42/.test(talk.text);
+  const after = await balance();
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  const rub = before !== null && after !== null ? (before - after).toFixed(1) : "?";
+  return `| tools | skill ${skill ? "yes" : "no"}, mcp ${mcp ? "yes" : "no"}, style ${styled ? "yes" : "no"} | ${talk.answer?.status ?? "no answer"} | ${talk.tools} | ${talk.asked} | ${((Date.now() - started) / 60_000).toFixed(1)} | ${rub} |`;
+}
+
+interface Talk {
+  answer: MessageView | null;
+  text: string;
+  /** Tool calls the answer made, and how many asked first. */
+  tools: number;
+  asked: number;
+  calls: { name: string; input: string }[];
+}
+
+/**
+ * One message in a chat, read from its stream like the window does. An MCP tool and a download are allowed (the
+ * folder is a throwaway one); a push, a command outside the folder or on the system is not.
+ */
+async function converse(chatId: string, content: string, until: number): Promise<Talk> {
+  const talk: Talk = { answer: null, text: "", tools: 0, asked: 0, calls: [] };
+  const res = await fetch(`${base}/chats/${chatId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+    signal: AbortSignal.timeout(Math.max(until - Date.now(), 1000)),
+  });
+  if (!res.ok || !res.body) throw new Error(`message: ${res.status} ${await res.text()}`);
+  let buffer = "";
+  const decoder = new TextDecoder();
+  for await (const chunk of res.body) {
+    buffer += decoder.decode(chunk as Uint8Array, { stream: true });
+    let end: number;
+    while ((end = buffer.indexOf("\n\n")) >= 0) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const data = block.split("\n").find((l) => l.startsWith("data:"))?.slice(5).trim();
+      if (!data) continue;
+      const e = JSON.parse(data) as StreamEvent;
+      if (e.type === "text") talk.text += e.text;
+      else if (e.type === "tool") {
+        talk.tools++;
+        talk.calls.push({ name: e.name, input: e.input.slice(0, 200) });
+        log(`  tool ${e.name} ${e.input.slice(0, 120)}`);
+      } else if (e.type === "approval") {
+        talk.asked++;
+        log(`  asks ${e.server}/${e.tool}${e.reason ? ` (${e.reason})` : ""}`);
+        await api("POST", `/chats/${chatId}/approvals/${e.id}`, { allow: !e.reason || e.reason === "download" });
+      } else if (e.type === "done") talk.answer = e.message;
+    }
+  }
+  return talk;
 }
 
 /** Answers like a user who trusts the recommendations, until the task needs nothing more or the time is up. */

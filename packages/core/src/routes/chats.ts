@@ -36,9 +36,13 @@ import { WORK_STEPS, workRules } from "../work/prompt";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 
 /** What the activity line shows of a tool's input. */
+/** The one thing of a call worth a line under the answer: the page, the command, the skill and its file. */
 const describeInput = (input: unknown) => {
-  const i = (input ?? {}) as { url?: unknown; command?: unknown };
-  return typeof i.url === "string" ? i.url : typeof i.command === "string" ? i.command : "";
+  const i = (input ?? {}) as { url?: unknown; command?: unknown; name?: unknown; path?: unknown };
+  if (typeof i.url === "string") return i.url;
+  if (typeof i.command === "string") return i.command;
+  if (typeof i.name === "string") return typeof i.path === "string" ? `${i.name}/${i.path}` : i.name;
+  return "";
 };
 
 const notFound = { error: { code: "not_found" } } as const;

@@ -128,10 +128,12 @@ describe("a task of the list as a conversation in the project's folder", () => {
     writeFileSync(join(folder, ".artel", "skills", "style", "SKILL.md"), ["---", "name: style", "description: When making pages for this site", "---", "Use the brand green.", ""].join("\n"));
     const { provider, project, calc } = await setup([call("use_skill", { name: "style" }), { text: "Готово." }]);
     const started = await (await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id], providerId: provider.id, model: "coder" })).json();
-    await say(started.chatId, started.message);
+    const events = await say(started.chatId, started.message);
     const requests = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
     expect(JSON.stringify(requests[0]!.body.messages[0])).toContain("style: When making pages for this site");
     expect(JSON.stringify(requests[1]!.body.messages)).toContain("Use the brand green.");
+    // The answer's actions name the skill (seen live: "use_skill" with nothing after it).
+    expect(events).toContainEqual({ type: "tool", name: "use_skill", input: "style" });
   });
 
   it("names its project and task in the list of chats, so the sidebar shows it under the project", async () => {
