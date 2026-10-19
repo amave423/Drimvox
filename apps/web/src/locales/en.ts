@@ -141,6 +141,7 @@ export const en: Record<keyof typeof ru, string> = {
   "error.unreachable": "Could not reach the provider. Check the internet connection or the address.",
   "error.no_key": "This provider needs a key.",
   "error.invalid": "Check the form fields.",
+  "error.step_limit": "The model used every step one answer may take and summed up. If the work is not done, say \"go on\".",
   "error.cut_off": "The answer was cut off: the model ran out of room. Write \"go on\", or start a new chat: local models remember only a short conversation.",
   "error.forbidden": "The key works, but the provider does not let it use this model: it is closed to the account or only for certain apps. Pick another.",
   "error.overloaded": "The model is overloaded at the provider right now. Try again a bit later or pick another.",

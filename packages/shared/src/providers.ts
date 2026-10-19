@@ -313,6 +313,7 @@ export const providerErrorCodes = [
   "no_proxy",
   /** The answer stopped where the model ran out of room (its context or its answer limit). */
   "cut_off",
+  "step_limit",
   /** The model only thought and gave no answer. */
   "no_answer",
   /** The key works, but may not use this model. */

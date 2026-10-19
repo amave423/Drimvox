@@ -22,6 +22,10 @@ import type { Connection } from "../providers/repo";
 import type { ChatRepo } from "./repo";
 
 /** What the chat can show, so models use it instead of ASCII art. */
+/** Told on the last step an answer may take: no tools, a summary, so it never ends empty. */
+const LAST_STEP =
+  "This is the last step of this answer: do not call tools. Write the answer now, in the user's language: what is done, where the results are, and what is left, so the user can say \"go on\".";
+
 /** How long a model on this computer may stay silent: reading a long context before the first word takes a while. */
 const LOCAL_IDLE_MS = 10 * 60_000;
 
@@ -112,6 +116,10 @@ export async function reply(i: ReplyInput): Promise<void> {
     ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }) : {}),
     ...i.extraTools,
   };
+  const steps = i.work?.steps || (i.folder ? FOLDER_STEPS : 8);
+  const memory = i.folder ? memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) : null;
+  /** The answer reached its last step: what it says there is a summary of unfinished work. */
+  let lastStep = false;
   try {
     const result = streamText({
       model: languageModel(i.conn, i.model),
@@ -130,9 +138,15 @@ export async function reply(i: ReplyInput): Promise<void> {
         ? {
             tools,
             // Search, read a page or two, call a tool or two, answer.
-            stopWhen: isStepCount(i.work?.steps || (i.folder ? FOLDER_STEPS : 8)),
-            // Long work in a folder: once the answer nears the model's context, its older part becomes a summary.
-            ...(i.folder ? { prepareStep: memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) } : {}),
+            stopWhen: isStepCount(steps),
+            // Long work in a folder: once the answer nears the model's context, its older part becomes a summary. The
+            // last step is for the summary (seen live: all 40 steps went on tools, the answer came empty).
+            prepareStep: async (o: { stepNumber: number; messages: ModelMessage[] }) => {
+              const base: { messages?: ModelMessage[] } = memory ? await memory(o) : {};
+              if (o.stepNumber < steps - 1) return base;
+              lastStep = true;
+              return { ...base, toolChoice: "none" as const, messages: [...(base.messages ?? o.messages), { role: "user" as const, content: LAST_STEP }] };
+            },
           }
         : {}),
       // OpenRouter and RouterAI search on their side for a fee; the plugin goes into the request body.
@@ -180,6 +194,8 @@ export async function reply(i: ReplyInput): Promise<void> {
   const stopped = i.signal.aborted;
   if (!stopped && silence.signal.aborted) error = { code: "timeout" };
   // Seen live: a model thought 90 000 characters and wrote nothing; an empty "done" answer said nothing of it.
+  // Stopped on a tool call (the steps ran out): not "thought and did not answer".
+  if (!stopped && !error && !text.trim() && finishReason === "tool-calls") error = { code: "step_limit" };
   if (!stopped && !error && !text.trim() && reasoning.trim()) error = { code: "no_answer" };
   // The model ran out of room (seen live: a local model with a small context stopped mid-answer, as if it had
   // finished). The answer stays a done one, so "go on" brings it back to the model, with a note under it.
@@ -212,7 +228,7 @@ export async function reply(i: ReplyInput): Promise<void> {
         : inputTokens !== null && outputTokens !== null
           ? costOf(price, i.conn.preset, usageOf(usage))
           : null,
-    error: stopped ? null : (error ?? (cutOff ? { code: "cut_off" } : null)),
+    error: stopped ? null : (error ?? (cutOff ? { code: "cut_off" } : lastStep ? { code: "step_limit" } : null)),
     activity: i.activity?.(),
   });
   if (!stopped) await i.emit({ type: "done", message });

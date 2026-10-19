@@ -67,6 +67,19 @@ describe("a chat with a folder", () => {
     expect(after.canUndo).toBe(false);
   });
 
+  // Seen live: a task took all 40 steps on tools, the last one too, and the answer came empty, called "thought a lot and
+  // did not answer" though the files were made. The last step is for the summary: no tools, a word on what is done.
+  it("ends with a summary when the steps run out, not with an empty answer", async () => {
+    const chat = await chatWith([...Array.from({ length: 39 }, () => call("list_files", { path: "." })), { text: "Сделал шаблон; осталось проверить сноски." }]);
+    await connect(chat.id, folder);
+    const events = await readEvents(await send(chat.id, "Сделай шаблон"));
+    const answer = events.at(-1).message;
+    expect(answer).toMatchObject({ status: "done", content: "Сделал шаблон; осталось проверить сноски.", error: { code: "step_limit" } });
+    const last = fake!.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!.body;
+    expect(last.tool_choice).toBe("none");
+    expect(JSON.stringify(last.messages)).toMatch(/last step/i);
+  });
+
   // Seen live: "…the project folder.The folder is empty…": what the model said between tool calls ran together.
   it("keeps what the model says before and after its tool calls apart", async () => {
     const chat = await chatWith([{ text: "Смотрю папку.", toolCalls: [{ name: "list_files", args: { path: "." } }] }, { text: "Готово." }]);
