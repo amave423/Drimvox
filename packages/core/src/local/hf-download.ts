@@ -35,6 +35,9 @@ export interface HfDownload {
 export class HfDownloadError extends Error {}
 
 const QUANT_TAIL = (quant: string) => new RegExp(`[-_.]${quant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.gguf$`, "i");
+/** Rounds over every way to the file that bring nothing new before the download gives up, and the pause between them. */
+const STALLED_ROUNDS = 3;
+const RETRY_MS = 1500;
 /** How long an address may take to start sending, and to go quiet in the middle, before the next one is tried. */
 const START_MS = 20_000;
 const STALL_MS = 45_000;
@@ -119,18 +122,29 @@ export async function downloadFile(d: FileDownload, repo: string, file: { path: 
   if (have() < file.size) {
     const tries = d.routes.flatMap((route) => d.bases.map((base) => ({ route, base, key: `${route.label}|${base}` })));
     const order = [...tries.filter((t) => t.key === preferred), ...tries.filter((t) => t.key !== preferred)];
-    const failures: string[] = [];
-    for (const t of order) {
-      if (d.signal.aborted) return null;
-      d.progress({ status: "downloading", completed: have(), total: file.size });
-      try {
-        await fetchInto(t.route, `${t.base}/${repo}/resolve/main/${file.path.split("/").map(encodeURIComponent).join("/")}`, part, have(), file.size, d);
-        preferred = t.key;
-        break;
-      } catch (err) {
+    let failures: string[] = [];
+    // Round after round over the ways there, each going on from where the last one broke (seen live: a proxy cut a
+    // 3 GB file at 3.4 GB and the download gave up). Only rounds that bring nothing count towards giving up.
+    let idle = 0;
+    while (have() < file.size && idle < STALLED_ROUNDS) {
+      const before = have();
+      failures = [];
+      for (const t of order) {
         if (d.signal.aborted) return null;
-        failures.push(`${t.route.label}: ${err instanceof Error ? err.message : String(err)}`);
+        d.progress({ status: "downloading", completed: have(), total: file.size });
+        try {
+          await fetchInto(t.route, `${t.base}/${repo}/resolve/main/${file.path.split("/").map(encodeURIComponent).join("/")}`, part, have(), file.size, d);
+          preferred = t.key;
+          break;
+        } catch (err) {
+          if (d.signal.aborted) return null;
+          failures.push(`${t.route.label}: ${err instanceof Error ? err.message : String(err)}`);
+          // This way brought more of the file: go on through it rather than trying the others.
+          if (have() > before) break;
+        }
       }
+      idle = have() > before ? 0 : idle + 1;
+      if (have() < file.size && idle > 0) await new Promise((r) => setTimeout(r, RETRY_MS));
     }
     if (have() < file.size) {
       const hint = d.routes.length > 1 ? "" : " Set a proxy in the settings: Artel then downloads through it.";

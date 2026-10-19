@@ -1,5 +1,6 @@
 // Live check of pictures and clips on this computer (docs/specs/local-images.md): the real engine and real models from
-// Hugging Face, through the real core API. `npm run live-local-media -- --model=z-image-turbo` downloads the model
+// Hugging Face, through the real core API. `npm run live-local-media -- --model=z-image-turbo` (a clip:
+// `--kind=video --model=wan2.1-t2v-1.3b`) downloads the model
 // (gigabytes: once, into .live-local/), draws a picture and saves it next to the log. The proxy from ARTEL_PROXY is used
 // when Hugging Face cannot be reached directly.
 import { startServer } from "@artel/core";
@@ -31,7 +32,8 @@ const gb = (n: number) => (n / 2 ** 30).toFixed(2);
 
 try {
   if (process.env.ARTEL_PROXY) await api("PUT", "/proxy", { url: process.env.ARTEL_PROXY });
-  const statusPath = kind === "video" ? "/local/videos" : "/local/images";
+  // Pictures and clips share one engine and one list.
+  const statusPath = "/local/images";
   let s = (await api("GET", statusPath)).body;
   log("status:", JSON.stringify({ supported: s.supported, engine: s.engine, models: s.models.map((m: any) => [m.id, m.fit, gb(m.sizeBytes), m.installed]) }));
   const model = () => s.models.find((m: any) => m.id === modelId);
@@ -61,7 +63,7 @@ try {
     const res = await fetch(`${base}/chats/${chat.id}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ content: text, options: { aspectRatio: "1:1" }, confirm: true }),
+      body: JSON.stringify({ content: text, options: kind === "video" ? { aspectRatio: "16:9", duration: 2 } : { aspectRatio: "1:1" }, confirm: true }),
     });
     const events = (await res.text()).split("\n").filter((l) => l.startsWith("data:")).map((l) => JSON.parse(l.slice(5)));
     const done = events.find((e) => e.type === "done")?.message;

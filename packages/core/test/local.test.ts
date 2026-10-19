@@ -229,9 +229,11 @@ describe("Hugging Face downloads", () => {
    * A file server that sends the file in slow pieces and honours Range; `body` may be swapped for a bad copy. With
    * `refuseFirst` the first request fails, as the direct way does on a closed network.
    */
-  async function mirror(body = FILE, refuseFirst = false): Promise<{ url: string; ranges: (string | null)[] }> {
+  async function mirror(body = FILE, refuseFirst = false, cuts = 0): Promise<{ url: string; ranges: (string | null)[] }> {
     const ranges: (string | null)[] = [];
     let refused = !refuseFirst;
+    // How many times the connection is cut in the middle of the file, as a flaky proxy does.
+    let cutsLeft = cuts;
     const s = createServer(async (req, res) => {
       if (!/\/someone\/tiny-GGUF\/resolve\/main\/tiny-Q4_K_M\.gguf$/.test(req.url ?? "")) {
         res.writeHead(404);
@@ -246,6 +248,10 @@ describe("Hugging Face downloads", () => {
       res.writeHead(start ? 206 : 200, { "content-length": String(body.length - start), "content-type": "application/octet-stream" });
       for (let at = start; at < body.length; at += 30_000) {
         if (res.destroyed) return;
+        if (cutsLeft > 0 && at - start >= 90_000) {
+          cutsLeft--;
+          return req.socket.destroy();
+        }
         res.write(body.subarray(at, Math.min(body.length, at + 30_000)));
         await sleep(40);
       }
@@ -278,6 +284,17 @@ describe("Hugging Face downloads", () => {
     await env.call("POST", "/api/local/pulls", { model: MODEL });
     const done = await until(status, (v) => v.pulls[0]?.done, 30_000);
     expect(done.pulls[0].error).toMatch(/Set a proxy in the settings/);
+  });
+
+  // Seen live: a proxy cut a 3 GB download at 3.4 GB and Artel gave up; the file was half there. Now it goes on from
+  // where the connection broke, as long as each try brings more of the file.
+  it("goes on by itself after the connection is cut in the middle of the file", async () => {
+    const m = await mirror(FILE, false, 2);
+    setup({ hf: await api(), hfFiles: [m.url] });
+    await env.call("POST", "/api/local/pulls", { model: MODEL });
+    const done = await until(status, (v) => v.pulls[0]?.done, 30_000);
+    expect(done.pulls[0]).toMatchObject({ error: null });
+    expect(m.ranges.filter((r) => r !== null).length).toBeGreaterThanOrEqual(2);
   });
 
   it("pauses and goes on from where it stopped", async () => {
