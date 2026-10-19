@@ -55,6 +55,18 @@ async function priceTable(fetchFn: typeof fetch): Promise<Map<string, ModelInfo>
 
 const GOOGLE_NOT_CHAT = /embedding|aqa|imagen|veo|tts|lyria|transcribe|robotics|deep-research|antigravity|computer-use|-latest$/i;
 
+/**
+ * Which Gemini API models a key without billing may use free, up to a daily limit. Google's API does not say it; its
+ * pricing page (2026-10) gives a free tier to Flash, Flash-Lite, Gemma and 2.5 Pro, and none to newer Pro, Argon, Omni
+ * and picture models.
+ */
+export function googleFreeTier(id: string): boolean {
+  if (/gemma/i.test(id)) return true;
+  if (/image|banana|omni|argon|customtools|veo|lyria/i.test(id)) return false;
+  if (/-pro\b/i.test(id)) return /^gemini-2\.5-pro/i.test(id);
+  return /flash/i.test(id);
+}
+
 interface Listed {
   id: string;
   name: string;
@@ -106,6 +118,7 @@ export async function nativeModels(conn: Connection): Promise<ModelInfo[]> {
         ...(known?.priceCacheRead !== undefined ? { priceCacheRead: known.priceCacheRead } : {}),
         tools: known?.tools ?? null,
         vision: known?.vision ?? null,
+        ...(conn.preset === "google" ? { freeTier: googleFreeTier(m.id) } : {}),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));

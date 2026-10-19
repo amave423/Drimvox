@@ -7,7 +7,7 @@ import { ModelPicker } from "./chat/ModelPicker";
 
 type Ref = { providerId: string; model: string } | null;
 
-function ModelSetting(p: { title: MessageKey; hint: ReactNode; value: Ref; image?: boolean; onChange(v: Ref): void }) {
+function ModelSetting(p: { title: MessageKey; hint: ReactNode; value: Ref; image?: boolean; vision?: boolean; onChange(v: Ref): void }) {
   const { t } = useApp();
   return (
     <div className="model-setting">
@@ -17,6 +17,7 @@ function ModelSetting(p: { title: MessageKey; hint: ReactNode; value: Ref; image
         <ModelPicker
           value={p.value && (p.image ? { ...p.value, kind: "image" } : p.value)}
           kinds={p.image ? ["image"] : undefined}
+          vision={p.vision}
           onChange={({ providerId, model }) => p.onChange({ providerId, model })}
         />
         {p.value && (
@@ -51,8 +52,8 @@ export function ProjectModels({ save }: { save(patch: SettingsPatch): void }) {
           value={settings.imageModel}
           onChange={(imageModel) => save({ imageModel })}
         />
-        <ModelSetting title="settings.visionModel" hint={t("settings.visionModelHint")} value={settings.visionModel} onChange={(visionModel) => save({ visionModel })} />
-        <ModelSetting title="settings.strongModel" hint={t("settings.strongModelHint")} value={settings.strongModel} onChange={(strongModel) => save({ strongModel })} />
+        {/* Only models that see pictures: a model without eyes cannot judge a screenshot. */}
+        <ModelSetting title="settings.visionModel" vision hint={t("settings.visionModelHint")} value={settings.visionModel} onChange={(visionModel) => save({ visionModel })} />
       </details>
     </section>
   );

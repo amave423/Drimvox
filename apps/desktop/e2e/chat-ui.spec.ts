@@ -158,6 +158,18 @@ test("a big photo is made smaller before it goes", async () => {
   await expect(page.locator(".attachments.is-pending")).toContainText("photo.webp");
   const size = await page.locator(".attachments.is-pending .attachment .mono").first().textContent();
   expect(size).toMatch(/KB|1\.\d MB/);
+
+  // The picture opens big before it goes, and again from the message after (seen: neither could be opened).
+  await page.getByRole("button", { name: "Открыть photo.webp" }).click();
+  await expect(page.getByRole("dialog", { name: "photo.webp" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("textbox", { name: /Сообщение/ }).press("Enter");
+  await expect(page.getByText("Вижу фото.")).toBeVisible();
+  await page.locator(".msg-user").getByRole("button", { name: "Открыть photo.webp" }).click();
+  await expect(page.getByRole("dialog", { name: "photo.webp" }).getByRole("link", { name: "Сохранить файл" })).toBeVisible();
+  await page.getByRole("button", { name: "Закрыть" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 // Seen live: left to itself, a model thought for minutes and wrote nothing; the user can now say how much it thinks.

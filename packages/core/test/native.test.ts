@@ -121,8 +121,20 @@ describe("Google Gemini", () => {
     });
     const id = await connect("google", `${vendor.origin}/v1beta`);
     const models = await (await env.call("GET", `/api/providers/${id}/models`)).json();
-    expect(models.map((m: any) => [m.id, m.priceIn])).toEqual([["gemini-2.5-flash", 0.3]]);
+    expect(models.map((m: any) => [m.id, m.priceIn, m.freeTier])).toEqual([["gemini-2.5-flash", 0.3, true]]);
     expect(await chatOnce(id, "gemini-2.5-flash")).toMatchObject({ status: "done", content: "Привет из Gemini", inputTokens: 8, outputTokens: 4 });
+  });
+});
+
+describe("Google's free tier", () => {
+  // The pricing page as of 2026-10: Flash, Flash-Lite, Gemma and 2.5 Pro have a free tier; newer Pro, Argon, Omni and
+  // picture models do not. The API does not say it, so Artel marks it by name (seen: the user could not tell).
+  it("marks the models that have a free daily limit", async () => {
+    const { googleFreeTier } = await import("../src/providers/native");
+    const free = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-2.5-pro", "gemma-4-31b-it", "gemini-3-flash-preview"];
+    const paid = ["gemini-4-argon", "gemini-3.1-pro-preview", "gemini-omni-1.1-flash", "gemini-3.1-flash-image", "gemini-nano-banana-2.1", "gemini-3.1-pro-preview-customtools"];
+    for (const id of free) expect(googleFreeTier(id), id).toBe(true);
+    for (const id of paid) expect(googleFreeTier(id), id).toBe(false);
   });
 });
 

@@ -20,7 +20,7 @@ export function codeForStatus(status: number): ProviderErrorCode {
 }
 
 /** The provider does not serve the user's country (Google's Gemini API from Russia, say); a proxy helps. */
-const REGION = /location is not supported|unsupported_country|country, region,? or territory|not available in your (country|region)/i;
+export const REGION = /location is not supported|unsupported_country|country, region,? or territory|not (currently )?available in your (location|country|region)/i;
 
 /** Pulls the human-readable message out of an OpenAI-style error body. */
 export function detailFromBody(body: unknown): string | undefined {

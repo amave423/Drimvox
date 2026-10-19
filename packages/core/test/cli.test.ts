@@ -250,6 +250,14 @@ describe("Antigravity CLI", () => {
     expect(second!.args).toEqual(expect.arrayContaining(["--conversation", "conv-1"]));
   });
 
+  it("says when the account is not served in the user's country", async () => {
+    // Seen live from Russia: Antigravity refused the account by its location.
+    script([{ error: "Eligibility check failed: Your current account is not eligible for Antigravity, because it is not currently available in your location." }]);
+    const id = await connect("antigravity");
+    const chat = await (await env.call("POST", "/api/chats", { providerId: id, model: "default" })).json();
+    expect(await say(chat.id, "Привет")).toMatchObject({ status: "error", error: { code: "region" } });
+  });
+
   it("tells the user to sign in when agy is not signed in", async () => {
     script([{ error: "authentication required: run agy to sign in" }]);
     const id = await connect("antigravity");

@@ -5,15 +5,6 @@
 .media-wait { width: 240px; max-width: 100%; aspect-ratio: 1; border: 1px dashed var(--line); background: var(--paper); }
 .msg-making { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: var(--muted); font-size: 14px; }
 
-.media-options { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; padding: 8px 0 2px; font-size: 13px; }
-.media-option { display: grid; gap: 3px; color: var(--muted); }
-.media-option select {
-  appearance: none; width: auto; padding: 5px 28px 5px 12px; font-size: 13px; border-radius: 999px; background-color: var(--paper);
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; cursor: pointer;
-}
-.media-price { margin-left: auto; color: var(--fg); font-size: 13px; }
-
 .picker-kinds { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
 .picker-kinds button { padding: 6px 12px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .picker-kinds button.is-on { color: var(--ink); border-bottom-color: var(--ink); }
@@ -29,3 +20,27 @@
 
 .diff-image { padding: 10px 14px; }
 .diff-image img { display: block; max-width: 100%; max-height: 360px; border: 1px solid var(--line); background: var(--paper); }
+
+/* A picture that opens over the window. */
+.zoomable { padding: 0; border: 0; background: none; cursor: zoom-in; display: block; }
+.lightbox { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 48px 24px 72px; background: var(--overlay); cursor: zoom-out; }
+.lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: var(--sheet-shadow); cursor: default; }
+.lightbox-bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 18px; padding: 16px 24px; color: var(--on-overlay); font-size: 14px; cursor: default; }
+.lightbox-name { margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
+.lightbox-action { color: var(--on-overlay); background: none; border: 1px solid currentColor; border-radius: 999px; padding: 6px 14px; font-size: 13px; text-decoration: none; }
+
+/* Artel's video player. */
+.player { position: relative; display: block; max-width: 100%; width: 560px; border-radius: 10px; overflow: hidden; background: var(--overlay); outline: none; }
+.player:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.media .player video { display: block; width: 100%; max-height: 520px; border: 0; background: transparent; cursor: pointer; }
+.player-big { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -60%); width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; color: var(--on-overlay); background: var(--overlay-soft); border: 1px solid var(--on-overlay); }
+.player-big svg { width: 28px; height: 28px; }
+.player-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 8px 12px; color: var(--on-overlay); background: linear-gradient(transparent, var(--overlay)); transition: opacity 0.2s; }
+.player.is-playing:not(:hover):not(:focus-within) .player-bar, .player-bar.is-quiet { opacity: 0; }
+.player-bar button { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: inherit; background: none; border: 0; }
+.player-bar button:hover { background: var(--overlay-soft); }
+.player-time { font-size: 12px; white-space: nowrap; }
+.player-seek { flex: 1; min-width: 60px; appearance: none; height: 4px; border-radius: 2px; cursor: pointer; background: linear-gradient(to right, var(--on-overlay) var(--done), var(--overlay-soft) var(--done)); }
+.player-seek::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--on-overlay); }
+.player:fullscreen { width: 100%; border-radius: 0; display: grid; place-items: center; }
+.player:fullscreen video { max-height: 100vh; }

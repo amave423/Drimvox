@@ -1,4 +1,5 @@
 import { rememberLimit } from "./limits";
+import { REGION } from "../providers/errors";
 import type { ProviderError } from "@artel/shared";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -116,6 +117,8 @@ export function classify(message: string): ProviderError {
   const detail = message.length > 300 ? `${message.slice(0, 300)}…` : message;
   // Google stopped serving Gemini CLI to personal accounts on June 18, 2026; signing in again does not help.
   if (/no longer supported for Gemini Code Assist|migrate to Antigravity/i.test(message)) return { code: "cli_retired", detail };
+  // The vendor does not serve the account where it is (seen: Antigravity from Russia); a VPN or a proxy helps, signing in does not.
+  if (REGION.test(message)) return { code: "region", detail };
   if (/not logged in|\/login|please log ?in|run .*login|authenticat|unauthori[sz]ed|invalid api key|credentials/i.test(message)) {
     return { code: "cli_login", detail };
   }

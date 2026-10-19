@@ -11,6 +11,8 @@ interface Props {
   tools?: ReactNode;
   /** A row between the text field and the controls, e.g. picture options. */
   extra?: ReactNode;
+  /** Next to the send button, e.g. what a picture will cost. */
+  beforeSend?: ReactNode;
   /** Replaces "Send", e.g. with the price of a clip. */
   sendLabel?: string;
   placeholder?: string;
@@ -18,7 +20,7 @@ interface Props {
   attach?: { files: PendingFile[]; onAdd(files: File[]): void; onRemove(key: string): void };
 }
 
-export function Composer({ disabled, streaming, onSend, onStop, tools, extra, sendLabel, placeholder, attach }: Props) {
+export function Composer({ disabled, streaming, onSend, onStop, tools, extra, beforeSend, sendLabel, placeholder, attach }: Props) {
   const { t } = useApp();
   const [text, setText] = useState("");
   const area = useRef<HTMLTextAreaElement>(null);
@@ -106,6 +108,7 @@ export function Composer({ disabled, streaming, onSend, onStop, tools, extra, se
         )}
         {tools}
         <span className="spacer" />
+        {beforeSend}
         {streaming ? (
           <button type="button" className="btn is-pencil" onClick={onStop}>
             {t("chat.stop")}

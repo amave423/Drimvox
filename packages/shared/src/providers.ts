@@ -267,6 +267,8 @@ export interface ModelInfo {
   resolved?: string | null;
   /** Whether a free model answers, when Artel has asked it or chatted with it lately. */
   available?: Availability;
+  /** A key without billing may use it free up to a daily limit (Google); the prices are those past it. */
+  freeTier?: boolean;
 }
 
 /** A model answers, is busy right now (a queue, a limit), or is gone (no longer served, or closed to the key). */

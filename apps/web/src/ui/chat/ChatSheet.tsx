@@ -19,7 +19,7 @@ import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/la
 import { loadMediaModel } from "../../lib/media";
 import { postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
-import { MediaOptions } from "./MediaOptions";
+import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
 import { AssistantMessage, UserMessage, type ChatApproval } from "./Messages";
 import { ModelPicker } from "./ModelPicker";
 import { loadModels } from "../../lib/models";
@@ -171,6 +171,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
     ...(folder ? [t("folder.connected", { name: folder.split(/[\\/]/).filter(Boolean).at(-1) ?? folder })] : []),
   ];
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
+  const mediaRows = useMediaOptionRows({ model: mediaModel, value: options, onChange: setOptions });
 
   async function saveFolder(id: string, next: string | null): Promise<boolean> {
     const res = await api.chats[":id"].folder.$patch({ param: { id }, json: { folder: next } }).catch(() => null);
@@ -370,6 +371,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
           tools={
             <>
               <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />
+              {mediaModel && mediaRows.rows.length > 0 && <ChatOptions changed={mediaRows.changed} rows={mediaRows.rows} />}
               {kind === "text" && choice && (
                 <ChatOptions
                   changed={changedOptions}
@@ -382,7 +384,7 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
               )}
             </>
           }
-          extra={mediaModel && <MediaOptions model={mediaModel} value={options} onChange={setOptions} estimateUsd={estimateUsd} />}
+          beforeSend={mediaModel && !confirm && <MediaPrice model={mediaModel} estimateUsd={estimateUsd} />}
           placeholder={kind === "text" ? undefined : t(kind === "image" ? "media.placeholderImage" : "media.placeholderVideo")}
           sendLabel={
             kind === "text"

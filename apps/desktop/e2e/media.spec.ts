@@ -54,7 +54,7 @@ async function launch(): Promise<Page> {
       return undefined;
     },
   });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_USD_RUB: "80" } });
   const page = await app.firstWindow();
   await expect(page.getByText("Ядро запущено")).toBeVisible();
 
@@ -78,9 +78,16 @@ test("a picture in a chat: the price before, the picture after, the gallery", as
 
   await page.getByRole("button", { name: /img\/dear/ }).click();
   await page.getByRole("tab", { name: "Картинки" }).click();
+  // The list names what one picture costs (seen: no prices at all).
+  await expect(page.getByRole("option", { name: /Cheap Painter.*≈ 3,20 ₽ за картинку/ })).toBeVisible();
   await page.getByRole("option", { name: /Cheap Painter/ }).click();
   await expect(page.getByText("≈ 3,20 ₽")).toBeVisible();
-  await page.getByLabel("Формат").selectOption("16:9");
+  // The settings of the picture are pills behind the options button, not bare selects under the box.
+  await expect(page.locator("select")).toHaveCount(0);
+  await page.getByRole("button", { name: /^Параметры/ }).click();
+  await page.getByRole("radiogroup", { name: "Формат" }).getByRole("radio", { name: "16:9" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Параметры: 16:9" })).toBeVisible();
   await page.getByLabel(/Опиши картинку/).fill("Лиса в шарфе");
   await page.getByRole("button", { name: "Создать" }).click();
 

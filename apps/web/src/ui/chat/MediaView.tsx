@@ -1,6 +1,8 @@
 import type { MediaItem } from "@artel/shared";
 import { useApp } from "../../context";
 import { fileName, mediaUrl, useAuthorizedUrl } from "../../lib/media";
+import { ZoomableImage } from "../Lightbox";
+import { VideoPlayer } from "./VideoPlayer";
 
 /** A picture or a clip from the core, with a link to save it. */
 export function MediaView({ item, compact = false }: { item: MediaItem; compact?: boolean }) {
@@ -11,9 +13,9 @@ export function MediaView({ item, compact = false }: { item: MediaItem; compact?
       {!src ? (
         <div className="media-wait" aria-busy />
       ) : item.kind === "image" ? (
-        <img src={src} alt={item.prompt} />
+        <ZoomableImage src={src} alt={item.prompt} download={fileName(item.prompt, item.mime)} />
       ) : (
-        <video src={src} controls preload="metadata" aria-label={item.prompt} />
+        <VideoPlayer src={src} label={item.prompt} />
       )}
       {src && !compact && (
         <figcaption>

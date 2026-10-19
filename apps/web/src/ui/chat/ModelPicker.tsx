@@ -1,9 +1,9 @@
-import type { ChatKind, MediaModel, ModelInfo, ProviderView } from "@artel/shared";
+import { estimateCost, type ChatKind, type MediaModel, type ModelInfo, type ProviderView } from "@artel/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
-import { formatPrice, formatTokens } from "../../lib/format";
+import { formatPrice, formatTokens, formatUsd } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
-import { loadMediaModels } from "../../lib/media";
+import { loadMediaModel, loadMediaModels } from "../../lib/media";
 import { checkFree, forgetModels, freeFirst, isFree, loadModels, type ModelsResult } from "../../lib/models";
 import { ErrorNote } from "../ErrorNote";
 
@@ -16,15 +16,22 @@ interface PickerProps {
   placement?: "below" | "above";
   /** Which kinds of models to offer; more than one shows tabs. Text only by default. */
   kinds?: ChatKind[];
+  /** Only models that see pictures (for checking screenshots). */
+  vision?: boolean;
 }
 
 type Listed = { id: string; name: string; info: ModelInfo | null };
 
-export function ModelPicker({ value, onChange, placement = "below", kinds = ["text"] }: PickerProps) {
+export function ModelPicker({ value, onChange, placement = "below", kinds: wanted = ["text"], vision = false }: PickerProps) {
   const { api, t, providers } = useApp();
   const [open, setOpen] = useState(false);
   const [providerId, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
-  const [kind, setKind] = useState<ChatKind>(value?.kind && kinds.includes(value.kind) ? value.kind : kinds[0]!);
+  // Local models and programs on a subscription only talk: no tabs for pictures and video there (seen: empty tabs).
+  const preset = providers.find((p) => p.id === providerId)?.preset;
+  const talkOnly = preset === "ollama" || preset === "lmstudio" || providers.find((p) => p.id === providerId)?.billing === "subscription";
+  const kinds: ChatKind[] = talkOnly && wanted.includes("text") ? ["text"] : wanted;
+  const [chosenKind, setKind] = useState<ChatKind>(value?.kind && wanted.includes(value.kind) ? value.kind : wanted[0]!);
+  const kind = kinds.includes(chosenKind) ? chosenKind : "text";
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<ModelsResult | null>(null);
   const [media, setMedia] = useState<MediaModel[] | null>(null);
@@ -80,17 +87,18 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
         : (media ?? []).map((m) => ({ id: m.id, name: m.name, info: null }));
     const q = query.trim().toLowerCase();
     const found = q ? all.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : all;
-    // Models that do not answer are left out: a chat with them only fails.
-    const list = found.filter((m) => m.info?.available !== "gone");
+    // Models that do not answer are left out: a chat with them only fails. Checking screenshots needs eyes.
+    const list = found.filter((m) => m.info?.available !== "gone" && (!vision || m.info?.vision === true));
     // Free models first, under their own heading, inside the kind they belong to; the limit cuts the paid ones, so a
     // free model far down the alphabet is not lost (seen live on OpenRouter's 470 models).
-    const split = kind === "text" ? freeFirst(list, (m) => !!m.info && isFree(m.info)) : null;
+    // Google's free tier counts too: a key without billing may use those models free up to a daily limit.
+    const split = kind === "text" ? freeFirst(list, (m) => !!m.info && (isFree(m.info) || m.info.freeTier === true)) : null;
     return {
       shown: list.slice(0, LIMIT),
       groups: split && { free: split.free, paid: split.paid.slice(0, Math.max(0, LIMIT - split.free.length)) },
       hidden: found.length - list.length,
     };
-  }, [result, media, kind, query]);
+  }, [result, media, kind, query, vision]);
   const loading = kind === "text" ? result === null : media === null;
 
   const providerName = providers.find((p) => p.id === value?.providerId)?.name;
@@ -121,6 +129,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
           </span>
         )}
         {m.info && <ModelFacts model={m.info} billing={providers.find((p) => p.id === providerId)?.billing} />}
+        {!m.info && kind !== "text" && providerId && <MediaPrice providerId={providerId} kind={kind} model={m.id} />}
       </button>
     </li>
   );
@@ -170,7 +179,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds = ["te
             {groups ? (
               <>
                 <li role="presentation" className="picker-group">
-                  {t("model.groupFree", { count: groups.free.length })}
+                  {t(preset === "google" ? "model.groupFreeTier" : "model.groupFree", { count: groups.free.length })}
                 </li>
                 {groups.free.map(item)}
                 <li role="presentation" className="picker-group">
@@ -199,8 +208,24 @@ function ModelFacts({ model, billing }: { model: ModelInfo; billing: ProviderVie
   return (
     <span className="picker-facts mono">
       {model.available === "busy" && <span className="picker-busy">{t("model.busy")}</span>}
+      {model.freeTier && <span className="is-ok-text">{t("model.freeTier")}</span>}
       <span>{price}</span>
       {model.contextLength && <span>{formatTokens(model.contextLength, settings.locale)}</span>}
     </span>
   );
+}
+
+/** What one picture or clip of a model costs at its usual settings (seen: the list showed no prices at all). */
+function MediaPrice({ providerId, kind, model }: { providerId: string; kind: Exclude<ChatKind, "text">; model: string }) {
+  const { api, t } = useApp();
+  const [cost, setCost] = useState<number | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void loadMediaModel(api, providerId, kind, model).then((m) => live && setCost(m ? estimateCost(m, {}) : null));
+    return () => {
+      live = false;
+    };
+  }, [api, providerId, kind, model]);
+  if (cost === undefined) return <span className="picker-facts mono muted">…</span>;
+  return <span className="picker-facts mono">{cost === null ? "—" : t(kind === "image" ? "model.perImage" : "model.perClip", { cost: formatUsd(cost) })}</span>;
 }

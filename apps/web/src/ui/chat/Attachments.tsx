@@ -1,4 +1,5 @@
 import type { AttachmentView } from "@artel/shared";
+import { ZoomableImage } from "../Lightbox";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { useAuthorizedUrl } from "../../lib/media";
@@ -100,7 +101,7 @@ function LocalThumb({ file }: { file: File }) {
     setSrc(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
-  return src ? <img className="attachment-thumb" src={src} alt="" /> : null;
+  return src ? <ZoomableImage className="attachment-thumb" src={src} alt={file.name} /> : null;
 }
 
 /** Files sent with a message: pictures as thumbnails, the rest by name. */
@@ -122,5 +123,5 @@ export function SentFiles({ chatId, files }: { chatId: string; files: Attachment
 function SentThumb({ chatId, file }: { chatId: string; file: AttachmentView }) {
   const { token } = useApp();
   const src = useAuthorizedUrl(`/api/chats/${chatId}/attachments/${file.id}`, token);
-  return src ? <img className="attachment-thumb" src={src} alt={file.name} /> : null;
+  return src ? <ZoomableImage className="attachment-thumb" src={src} alt={file.name} download={file.name} /> : null;
 }
