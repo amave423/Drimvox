@@ -3,6 +3,7 @@ import type { ChatRepo, PendingJob } from "../chats/repo";
 import { describeError } from "../providers/errors";
 import type { Connection, ProviderRepo } from "../providers/repo";
 import { downloadVideo, generateImage, pollVideo, submitVideo } from "./generate";
+import { filmLocally } from "./local";
 import type { MediaRepo } from "./repo";
 
 /** Clips that take longer than this are given up on. */
@@ -49,10 +50,12 @@ export class Studio {
     await i.emit({ type: "start", userMessage, assistantMessageId: answer.id });
 
     try {
-      if (i.model.kind === "image") {
-        const picture = await generateImage(i.conn, i.model, i.prompt, i.options, this.stop.signal);
+      if (i.model.kind === "image" || i.conn.preset === "sdcpp") {
+        // A picture, or a clip made on this computer: either is ready when the call returns.
+        const picture =
+          i.model.kind === "image" ? await generateImage(i.conn, i.model, i.prompt, i.options, this.stop.signal) : await filmLocally(i.model.id, i.prompt, i.options, this.stop.signal);
         this.o.media.add({
-          kind: "image",
+          kind: i.model.kind,
           ...picture,
           prompt: i.prompt,
           providerId: i.conn.id,

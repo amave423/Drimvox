@@ -40,7 +40,8 @@ export type MediaOptions = z.infer<typeof mediaOptionsSchema>;
 export const CONFIRM_ABOVE_USD = 0.1;
 
 export function needsConfirmation(model: MediaModel, estimate: number | null): boolean {
-  return model.kind === "video" || estimate === null || estimate > CONFIRM_ABOVE_USD || isRoughEstimate(model);
+  // A clip asks first, except a free one (made on this computer): it costs only time.
+  return (model.kind === "video" && estimate !== 0) || estimate === null || estimate > CONFIRM_ABOVE_USD || isRoughEstimate(model);
 }
 
 /**

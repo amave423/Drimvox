@@ -73,6 +73,8 @@ describe("the short list", () => {
     expect(s.models.map((m: any) => [m.id, m.fit, m.installed])).toEqual([
       ["z-image-turbo", "fast", false],
       ["qwen-image-2512", "slow", false],
+      ["wan2.2-ti2v-5b", "slow", false],
+      ["wan2.1-t2v-1.3b", "fast", false],
     ]);
     // The four-bit Z-Image here; a card with 24 GB gets the eight-bit one.
     expect(model(s, "z-image-turbo").sizeBytes).toBeLessThan(7 * GB);
@@ -208,3 +210,93 @@ async function enginePort(): Promise<number> {
   await until(async () => existsSync(file), (ok) => ok);
   return Number(readFileSync(file, "utf8"));
 }
+
+// Clips on this computer: Wan through the same engine (docs/specs/local-images.md).
+describe("video", () => {
+  it("offers video models sized for the computer, with their kind", async () => {
+    const { url } = await startFakeHub(servers);
+    setup(url);
+    const s = await status();
+    expect(s.models.map((m: any) => [m.id, m.kind])).toEqual([
+      ["z-image-turbo", "image"],
+      ["qwen-image-2512", "image"],
+      ["wan2.2-ti2v-5b", "video"],
+      ["wan2.1-t2v-1.3b", "video"],
+    ]);
+  });
+
+  it("films a free clip in a video chat, with the text encoder Wan needs", async () => {
+    const hf = await startFakeHub(servers);
+    setup(hf.url);
+    await download("wan2.1-t2v-1.3b");
+    const { providerId } = await status();
+    const listed = await (await env.call("GET", `/api/providers/${providerId}/media-models?kind=video`)).json();
+    expect(listed).toEqual([expect.objectContaining({ id: "wan2.1-t2v-1.3b", kind: "video", durations: [2, 3, 5] })]);
+    expect(await (await env.call("GET", `/api/providers/${providerId}/media-models?kind=image`)).json()).toEqual([]);
+
+    const chat = await (await env.call("POST", "/api/chats", { providerId, model: "wan2.1-t2v-1.3b", kind: "video" })).json();
+    // Free: no "Start" with a price first.
+    const res = await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Лиса бежит по снегу", options: { aspectRatio: "16:9", duration: 3 } });
+    expect(res.status).toBe(200);
+    const done = (await readEvents(res)).find((e) => e.type === "done").message;
+    expect(done).toMatchObject({ status: "done", costUsd: 0 });
+    expect(done.media[0]).toMatchObject({ kind: "video", mime: "video/webm", prompt: "Лиса бежит по снегу" });
+
+    const port = await enginePort();
+    const { args } = await fake(port, "args");
+    expect(args[args.indexOf("--t5xxl") + 1]).toMatch(/umt5-xxl-encoder-Q4_K_M\.gguf$/);
+    expect(args[args.indexOf("--diffusion-model") + 1]).toMatch(/wan2\.1_t2v_1\.3B_fp16\.safetensors$/);
+    const [job] = await fake(port, "jobs");
+    // Three seconds at Wan 2.1's 16 frames a second: 4n+1 frames.
+    expect(job).toMatchObject({ prompt: "Лиса бежит по снегу", width: 832, height: 480, video_frames: 49, fps: 16 });
+  });
+});
+
+// docs/specs/local-images.md: models found on Hugging Face, by what they make. Artel runs one when it knows its family:
+// the found file is the model itself, the rest (VAE, text encoder) come from the checked model of that family.
+describe("Hugging Face", () => {
+  it("searches models that make pictures, and says which ones Artel can run", async () => {
+    const hf = await startFakeHub(servers);
+    setup(hf.url);
+    const found = await (await env.call("GET", "/api/local/images/search?kind=image&q=turbo")).json();
+    expect(found).toEqual([
+      { repo: "someone/Z-Image-Turbo-Fun-GGUF", downloads: 5000, likes: 40, family: "z-image-turbo" },
+      { repo: "someone/flux-mystery-GGUF", downloads: 9000, likes: 90, family: null },
+    ]);
+    const video = await (await env.call("GET", "/api/local/images/search?kind=video&q=wan")).json();
+    expect(video.map((r: any) => [r.repo, r.family])).toEqual([["QuantStack/Wan2.2-TI2V-5B-GGUF", "wan2.2-ti2v-5b"]]);
+  });
+
+  it("lists the model files of a repository with the fit, and downloads one with its family's other files", async () => {
+    const hf = await startFakeHub(servers);
+    setup(hf.url);
+    const files = await (await env.call("GET", "/api/local/images/hf?repo=someone/Z-Image-Turbo-Fun-GGUF")).json();
+    // The VAE in the repository is not a model to choose.
+    expect(files.map((f: any) => [f.file, f.quant, f.fit])).toEqual([
+      ["z_image_turbo_fun-Q5_K_M.gguf", "Q5_K_M", "fast"],
+      ["z_image_turbo_fun-Q8_0.gguf", "Q8_0", "fast"],
+    ]);
+    const id = files[0].model;
+    expect(id).toBe("hf:someone/Z-Image-Turbo-Fun-GGUF:z_image_turbo_fun-Q5_K_M.gguf");
+    await download(id);
+    expect([...hf.files.keys()].sort()).toEqual(["Qwen3-4B-Instruct-2507-Q4_K_M.gguf", "split_files/vae/ae.safetensors", "z_image_turbo_fun-Q5_K_M.gguf"]);
+    const s = await status();
+    expect(model(s, id)).toMatchObject({ kind: "image", installed: true, source: "hf" });
+
+    // It draws like the checked one of its family, with its own file.
+    await draw(id, "Кот");
+    const { args } = await fake(await enginePort(), "args");
+    expect(args[args.indexOf("--diffusion-model") + 1]).toMatch(/z_image_turbo_fun-Q5_K_M\.gguf$/);
+
+    // Deleting it leaves the files the checked models share.
+    await env.call("DELETE", `/api/local/images/models/${encodeURIComponent(id)}`);
+    expect(model(await status(), id)).toBeUndefined();
+  });
+
+  it("does not download a model of a family it does not know", async () => {
+    const hf = await startFakeHub(servers);
+    setup(hf.url);
+    const res = await env.call("POST", "/api/local/images/pulls", { model: "hf:someone/flux-mystery-GGUF:flux-mystery-Q4_K_S.gguf" });
+    expect(res.status).toBe(409);
+  });
+});

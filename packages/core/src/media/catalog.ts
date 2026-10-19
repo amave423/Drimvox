@@ -20,7 +20,7 @@ const style = (conn: Connection): "separate" | "combined" | null =>
 /** Image or video models of a provider, sorted by name, prices in dollars where the catalog has them. */
 export async function listMediaModels(conn: Connection, kind: MediaKind): Promise<MediaModel[]> {
   // Pictures on this computer: the downloaded models, no catalog to ask.
-  if (conn.preset === "sdcpp") return kind === "image" ? localMediaModels() : [];
+  if (conn.preset === "sdcpp") return localMediaModels(kind);
   const how = style(conn);
   if (!how) return [];
   const key = `${conn.cacheKey}|${kind}`;

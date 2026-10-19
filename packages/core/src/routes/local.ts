@@ -1,9 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { hfRepoName, localImageModelIds, localImagePullSchema, localModelName, localPullSchema } from "@artel/shared";
+import { hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@artel/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { CatalogError } from "../local/catalog";
 import { EngineError } from "../local/images/server";
+import { HubError } from "../local/images/found";
 import type { LocalModels } from "../local/service";
 
 const unreachable = (err: unknown) => ({ error: { code: "hf_unreachable", detail: err instanceof Error ? err.message : String(err) } });
@@ -72,7 +73,25 @@ export function localRoutes(local: LocalModels) {
     .delete("/images/pulls", zValidator("query", localImagePullSchema), (c) =>
       local.images.cancel(c.req.valid("query").model) ? c.json({ ok: true as const }, 200) : c.json({ error: { code: "not_found" as const } }, 404),
     )
-    .delete("/images/models/:id", zValidator("param", z.object({ id: z.enum(localImageModelIds) })), async (c) => {
+    // Models that make pictures or clips on Hugging Face, and a repository's files with the fit of each.
+    .get("/images/search", zValidator("query", hfMediaSearchSchema), async (c) => {
+      const { kind, q } = c.req.valid("query");
+      try {
+        return c.json(await local.images.search(kind, q), 200);
+      } catch (err) {
+        if (err instanceof HubError) return c.json(unreachable(err), 502);
+        throw err;
+      }
+    })
+    .get("/images/hf", zValidator("query", z.object({ repo: hfRepoName })), async (c) => {
+      try {
+        return c.json(await local.images.files(c.req.valid("query").repo), 200);
+      } catch (err) {
+        if (err instanceof HubError) return c.json(unreachable(err), 502);
+        throw err;
+      }
+    })
+    .delete("/images/models/:id", zValidator("param", z.object({ id: localImageModelId })), async (c) => {
       await local.images.remove(c.req.valid("param").id);
       return c.json({ ok: true as const }, 200);
     });

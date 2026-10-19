@@ -29,7 +29,9 @@ interface Props {
 export function App({ api, token, initialSettings, status }: Props) {
   const [settings, setSettings] = useState(initialSettings);
   // The desktop opens on the local models when the installer was asked to install Ollama (apps/desktop/src/main.ts).
-  const [view, setView] = useState<View>(() => (location.hash === "#local" ? { kind: "local" } : { kind: "home" }));
+  const [view, setView] = useState<View>(() =>
+    location.hash === "#local" ? { kind: "local" } : location.hash === "#local-images" ? { kind: "local", part: "image" } : { kind: "home" },
+  );
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [chats, setChats] = useState<ChatView[]>([]);
   const [today, setToday] = useState<UsageSummary | null>(null);
@@ -182,7 +184,7 @@ export function App({ api, token, initialSettings, status }: Props) {
           {view.kind === "home" && <HomeSheet />}
           {view.kind === "settings" && <SettingsSheet />}
           {view.kind === "providers" && <ProvidersSheet />}
-          {view.kind === "local" && <LocalModelsSheet />}
+          {view.kind === "local" && <LocalModelsSheet part={view.part} />}
           {view.kind === "gallery" && <GallerySheet />}
           {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} autoSend={view.send} />}
           {view.kind === "project" && <ProjectSheet key={view.projectId} projectId={view.projectId} />}

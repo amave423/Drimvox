@@ -30,15 +30,38 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
         "unsloth/Qwen-Image-2512-GGUF": ["qwen-image-2512-Q4_K_S.gguf"],
         "unsloth/Qwen2.5-VL-7B-Instruct-GGUF": ["Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf"],
         "Comfy-Org/Qwen-Image_ComfyUI": ["split_files/vae/qwen_image_vae.safetensors"],
+        "QuantStack/Wan2.2-TI2V-5B-GGUF": ["Wan2.2-TI2V-5B-Q4_K_M.gguf", "Wan2.2-TI2V-5B-Q8_0.gguf"],
+        "city96/umt5-xxl-encoder-gguf": ["umt5-xxl-encoder-Q4_K_M.gguf", "umt5-xxl-encoder-Q8_0.gguf"],
+        "Comfy-Org/Wan_2.2_ComfyUI_Repackaged": ["split_files/vae/wan2.2_vae.safetensors"],
+        // Found by the search: one of a family Artel knows, one it does not.
+        "someone/Z-Image-Turbo-Fun-GGUF": ["z_image_turbo_fun-Q5_K_M.gguf", "z_image_turbo_fun-Q8_0.gguf", "vae/ae.safetensors"],
+        "someone/flux-mystery-GGUF": ["flux-mystery-Q4_K_S.gguf"],
+        "Comfy-Org/Wan_2.1_ComfyUI_repackaged": ["split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors", "split_files/vae/wan_2.1_vae.safetensors"],
       };
+      const all = url.searchParams.get("recursive") === "true";
       const list = (names[tree[1]!] ?? [])
-        .filter((p) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "") === folder)
+        .filter((p) => all || (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "") === folder)
         .map((p) => {
           const body = fileOf(p);
           return { type: "file", path: p, size: body.length, lfs: { oid: sha(body), size: body.length } };
         });
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify(list));
+    }
+    // The search, by what a model makes.
+    if (url.pathname === "/api/models") {
+      const kind = url.searchParams.get("pipeline_tag");
+      const found =
+        kind === "text-to-image"
+          ? [
+              { id: "someone/Z-Image-Turbo-Fun-GGUF", downloads: 5000, likes: 40, pipeline_tag: "text-to-image" },
+              { id: "someone/flux-mystery-GGUF", downloads: 9000, likes: 90, pipeline_tag: "text-to-image" },
+            ]
+          : kind === "text-to-video"
+            ? [{ id: "QuantStack/Wan2.2-TI2V-5B-GGUF", downloads: 7000, likes: 70, pipeline_tag: "text-to-video" }]
+            : [];
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify(found));
     }
     const file = /^\/[^/]+\/[^/]+\/resolve\/main\/(.+)$/.exec(url.pathname);
     if (file) {

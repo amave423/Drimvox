@@ -71,7 +71,7 @@ async function launch() {
     const images = takeInstallerNote("install-images");
     if (ollama) void callCore(port, "/api/local/install");
     if (images) void callCore(port, "/api/local/images/engine");
-    await createWindow(ollama || images ? "local" : undefined);
+    await createWindow(ollama ? "local" : images ? "local-images" : undefined);
   } catch (err) {
     dialog.showErrorBox("Artel не запустился", err instanceof Error ? err.message : String(err));
     app.quit();
@@ -267,7 +267,7 @@ function registerIpc() {
   });
 }
 
-async function createWindow(view?: "local") {
+async function createWindow(view?: "local" | "local-images") {
   const dark = nativeTheme.shouldUseDarkColors;
   win = new BrowserWindow({
     width: 1360,

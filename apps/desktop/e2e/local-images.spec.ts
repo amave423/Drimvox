@@ -45,6 +45,8 @@ test("downloads a picture model on the local models' sheet and draws with it in 
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Локальные модели" }).click();
+  // Text, pictures and video are parts of the sheet.
+  await page.getByRole("radio", { name: "Картинки" }).click();
   await expect(page.getByRole("heading", { name: "Картинки на этом компьютере" })).toBeVisible();
   const card = page.locator(".local-card", { hasText: "Z-Image Turbo" });
   await expect(card.getByText("быстро")).toBeVisible();
@@ -108,7 +110,63 @@ test("offers the picture engine on its own on the sheet", async () => {
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Локальные модели" }).click();
+  await page.getByRole("radio", { name: "Картинки" }).click();
   await page.getByRole("button", { name: "Скачать движок · 30 МБ" }).click();
   await expect(page.getByRole("button", { name: /Скачать движок/ })).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByText(/Движок stable-diffusion\.cpp/)).toHaveCount(0);
+});
+
+test("downloads a video model in the video part and films a free clip in a chat", async () => {
+  hub = await startFakeHub();
+  const local = {
+    command: null,
+    hardware: { ramBytes: 32 * GB, gpu: { name: "RTX 3080", vramBytes: 10 * GB }, unified: false },
+    registryUrl: "http://127.0.0.1:9",
+    hfUrl: hub.url,
+    hfFiles: [hub.url],
+    images: { engineUrl: `${hub.url}/engine.zip`, serverCommand: [process.execPath, FAKE_SD] },
+  };
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) } });
+  const page = await app.firstWindow();
+  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await page.getByRole("radio", { name: "Видео" }).click();
+  await expect(page.getByRole("heading", { name: "Видео на этом компьютере" })).toBeVisible();
+  // Only video models here.
+  await expect(page.locator(".local-card", { hasText: "Z-Image Turbo" })).toHaveCount(0);
+  const card = page.locator(".local-card", { hasText: "Wan 2.1 1.3B" });
+  await card.getByRole("button", { name: /^Скачать · / }).click();
+  await expect(card.getByText(/^Скачана · /)).toBeVisible({ timeout: 20_000 });
+
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("tab", { name: "Видео" }).click();
+  await page.getByRole("option", { name: /Wan 2\.1 1\.3B/ }).click();
+  await page.getByLabel(/Опиши/).fill("Лиса бежит по снегу");
+  // Free: started at once, no price to confirm.
+  await page.getByRole("button", { name: /^Создать/ }).click();
+  await expect(page.locator(".msg-assistant .player")).toHaveCount(1, { timeout: 20_000 });
+});
+
+test("finds a picture model on Hugging Face, greys out an unknown family and downloads a known one", async () => {
+  hub = await startFakeHub();
+  const local = {
+    command: null,
+    hardware: { ramBytes: 32 * GB, gpu: { name: "RTX 3080", vramBytes: 10 * GB }, unified: false },
+    registryUrl: "http://127.0.0.1:9",
+    hfUrl: hub.url,
+    hfFiles: [hub.url],
+    images: { engineUrl: `${hub.url}/engine.zip`, serverCommand: [process.execPath, FAKE_SD] },
+  };
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) } });
+  const page = await app.firstWindow();
+  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await page.getByRole("radio", { name: "Картинки" }).click();
+  await page.getByPlaceholder(/z-image или qwen-image/).fill("turbo");
+  await page.getByRole("button", { name: "Найти" }).click();
+  await expect(page.locator(".local-repo.is-unsupported", { hasText: "someone/flux-mystery-GGUF" })).toContainText("пока не знает");
+  await page.getByRole("button", { name: /someone\/Z-Image-Turbo-Fun-GGUF/ }).click();
+  const row = page.locator(".local-variants .local-row", { hasText: "Q5_K_M" });
+  await row.getByRole("button", { name: /^Скачать · / }).click();
+  await expect(row.getByText(/^Скачана · /)).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".local-card", { hasText: "Z-Image-Turbo-Fun-GGUF · Q5_K_M" })).toContainText("Найдена на Hugging Face");
 });

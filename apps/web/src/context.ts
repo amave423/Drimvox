@@ -15,11 +15,14 @@ export interface CoreStatus {
  * `key` keeps a chat screen alive while a new chat gets its id, so a streaming answer
  * is not lost when the draft turns into a saved chat.
  */
+export type LocalPart = "text" | "image" | "video";
+
 export type View =
   | { kind: "home" }
   | { kind: "settings" }
   | { kind: "providers" }
-  | { kind: "local" }
+  /** `part`: which of the local models to show first (text through Ollama, pictures, video). */
+  | { kind: "local"; part?: LocalPart }
   | { kind: "gallery" }
   /** `send`: a message to send at once, the first of a project task's conversation. */
   | { kind: "chat"; chatId: string | null; key: string; send?: string }

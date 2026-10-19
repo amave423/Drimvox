@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
+import { LocalMediaSearch } from "./LocalMediaSearch";
 import { PullControl, type PullActions } from "./PullControl";
 import { useSize } from "./size";
 
@@ -10,7 +11,7 @@ import { useSize } from "./size";
  * Pictures on this computer (docs/specs/local-images.md): the short list sized for it, downloads with the engine,
  * and a word on where the models show up once downloaded.
  */
-export function LocalImagesSection() {
+export function LocalImagesSection({ kind }: { kind: "image" | "video" }) {
   const { api, t, reloadProviders } = useApp();
   const size = useSize();
   const [status, setStatus] = useState<LocalImagesStatus | null>(null);
@@ -59,13 +60,15 @@ export function LocalImagesSection() {
 
   if (!status) return null;
   const ep = status.enginePull;
+  const models = status.models.filter((m) => m.kind === kind);
+  const k = kind === "image" ? "localImages" : "localVideo";
   return (
     <>
-      <h2 className="sheet-h">{t("localImages.title")}</h2>
-      <p className="muted">{t("localImages.hint")}</p>
+      <h2 className="sheet-h">{t(`${k}.title`)}</h2>
+      <p className="muted">{t(`${k}.hint`)}</p>
       {!status.supported && <p className="note">{t("localImages.unsupported")}</p>}
-      {status.supported && status.models.length === 0 && <p className="muted">{t("localImages.none")}</p>}
-      {status.supported && status.models.length > 0 && (
+      {status.supported && models.length === 0 && <p className="muted">{t(`${k}.none`)}</p>}
+      {status.supported && models.length > 0 && (
         <>
           {!status.engine && (
             <div className="local-row local-engine">
@@ -81,22 +84,23 @@ export function LocalImagesSection() {
             </div>
           )}
           <ul className="local-cards local-image-cards">
-            {status.models.map((m) => (
+            {models.map((m) => (
               <li key={m.id} className="local-card">
                 <div className="local-card-head">
                   <span className="local-card-name">{m.name}</span>
-                  <span className={`local-fit is-${m.fit}`} title={t(m.fit === "fast" ? "localImages.fastHint" : "localImages.slowHint")}>
+                  <span className={`local-fit is-${m.fit}`} title={t(m.fit === "fast" ? `${k}.fastHint` : `${k}.slowHint`)}>
                     {t(m.fit === "fast" ? "local.fast" : "local.slow")}
                   </span>
                 </div>
-                <p>{t(`localImages.model.${m.id}` as MessageKey)}</p>
+                <p>{m.source === "hf" ? t("localImages.found") : t(`localImages.model.${m.id}` as MessageKey)}</p>
                 <PullControl model={m.id} sizeBytes={m.sizeBytes} installed={m.installed} pull={m.pull ?? undefined} actions={actions} />
               </li>
             ))}
           </ul>
-          {status.models.some((m) => m.installed) && <p className="note">{t("localImages.where")}</p>}
+          {models.some((m) => m.installed) && <p className="note">{t(`${k}.where`)}</p>}
         </>
       )}
+      {status.supported && <LocalMediaSearch kind={kind} status={status} actions={actions} />}
     </>
   );
 }

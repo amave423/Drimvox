@@ -49,6 +49,17 @@ createServer(async (req, res) => {
     }, ms);
     return json(res, 202, { id, kind: "img_gen", status: "queued", created: 0, poll_url: `/sdcpp/v1/jobs/${id}` });
   }
+  // A clip: the whole file at once, as the real server sends a finished video job.
+  if (req.method === "POST" && url.pathname === "/sdcpp/v1/vid_gen") {
+    const body = await read(req);
+    const id = `job_${next++}`;
+    const job = { id, body, status: "generating", result: null, error: null };
+    jobs.set(id, job);
+    setTimeout(() => {
+      Object.assign(job, { status: "completed", result: { b64_json: Buffer.from("1a45dfa3fakewebm").toString("base64"), mime_type: "video/webm", output_format: "webm", fps: body.fps, frame_count: body.video_frames } });
+    }, ms);
+    return json(res, 202, { id, kind: "vid_gen", status: "queued", created: 0, poll_url: `/sdcpp/v1/jobs/${id}` });
+  }
   const cancel = /^\/sdcpp\/v1\/jobs\/([^/]+)\/cancel$/.exec(url.pathname);
   if (req.method === "POST" && cancel) {
     const job = jobs.get(cancel[1]);

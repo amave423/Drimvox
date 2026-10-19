@@ -1,5 +1,5 @@
 import type { MediaModel } from "@artel/shared";
-import { IMAGE_SIZES } from "../local/images/catalog";
+import { IMAGE_SIZES, VIDEO_DURATIONS, VIDEO_SIZES } from "../local/images/catalog";
 import { EngineError } from "../local/images/server";
 import type { LocalImages } from "../local/images/service";
 import { ProviderFailure } from "../providers/errors";
@@ -12,20 +12,47 @@ export function useLocalImages(images: LocalImages): void {
   engine = images;
 }
 
-/** The downloaded picture models, as the picture chats list them: free, every aspect ratio the engine draws. */
-export async function localMediaModels(): Promise<MediaModel[]> {
+/** The downloaded models of one kind, as the picture and video chats list them: free, the sizes the engine makes. */
+export async function localMediaModels(kind: "image" | "video"): Promise<MediaModel[]> {
   if (!engine) return [];
-  return (await engine.installed()).map((m) => ({
-    id: m.id,
-    name: m.name,
-    kind: "image" as const,
-    aspectRatios: Object.keys(IMAGE_SIZES),
-    resolutions: [],
-    durations: [],
-    audio: false,
-    viaChat: false,
-    pricing: { lines: [{ billable: "output_image", unit: "image", costUsd: 0, variant: null }], skus: {} },
-  }));
+  const common = { audio: false, viaChat: false };
+  return (await engine.installed())
+    .filter((m) => m.kind === kind)
+    .map((m): MediaModel =>
+      kind === "image"
+        ? {
+            ...common,
+            id: m.id,
+            name: m.name,
+            kind,
+            aspectRatios: Object.keys(IMAGE_SIZES),
+            resolutions: [],
+            durations: [],
+            pricing: { lines: [{ billable: "output_image", unit: "image", costUsd: 0, variant: null }], skus: {} },
+          }
+        : {
+            ...common,
+            id: m.id,
+            name: m.name,
+            kind,
+            aspectRatios: Object.keys(VIDEO_SIZES),
+            resolutions: ["480p"],
+            durations: VIDEO_DURATIONS,
+            pricing: { lines: [], skus: { duration_seconds: "0" } },
+          },
+    );
+}
+
+/** A clip on this computer: made right in the answer (minutes), not as a provider's job to wait for. */
+export async function filmLocally(model: string, prompt: string, o: { aspectRatio?: string; duration?: number }, signal?: AbortSignal): Promise<Generated> {
+  if (!engine) throw new ProviderFailure({ code: "provider_error", detail: "The video engine is not running" });
+  try {
+    const clip = await engine.film(model, prompt, o.aspectRatio, o.duration, signal);
+    return { ...clip, costUsd: 0 };
+  } catch (err) {
+    if (err instanceof EngineError) throw new ProviderFailure({ code: "provider_error", detail: err.message });
+    throw err;
+  }
 }
 
 export async function drawLocally(model: string, prompt: string, aspectRatio: string | undefined, signal?: AbortSignal): Promise<Generated> {

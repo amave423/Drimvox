@@ -1,9 +1,10 @@
-import type { LocalHardware, LocalImageModelId, LocalImagesStatus, LocalPull } from "@artel/shared";
+import type { HfMediaFile, HfMediaRepo, LocalHardware, LocalImageModelId, LocalImagesStatus, LocalPull } from "@artel/shared";
 import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fetchVia } from "../../proxy";
 import { downloadFile, fileByPath, type Route } from "../hf-download";
-import { fileKey, IMAGE_MODELS, IMAGE_SIZES, sizeOf, variantFor, type ImageFile, type ImageFileRole, type ImageModelDef } from "./catalog";
+import { FoundModels, mediaFiles, searchMedia } from "./found";
+import { familyOf, fileKey, foundModel, IMAGE_MODELS, IMAGE_SIZES, sizeOf, variantFor, VIDEO_DURATIONS, VIDEO_SIZES, type ImageFile, type ImageFileRole, type ImageModelDef } from "./catalog";
 import { ENGINE_TAG, engineUrl, findServer, installEngine } from "./engine";
 import { EngineError, ImageServer } from "./server";
 
@@ -46,12 +47,42 @@ export class LocalImages {
   private drawing = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly url: string | null;
+  private readonly found: FoundModels;
 
   constructor(
     private readonly d: Deps,
     private readonly o: LocalImagesOptions = {},
   ) {
     this.url = o.engineUrl === undefined ? engineUrl() : o.engineUrl;
+    this.found = new FoundModels(d.dir);
+  }
+
+  /** The checked models and the ones downloaded from a search. */
+  private defs(): ImageModelDef[] {
+    return [...IMAGE_MODELS, ...this.found.list()];
+  }
+
+  /** Models that make pictures or clips on Hugging Face, the ones Artel can run first. */
+  search(kind: "image" | "video", query: string): Promise<HfMediaRepo[]> {
+    return searchMedia(this.d.hf.apiUrl, kind, query);
+  }
+
+  /** A found repository's model files, with the fit of each together with its family's other files. */
+  async files(repo: string): Promise<HfMediaFile[]> {
+    const installed = (id: string) => {
+      const m = this.defs().find((d) => d.id === id);
+      return !!m && this.installedFiles(m.variants[0]!);
+    };
+    return mediaFiles(this.d.hf.apiUrl, repo, await this.d.hardware(), installed);
+  }
+
+  /** A model found on Hugging Face, by its id: its own file's size from Hugging Face, the rest from its family. */
+  private async resolveFound(id: string): Promise<ImageModelDef> {
+    const m = /^hf:([^:]+):(.+)$/.exec(id);
+    const family = m ? IMAGE_MODELS.find((d) => d.id === familyOf(`${m[1]}/${m[2]}`)) : undefined;
+    if (!m || !family) throw new EngineError("Artel does not know what else this model needs");
+    const info = await fileByPath(this.d.hf.apiUrl, m[1]!, m[2]!, AbortSignal.timeout(30_000));
+    return foundModel(family, m[1]!, m[2]!, info.size);
   }
 
   private get engineDir(): string {
@@ -82,11 +113,11 @@ export class LocalImages {
 
   async status(): Promise<LocalImagesStatus> {
     const hw = await this.d.hardware();
-    const models = IMAGE_MODELS.flatMap((m) => {
+    const models = this.defs().flatMap((m) => {
       const v = variantFor(m, hw);
       if (!v) return [];
       const a = this.pulls.get(m.id);
-      return [{ id: m.id, name: m.name, fit: v.fit, sizeBytes: sizeOf(v.files), installed: this.installedFiles(v.files), pull: a ? { ...a.pull } : null }];
+      return [{ id: m.id, kind: m.kind, name: m.name, source: m.id.startsWith("hf:") ? ("hf" as const) : ("checked" as const), fit: v.fit, sizeBytes: sizeOf(v.files), installed: this.installedFiles(v.files), pull: a ? { ...a.pull } : null }];
     });
     return {
       supported: this.url !== null,
@@ -101,7 +132,7 @@ export class LocalImages {
   /** The downloaded models, for the picture chats. */
   async installed(): Promise<ImageModelDef[]> {
     const hw = await this.d.hardware();
-    return IMAGE_MODELS.filter((m) => {
+    return this.defs().filter((m) => {
       const v = variantFor(m, hw);
       return v && this.installedFiles(v.files);
     });
@@ -110,9 +141,10 @@ export class LocalImages {
   /** Starts downloading a model (and the engine, the first time), or returns the download already going. */
   async pull(id: LocalImageModelId): Promise<LocalPull> {
     if (this.url === null) throw new EngineError("There is no build of the engine for this system");
-    const model = IMAGE_MODELS.find((m) => m.id === id)!;
+    const model = this.defs().find((m) => m.id === id) ?? (await this.resolveFound(id));
     const v = await this.variant(model);
     if (!v) throw new EngineError("This model does not fit this computer");
+    if (id.startsWith("hf:")) this.found.add(model);
     const going = this.pulls.get(id);
     if (going && !going.pull.done && !going.pull.paused) return { ...going.pull };
     const before = going?.pull.paused ? going.pull : null;
@@ -259,8 +291,11 @@ export class LocalImages {
 
   /** Deletes a model's files, except those another downloaded model needs. */
   async remove(id: LocalImageModelId): Promise<boolean> {
-    const model = IMAGE_MODELS.find((m) => m.id === id)!;
+    const model = this.defs().find((m) => m.id === id);
+    if (!model) return false;
     if (this.server?.loaded.model === id) this.stopServer();
+    // A found model leaves the list too; a checked one stays offered.
+    if (id.startsWith("hf:")) this.found.remove(id);
     this.pulls.delete(id);
     const others = (await this.installed()).filter((m) => m.id !== id);
     const kept = new Set(others.flatMap((m) => m.variants.flat().map(fileKey)));
@@ -276,15 +311,27 @@ export class LocalImages {
 
   /** Draws one picture with a downloaded model, starting the engine with it first when needed. */
   async draw(id: string, prompt: string, aspectRatio: string | undefined, signal?: AbortSignal): Promise<Buffer> {
-    const model = IMAGE_MODELS.find((m) => m.id === id);
+    const [width, height] = IMAGE_SIZES[aspectRatio ?? "1:1"] ?? IMAGE_SIZES["1:1"]!;
+    return this.withServer(id, (server, stop) => server.draw(prompt, width, height, stop), signal);
+  }
+
+  /** Films one clip with a downloaded video model. */
+  async film(id: string, prompt: string, aspectRatio: string | undefined, seconds: number | undefined, signal?: AbortSignal): Promise<{ bytes: Buffer; mime: string }> {
+    const [width, height] = VIDEO_SIZES[aspectRatio ?? "16:9"] ?? VIDEO_SIZES["16:9"]!;
+    const duration = seconds && VIDEO_DURATIONS.includes(seconds) ? seconds : VIDEO_DURATIONS[0]!;
+    return this.withServer(id, (server, stop) => server.film(prompt, width, height, duration, stop), signal);
+  }
+
+  /** The engine running with this model's files, for one job; it is not stopped for being idle while the job goes. */
+  private async withServer<T>(id: string, job: (server: ImageServer, signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
+    const model = this.defs().find((m) => m.id === id);
     const v = model ? await this.variant(model) : null;
     if (!model || !v || !this.installedFiles(v.files)) throw new EngineError("This model is not downloaded");
     const server = await this.serverFor(model, v.files, v.fit === "slow");
-    const [width, height] = IMAGE_SIZES[aspectRatio ?? "1:1"] ?? IMAGE_SIZES["1:1"]!;
     this.touch();
     this.drawing++;
     try {
-      return await server.draw(prompt, width, height, signal ?? new AbortController().signal);
+      return await job(server, signal ?? new AbortController().signal);
     } finally {
       this.drawing--;
       this.touch();
@@ -299,7 +346,7 @@ export class LocalImages {
     this.stopServer();
     const command = this.serverCommand();
     if (!command) throw new EngineError("The engine is not downloaded");
-    const paths = Object.fromEntries(files.map((f) => [f.role, this.pathOf(f)])) as Record<ImageFileRole, string>;
+    const paths = Object.fromEntries(files.map((f) => [f.role, this.pathOf(f)])) as Partial<Record<ImageFileRole, string>>;
     const server = new ImageServer({ model: model.id, files: paths, settings: model.settings, offload }, command, this.o.serverEnv ?? {});
     this.starting = server.start().then(() => server);
     try {
