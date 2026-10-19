@@ -1,4 +1,4 @@
-import { BATCH_POINTS, pointsOf, SIZE_POINTS, type BacklogItem, type BacklogSize, type ProjectPlan, type TaskView } from "@artel/shared";
+import { BATCH_POINTS, pointsOf, SIZE_POINTS, type BacklogItem, type BacklogSize, type ProjectPlan, type TaskView, type WorkStart } from "@artel/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
@@ -18,7 +18,7 @@ interface Props {
  * BATCH_POINTS and starts it; each task is reviewed before "Next" starts another.
  */
 export function Backlog({ projectId, choice, onChoice, noTools }: Props) {
-  const { api, t, navigate, reloadTasks } = useApp();
+  const { api, t, navigate, reloadTasks, reloadChats } = useApp();
   const [items, setItems] = useState<BacklogItem[] | null>(null);
   const [plan, setPlan] = useState<ProjectPlan | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
@@ -43,7 +43,7 @@ export function Backlog({ projectId, choice, onChoice, noTools }: Props) {
   }, [projectId]);
 
   if (items === null) return null;
-  const active = items.find((i) => i.status === "active");
+  const active = items.find((i) => i.status === "active" || i.status === "review");
   const waiting = items.filter((i) => i.status === "picked");
   const open = items.filter((i) => i.status === "open");
   const chosen = picked.map((id) => items.find((i) => i.id === id)).filter((i): i is BacklogItem => !!i);
@@ -58,17 +58,26 @@ export function Backlog({ projectId, choice, onChoice, noTools }: Props) {
       const body = (await res?.json().catch(() => null)) as { error?: { code?: string } } | null;
       return setFailed(body?.error?.code ?? "unknown");
     }
-    const task = (await res.json()) as TaskView;
+    const body = (await res.json()) as TaskView | WorkStart;
     if (choice) rememberLastModel(choice);
     setPicked([]);
+    // A task of the list is a conversation in the project's folder; the interview is still a task.
+    if ("chatId" in body) {
+      await reloadChats();
+      return navigate({ kind: "chat", chatId: body.chatId, key: body.chatId, send: body.message });
+    }
     await reloadTasks();
-    navigate({ kind: "task", taskId: task.id });
+    navigate({ kind: "task", taskId: body.id });
   }
 
   const startPlan = () =>
     choice && startTask(() => api.projects[":id"].backlog.plan.$post({ param: { id: projectId }, json: { task: text.trim(), providerId: choice.providerId, model: choice.model } }));
   const run = () => choice && startTask(() => api.projects[":id"].backlog.run.$post({ param: { id: projectId }, json: { ids: picked, providerId: choice.providerId, model: choice.model } }));
   const next = () => startTask(() => api.projects[":id"].backlog.next.$post({ param: { id: projectId } }));
+
+  /** A task's conversation, or the old-style task for one started before conversations. */
+  const openWork = (item: BacklogItem) =>
+    item.chatId ? navigate({ kind: "chat", chatId: item.chatId, key: item.chatId }) : item.taskId && navigate({ kind: "task", taskId: item.taskId });
 
   async function move(id: string, by: -1 | 1) {
     const order = open.map((i) => i.id);
@@ -135,10 +144,10 @@ export function Backlog({ projectId, choice, onChoice, noTools }: Props) {
       <h2 className="sheet-h">{t("backlog.title")}</h2>
       {plan?.context && <p className="muted backlog-context">{plan.context}</p>}
 
-      {active?.taskId && (
+      {active && (active.chatId || active.taskId) && (
         <p className="note">
-          {t("backlog.now", { title: active.title })}{" "}
-          <button className="link" onClick={() => navigate({ kind: "task", taskId: active.taskId! })}>
+          {t(active.status === "review" ? "backlog.review" : "backlog.now", { title: active.title })}{" "}
+          <button className="link" onClick={() => openWork(active)}>
             {t("backlog.open")}
           </button>
         </p>
@@ -185,8 +194,8 @@ export function Backlog({ projectId, choice, onChoice, noTools }: Props) {
                 ))}
               </ul>
               <div className="backlog-tools">
-                {item.taskId && (
-                  <button className="link" onClick={() => navigate({ kind: "task", taskId: item.taskId! })}>
+                {(item.chatId || item.taskId) && (
+                  <button className="link" onClick={() => openWork(item)}>
                     {t("backlog.open")}
                   </button>
                 )}

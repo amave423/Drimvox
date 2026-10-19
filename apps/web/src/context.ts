@@ -21,7 +21,8 @@ export type View =
   | { kind: "providers" }
   | { kind: "local" }
   | { kind: "gallery" }
-  | { kind: "chat"; chatId: string | null; key: string }
+  /** `send`: a message to send at once, the first of a project task's conversation. */
+  | { kind: "chat"; chatId: string | null; key: string; send?: string }
   | { kind: "project"; projectId: string }
   | { kind: "task"; taskId: string };
 

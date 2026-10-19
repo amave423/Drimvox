@@ -45,7 +45,7 @@ export function backlogRoutes(projects: ProjectRepo, backlog: BacklogRepo, servi
     .delete("/:id/backlog/:itemId", (c) => {
       const item = own(c.req.param("id"), c.req.param("itemId"));
       if (!item) return c.json(notFound, 404);
-      if (item.status === "active") return c.json({ error: { code: "busy" as const } }, 409);
+      if (item.status === "active" || item.status === "review") return c.json({ error: { code: "busy" as const } }, 409);
       backlog.remove(item.id);
       return c.body(null, 204);
     })
@@ -61,6 +61,35 @@ export function backlogRoutes(projects: ProjectRepo, backlog: BacklogRepo, servi
       const { ids, providerId, model } = c.req.valid("json");
       try {
         return c.json(await service.run(id, ids, providerId, model), 201);
+      } catch (err) {
+        return c.json(refused(err), 409);
+      }
+    })
+    // A task's conversation: what it changed, accepting it as one commit, or rolling the folder back.
+    .get("/:id/backlog/:itemId/changes", async (c) => {
+      const item = own(c.req.param("id"), c.req.param("itemId"));
+      if (!item) return c.json(notFound, 404);
+      try {
+        return c.json(await service.changes(item.id), 200);
+      } catch (err) {
+        return c.json(refused(err), 409);
+      }
+    })
+    .post("/:id/backlog/:itemId/accept", zValidator("json", z.object({ message: z.string().trim().max(500).optional() }).strict()), async (c) => {
+      const item = own(c.req.param("id"), c.req.param("itemId"));
+      if (!item) return c.json(notFound, 404);
+      try {
+        return c.json(await service.accept(item.id, c.req.valid("json").message), 200);
+      } catch (err) {
+        return c.json(refused(err), 409);
+      }
+    })
+    .post("/:id/backlog/:itemId/undo", async (c) => {
+      const item = own(c.req.param("id"), c.req.param("itemId"));
+      if (!item) return c.json(notFound, 404);
+      try {
+        await service.undo(item.id);
+        return c.json({ ok: true as const }, 200);
       } catch (err) {
         return c.json(refused(err), 409);
       }

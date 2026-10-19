@@ -28,6 +28,7 @@ import { FolderSwitch } from "./FolderSwitch";
 import { readThinking, ThinkingSwitch } from "./ThinkingSwitch";
 import { ChatOptions } from "./ChatOptions";
 import { ChatMargin } from "./ChatMargin";
+import { WorkReview } from "../projects/WorkReview";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 
 /** Tools of a chat with a folder, each with its own line in the answer. */
@@ -51,7 +52,7 @@ interface Draft {
 /** Answers still being made on the provider's side, such as clips, are checked this often. */
 const PENDING_POLL_MS = 3000;
 
-export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey: string }) {
+export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null; viewKey: string; autoSend?: string }) {
   const { api, token, t, providers, navigate, reloadChats, reloadToday } = useApp();
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
@@ -120,6 +121,14 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
   useEffect(() => {
     if (chatId && chatId !== chat?.id) void load(chatId);
   }, [chatId]);
+
+  // A project task's conversation starts with the task itself, sent once the chat and its model are loaded.
+  const autoSent = useRef(false);
+  useEffect(() => {
+    if (!autoSend || autoSent.current || !chat || chat.id !== chatId || chat.messages.length > 0 || !choice || draft) return;
+    autoSent.current = true;
+    void send(autoSend);
+  }, [autoSend, chat, choice]);
 
   // A new chat starts with the model used last, once providers are known.
   useEffect(() => {
@@ -362,6 +371,9 @@ export function ChatSheet({ chatId, viewKey }: { chatId: string | null; viewKey:
         {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
         {attachError && <p className="error-note">{t(`attach.${attachError}` as MessageKey, { max: MAX_FILES })}</p>}
         {folderError && <p className="error-note">{t(folderError === "no_tools" ? "folder.noTools" : folderError === "not_found" ? "folder.notFound" : "folder.failed")}</p>}
+        {chat?.projectId && chat.itemId && (
+          <WorkReview projectId={chat.projectId} itemId={chat.itemId} busy={!!draft} answers={answers.length} />
+        )}
         <Composer
           disabled={!choice || (kind !== "text" && !mediaModel)}
           streaming={!!draft}

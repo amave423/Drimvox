@@ -3,10 +3,11 @@ import { toModelMessages } from "./history";
 import { notesBlock } from "../agent/notes";
 import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
 import { FOLDER_STEPS, folderHint } from "./folder";
+import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory } from "../agent/memory";
 import { availabilityFromError, canCheck, noteAvailability } from "../providers/availability";
 import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
 import type { ThinkingLevel, WebMode } from "@artel/shared";
-import { isStepCount, streamText, type ToolSet } from "ai";
+import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai";
 import { cliReply } from "../cli/chat";
 import { isCli } from "../cli/kinds";
 import { WEB_HINT, webTools } from "../internet/tools";
@@ -49,6 +50,8 @@ export interface ReplyInput {
   vision?: boolean;
   /** The chat's folder: the model works in it, and it is snapshotted before the answer so the answer can be undone. */
   folder?: string | null;
+  /** A project task's conversation (docs/specs/project-work.md): its rules and how many steps an answer may take. */
+  work?: { system: string; steps: number };
   emit(event: StreamEvent): Promise<void>;
 }
 
@@ -93,6 +96,9 @@ export async function reply(i: ReplyInput): Promise<void> {
   };
   resetClock();
 
+  // Memory for long work: the model's context decides when the older part of the answer is summarized.
+  const limit = i.folder ? memoryLimit(await findModel(i.conn, i.model)) : 0;
+  let extraUsage = { inputTokens: 0, outputTokens: 0 };
   const tools: ToolSet = {
     ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }) : {}),
     ...i.extraTools,
@@ -106,6 +112,7 @@ export async function reply(i: ReplyInput): Promise<void> {
         i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
         i.folder ? folderHint(i.folder) : "",
         i.folder ? notesBlock(i.folder) : "",
+        i.work?.system ?? "",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -114,7 +121,9 @@ export async function reply(i: ReplyInput): Promise<void> {
         ? {
             tools,
             // Search, read a page or two, call a tool or two, answer.
-            stopWhen: isStepCount(i.folder ? FOLDER_STEPS : 8),
+            stopWhen: isStepCount(i.work?.steps ?? (i.folder ? FOLDER_STEPS : 8)),
+            // Long work in a folder: once the answer nears the model's context, its older part becomes a summary.
+            ...(i.folder ? { prepareStep: memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) } : {}),
           }
         : {}),
       // OpenRouter and RouterAI search on their side for a fee; the plugin goes into the request body.
@@ -162,6 +171,10 @@ export async function reply(i: ReplyInput): Promise<void> {
   // What this answer says about the model: the picker hides free models that are gone.
   const learned = stopped ? null : error ? availabilityFromError(error.code) : "ok";
   if (learned && canCheck(i.conn)) noteAvailability(i.conn, i.model, learned);
+  // The summaries written for the memory are paid for too.
+  if (usage && (extraUsage.inputTokens || extraUsage.outputTokens)) {
+    usage = { ...usage, inputTokens: (usage.inputTokens ?? 0) + extraUsage.inputTokens, outputTokens: (usage.outputTokens ?? 0) + extraUsage.outputTokens };
+  }
   const inputTokens = usage?.inputTokens ?? null;
   const outputTokens = usage?.outputTokens ?? null;
   const price = inputTokens !== null && outputTokens !== null ? await findModel(i.conn, i.model) : undefined;
@@ -189,3 +202,32 @@ export async function reply(i: ReplyInput): Promise<void> {
 }
 
 
+
+const addUsage = (a: { inputTokens: number; outputTokens: number }, b: { inputTokens: number; outputTokens: number }) => ({
+  inputTokens: a.inputTokens + b.inputTokens,
+  outputTokens: a.outputTokens + b.outputTokens,
+});
+
+/**
+ * The agent's memory inside one long answer (agent/memory.ts): past the limit, the older steps are told by a summary the
+ * model writes, with the current text of the files it changed. Without this a task's answer of 200 steps outgrew the
+ * model's context.
+ */
+function memoryStep(i: ReplyInput, limit: number, spent: (u: { inputTokens: number; outputTokens: number }) => void) {
+  let memory: Memory | null = null;
+  return async ({ messages }: { messages: ModelMessage[] }) => {
+    let sent = withMemory(messages, memory);
+    const upTo = sizeOf(sent) > limit ? cutPoint(messages, memory, limit) : null;
+    if (upTo !== null && i.folder) {
+      try {
+        const r = await remember(i.conn, i.model, i.folder, messages, memory, upTo, i.signal);
+        memory = r.memory;
+        spent({ inputTokens: r.inputTokens, outputTokens: r.outputTokens });
+        sent = withMemory(messages, memory);
+      } catch {
+        // Without a summary the step goes as it is; the next one tries again.
+      }
+    }
+    return sent === messages ? {} : { messages: sent };
+  };
+}

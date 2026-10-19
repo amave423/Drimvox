@@ -129,7 +129,7 @@ export function createCore(o: AppOptions) {
     skillsDir: join(o.dataDir, "skills"),
     idleTimeoutMs,
   });
-  const backlogService = new BacklogService(backlog, tasks, runner);
+  const backlogService = new BacklogService(backlog, runner, projects, chats);
   const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });
   studio.resume();
 
@@ -153,7 +153,15 @@ export function createCore(o: AppOptions) {
     .route("/providers", providerRoutes(providers))
     .route("/local", localRoutes(local))
     .route("/proxy", proxyRoutes(proxies, o.proxyCheckUrl ?? "https://www.google.com/generate_204"))
-    .route("/chats", chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs, join(o.dataDir, "cli-chats")))
+    .route(
+      "/chats",
+      chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs, join(o.dataDir, "cli-chats"), {
+        service: backlogService,
+        plan: (projectId) => backlog.plan(projectId),
+        visualKit,
+        visionModel: () => readSettings(o.db).visionModel,
+      }),
+    )
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills")))

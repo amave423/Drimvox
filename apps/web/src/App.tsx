@@ -183,7 +183,7 @@ export function App({ api, token, initialSettings, status }: Props) {
           {view.kind === "providers" && <ProvidersSheet />}
           {view.kind === "local" && <LocalModelsSheet />}
           {view.kind === "gallery" && <GallerySheet />}
-          {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} />}
+          {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} autoSend={view.send} />}
           {view.kind === "project" && <ProjectSheet key={view.projectId} projectId={view.projectId} />}
           {view.kind === "task" && <TaskSheet key={view.taskId} taskId={view.taskId} />}
         </main>

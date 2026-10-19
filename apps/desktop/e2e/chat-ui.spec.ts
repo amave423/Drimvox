@@ -94,7 +94,7 @@ test("renames a chat, deletes one from the list, and deletes several at once", a
   await row("Чат номер 1").getByRole("button", { name: "Удалить", exact: true }).click();
   await expect(page.getByText("Чат номер 1")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Выбрать" }).click();
+  await page.getByRole("button", { name: "Выбрать", exact: true }).click();
   await page.getByRole("checkbox", { name: "Чат номер 2" }).check();
   await page.getByRole("checkbox", { name: "Чат номер 3" }).check();
   await page.getByRole("button", { name: "Удалить (2)" }).click();

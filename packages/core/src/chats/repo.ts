@@ -11,6 +11,8 @@ interface ChatRow {
   model: string | null;
   kind: ChatKind;
   folder: string | null;
+  project_id: string | null;
+  item_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -93,15 +95,27 @@ export class ChatRepo {
     return { ...toChat(row), messages: messages.map((m) => toMessage(m, media.get(m.id) ?? [], files.get(m.id) ?? [])) };
   }
 
-  create(providerId: string, model: string, kind: ChatKind = "text"): ChatView {
+  /** A new chat; `work` makes it a project task's conversation in the project's folder. */
+  create(providerId: string, model: string, kind: ChatKind = "text", work?: { folder: string; projectId: string; itemId: string; title: string }): ChatView {
     const now = Date.now();
-    const row = { id: randomUUID(), title: null, provider_id: providerId, model, kind, created_at: now, updated_at: now };
+    const row = {
+      id: randomUUID(),
+      title: work?.title ?? null,
+      provider_id: providerId,
+      model,
+      kind,
+      folder: work?.folder ?? null,
+      project_id: work?.projectId ?? null,
+      item_id: work?.itemId ?? null,
+      created_at: now,
+      updated_at: now,
+    };
     this.db.sql
       .prepare(
-        "insert into chats (id, title, provider_id, model, kind, created_at, updated_at) values (:id, :title, :provider_id, :model, :kind, :created_at, :updated_at)",
+        "insert into chats (id, title, provider_id, model, kind, folder, project_id, item_id, created_at, updated_at) values (:id, :title, :provider_id, :model, :kind, :folder, :project_id, :item_id, :created_at, :updated_at)",
       )
       .run({ ...row });
-    return toChat({ ...row, folder: null });
+    return toChat(row);
   }
 
   update(id: string, patch: ChatUpdate): ChatView | null {
@@ -287,6 +301,8 @@ function toChat(r: ChatRow): ChatView {
     model: r.model,
     kind: r.kind,
     folder: r.folder ?? null,
+    projectId: r.project_id ?? null,
+    itemId: r.item_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

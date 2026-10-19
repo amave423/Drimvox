@@ -69,14 +69,9 @@ test("a project: the interview, the task list, a batch of three points, review, 
       { title: "Статистика", done: ["График по дням"], size: "L" },
     ],
   });
-  const mvp: FakeTurn = {
-    toolCalls: [
-      { name: "write_file", args: { path: "index.html", content: "<button>Старт</button>\n" } },
-      { name: "finish", args: { summary: "Сделал таймер", commit_message: "Add the timer" } },
-    ],
-  };
-  const verdict = call("report_acceptance", { results: [{ id: "R1", status: "done", evidence: "кнопка есть", problem: "" }], summary: "Принято" });
-  const page = await launch([call("ask_questions", { questions: [] }), list, mvp], [verdict]);
+  // The task is a conversation in the project's folder (docs/specs/project-work.md): the agent writes, then answers.
+  const mvp: FakeTurn[] = [call("write_file", { path: "index.html", content: "<button>Старт</button>\n" }), { text: "Сделал таймер: кнопка «Старт». Запуск: откройте index.html." }];
+  const page = await launch([call("ask_questions", { questions: [] }), list, ...mvp], []);
 
   await page.getByRole("button", { name: "+ Проект" }).click();
   await page.getByLabel("Опиши проект").fill("Помодоро-таймер");
@@ -96,13 +91,22 @@ test("a project: the interview, the task list, a batch of three points, review, 
   await expect(box("Статистика")).toBeDisabled();
 
   await page.getByRole("button", { name: "Начать" }).click();
-  await expect(page.getByText("Агент закончил. Посмотри правки")).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Принять" }).click();
-  await expect(page.getByText(/Принято: коммит/)).toBeVisible();
+  // The task opens as a conversation and goes at once; the agent works right in the folder.
+  await expect(page.locator(".msg-user")).toContainText("MVP: таймер 25 минут");
+  await expect(page.getByText("Сделал таймер: кнопка «Старт».")).toBeVisible({ timeout: 30_000 });
   expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Старт");
+  const review = page.getByRole("region", { name: "Проверка пункта" });
+  await expect(review).toContainText("Пункт «MVP: таймер 25 минут» готов.");
+  await review.getByText(/Изменённые файлы: 1/).click();
+  await expect(review).toContainText("index.html");
+  // It lives under its project in the sidebar, not among the chats.
+  await expect(page.locator(".side-projects").getByRole("button", { name: "MVP: таймер 25 минут" })).toBeVisible();
 
-  await page.getByRole("button", { name: "К списку задач" }).click();
-  await expect(page.getByText("Следующая: «Пауза и сброс».")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Дальше" })).toBeVisible();
+  await review.getByRole("button", { name: "Принять" }).click();
+  await expect(page.getByText(/Принято: коммит/)).toBeVisible();
+  expect(execFileSync("git", ["log", "-1", "--format=%s"], { cwd: repo, encoding: "utf8" }).trim()).toBe("MVP: таймер 25 минут");
+  await expect(page.getByRole("button", { name: "Дальше: «Пауза и сброс»" })).toBeVisible();
+
+  await page.locator(".side-projects").getByRole("button", { name: /^artel-repo-/ }).first().click();
   await expect(page.locator(".backlog-item", { hasText: "MVP" })).toContainText("готово");
 });

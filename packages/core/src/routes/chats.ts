@@ -28,8 +28,30 @@ import type { WebAccess } from "../internet/web";
 import type { McpHub } from "../mcp/hub";
 import type { Studio } from "../media/studio";
 import type { ProviderRepo } from "../providers/repo";
+import type { ProjectPlan } from "@artel/shared";
+import type { BacklogService } from "../backlog/service";
+import { resolveVision } from "../visual/look";
+import { visualTools, type VisualKit } from "../visual/tools";
+import { WORK_STEPS, workRules } from "../work/prompt";
+
+/** What the activity line shows of a tool's input. */
+const describeInput = (input: unknown) => {
+  const i = (input ?? {}) as { url?: unknown; command?: unknown };
+  return typeof i.url === "string" ? i.url : typeof i.command === "string" ? i.command : "";
+};
 
 const notFound = { error: { code: "not_found" } } as const;
+
+/** What a project task's conversation needs beyond a chat with a folder (docs/specs/project-work.md). */
+export interface WorkDeps {
+  service: BacklogService;
+  plan(projectId: string): ProjectPlan | null;
+  visualKit: VisualKit;
+  visionModel(): { providerId: string; model: string } | null;
+}
+
+/** Looks at pages per answer of a task: the desktop and the phone, then again after a fix. */
+const WORK_LOOKS = { looks: 8, then: "You have looked enough: finish with what you have and say what is left." };
 /** One attached file at most; the window sends ten at most. */
 const MAX_ATTACHMENT = 20 * 1024 * 1024;
 
@@ -42,6 +64,7 @@ export function chatRoutes(
   approvals: ChatApprovals,
   idleTimeoutMs: number,
   cliDir: string,
+  work: WorkDeps,
 ) {
   return new Hono()
     .get("/", (c) => c.json(chats.list()))
@@ -154,9 +177,28 @@ export function chatRoutes(
               onResult: () => {},
             })
           : {};
+        // A task of a project's list: its rules, more steps, a dev server in the background and a look at the pages.
+        const task = chat.itemId && chat.projectId && chat.folder && toolsOk ? chat : null;
+        if (task) work.service.working(chat.id);
+        const workTools =
+          task && task.folder
+            ? visualTools(
+                {
+                  kit: work.visualKit,
+                  taskId: chat.id,
+                  worktree: task.folder,
+                  vision: await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel),
+                  hooks: { onCall: (call) => void emit({ type: "tool", name: call.name, input: describeInput(call.input) }), onResult: () => {}, askApproval: async () => false },
+                  onSpend: () => {},
+                  event: () => {},
+                },
+                WORK_LOOKS,
+              )
+            : {};
         await reply({
           chats,
           chatId: chat.id,
+          work: task ? { system: workRules(work.plan(task.projectId!)), steps: WORK_STEPS } : undefined,
           conn,
           model: chat.model!,
           content,
@@ -168,6 +210,7 @@ export function chatRoutes(
           // With a folder the model reads, writes and runs commands in it; risky commands ask in the answer.
           extraTools: {
             ...mcpTools,
+            ...workTools,
             ...(chat.folder && toolsOk
               ? folderTools(
                   chat.folder,
@@ -184,6 +227,12 @@ export function chatRoutes(
           cliDir,
           emit,
         });
+        if (task) {
+          // A dev server the agent started does not hold the port once it answered (seen: "npm run dev" failed after).
+          work.visualKit.background.stopAll(chat.id);
+          const last = chats.get(chat.id)?.messages.at(-1);
+          if (last?.role === "assistant" && last.status === "done") work.service.answered(chat.id);
+        }
       });
     });
 }

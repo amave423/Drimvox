@@ -13,7 +13,7 @@ export const SIZE_POINTS: Record<BacklogSize, number> = { S: 1, M: 2, L: 3 };
 /** The most a batch may weigh: what one agent does well before the user looks. */
 export const BATCH_POINTS = 3;
 
-export type BacklogStatus = "open" | "picked" | "active" | "done";
+export type BacklogStatus = "open" | "picked" | "active" | "review" | "done";
 
 export interface BacklogItem {
   id: string;
@@ -23,10 +23,24 @@ export interface BacklogItem {
   /** "Done when …" points: what the result must do, as the user would check it. */
   done: string[];
   size: BacklogSize;
-  /** open: in the list; picked: in the current batch, waiting its turn; active: being done or reviewed; done: accepted. */
+  /** open: in the list; picked: in the current batch, waiting its turn; active: being done; review: the agent answered, the user checks; done: accepted. */
   status: BacklogStatus;
-  /** The task doing it, once it started. */
+  /** The old-style task doing it (before conversations); null for new ones. */
   taskId: string | null;
+  /** The conversation it is done in, once it started. */
+  chatId: string | null;
+}
+
+/** A task of the list started: its conversation, and the first message to send in it. */
+export interface WorkStart {
+  itemId: string;
+  chatId: string;
+  message: string;
+}
+
+/** What a task changed in the project's folder since it started. */
+export interface WorkChanges {
+  files: { path: string; status: "added" | "modified" | "deleted" }[];
 }
 
 /** What the project's tasks share: decided in the interview, read by every task of the list. */

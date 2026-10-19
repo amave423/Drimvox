@@ -72,6 +72,9 @@ export interface ChatView {
   kind: ChatKind;
   /** The folder the model works in; null for a chat without one. */
   folder: string | null;
+  /** A task of a project's list worked on in this conversation (docs/specs/project-work.md); null for a plain chat. */
+  projectId: string | null;
+  itemId: string | null;
   createdAt: number;
   updatedAt: number;
 }

@@ -11,6 +11,8 @@ interface Row {
   size: BacklogItem["size"];
   status: BacklogStatus;
   task_id: string | null;
+  chat_id: string | null;
+  checkpoint: string | null;
   created_at: number;
 }
 
@@ -23,6 +25,7 @@ const toItem = (r: Row): BacklogItem => ({
   size: r.size,
   status: r.status,
   taskId: r.task_id,
+  chatId: r.chat_id ?? null,
 });
 
 /** The project's task list and the plan its tasks share. */
@@ -36,6 +39,16 @@ export class BacklogRepo {
   get(id: string): BacklogItem | null {
     const row = this.db.sql.prepare("select * from backlog where id = ?").get(id) as Row | undefined;
     return row ? toItem(row) : null;
+  }
+
+  byChat(chatId: string): BacklogItem | null {
+    const row = this.db.sql.prepare("select * from backlog where chat_id = ?").get(chatId) as Row | undefined;
+    return row ? toItem(row) : null;
+  }
+
+  /** The folder's snapshot from before the task started, to roll it back to. */
+  checkpoint(id: string): string | null {
+    return (this.db.sql.prepare("select checkpoint from backlog where id = ?").get(id) as { checkpoint: string | null } | undefined)?.checkpoint ?? null;
   }
 
   byTask(taskId: string): BacklogItem | null {
@@ -57,13 +70,18 @@ export class BacklogRepo {
     return ids.map((id) => this.get(id)!);
   }
 
-  update(id: string, patch: Partial<{ title: string; done: string[]; size: BacklogItem["size"]; status: BacklogStatus; taskId: string | null; position: number }>): void {
+  update(
+    id: string,
+    patch: Partial<{ title: string; done: string[]; size: BacklogItem["size"]; status: BacklogStatus; taskId: string | null; chatId: string | null; checkpoint: string | null; position: number }>,
+  ): void {
     const columns: Record<string, string | number | null> = {};
     if (patch.title !== undefined) columns.title = patch.title;
     if (patch.done !== undefined) columns.done = JSON.stringify(patch.done);
     if (patch.size !== undefined) columns.size = patch.size;
     if (patch.status !== undefined) columns.status = patch.status;
     if (patch.taskId !== undefined) columns.task_id = patch.taskId;
+    if (patch.chatId !== undefined) columns.chat_id = patch.chatId;
+    if (patch.checkpoint !== undefined) columns.checkpoint = patch.checkpoint;
     if (patch.position !== undefined) columns.position = patch.position;
     const keys = Object.keys(columns);
     if (keys.length === 0) return;

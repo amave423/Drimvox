@@ -6,7 +6,8 @@ import { StatusDot } from "./tasks/StatusDot";
 const FINISHED = new Set(["accepted", "discarded"]);
 
 export function Sidebar() {
-  const { t, status, view, navigate, providers, projects, tasks } = useApp();
+  const { t, status, view, navigate, providers, projects, tasks, chats } = useApp();
+  const currentChat = view.kind === "chat" ? view.chatId : undefined;
   const currentProject = view.kind === "project" ? view.projectId : undefined;
   const currentTask = view.kind === "task" ? view.taskId : undefined;
 
@@ -23,6 +24,8 @@ export function Sidebar() {
           <ul className="side-list">
             {projects.map((project) => {
               const open = tasks.filter((task) => task.projectId === project.id && !FINISHED.has(task.status)).slice(0, 6);
+              // The project's task conversations, the newest first.
+              const work = chats.filter((c) => c.projectId === project.id).slice(0, 6);
               return (
                 <li key={project.id}>
                   <button
@@ -31,8 +34,19 @@ export function Sidebar() {
                   >
                     <span className="side-item-title">{project.name}</span>
                   </button>
-                  {open.length > 0 && (
+                  {(open.length > 0 || work.length > 0) && (
                     <ul className="side-sublist">
+                      {work.map((chat) => (
+                        <li key={chat.id}>
+                          <button
+                            className={`side-item side-task${chat.id === currentChat ? " is-on" : ""}`}
+                            onClick={() => navigate({ kind: "chat", chatId: chat.id, key: chat.id })}
+                            aria-current={chat.id === currentChat ? "page" : undefined}
+                          >
+                            <span className="side-item-title">{chat.title ?? t("chat.untitled")}</span>
+                          </button>
+                        </li>
+                      ))}
                       {open.map((task) => (
                         <li key={task.id}>
                           <button

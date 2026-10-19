@@ -93,21 +93,6 @@ describe("the task list", () => {
     expect((await backlog(projectId)).plan.checks).toEqual(["npm test", "node --test", "./check.sh", ".\\check.ps1"]);
   });
 
-  // Seen live: the MVP was "a working timer", the look a later task; the coder spent its time measuring the ring in a
-  // browser it started itself.
-  it("tells the coder to do this task only and to stop once its points hold", async () => {
-    const write = call("write_file", { path: "index.html", content: "<button>Старт</button>\n" });
-    const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list, write, finish], [verdict(["R1", "R2"])]);
-    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
-    const { items } = await backlog(projectId);
-    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/run`, { ids: [items[0].id], providerId, model: "coder" })).json()).id);
-    const coder = fake!.requests.find((r) => r.path === "/v1/chat/completions" && !isAcceptor(r.body) && JSON.stringify(r.body.messages).includes("Кнопка «Старт»"))!;
-    const system = coder.body.messages[0].content as string;
-    expect(system).toMatch(/one task of the project's list/i);
-    expect(system).toMatch(/do not polish/i);
-    expect(system).not.toMatch(/approved spec/i);
-  });
-
   it("refuses a batch heavier than three points", async () => {
     const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list]);
     await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
@@ -117,65 +102,4 @@ describe("the task list", () => {
     expect(await res.json()).toEqual({ error: { code: "too_many_points" } });
   });
 
-  // One reviewer pass and at most one round of rework: then the user sees the work with an honest report.
-  it("sends unmet points back once, then hands the work over, and does not redo what went unchecked", async () => {
-    const partial = call("report_acceptance", {
-      results: [
-        { id: "R1", status: "partial", evidence: "кнопка есть", problem: "отсчёт не идёт" },
-        { id: "R2", status: "done", evidence: "видно", problem: "" },
-      ],
-      summary: "Почти",
-    });
-    const write = call("write_file", { path: "index.html", content: "<button>Старт</button>\n" });
-    const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list, write, finish, finish], [partial, partial]);
-    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
-    const { items } = await backlog(projectId);
-    const task = await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/run`, { ids: [items[0].id], providerId, model: "coder" })).json()).id);
-    expect(task).toMatchObject({ status: "review", statusReason: "acceptance_partial" });
-    expect(task.acceptance.round).toBe(2);
-    // The reviewer is told the pages to look at and has a step limit of its own.
-    const reviewerAsk = JSON.stringify(fake!.requests.find((r) => r.path === "/v1/chat/completions" && isAcceptor(r.body))!.body.messages);
-    expect(reviewerAsk).toContain("http://localhost:5173/");
-  });
-
-  it("does not send the coder back for points the reviewer left unchecked", async () => {
-    const some = call("report_acceptance", { results: [{ id: "R1", status: "done", evidence: "видно", problem: "" }], summary: "Проверил первое" });
-    const write = call("write_file", { path: "index.html", content: "<button>Старт</button>\n" });
-    const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list, write, finish], [some]);
-    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
-    const { items } = await backlog(projectId);
-    const task = await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/run`, { ids: [items[0].id], providerId, model: "coder" })).json()).id);
-    expect(task.status).toBe("review");
-    expect(task.acceptance.results.map((r: any) => r.status)).toEqual(["done", "unchecked"]);
-    expect(task.acceptance.round).toBe(1);
-  });
-
-  it("does the batch one task at a time: reviewed, accepted into the folder, then the next on the user's word", async () => {
-    const write = call("write_file", { path: "index.html", content: "<button>Старт</button><p>25:00</p>\n" });
-    const pause = call("write_file", { path: "pause.js", content: "export const pause = () => {};\n" });
-    const { providerId, projectId } = await setup([call("ask_questions", { questions: [] }), list, write, finish, pause, finish], [verdict(["R1", "R2"]), verdict(["R1"])]);
-    await settle((await (await env.call("POST", `/api/projects/${projectId}/backlog/plan`, { task: "Помодоро", providerId, model: "coder" })).json()).id);
-    const { items } = await backlog(projectId);
-
-    const started = await env.call("POST", `/api/projects/${projectId}/backlog/run`, { ids: [items[0].id, items[1].id], providerId, model: "coder" });
-    expect(started.status).toBe(201);
-    const first = await settle((await started.json()).id);
-    expect(first).toMatchObject({ status: "review", kind: "item" });
-    expect(first.task).toContain("Кнопка «Старт» запускает отсчёт 25:00");
-    expect((await backlog(projectId)).items.map((i) => i.status)).toEqual(["active", "picked", "open"]);
-
-    expect((await env.call("POST", `/api/tasks/${first.id}/accept`, {})).status).toBe(200);
-    expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Старт");
-    expect((await backlog(projectId)).items.map((i) => i.status)).toEqual(["done", "picked", "open"]);
-    // Nothing starts before the user says so.
-    expect(existsSync(join(repo, "pause.js"))).toBe(false);
-
-    const next = await env.call("POST", `/api/projects/${projectId}/backlog/next`);
-    expect(next.status).toBe(201);
-    const second = await settle((await next.json()).id);
-    expect(second.task).toContain("Кнопки паузы и сброса работают");
-    await env.call("POST", `/api/tasks/${second.id}/discard`);
-    expect((await backlog(projectId)).items.map((i) => i.status)).toEqual(["done", "open", "open"]);
-    expect((await env.call("POST", `/api/projects/${projectId}/backlog/next`)).status).toBe(409);
-  });
 });

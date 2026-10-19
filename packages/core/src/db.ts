@@ -211,6 +211,11 @@ const migrations: string[] = [
      created_at integer not null
    ) strict;
    create index attachments_message on attachments(message_id);`,
+  // A task of the list is a conversation in the project's folder (docs/specs/project-work.md).
+  `alter table chats add column project_id text;
+   alter table chats add column item_id text;
+   alter table backlog add column chat_id text;
+   alter table backlog add column checkpoint text;`,
 ];
 
 export interface Database {

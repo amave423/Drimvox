@@ -26,7 +26,9 @@ export function TrashIcon() {
  * The list scrolls on its own, so the sections around it stay in place however many chats there are.
  */
 export function SideChats() {
-  const { api, t, view, navigate, openNewChat, chats, reloadChats } = useApp();
+  const { api, t, view, navigate, openNewChat, chats: all, reloadChats } = useApp();
+  // A project task's conversation lives under its project (seen: it looked like a stray new chat in this list).
+  const chats = all.filter((c) => !c.projectId);
   const current = view.kind === "chat" ? view.chatId : undefined;
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);

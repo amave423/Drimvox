@@ -19,11 +19,14 @@ export async function cliReply(i: ReplyInput, dir: string, formatHint: string): 
 
   const preset = i.conn.preset as CliId;
   const resume = sessionFor(i.chats.cliSession(i.chatId), preset, i.model);
-  const cwd = join(dir, i.chatId);
+  // A project task's conversation (docs/specs/project-work.md): the CLI works in the project's folder with the task's
+  // rules, as it would in a terminal. Any other chat runs in its own empty folder.
+  const working = !!(i.work && i.folder);
+  const cwd = working ? i.folder! : join(dir, i.chatId);
   mkdirSync(cwd, { recursive: true });
   const prompt = resume
     ? i.content
-    : [nowLine(), formatHint, "You are chatting with the user inside Artel. Answer in the user's language.", transcript(history.slice(0, -1)), i.content]
+    : [nowLine(), formatHint, working ? i.work!.system : "You are chatting with the user inside Artel. Answer in the user's language.", transcript(history.slice(0, -1)), i.content]
         .filter(Boolean)
         .join("\n\n");
 
@@ -33,7 +36,7 @@ export async function cliReply(i: ReplyInput, dir: string, formatHint: string): 
     cwd,
     prompt,
     model: i.model,
-    mode: "chat",
+    mode: working ? "write" : "chat",
     web: i.web !== "off",
     resume,
     schema: null,
