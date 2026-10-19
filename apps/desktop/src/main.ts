@@ -2,8 +2,8 @@ import { coreGitEnv } from "./git-env";
 import { attachContextMenu } from "./context-menu";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { InitMessage } from "./core-process";
 import { PAGE_HEIGHT_SCRIPT } from "@artel/shared";
 import { loadSecretKey } from "./keyring";
@@ -66,10 +66,32 @@ async function launch() {
     const port = await startCore();
     origin = devServerUrl ?? `http://127.0.0.1:${port}`;
     registerIpc();
-    await createWindow();
+    const ollama = takeInstallerNote("install-ollama");
+    if (ollama) void installOllama(port);
+    await createWindow(ollama ? "local" : undefined);
   } catch (err) {
     dialog.showErrorBox("Artel не запустился", err instanceof Error ? err.message : String(err));
     app.quit();
+  }
+}
+
+/**
+ * What the installer was asked besides the files (build/installer.nsh): it leaves a note beside the program, and the
+ * first start acts on it once.
+ */
+function takeInstallerNote(name: string): boolean {
+  const note = join(process.env.ARTEL_TEST_PROGRAM_DIR ?? dirname(process.execPath), name);
+  if (!existsSync(note)) return false;
+  rmSync(note, { force: true });
+  return true;
+}
+
+/** The installer's "Install Ollama" box: the core's own install, with its progress on the local models' sheet. */
+async function installOllama(port: number): Promise<void> {
+  try {
+    await fetch(`http://127.0.0.1:${port}/api/local/install`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
+  } catch {
+    // The sheet still offers the install.
   }
 }
 
@@ -237,7 +259,7 @@ function registerIpc() {
   });
 }
 
-async function createWindow() {
+async function createWindow(view?: "local") {
   const dark = nativeTheme.shouldUseDarkColors;
   win = new BrowserWindow({
     width: 1360,
@@ -272,7 +294,7 @@ async function createWindow() {
     if (!fromOurPage(url)) event.preventDefault();
   });
 
-  await win.loadURL(origin);
+  await win.loadURL(view ? `${origin}#${view}` : origin);
 }
 
 app.on("window-all-closed", () => app.quit());

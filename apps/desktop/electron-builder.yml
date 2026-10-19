@@ -24,14 +24,26 @@ nodeGypRebuild: false
 win:
   target: nsis
   artifactName: Artel-Setup-${version}.${ext}
+# A wizard rather than one click: where to install, a desktop shortcut, Ollama on the first start (build/installer.nsh),
+# with Artel's own pictures. Per user, no administrator needed; Russian or English by the system's language.
 nsis:
-  oneClick: true
+  oneClick: false
   perMachine: false
+  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Artel
   runAfterFinish: true
   deleteAppDataOnUninstall: false
+  include: build/installer.nsh
+  installerSidebar: build/installerSidebar.bmp
+  uninstallerSidebar: build/installerSidebar.bmp
+  installerHeader: build/installerHeader.bmp
+  installerLanguages:
+    - ru_RU
+    - en_US
+  multiLanguageInstaller: true
+  displayLanguageSelector: false
 
 linux:
   target:

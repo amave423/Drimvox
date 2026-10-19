@@ -28,7 +28,8 @@ interface Props {
 
 export function App({ api, token, initialSettings, status }: Props) {
   const [settings, setSettings] = useState(initialSettings);
-  const [view, setView] = useState<View>({ kind: "home" });
+  // The desktop opens on the local models when the installer was asked to install Ollama (apps/desktop/src/main.ts).
+  const [view, setView] = useState<View>(() => (location.hash === "#local" ? { kind: "local" } : { kind: "home" }));
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [chats, setChats] = useState<ChatView[]>([]);
   const [today, setToday] = useState<UsageSummary | null>(null);
