@@ -28,6 +28,11 @@ test("opens with a working core and remembers theme and language", async () => {
   let page = await app.firstWindow();
 
   await expect(page.getByRole("heading", { name: "Добро пожаловать в Artel" })).toBeVisible();
+  // Someone new sees three first steps, the first with its ways and buttons.
+  const steps = page.getByRole("region", { name: "Первые шаги" });
+  await expect(steps).toContainText("Подключи нейросеть");
+  await expect(steps).toContainText("По подписке.");
+  await expect(steps.getByRole("button", { name: "Ключи и модели" })).toBeVisible();
   // The first page explains how to use the app, part by part.
   for (const part of ["Модели", "Чат", "Проект", "Разрешения и расходы"]) await expect(page.getByRole("region", { name: part })).toBeVisible();
   await expect(page.getByText(/«Папка» подключает папку/)).toBeVisible();

@@ -148,3 +148,12 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 
 .update-note { margin-left: auto; margin-right: 18px; }
 .update-note + span { margin-left: 0; }
+/* First steps on the home page: numbered, ticked once done. */
+.first-steps ol { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 16px; }
+.first-steps > ol > li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.first-steps > ol > li.is-done { opacity: 0.65; }
+.first-steps h3 { margin: 4px 0 4px; font: 600 16px/1.4 var(--font-ui); }
+.first-steps p { margin: 0 0 8px; }
+.step-mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 14px; color: var(--sheet); background: var(--ink); }
+.is-done .step-mark { background: var(--ok); }
+.start-ways { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; line-height: 1.5; }

@@ -1,5 +1,6 @@
 import { useApp } from "../context";
 import type { MessageKey } from "../i18n";
+import { FirstSteps } from "./FirstSteps";
 
 /** How to use Artel, by what the user meets first (seen: testers asked for hints and instructions). */
 const guide: { title: MessageKey; items: MessageKey[] }[] = [
@@ -10,23 +11,13 @@ const guide: { title: MessageKey; items: MessageKey[] }[] = [
 ];
 
 export function HomeSheet() {
-  const { t, status, providers, navigate, openNewChat } = useApp();
+  const { t, status } = useApp();
   return (
     <article className="sheet">
       <div className="sheet-body">
         <h1>{t("home.title")}</h1>
         <p className="lede">{t("home.lede")}</p>
-        <div className="actions">
-          {providers.length === 0 ? (
-            <button className="btn is-primary" onClick={() => navigate({ kind: "providers" })}>
-              {t("home.connect")}
-            </button>
-          ) : (
-            <button className="btn is-primary" onClick={openNewChat}>
-              {t("home.startChat")}
-            </button>
-          )}
-        </div>
+        <FirstSteps />
         <h2 className="sheet-h">{t("home.next")}</h2>
         <div className="guide">
           {guide.map((g) => (

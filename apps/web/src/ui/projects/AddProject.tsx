@@ -3,9 +3,9 @@ import { useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 
-/** Adds a project folder: the native picker on the desktop, a path field in a plain browser. */
-export function AddProject() {
-  const { api, t, reloadProjects, navigate } = useApp();
+/** Adding a project folder: the native picker on the desktop, a path field in a plain browser. */
+export function useAddProject() {
+  const { api, reloadProjects, navigate } = useApp();
   const [typing, setTyping] = useState(false);
   const [path, setPath] = useState("");
   const [failed, setFailed] = useState(false);
@@ -35,6 +35,13 @@ export function AddProject() {
     if (folder) await add(folder);
   }
 
+  return { pick, add, typing, path, setPath, failed };
+}
+
+/** The sidebar's "+ Project". */
+export function AddProject() {
+  const { t } = useApp();
+  const { pick, add, typing, path, setPath, failed } = useAddProject();
   return (
     <>
       <button className="side-new" onClick={() => void pick()}>
