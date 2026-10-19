@@ -26,7 +26,7 @@ test("the packaged app starts its core from the archive and shows the interface"
   test.skip(!existsSync(exe), "no packaged build: run npm run dist");
   app = await electron.launch({ executablePath: exe, env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_NO_UPDATES: "1" } });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/^Artel \d+\.\d+\.\d+$/)).toBeVisible();
   expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(true);
   // Fonts and styles come from resources/web, not from the internet.
@@ -54,7 +54,7 @@ test("the installed app says whether it is the latest version, and what went wro
     for (const [path, expected] of [["ok", /Это последняя версия/], ["broken", /Не получилось проверить обновления/]] as const) {
       app = await electron.launch({ executablePath: exe, env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_UPDATE_URL: `${base}/${path}` } });
       const page = await app.firstWindow();
-      await expect(page.getByText("Ядро запущено")).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible({ timeout: 30_000 });
       await page.getByRole("button", { name: "Настройки" }).click();
       const section = page.getByRole("region", { name: "Обновления" });
       await section.getByRole("button", { name: "Проверить сейчас" }).click();

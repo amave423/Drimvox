@@ -28,7 +28,7 @@ async function launch(chunks: FakeChunk[], delayMs = 0): Promise<Page> {
   fake = await startFakeProvider({ key: KEY, models, chunks, delayMs });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData } });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Ключи и модели" }).click();
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Название").fill("Тестовый");
@@ -72,10 +72,8 @@ test("many chats scroll inside their own list, without running over the rest of 
   await expect(page.getByText("Чат номер 39")).toBeVisible();
   const box = async (selector: string) => (await page.locator(selector).boundingBox())!;
   const chats = await box(".side-chats-group");
-  const system = await box(".side-system");
   const nav = await box(".side-nav");
-  expect(chats.y + chats.height).toBeLessThanOrEqual(system.y + 1);
-  expect(system.y + system.height).toBeLessThanOrEqual(nav.y + 1);
+  expect(chats.y + chats.height).toBeLessThanOrEqual(nav.y + 1);
 });
 
 test("renames a chat, deletes one from the list, and deletes several at once", async () => {

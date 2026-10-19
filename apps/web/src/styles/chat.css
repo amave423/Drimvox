@@ -170,7 +170,9 @@
 .options-panel { width: min(340px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }
 .options-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; font-size: 13px; }
 .options-row .picker { justify-self: start; }
-.options-panel .picker-panel.is-above { bottom: auto; top: 0; left: calc(100% + 10px); }
+/* An option's own list opens to the right of its row and grows upwards from its bottom, like the panel itself (seen:
+   the thinking list ran down past the sheet and left an empty band under it). */
+.options-panel .picker-panel.is-above { top: auto; bottom: 0; left: calc(100% + 10px); }
 @media (max-width: 760px) { .options-panel .picker-panel.is-above { left: 0; top: auto; bottom: calc(100% + 6px); } }
 /* Choices inside the options panel: pills, like the rest of the bar. */
 .pills { display: flex; flex-wrap: wrap; gap: 4px; }

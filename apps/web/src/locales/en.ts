@@ -15,9 +15,6 @@ export const en: Record<keyof typeof ru, string> = {
   "side.rename": "Rename “{title}”",
   "side.renameLabel": "Chat name",
   "side.delete": "Delete “{title}”",
-  "side.system": "System",
-  "side.core": "Core is running",
-  "side.database": "Database, schema {version}",
   "side.keys": "Keys and models",
 
   "github.title": "GitHub",
@@ -902,6 +899,7 @@ export const en: Record<keyof typeof ru, string> = {
   "review.titlePartial": "The work is not finished: this is what the agent got done. Accept it as it is, or continue.",
   "approval.answerAbove": "Waiting for an answer: the buttons are at the top of the page.",
   "team.openAsker": "Open «{title}»",
+  "settings.focusAssist": "Windows' Focus Assist is on: notifications of every app go to the action centre without a banner or a sound. Turn it off in Settings → System → Focus assist and check its automatic rules there (games, full screen, a schedule).",
   "settings.notificationsTest": "Test a notification",
   "notice.test": "Notifications work",
   "notice.testBody": "This is how Artel tells you a task needs you.",

@@ -48,7 +48,7 @@ test("publishes a project on GitHub: the code to enter, the name, private by def
     },
   });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "+ Проект" }).click();
 
   const github = page.getByRole("region", { name: "GitHub" });

@@ -46,7 +46,7 @@ async function launch(script: FakeTurn[], env: Record<string, string> = {}): Pro
   fake = await startFakeProvider({ key: KEY, models, script });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo, ...env } });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Ключи и модели" }).click();
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();

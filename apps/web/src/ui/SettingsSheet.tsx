@@ -16,6 +16,11 @@ type SaveState = "idle" | "saved" | "failed";
 
 export function SettingsSheet() {
   const { t, settings, updateSettings, usdRub } = useApp();
+  // Windows' Focus Assist hides every app's notifications: said here, where notifications are switched on.
+  const [focusAssist, setFocusAssist] = useState(false);
+  useEffect(() => {
+    void window.artel?.focusAssist?.().then((profile) => setFocusAssist(profile === 1 || profile === 2));
+  }, []);
   const [state, setState] = useState<SaveState>("idle");
   // The budget is kept in dollars and edited in the currency on screen.
   const perUsd = settings.currency === "RUB" && usdRub > 0 ? usdRub : 1;
@@ -77,6 +82,7 @@ export function SettingsSheet() {
             </>
           )}
         </p>
+        {focusAssist && <p className="note is-pencil">{t("settings.focusAssist")}</p>}
 
         <h2 className="sheet-h">{t("settings.developerTitle")}</h2>
         <Toggle checked={settings.developer} onChange={(developer) => void save({ developer })}>

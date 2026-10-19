@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("artel", {
   openSkillsFolder: () => ipcRenderer.send("artel:open-skills"),
   notify: (notice: { title: string; body: string; taskId: string }) => ipcRenderer.send("artel:notify", notice),
   testNotify: (notice: { title: string; body: string }) => ipcRenderer.send("artel:notify-test", notice),
+  focusAssist: (): Promise<number | null> => ipcRenderer.invoke("artel:focus-assist"),
   updateState: () => ipcRenderer.invoke("artel:update-state"),
   onUpdate: (listener: (state: unknown) => void) => {
     const handler = (_event: unknown, state: unknown) => listener(state);

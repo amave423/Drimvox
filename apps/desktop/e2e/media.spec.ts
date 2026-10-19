@@ -56,7 +56,7 @@ async function launch(): Promise<Page> {
   });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_USD_RUB: "80" } });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Ключи и модели" }).click();
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();

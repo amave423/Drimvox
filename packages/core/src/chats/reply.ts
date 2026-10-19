@@ -22,6 +22,9 @@ import type { Connection } from "../providers/repo";
 import type { ChatRepo } from "./repo";
 
 /** What the chat can show, so models use it instead of ASCII art. */
+/** How long a model on this computer may stay silent: reading a long context before the first word takes a while. */
+const LOCAL_IDLE_MS = 10 * 60_000;
+
 export const FORMAT_HINT =
   "Answers are shown as Markdown with tables, LaTeX math ($...$ inline, $$...$$ for blocks) and highlighted code. " +
   "For diagrams and charts write a ```mermaid block: flowchart, sequenceDiagram, pie, xychart-beta for bar and line charts, gantt, mindmap.";
@@ -91,12 +94,14 @@ export async function reply(i: ReplyInput): Promise<void> {
   /** The provider's own bill in its currency, summed over the steps, when it sends one. */
   let billed: number | null = null;
 
-  // Some hosted models sit in a queue or hang; every streamed part resets the clock.
+  // Some hosted models sit in a queue or hang; every streamed part resets the clock. A model on this computer reads a
+  // long context (pages it opened) for minutes before its first word, so it gets longer.
+  const idleMs = i.conn.preset === "ollama" || i.conn.preset === "lmstudio" ? Math.max(i.idleTimeoutMs, LOCAL_IDLE_MS) : i.idleTimeoutMs;
   const silence = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const resetClock = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => silence.abort(), i.idleTimeoutMs);
+    timer = setTimeout(() => silence.abort(), idleMs);
   };
   resetClock();
 
@@ -141,7 +146,10 @@ export async function reply(i: ReplyInput): Promise<void> {
       onError: () => {},
     });
     for await (const part of result.fullStream) {
-      resetClock();
+      // While Artel itself runs a tool (a search, a page, a command), the model is not silent: the clock waits (seen:
+      // an answer cut as "silent" while a search went on).
+      if (part.type === "tool-call") clearTimeout(timer);
+      else resetClock();
       if (part.type === "text-delta") {
         // What the model says after a tool call is a new paragraph (seen live: "…folder.The folder is empty…").
         const piece = newStep && text && !/\n\s*$/.test(text) ? `\n\n${part.text.trimStart()}` : part.text;

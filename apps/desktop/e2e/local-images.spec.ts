@@ -42,7 +42,7 @@ test("downloads a picture model on the local models' sheet and draws with it in 
     env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) },
   });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Локальные модели" }).click();
   await expect(page.getByRole("heading", { name: "Картинки на этом компьютере" })).toBeVisible();
@@ -106,7 +106,7 @@ test("offers the picture engine on its own on the sheet", async () => {
   };
   app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Локальные модели" }).click();
   await page.getByRole("button", { name: "Скачать движок · 30 МБ" }).click();
   await expect(page.getByRole("button", { name: /Скачать движок/ })).toHaveCount(0, { timeout: 10_000 });

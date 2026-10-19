@@ -48,7 +48,7 @@ async function launch(): Promise<Page> {
     },
   });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Ключи и модели" }).click();
   return page;
 }

@@ -86,7 +86,7 @@ test("a browser sets the password with the setup code, chats, signs out and back
   await expect(page.getByText("Неверный код первого входа.")).toBeVisible();
   await page.getByLabel("Код первого входа").fill(code);
   await page.getByRole("button", { name: "Задать пароль и войти" }).click();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Ключи и модели" }).click();
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
@@ -112,6 +112,6 @@ test("a browser sets the password with the setup code, chats, signs out and back
   await expect(page.getByText("Неверный пароль.")).toBeVisible();
   await page.getByLabel("Пароль").fill(PASSWORD);
   await page.getByRole("button", { name: "Войти" }).click();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /^Привет$/ })).toBeVisible();
 });

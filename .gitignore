@@ -10,3 +10,4 @@ playwright-report/
 !.env.example
 .DS_Store
 .bench/
+.live-local/

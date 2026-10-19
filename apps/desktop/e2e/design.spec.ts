@@ -108,7 +108,7 @@ test("the look: samples in the interview, the user's own sample, the brief, a de
   });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo } });
   const page: Page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Ключи и модели" }).click();
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();

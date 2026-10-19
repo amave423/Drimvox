@@ -11,15 +11,18 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <button className="logo" onClick={() => navigate({ kind: "home" })} title={t("top.home")}>
-        <img src={logo} alt="" width={22} height={22} />
-        Artel
-      </button>
-      {crumb && (
-        <span className="crumb" title={crumb}>
-          {crumb}
-        </span>
-      )}
+      {/* The name and the place stand on one line of text, the mark centred beside the name. */}
+      <div className="topbar-title">
+        <button className="logo" onClick={() => navigate({ kind: "home" })} title={t("top.home")}>
+          <img src={logo} alt="" width={22} height={22} />
+          <span className="logo-name">Artel</span>
+        </button>
+        {crumb && (
+          <span className="crumb" title={crumb}>
+            {crumb}
+          </span>
+        )}
+      </div>
     </header>
   );
 }

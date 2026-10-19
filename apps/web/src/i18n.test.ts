@@ -32,11 +32,11 @@ describe("translate", () => {
   });
 
   it("fills placeholders", () => {
-    expect(translate("en", "side.database", { version: 3 })).toBe("Database, schema 3");
+    expect(translate("en", "local.get", { size: "3 GB" })).toBe("Download · 3 GB");
   });
 
   it("leaves unknown placeholders visible", () => {
-    expect(translate("en", "side.database")).toBe("Database, schema {version}");
+    expect(translate("en", "local.get")).toBe("Download · {size}");
   });
 });
 

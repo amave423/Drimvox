@@ -40,7 +40,10 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 }
 .topbar button { -webkit-app-region: no-drag; }
 /* The mark and the name in the interface font: the app's sign, not a heading of the sheet. */
+/* Seen: the place looked higher than the name: boxes were centred, letters were not. Now both stand on one baseline. */
+.topbar-title { display: flex; align-items: baseline; gap: 18px; min-width: 0; }
 .logo { display: inline-flex; align-items: center; gap: 8px; font: 600 18px var(--font-ui); letter-spacing: -0.01em; }
+.logo-name { align-self: baseline; }
 .logo img { display: block; }
 .crumb { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-link { padding: 5px 12px; border-radius: 999px; color: var(--muted); }
@@ -65,20 +68,13 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .side .side-chats { overflow-y: auto; min-height: 0; flex: 1 1 auto; align-content: start; }
 .side-h { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
 .side-empty { margin: 0; font-size: 14px; color: var(--muted); }
-.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
-.checks li { display: flex; gap: 8px; align-items: center; }
-.checks i {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--ok); color: var(--sheet);
-  font: normal 11px/18px var(--font-ui); text-align: center;
-}
 .side-nav { margin-top: auto; display: grid; gap: 2px; border-top: 1px solid var(--line); padding-top: 10px; }
 .side-link { margin: 0 -8px; display: flex; justify-content: space-between; align-items: baseline; padding: 7px 8px; border-radius: 8px; font-size: 14px; text-align: left; }
 .side-link:hover { background: var(--sheet); }
 .side-link small { color: var(--muted); font-size: 12px; }
 
 /* Positioned: hidden labels inside it stay within the scroller instead of stretching the window. */
-.desk { position: relative; overflow: auto; padding: 28px 40px 0; display: flex; justify-content: center; align-items: flex-start; }
+.desk { position: relative; overflow: auto; padding: 28px 40px; display: flex; justify-content: center; align-items: flex-start; }
 .desk.is-alone { height: 100%; }
 
 .bottombar {
@@ -95,13 +91,13 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 }
 
 /* ---------- Sheet ---------- */
+/* A card on the desk, with room around it; wider on a big screen, so a 31-inch one is not mostly empty (seen). */
 .sheet {
   width: 100%;
-  max-width: 900px;
-  min-height: calc(100% - 28px);
+  max-width: max(900px, min(1400px, 66vw));
+  min-height: 100%;
   background: var(--sheet);
   border: 1px solid var(--line);
-  border-bottom: 0;
   box-shadow: var(--sheet-shadow);
   padding: 34px 38px;
   display: grid;

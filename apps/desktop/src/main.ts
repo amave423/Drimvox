@@ -1,6 +1,7 @@
 import { coreGitEnv } from "./git-env";
 import { attachContextMenu } from "./context-menu";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell, utilityProcess, type UtilityProcess } from "electron";
+import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -245,6 +246,8 @@ function registerIpc() {
     win?.flashFrame(true);
   });
 
+  ipcMain.handle("artel:focus-assist", (event) => (fromOurPage(event.senderFrame?.url) ? focusAssist() : null));
+
   // Settings: one notification now, whatever window is in front, to see that they reach the desktop.
   ipcMain.on("artel:notify-test", (event, notice: { title?: unknown; body?: unknown }) => {
     if (!fromOurPage(event.senderFrame?.url) || !Notification.isSupported()) return;
@@ -317,6 +320,27 @@ app.on("before-quit", (event) => {
   child.postMessage({ type: "quit" });
   setTimeout(() => child.kill(), 3_000).unref();
 });
+
+/**
+ * Windows' Focus Assist: 0 off, 1 priority only, 2 alarms only (seen: "alarms only" sent every notification to the
+ * action centre without a banner or a sound, and it looked like Artel's fault). Read from the shell's own state with
+ * PowerShell; null elsewhere or when it cannot be read.
+ */
+function focusAssist(): Promise<number | null> {
+  if (process.env.ARTEL_TEST_FOCUS_ASSIST) return Promise.resolve(Number(process.env.ARTEL_TEST_FOCUS_ASSIST));
+  if (process.platform !== "win32") return Promise.resolve(null);
+  const script = [
+    `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class Wnf { [DllImport("ntdll.dll")] public static extern int NtQueryWnfStateData(ref ulong n, IntPtr t, IntPtr s, out uint c, byte[] b, ref uint z); }'`,
+    "$n = [UInt64]'0xd83063ea3bf1c75'; $b = New-Object byte[] 4; $z = [uint32]4; $c = [uint32]0",
+    "if ([Wnf]::NtQueryWnfStateData([ref]$n, [IntPtr]::Zero, [IntPtr]::Zero, [ref]$c, $b, [ref]$z) -eq 0) { [BitConverter]::ToInt32($b, 0) }",
+  ].join("; ");
+  return new Promise((resolve) => {
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 10_000 }, (err, out) => {
+      const value = Number(String(out).trim());
+      resolve(err || !Number.isInteger(value) ? null : value);
+    });
+  });
+}
 
 /**
  * Notifications being shown. Windows drops a toast whose object was collected: it went straight to the action centre,

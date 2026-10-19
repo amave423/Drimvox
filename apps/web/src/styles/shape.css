@@ -2,7 +2,7 @@
  * Rounded corners everywhere (seen: sharp corners on the sheet, the message bubbles, pictures, tables and the diff
  * looked unfinished next to the rounded buttons). One place for the shapes the other files leave square.
  */
-.sheet { border-radius: 18px 18px 0 0; }
+.sheet { border-radius: 18px; }
 .msg-user { border-radius: 16px; }
 
 .media img, .media video, .media-wait, .diff-image img, .lightbox img { border-radius: 12px; }

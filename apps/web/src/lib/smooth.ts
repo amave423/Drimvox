@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 const CATCH_UP_MS = 400;
 /** The least speed, letters per millisecond, so the last few letters do not crawl. */
 const MIN_RATE = 0.06;
-/** Markdown is drawn again at most this often: every frame would be too much for a long answer. */
-const FRAME_MS = 32;
+/** Drawn every frame, so the letters come one or two at a time, as on DeepSeek's own site (seen: words at a time). */
+const FRAME_MS = 0;
 
 /**
  * An answer being written, shown letter by letter instead of in the pieces the provider sends (seen: it jerked). The

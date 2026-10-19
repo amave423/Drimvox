@@ -36,8 +36,7 @@ test("opens with a working core and remembers theme and language", async () => {
   // The first page explains how to use the app, part by part.
   for (const part of ["Модели", "Чат", "Проект", "Разрешения и расходы"]) await expect(page.getByRole("region", { name: part })).toBeVisible();
   await expect(page.getByText(/«Папка» подключает папку/)).toBeVisible();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
-  await expect(page.getByText(/База данных, схема \d+/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   // The bottom bar names the version the app was built as.
   await expect(page.getByText(/^Artel \d+\.\d+\.\d+$/)).toBeVisible();
 
@@ -61,10 +60,19 @@ test("opens with a working core and remembers theme and language", async () => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
 
+// Seen: notifications went straight to the action centre without a sound, all of them: Focus Assist was on ("alarms
+// only"). The settings say so next to the notifications.
+test("says when Windows hides notifications by Focus Assist", async () => {
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_FOCUS_ASSIST: "2" } });
+  const page = await app.firstWindow();
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await expect(page.getByText(/Фокусировка внимания/)).toBeVisible();
+});
+
 test("the core refuses callers that do not have the token", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   const origin = new URL(page.url()).origin;
   const res = await fetch(`${origin}/api/settings`);
@@ -74,20 +82,20 @@ test("the core refuses callers that do not have the token", async () => {
 test("the page has no access to Node", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   const exposed = await page.evaluate(() => ({
     require: typeof (window as unknown as { require?: unknown }).require,
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { artel?: object }).artel ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "getToken", "installUpdate", "notify", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "setTitleBar", "testNotify", "updateState"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "getToken", "installUpdate", "notify", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "setTitleBar", "testNotify", "updateState"] });
 });
 
 test("creates and deletes a shared skill in the settings", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Настройки" }).first().click();
 
   await page.getByRole("button", { name: "Создать скилл" }).click();

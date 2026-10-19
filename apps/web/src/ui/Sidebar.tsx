@@ -6,7 +6,7 @@ import { StatusDot } from "./tasks/StatusDot";
 const FINISHED = new Set(["accepted", "discarded"]);
 
 export function Sidebar() {
-  const { t, status, view, navigate, providers, projects, tasks, chats } = useApp();
+  const { t, view, navigate, providers, projects, tasks, chats } = useApp();
   const currentChat = view.kind === "chat" ? view.chatId : undefined;
   const currentProject = view.kind === "project" ? view.projectId : undefined;
   const currentTask = view.kind === "task" ? view.taskId : undefined;
@@ -69,20 +69,6 @@ export function Sidebar() {
       </section>
 
       <SideChats />
-
-      <section className="side-system">
-        <h2 className="side-h">{t("side.system")}</h2>
-        <ul className="checks">
-          <li>
-            <i aria-hidden>✓</i>
-            {t("side.core")}
-          </li>
-          <li>
-            <i aria-hidden>✓</i>
-            {t("side.database", { version: status.schemaVersion })}
-          </li>
-        </ul>
-      </section>
 
       <nav className="side-nav">
         <button className={`side-link${view.kind === "gallery" ? " is-on" : ""}`} onClick={() => navigate({ kind: "gallery" })}>

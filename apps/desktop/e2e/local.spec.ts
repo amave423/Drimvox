@@ -71,7 +71,7 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
     env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, ARTEL_TEST_LOCAL: JSON.stringify(local) },
   });
   const page: Page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Локальные модели" }).click();
   await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Artel/)).toBeVisible({ timeout: 30_000 });
@@ -138,7 +138,7 @@ test("installs Ollama from the sheet: the size first, then Artel finds it", asyn
   };
   app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, ARTEL_TEST_LOCAL: JSON.stringify(local) } });
   const page: Page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Локальные модели" }).click();
   await expect(page.getByText(/Ollama не установлена/)).toBeVisible();

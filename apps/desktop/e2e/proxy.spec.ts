@@ -38,7 +38,7 @@ async function launch(): Promise<Page> {
     env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PROXY_CHECK_URL: `${page204.origin}/ping` },
   });
   const page = await app.firstWindow();
-  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   return page;
 }
 

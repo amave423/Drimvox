@@ -13,6 +13,8 @@
 .gallery-card { display: grid; align-content: start; gap: 6px; min-width: 0; }
 .gallery-card .media { margin: 0; justify-items: stretch; }
 .gallery-card .media img, .gallery-card .media video { width: 100%; max-height: 260px; object-fit: contain; }
+/* A clip in the gallery keeps to its card (seen: the player's own width ran over the next one). */
+.gallery-card .player { width: 100%; }
 .gallery-prompt { margin: 0; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .gallery-meta { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
 .gallery-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; }

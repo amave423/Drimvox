@@ -8,6 +8,8 @@ interface ArtelBridge {
   notify(notice: { title: string; body: string; taskId: string }): void;
   /** A notification right now, even with the window in front: to check that they reach the desktop. */
   testNotify(notice: { title: string; body: string }): void;
+  /** Windows' Focus Assist: 0 off, 1 priority only, 2 alarms only; null where it cannot be told. */
+  focusAssist?(): Promise<number | null>;
   /** Where updating stands: checking, the latest, a newer version coming or ready, or what went wrong. */
   updateState(): Promise<UpdateState | null>;
   onUpdate(listener: (state: UpdateState) => void): () => void;
