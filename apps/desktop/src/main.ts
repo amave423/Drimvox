@@ -199,7 +199,7 @@ function registerIpc() {
     // Tests cannot take the focus away from the window; they say it is elsewhere.
     const away = process.env.ARTEL_TEST_UNFOCUSED === "1" || !win?.isFocused();
     if (!away || !Notification.isSupported()) return;
-    const toast = new Notification({ title: title.slice(0, 120), body: body.slice(0, 300), silent: false });
+    const toast = makeToast(title, body);
     toast.on("click", () => {
       if (!win) return;
       if (win.isMinimized()) win.restore();
@@ -223,7 +223,7 @@ function registerIpc() {
     if (!fromOurPage(event.senderFrame?.url) || !Notification.isSupported()) return;
     const { title, body } = notice ?? {};
     if (typeof title !== "string" || typeof body !== "string") return;
-    new Notification({ title: title.slice(0, 120), body: body.slice(0, 300), silent: false }).show();
+    makeToast(title, body).show();
   });
 
   const hex = /^#[0-9a-f]{6}$/i;
@@ -290,3 +290,20 @@ app.on("before-quit", (event) => {
   child.postMessage({ type: "quit" });
   setTimeout(() => child.kill(), 3_000).unref();
 });
+
+const xml = (text: string) => text.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/**
+ * A notification with the system's sound. On Windows the sound comes from the toast's own template, so it is named
+ * there (seen: toasts arrived without a sound).
+ */
+function makeToast(title: string, body: string): Notification {
+  const t = title.slice(0, 120);
+  const b = body.slice(0, 300);
+  if (process.platform !== "win32") return new Notification({ title: t, body: b, silent: false });
+  return new Notification({
+    title: t,
+    body: b,
+    toastXml: `<toast><visual><binding template="ToastGeneric"><text>${xml(t)}</text><text>${xml(b)}</text></binding></visual><audio src="ms-winsoundevent:Notification.Default"/></toast>`,
+  });
+}

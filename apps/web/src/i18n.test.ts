@@ -22,6 +22,15 @@ describe("dictionaries", () => {
 });
 
 describe("translate", () => {
+  // Seen: a task stopped for a reason with no text, and the whole window went white.
+  it("never breaks on a key it does not know", () => {
+    expect(translate("ru", "task.reason.no_such_reason" as never, { n: 1 })).toBe("task.reason.no_such_reason");
+  });
+
+  it("has a text for the reviewer giving no verdict", () => {
+    expect(dictionaries.ru["task.reason.acceptance_error" as keyof typeof dictionaries.ru]).toBeTruthy();
+  });
+
   it("fills placeholders", () => {
     expect(translate("en", "side.database", { version: 3 })).toBe("Database, schema 3");
   });

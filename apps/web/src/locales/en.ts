@@ -209,6 +209,7 @@ export const en: Record<keyof typeof ru, string> = {
   "task.status.discarded": "Discarded",
   "task.reason.budget": "The agent used up the task budget. Continue adds another {budget}.",
   "task.reason.steps": "The agent took 60 steps in a row and stopped so it would not loop.",
+  "task.reason.acceptance_error": "The reviewer could not reach a verdict on the work. Look at the changes yourself: accept them, send them back or discard them.",
   "task.reason.restart": "Work stopped when Artel restarted. Changes in the copy are kept.",
   "task.reason.user": "You stopped the agent. Changes in the copy are kept.",
   "task.reason.no_provider": "This task's provider was disconnected. Connect it again in Keys and models.",
