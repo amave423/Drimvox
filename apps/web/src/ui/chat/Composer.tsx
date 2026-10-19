@@ -23,7 +23,11 @@ interface Props {
   sendLabel?: string;
   placeholder?: string;
   /** Files may be attached: the paperclip button, dropping them on the field, pasting a picture. */
-  attach?: { files: PendingFile[]; onAdd(files: File[]): void; onRemove(key: string): void };
+  /**
+   * Files to send. `photos`: a picture or video chat, where only photos go; `blocked`: why the paperclip is off (the
+   * model takes no photos), shown on it instead of hiding it.
+   */
+  attach?: { files: PendingFile[]; onAdd(files: File[]): void; onRemove(key: string): void; photos?: boolean; blocked?: string };
 }
 
 export function Composer({ disabled, streaming, onSend, onStop, picker, options, extra, beforeSend, sendLabel, placeholder, attach }: Props) {
@@ -70,9 +74,9 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
     <button
       type="button"
       className="attach-button"
-      aria-label={t("attach.add")}
-      title={t("attach.add")}
-      disabled={disabled || streaming}
+      aria-label={attach.blocked ? `${t("attach.add")}: ${attach.blocked}` : t(attach.photos ? "attach.photo" : "attach.add")}
+      title={attach.blocked ?? t(attach.photos ? "attach.photo" : "attach.add")}
+      disabled={disabled || streaming || !!attach.blocked}
       onClick={() => filePicker.current?.click()}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -123,6 +127,7 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
           type="file"
           multiple
           hidden
+          accept={attach.photos ? "image/*" : undefined}
           onChange={(e) => {
             attach.onAdd([...(e.target.files ?? [])]);
             e.target.value = "";

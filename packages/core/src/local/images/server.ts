@@ -132,11 +132,16 @@ export class ImageServer {
   }
 
   /** Films one clip of `seconds` at the model's own frame rate; resolves with the file and its type. */
-  async film(prompt: string, width: number, height: number, seconds: number, signal: AbortSignal): Promise<{ bytes: Buffer; mime: string }> {
+  async film(prompt: string, width: number, height: number, seconds: number, signal: AbortSignal, firstFrame?: string): Promise<{ bytes: Buffer; mime: string }> {
     const fps = this.loaded.settings.fps ?? 16;
     // Wan takes 4n+1 frames.
     const frames = Math.round((fps * seconds) / 4) * 4 + 1;
-    const job = await this.submit("vid_gen", { prompt, width, height, seed: -1, video_frames: frames, fps, output_format: "webm", ...this.sampling() }, signal);
+    // A photo (a data URL) is the clip's first frame (Wan 2.2 5B makes a clip from a picture).
+    const job = await this.submit(
+      "vid_gen",
+      { prompt, width, height, seed: -1, video_frames: frames, fps, output_format: "webm", ...(firstFrame ? { init_image: firstFrame } : {}), ...this.sampling() },
+      signal,
+    );
     const result = job.result as { b64_json?: string; mime_type?: string } | null;
     if (!result?.b64_json) throw new EngineError("The engine sent no clip");
     return { bytes: Buffer.from(result.b64_json, "base64"), mime: result.mime_type ?? "video/webm" };

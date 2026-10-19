@@ -38,6 +38,14 @@ function pick(list: string[], value: string | undefined): string | undefined {
   return value && list.includes(value) ? value : undefined;
 }
 
+/** A photo from the chat, for a model that takes one (docs/specs/media.md). */
+export interface Photo {
+  mime: string;
+  data: Buffer;
+}
+
+const dataUrl = (p: Photo) => `data:${p.mime};base64,${p.data.toString("base64")}`;
+
 export interface Generated {
   bytes: Buffer;
   mime: string;
@@ -45,13 +53,20 @@ export interface Generated {
 }
 
 /** Draws one picture. Pictures take seconds to a minute; five minutes is the limit. */
-export async function generateImage(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal): Promise<Generated> {
+export async function generateImage(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal, photos: Photo[] = []): Promise<Generated> {
   if (conn.preset === "sdcpp") return drawLocally(model.id, prompt, o.aspectRatio, signal);
-  if (model.viaChat) return drawInChat(conn, model, prompt, o, signal);
+  if (model.viaChat) return drawInChat(conn, model, prompt, o, signal, photos);
   const body = await postJson(
     conn,
     "/images",
-    { model: model.id, prompt, n: 1, aspect_ratio: pick(model.aspectRatios, o.aspectRatio), resolution: pick(model.resolutions, o.resolution) },
+    {
+      model: model.id,
+      prompt,
+      n: 1,
+      aspect_ratio: pick(model.aspectRatios, o.aspectRatio),
+      resolution: pick(model.resolutions, o.resolution),
+      ...(photos.length ? { input_references: photos.map((p) => ({ type: "image_url", image_url: { url: dataUrl(p) } })) } : {}),
+    },
     5 * 60_000,
     signal,
   );
@@ -65,14 +80,16 @@ export async function generateImage(conn: Connection, model: MediaModel, prompt:
 }
 
 /** Gemini-style models answer a chat request with text and pictures as data: URLs. */
-async function drawInChat(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal): Promise<Generated> {
+async function drawInChat(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal, photos: Photo[] = []): Promise<Generated> {
   const aspect = pick(model.aspectRatios, o.aspectRatio);
+  // Photos go with the words, as pictures in the message.
+  const content = photos.length ? [{ type: "text", text: prompt }, ...photos.map((p) => ({ type: "image_url", image_url: { url: dataUrl(p) } }))] : prompt;
   const body = await postJson(
     conn,
     "/chat/completions",
     {
       model: model.id,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content }],
       modalities: ["image", "text"],
       ...(aspect ? { image_config: { aspect_ratio: aspect } } : {}),
     },
@@ -93,7 +110,7 @@ function sniff(b64: string): string {
 }
 
 /** Starts a clip; the provider renders it in the background. Returns the job id. */
-export async function submitVideo(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions): Promise<string> {
+export async function submitVideo(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, photos: Photo[] = []): Promise<string> {
   const duration = o.duration && model.durations.includes(o.duration) ? o.duration : model.durations[0];
   const body = await postJson(
     conn,
@@ -105,6 +122,8 @@ export async function submitVideo(conn: Connection, model: MediaModel, prompt: s
       resolution: pick(model.resolutions, o.resolution),
       aspect_ratio: pick(model.aspectRatios, o.aspectRatio),
       generate_audio: model.audio ? (o.audio ?? false) : undefined,
+      // The photo is the clip's first frame.
+      ...(photos[0] ? { frame_images: [{ type: "image_url", image_url: { url: dataUrl(photos[0]) }, frame_type: "first_frame" }] } : {}),
     },
     60_000,
   );

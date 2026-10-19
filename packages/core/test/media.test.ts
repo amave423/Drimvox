@@ -32,6 +32,19 @@ const imageModels = {
       supported_parameters: { aspect_ratio: { type: "enum", values: ["1:1", "16:9"] }, resolution: { type: "enum", values: ["1K", "2K"] } },
     },
     { id: "img/dear", name: "Dear Image", architecture: { output_modalities: ["image"] }, supported_parameters: {} },
+    // Takes up to four photos as references; an editing model needs at least one.
+    {
+      id: "img/ref",
+      name: "Reference Image",
+      architecture: { input_modalities: ["text", "image"], output_modalities: ["image"] },
+      supported_parameters: { input_references: { type: "range", min: 0, max: 4 } },
+    },
+    {
+      id: "img/edit",
+      name: "Edit Image",
+      architecture: { input_modalities: ["text", "image"], output_modalities: ["image"] },
+      supported_parameters: { input_references: { type: "range", min: 1, max: 8 } },
+    },
     { id: "img/unpriced", name: "Unpriced", architecture: { output_modalities: ["image"] }, supported_parameters: {} },
   ],
 };
@@ -39,6 +52,8 @@ const endpoints: Record<string, unknown[]> = {
   "img/cheap": [{ billable: "output_image", unit: "image", cost_usd: 0.04 }],
   "img/dear": [{ billable: "output_image", unit: "image", cost_usd: 0.25 }],
   "img/unpriced": [],
+  "img/ref": [{ billable: "output_image", unit: "image", cost_usd: 0.04 }],
+  "img/edit": [{ billable: "output_image", unit: "image", cost_usd: 0.04 }],
 };
 const videoModels = {
   data: [
@@ -50,6 +65,7 @@ const videoModels = {
       supported_durations: [4, 8],
       generate_audio: true,
       pricing_skus: { duration_seconds_without_audio: "0.03", duration_seconds_with_audio: "0.05" },
+      supported_frame_images: ["first_frame", "last_frame"],
     },
   ],
 };
@@ -114,7 +130,7 @@ describe("catalog", () => {
   it("lists image and video models with what they support", async () => {
     const id = await start();
     const images = await (await env.call("GET", `/api/providers/${id}/media-models?kind=image`)).json();
-    expect(images.map((m: any) => m.id)).toEqual(["img/cheap", "img/dear", "img/unpriced"]);
+    expect(images.map((m: any) => m.id)).toEqual(["img/cheap", "img/dear", "img/edit", "img/ref", "img/unpriced"]);
     expect(images[0]).toMatchObject({ kind: "image", aspectRatios: ["1:1", "16:9"], resolutions: ["1K", "2K"], pricing: null });
 
     const videos = await (await env.call("GET", `/api/providers/${id}/media-models?kind=video`)).json();
@@ -290,5 +306,62 @@ describe("pictures made by an agent", () => {
     for (let i = 0; i < 100 && !fake!.requests.some((r) => r.path === "/v1/chat/completions"); i++) await new Promise((r) => setTimeout(r, 20));
     const tools = fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body.tools.map((t: any) => t.function.name);
     expect(tools).not.toContain("generate_image");
+  });
+});
+
+// Photos for pictures and clips (docs/specs/media.md): only to a model that says it takes them; the others say they do not.
+describe("photos", () => {
+  const upload = async (chatId: string) =>
+    (await (await env.call("POST", `/api/chats/${chatId}/attachments`, { name: "face.png", type: "image/png", data: PNG.toString("base64") })).json()).id as string;
+
+  it("tells which models take photos, and how many", async () => {
+    const id = await start();
+    const images = await (await env.call("GET", `/api/providers/${id}/media-models?kind=image`)).json();
+    const of = (m: string) => images.find((x: any) => x.id === m).photos;
+    expect(of("img/cheap")).toBeNull();
+    expect(of("img/ref")).toEqual({ use: "reference", min: 0, max: 4 });
+    expect(of("img/edit")).toEqual({ use: "reference", min: 1, max: 8 });
+    const videos = await (await env.call("GET", `/api/providers/${id}/media-models?kind=video`)).json();
+    expect(videos[0].photos).toEqual({ use: "first_frame", min: 0, max: 1 });
+  });
+
+  it("sends a photo to a model that takes references", async () => {
+    const id = await start();
+    const chatId = await chatWith(id, "img/ref", "image");
+    const photo = await upload(chatId);
+    const res = await send(chatId, { content: "Этот человек в космосе", attachments: [photo] });
+    expect(res.status).toBe(200);
+    await readEvents(res);
+    const sent = fake!.requests.find((r) => r.path === "/v1/images")!.body;
+    expect(sent.input_references).toEqual([{ type: "image_url", image_url: { url: `data:image/png;base64,${PNG.toString("base64")}` } }]);
+  });
+
+  it("does not send a photo to a model that cannot take one, and says so", async () => {
+    const id = await start();
+    const chatId = await chatWith(id, "img/cheap", "image");
+    const photo = await upload(chatId);
+    const res = await send(chatId, { content: "Этот человек в космосе", attachments: [photo] });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("no_photo_input");
+    expect(fake!.requests.some((r) => r.path === "/v1/images")).toBe(false);
+  });
+
+  it("asks for a photo where the model needs one", async () => {
+    const id = await start();
+    const chatId = await chatWith(id, "img/edit", "image");
+    const res = await send(chatId, { content: "Сделай фон синим" });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.code).toBe("photo_required");
+  });
+
+  it("starts a clip from a photo", async () => {
+    const id = await start();
+    const chatId = await chatWith(id, "vid/lite", "video");
+    const photo = await upload(chatId);
+    const res = await send(chatId, { content: "Он улыбается", attachments: [photo], confirm: true });
+    expect(res.status).toBe(200);
+    await readEvents(res);
+    const sent = fake!.requests.find((r) => r.path === "/v1/videos")!.body;
+    expect(sent.frame_images).toEqual([{ type: "image_url", image_url: { url: `data:image/png;base64,${PNG.toString("base64")}` }, frame_type: "first_frame" }]);
   });
 });

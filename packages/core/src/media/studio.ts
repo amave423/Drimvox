@@ -2,7 +2,7 @@ import type { MediaModel, MediaOptions, ProviderError, StreamEvent } from "@arte
 import type { ChatRepo, PendingJob } from "../chats/repo";
 import { describeError } from "../providers/errors";
 import type { Connection, ProviderRepo } from "../providers/repo";
-import { downloadVideo, generateImage, pollVideo, submitVideo } from "./generate";
+import { downloadVideo, generateImage, pollVideo, submitVideo, type Photo } from "./generate";
 import { filmLocally } from "./local";
 import type { MediaRepo } from "./repo";
 
@@ -41,10 +41,15 @@ export class Studio {
     model: MediaModel;
     prompt: string;
     options: MediaOptions;
+    /** Photos for a model that takes them (checked before), with their uploads to show under the request. */
+    photos?: { ids: string[]; files: Photo[] };
     emit(event: StreamEvent): Promise<void>;
   }): Promise<void> {
     const { chats } = this.o;
-    const userMessage = chats.addMessage({ chatId: i.chatId, role: "user", content: i.prompt, status: "done" });
+    const added = chats.addMessage({ chatId: i.chatId, role: "user", content: i.prompt, status: "done" });
+    if (i.photos?.ids.length) chats.attachments.attach(i.chatId, added.id, i.photos.ids);
+    const userMessage = chats.message(added.id)!;
+    const photos = i.photos?.files ?? [];
     chats.nameIfUntitled(i.chatId, i.prompt);
     const answer = chats.addMessage({ chatId: i.chatId, role: "assistant", content: "", status: "streaming", providerId: i.conn.id, model: i.model.id });
     await i.emit({ type: "start", userMessage, assistantMessageId: answer.id });
@@ -53,7 +58,9 @@ export class Studio {
       if (i.model.kind === "image" || i.conn.preset === "sdcpp") {
         // A picture, or a clip made on this computer: either is ready when the call returns.
         const picture =
-          i.model.kind === "image" ? await generateImage(i.conn, i.model, i.prompt, i.options, this.stop.signal) : await filmLocally(i.model.id, i.prompt, i.options, this.stop.signal);
+          i.model.kind === "image"
+            ? await generateImage(i.conn, i.model, i.prompt, i.options, this.stop.signal, photos)
+            : await filmLocally(i.model.id, i.prompt, i.options, this.stop.signal, photos[0]);
         this.o.media.add({
           kind: i.model.kind,
           ...picture,
@@ -65,7 +72,7 @@ export class Studio {
         });
         this.finish(answer.id, picture.costUsd);
       } else {
-        const jobId = await submitVideo(i.conn, i.model, i.prompt, i.options);
+        const jobId = await submitVideo(i.conn, i.model, i.prompt, i.options, photos);
         chats.setMediaJob(answer.id, jobId);
         this.watch(i.conn, {
           messageId: answer.id,

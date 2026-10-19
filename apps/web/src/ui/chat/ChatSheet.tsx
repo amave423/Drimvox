@@ -22,6 +22,7 @@ import { Composer } from "./Composer";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
 import { AssistantMessage, UserMessage, type ChatApproval } from "./Messages";
 import { ModelPicker } from "./ModelPicker";
+import { isPhoto, photoProblem } from "./photos";
 import { loadModels } from "../../lib/models";
 import { readWebMode, WebSwitch } from "./WebSwitch";
 import { FolderSwitch } from "./FolderSwitch";
@@ -259,7 +260,10 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     if (!choice) return;
     setFailed(false);
     setAttachError(null);
-    if (noVision && files.some((f) => /^image\//.test(f.file.type))) return setAttachError("no_vision");
+    if (kind === "text" && noVision && files.some(isPhoto)) return setAttachError("no_vision");
+    // Pictures and clips: photos only to a model that takes them, as many as it takes (the core refuses the same).
+    const problem = kind === "text" ? null : photoProblem(mediaModel, files);
+    if (problem) return setAttachError(problem);
     let id = chat?.id;
     const target = { providerId: choice.providerId, model: choice.model, kind };
     try {
@@ -280,7 +284,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
       return;
     }
     rememberLastModel(choice);
-    const attached = files.length && kind === "text" ? await upload(id) : [];
+    const attached = files.length ? await upload(id) : [];
     if (attached === null) return setAttachError("failed");
     setFiles([]);
 
@@ -292,7 +296,9 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         `/api/chats/${id}/messages`,
         token,
         // The price was on the button the user pressed; that is the confirmation.
-        kind === "text" ? { content, web: webMode, thinking: thinks ? thinking : "auto", attachments: attached.map((a) => a.id) } : { content, options, confirm },
+        kind === "text"
+          ? { content, web: webMode, thinking: thinks ? thinking : "auto", attachments: attached.map((a) => a.id) }
+          : { content, options, confirm, attachments: attached.map((a) => a.id) },
         (e) => {
           // The core named the chat after the question: the list shows the name before the answer is done.
           if (e.type === "start") void reloadChats();
@@ -409,8 +415,14 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
           streaming={!!draft}
           onSend={(text) => void send(text)}
           onStop={() => abort.current?.abort()}
-          attach={kind === "text" ? { files, onAdd: (added) => void addFiles(added), onRemove: (key) => setFiles(files.filter((f) => f.key !== key)) } : undefined}
-          picker={<ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />}
+          attach={{
+            files,
+            onAdd: (added) => void addFiles(added),
+            onRemove: (key) => setFiles(files.filter((f) => f.key !== key)),
+            photos: kind !== "text",
+            blocked: kind !== "text" && mediaModel && !mediaModel.photos ? t("photos.cannot") : undefined,
+          }}
+          picker={<ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} photos={kind !== "text" && files.some(isPhoto)} />}
           options={
             mediaModel
               ? mediaRows

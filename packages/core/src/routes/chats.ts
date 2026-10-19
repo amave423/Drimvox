@@ -150,6 +150,12 @@ export function chatRoutes(
         const model = await mediaModel(conn, chat.kind, chat.model);
         if (!model) return c.json({ error: { code: "invalid", detail: "Unknown media model" } }, 400);
         // Video, dear pictures and unknown prices start only after the user saw the price.
+        // Photos only to a model that takes them; one that needs one gets none without it (docs/specs/media.md).
+        const photos = files.filter((f) => f!.kind === "image");
+        if (files.length > photos.length) return c.json({ error: { code: "no_photo_input" as const } }, 409);
+        if (photos.length > 0 && !model.photos) return c.json({ error: { code: "no_photo_input" as const } }, 409);
+        if (model.photos && photos.length < model.photos.min) return c.json({ error: { code: "photo_required" as const } }, 409);
+        if (model.photos && photos.length > model.photos.max) return c.json({ error: { code: "too_many_photos" as const, max: model.photos.max } }, 409);
         const estimateUsd = estimateCost(model, options);
         if (needsConfirmation(model, estimateUsd) && !confirm) return c.json({ error: { code: "confirm", estimateUsd } }, 409);
         return streamSSE(c, async (stream) => {
@@ -159,6 +165,7 @@ export function chatRoutes(
             model,
             prompt: content,
             options,
+            photos: { ids: photos.map((f) => f!.id), files: photos.map((f) => ({ mime: f!.type, data: chats.attachments.file(f!.id) })) },
             emit: async (event) => {
               await stream.writeSSE({ data: JSON.stringify(event) });
             },

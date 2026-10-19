@@ -316,10 +316,10 @@ export class LocalImages {
   }
 
   /** Films one clip with a downloaded video model. */
-  async film(id: string, prompt: string, aspectRatio: string | undefined, seconds: number | undefined, signal?: AbortSignal): Promise<{ bytes: Buffer; mime: string }> {
+  async film(id: string, prompt: string, aspectRatio: string | undefined, seconds: number | undefined, signal?: AbortSignal, firstFrame?: string): Promise<{ bytes: Buffer; mime: string }> {
     const [width, height] = VIDEO_SIZES[aspectRatio ?? "16:9"] ?? VIDEO_SIZES["16:9"]!;
     const duration = seconds && VIDEO_DURATIONS.includes(seconds) ? seconds : VIDEO_DURATIONS[0]!;
-    return this.withServer(id, (server, stop) => server.film(prompt, width, height, duration, stop), signal);
+    return this.withServer(id, (server, stop) => server.film(prompt, width, height, duration, stop, firstFrame), signal);
   }
 
   /** The engine running with this model's files, for one job; it is not stopped for being idle while the job goes. */

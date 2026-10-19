@@ -1,4 +1,4 @@
-import { estimateCost, type ChatKind, type MediaModel, type ModelInfo, type ProviderView } from "@artel/shared";
+import { estimateCost, type ChatKind, type MediaModel, type ModelInfo, type PhotoInput, type ProviderView } from "@artel/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
 import { formatPrice, formatTokens, formatUsd } from "../../lib/format";
@@ -18,11 +18,13 @@ interface PickerProps {
   kinds?: ChatKind[];
   /** Only models that see pictures (for checking screenshots). */
   vision?: boolean;
+  /** A photo waits to be sent: picture and video models that take one come first, the others cannot be chosen. */
+  photos?: boolean;
 }
 
-type Listed = { id: string; name: string; info: ModelInfo | null };
+type Listed = { id: string; name: string; info: ModelInfo | null; photoInput?: PhotoInput | null };
 
-export function ModelPicker({ value, onChange, placement = "below", kinds: wanted = ["text"], vision = false }: PickerProps) {
+export function ModelPicker({ value, onChange, placement = "below", kinds: wanted = ["text"], vision = false, photos = false }: PickerProps) {
   const { api, t, providers } = useApp();
   const [open, setOpen] = useState(false);
   const [providerId, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
@@ -85,11 +87,13 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
         ? result && "models" in result
           ? result.models.map((m) => ({ id: m.id, name: m.name, info: m }))
           : []
-        : (media ?? []).map((m) => ({ id: m.id, name: m.name, info: null }));
+        : (media ?? []).map((m) => ({ id: m.id, name: m.name, info: null, photoInput: m.photos }));
     const q = query.trim().toLowerCase();
     const found = q ? all.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : all;
     // Models that do not answer are left out: a chat with them only fails. Checking screenshots needs eyes.
-    const list = found.filter((m) => m.info?.available !== "gone" && (!vision || m.info?.vision === true));
+    const usable = found.filter((m) => m.info?.available !== "gone" && (!vision || m.info?.vision === true));
+    // With a photo attached, the models that take one first (docs/specs/media.md).
+    const list = photos && kind !== "text" ? [...usable.filter((m) => m.photoInput), ...usable.filter((m) => !m.photoInput)] : usable;
     // Free models first, under their own heading, inside the kind they belong to; the limit cuts the paid ones, so a
     // free model far down the alphabet is not lost (seen live on OpenRouter's 470 models).
     // Google's free tier counts too: a key without billing may use those models free up to a daily limit.
@@ -99,7 +103,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
       groups: split && { free: split.free, paid: split.paid.slice(0, Math.max(0, LIMIT - split.free.length)) },
       hidden: found.length - list.length,
     };
-  }, [result, media, kind, query, vision]);
+  }, [result, media, kind, query, vision, photos]);
   const loading = kind === "text" ? result === null : media === null;
 
   const providerName = providers.find((p) => p.id === value?.providerId)?.name;
@@ -109,9 +113,14 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const label =
     value && providerName ? `${providerName} / ${isCliDefault(value.providerId, value.model) ? t("model.cliDefault") : value.model}` : t("model.pick");
 
+  // A model that takes no photo cannot be chosen while one waits: it would be refused anyway.
+  const refused = (m: Listed) => photos && kind !== "text" && !m.photoInput;
   const item = (m: Listed) => (
-    <li key={m.id} role="option" aria-selected={value?.providerId === providerId && value?.model === m.id}>
+    <li key={m.id} role="option" aria-selected={value?.providerId === providerId && value?.model === m.id} aria-disabled={refused(m) || undefined}>
       <button
+        type="button"
+        disabled={refused(m)}
+        className={refused(m) ? "is-unsupported" : undefined}
         onClick={() => {
           if (!providerId) return;
           onChange({ providerId, model: m.id, kind });
@@ -127,6 +136,8 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
           <span className="picker-name">
             {m.name}
             {m.name !== m.id && <small className="mono">{m.id}</small>}
+            {kind !== "text" && m.photoInput && <PhotoMark photos={m.photoInput} />}
+            {refused(m) && <small className="picker-why">{t("photos.cannot")}</small>}
           </span>
         )}
         {m.info && <ModelFacts model={m.info} billing={providers.find((p) => p.id === providerId)?.billing} />}
@@ -137,7 +148,8 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
 
   return (
     <div className="picker" ref={root}>
-      <button className="picker-button" aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen(!open)}>
+      {/* Not a submit button: the picker sits in the message form (seen: with a file attached, opening it sent the message). */}
+      <button type="button" className="picker-button" aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen(!open)}>
         <span className={`picker-label${value && providerName ? " mono" : ""}`}>{label}</span>
         <span aria-hidden>▾</span>
       </button>
@@ -146,7 +158,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
           {providers.length > 1 && (
             <div className="picker-providers">
               {providers.map((p) => (
-                <button key={p.id} className={p.id === providerId ? "is-on" : undefined} onClick={() => setProviderId(p.id)}>
+                <button type="button" key={p.id} className={p.id === providerId ? "is-on" : undefined} onClick={() => setProviderId(p.id)}>
                   {p.name}
                 </button>
               ))}
@@ -155,7 +167,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
           {kinds.length > 1 && (
             <div className="picker-kinds" role="tablist">
               {kinds.map((k) => (
-                <button key={k} role="tab" aria-selected={k === kind} className={k === kind ? "is-on" : undefined} onClick={() => setKind(k)}>
+                <button type="button" key={k} role="tab" aria-selected={k === kind} className={k === kind ? "is-on" : undefined} onClick={() => setKind(k)}>
                   {t(`model.kind.${k}`)}
                 </button>
               ))}
@@ -229,4 +241,14 @@ function MediaPrice({ providerId, kind, model }: { providerId: string; kind: Exc
   }, [api, providerId, kind, model]);
   if (cost === undefined) return <span className="picker-facts mono muted">…</span>;
   return <span className="picker-facts mono">{cost === null ? "—" : t(kind === "image" ? "model.perImage" : "model.perClip", { cost: formatUsd(cost) })}</span>;
+}
+
+/** What a model does with a photo, on its line in the list: a reference, a first frame; "needs a photo" where it must. */
+function PhotoMark({ photos }: { photos: PhotoInput }) {
+  const { t } = useApp();
+  return (
+    <span className="picker-photo" title={t(photos.use === "reference" ? "photos.referenceHint" : "photos.firstFrameHint")}>
+      {t(photos.min > 0 ? "photos.required" : photos.use === "reference" ? "photos.reference" : "photos.firstFrame")}
+    </span>
+  );
 }

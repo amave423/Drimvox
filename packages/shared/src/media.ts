@@ -10,6 +10,16 @@ export interface PriceLine {
   variant: string | null;
 }
 
+/**
+ * What a model does with a photo (docs/specs/media.md): takes it as a reference for a picture (a face, a style, a photo
+ * to edit), or starts a clip from it. `min` above 0: it does not work without one.
+ */
+export interface PhotoInput {
+  use: "reference" | "first_frame";
+  min: number;
+  max: number;
+}
+
 export interface MediaModel {
   id: string;
   name: string;
@@ -22,6 +32,8 @@ export interface MediaModel {
   audio: boolean;
   /** Draws through chat completions (Gemini-style models that answer with text and pictures). */
   viaChat: boolean;
+  /** Null: the model takes no photos, and none is sent to it. */
+  photos: PhotoInput | null;
   /** Null until loaded: image prices live on a separate endpoint per model. */
   pricing: { lines: PriceLine[]; skus: Record<string, string> } | null;
 }

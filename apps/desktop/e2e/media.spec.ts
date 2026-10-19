@@ -37,11 +37,15 @@ async function launch(): Promise<Page> {
             data: [
               { id: "img/cheap", name: "Cheap Painter", supported_parameters: { aspect_ratio: { type: "enum", values: ["1:1", "16:9"] } } },
               { id: "img/dear", name: "Dear Painter", supported_parameters: {} },
+              { id: "img/ref", name: "Portrait Painter", supported_parameters: { input_references: { type: "range", min: 0, max: 4 } } },
             ],
           },
         };
       }
       if (method === "GET" && path === "/v1/images/models/img/cheap/endpoints") {
+        return { json: { endpoints: [{ pricing: [{ billable: "output_image", unit: "image", cost_usd: 0.04 }] }] } };
+      }
+      if (method === "GET" && path === "/v1/images/models/img/ref/endpoints") {
         return { json: { endpoints: [{ pricing: [{ billable: "output_image", unit: "image", cost_usd: 0.04 }] }] } };
       }
       if (method === "GET" && path === "/v1/images/models/img/dear/endpoints") {
@@ -103,4 +107,37 @@ test("a picture in a chat: the price before, the picture after, the gallery", as
   await expect(page.getByRole("img", { name: "Лиса в шарфе" })).toBeVisible();
   await page.getByRole("button", { name: "Открыть чат" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Лиса в шарфе" })).toBeVisible();
+});
+
+// docs/specs/media.md: a photo only for a model that takes one; the others say they do not.
+test("a photo goes only to a model that takes one, and the others say so", async () => {
+  const page = await launch();
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("tab", { name: "Картинки" }).click();
+  // The list marks what takes a photo.
+  await expect(page.getByRole("option", { name: /Portrait Painter.*по фото/ })).toBeVisible();
+  await page.getByRole("option", { name: /Cheap Painter/ }).click();
+  // A model without photos: the paperclip is there, off, with why.
+  await expect(page.getByRole("button", { name: /Эта модель не работает по фото/ })).toBeDisabled();
+
+  await page.getByRole("button", { name: /img\/cheap/ }).click();
+  await page.getByRole("tab", { name: "Картинки" }).click();
+  await page.getByRole("option", { name: /Portrait Painter/ }).click();
+  await page.locator("input[type=file]").setInputFiles({ name: "face.png", mimeType: "image/png", buffer: PNG });
+  // With a photo waiting, a model that takes none cannot be picked.
+  await page.getByRole("button", { name: /img\/ref/ }).click();
+  await expect(page.getByRole("option", { name: /Cheap Painter/ }).getByRole("button")).toBeDisabled();
+  await expect(page.getByRole("option", { name: /Cheap Painter/ })).toContainText("не работает по фото");
+  await page.keyboard.press("Escape");
+  // Opening the list sent nothing (seen: the picker's button sent the form with the photo in it).
+  await expect(page.locator(".msg-user")).toHaveCount(0);
+
+  await page.getByLabel(/Опиши картинку/).fill("Этот человек в космосе");
+  await page.getByRole("button", { name: /^Создать/ }).click();
+  // The photo is uploaded first, then the picture drawn: under the whole suite this takes longer.
+  await expect(page.getByRole("img", { name: "Этот человек в космосе" })).toBeVisible({ timeout: 15_000 });
+  const sent = fake!.requests.find((r) => r.path === "/v1/images")!.body;
+  expect(sent.model).toBe("img/ref");
+  expect(sent.input_references[0].image_url.url).toMatch(/^data:image\/png;base64,/);
 });

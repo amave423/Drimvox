@@ -105,10 +105,14 @@ function normalize(kind: MediaKind, raw: Raw, factor: number | null): MediaModel
         lines = [{ billable: "output_image", unit: String(units.image_output ?? "image"), costUsd: round(pricing.image_output * factor), variant: null }];
       }
     }
+    // The catalog says how many reference photos a model takes; one that names none takes none.
+    const refs = (raw.supported_parameters as Record<string, { min?: unknown; max?: unknown }> | undefined)?.input_references;
+    const maxRefs = typeof refs?.max === "number" ? refs.max : 0;
     return {
       id,
       name,
       kind,
+      photos: maxRefs > 0 ? { use: "reference", min: typeof refs?.min === "number" ? refs.min : 0, max: maxRefs } : null,
       aspectRatios: strings(raw.supported_aspect_ratios).length ? strings(raw.supported_aspect_ratios) : strings(params.aspect_ratio?.values),
       resolutions: strings(params.resolution?.values),
       durations: [],
@@ -129,6 +133,8 @@ function normalize(kind: MediaKind, raw: Raw, factor: number | null): MediaModel
     id,
     name,
     kind,
+    // A clip that can start from a photo says so in its frames.
+    photos: strings(raw.supported_frame_images).includes("first_frame") ? { use: "first_frame", min: 0, max: 1 } : null,
     aspectRatios: strings(raw.supported_aspect_ratios),
     resolutions: strings(raw.supported_resolutions),
     durations: Array.isArray(raw.supported_durations)
