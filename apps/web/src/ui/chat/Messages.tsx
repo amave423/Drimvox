@@ -28,6 +28,8 @@ interface AssistantProps {
   message?: MessageView;
   /** Shown while a picture or a clip is being made. */
   making?: ChatKind;
+  /** The chat's kind: what an answer still being written is waiting for (a text, a picture, a clip). */
+  kind?: ChatKind;
   /** What the model searched and read while answering. */
   activity?: string[];
   /** What a saved answer did, folded under one line. */
@@ -58,6 +60,7 @@ export function AssistantMessage({
   streaming,
   message,
   making,
+  kind,
   activity = [],
   done = [],
   approvals = [],
@@ -82,6 +85,7 @@ export function AssistantMessage({
     meta = message.costUsd === null ? t("msg.metaMediaNoCost") : t("msg.metaMedia", { cost: formatUsd(message.costUsd) });
   }
   // A clip keeps its answer open for minutes after the request itself has ended.
+  // Still being written, seen from a window that did not send it (or after coming back to the chat).
   const rendering = message?.status === "streaming";
 
   return (
@@ -133,7 +137,9 @@ export function AssistantMessage({
       {(making || rendering) && (
         <p className="msg-making">
           <span className="action-spinner" aria-hidden />
-          {rendering ? t("media.videoWaiting") : t(making === "video" ? "media.videoSending" : "media.drawing")}
+          {rendering
+            ? t(kind === "video" ? "media.videoWaiting" : kind === "image" ? "media.drawing" : "chat.answering")
+            : t(making === "video" ? "media.videoSending" : "media.drawing")}
         </p>
       )}
       {streaming && !making && !content && !reasoning && <span className="caret" aria-hidden />}

@@ -159,6 +159,21 @@ test("an answer appears letter by letter, not in pieces", async () => {
   await expect.poll(async () => (await answer.innerText()).length, { timeout: 1500 }).toBeGreaterThanOrEqual(piece.trim().length);
 });
 
+// Seen: back in a chat whose answer was still being written, the page said a clip was being made and nothing stopped it.
+test("an answer still being written shows how far it got after coming back, and stops from there", async () => {
+  const page = await launch(Array.from({ length: 80 }, (_, i) => ({ text: `часть ${i} ` })), 150);
+  await ask(page, "Пиши долго");
+  await expect(page.locator(".msg-assistant .md")).toContainText("часть 0", { timeout: 10_000 });
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await page.locator(".side-chat", { hasText: "Пиши долго" }).click();
+  await expect(page.getByText("Модель отвечает…")).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/Ролик/)).toHaveCount(0);
+  await expect(page.locator(".msg-assistant .md")).toContainText("часть 0");
+  await page.getByRole("button", { name: "Стоп" }).click();
+  await expect(page.getByText("Модель отвечает…")).toHaveCount(0, { timeout: 5_000 });
+  await expect(page.getByRole("button", { name: "Отправить" })).toBeVisible();
+});
+
 test("a code block has a copy button", async () => {
   const page = await launch([{ text: "Вот код:\n\n```js\nconst total = 1;\n```" }]);
   await ask(page, "Покажи код");

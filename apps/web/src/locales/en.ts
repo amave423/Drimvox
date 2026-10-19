@@ -155,6 +155,7 @@ export const en: Record<keyof typeof ru, string> = {
   "chat.openKeys": "Open Keys and models",
   "chat.placeholder": "Message (Shift+Enter for a new line)",
   "chat.send": "Send",
+  "chat.answering": "The model is answering…",
   "chat.stop": "Stop",
   "chat.reasoning": "Model reasoning",
   "chat.stopped": "Stopped",

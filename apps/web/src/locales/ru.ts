@@ -154,6 +154,7 @@ export const ru = {
   "chat.openKeys": "Открыть «Ключи и модели»",
   "chat.placeholder": "Сообщение (Shift+Enter — новая строка)",
   "chat.send": "Отправить",
+  "chat.answering": "Модель отвечает…",
   "chat.stop": "Стоп",
   "chat.reasoning": "Размышления модели",
   "chat.stopped": "Остановлено",

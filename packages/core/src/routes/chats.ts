@@ -46,6 +46,8 @@ const describeInput = (input: unknown) => {
 };
 
 const notFound = { error: { code: "not_found" } } as const;
+/** How often an answer being written is saved: what a window coming back to the chat sees. */
+const PROGRESS_MS = 1000;
 
 /** What a project task's conversation needs beyond a chat with a folder (docs/specs/project-work.md). */
 export interface WorkDeps {
@@ -73,6 +75,8 @@ export function chatRoutes(
   cliDir: string,
   work: WorkDeps,
 ) {
+  /** Answers being written, by chat: "Stop" reaches them from any window (seen: back in the chat, nothing could stop it). */
+  const running = new Map<string, AbortController>();
   return new Hono()
     .get("/", (c) => c.json(chats.list()))
     .post("/", zValidator("json", chatCreateSchema), (c) => {
@@ -131,6 +135,12 @@ export function chatRoutes(
       chats.setCheckpoint(message.id, null);
       return c.json({ ok: true as const }, 200);
     })
+    .post("/:id/stop", (c) => {
+      const answer = running.get(c.req.param("id"));
+      if (!answer) return c.json(notFound, 404);
+      answer.abort();
+      return c.json({ ok: true as const }, 200);
+    })
     .post("/:id/approvals/:approvalId", zValidator("json", approvalDecisionSchema), (c) => {
       const { allow, always } = c.req.valid("json");
       const known = approvals.answer(c.req.param("id"), c.req.param("approvalId"), allow, always);
@@ -181,10 +191,22 @@ export function chatRoutes(
       return streamSSE(c, async (stream) => {
         const controller = new AbortController();
         stream.onAbort(() => controller.abort());
-        // What the model does is kept with its answer, not only streamed (seen: it vanished once the chat reloaded).
+        running.set(chat.id, controller);
+        // What the model does is kept with its answer, not only streamed (seen: it vanished once the chat reloaded), and
+        // saved as it goes, so a window that comes back to the chat sees how far the answer got.
         const activity: { name: string; input: string }[] = [];
+        const partial = { id: "", content: "", reasoning: "", savedAt: 0 };
+        const saveProgress = (force = false) => {
+          if (!partial.id || (!force && Date.now() - partial.savedAt < PROGRESS_MS)) return;
+          partial.savedAt = Date.now();
+          chats.saveProgress(partial.id, { content: partial.content, reasoning: partial.reasoning || null, activity });
+        };
         const emit = async (event: StreamEvent) => {
+          if (event.type === "start") partial.id = event.assistantMessageId;
+          if (event.type === "text") partial.content += event.text;
+          if (event.type === "reasoning") partial.reasoning += event.text;
           if (event.type === "tool") activity.push({ name: event.name, input: event.input });
+          saveProgress(event.type === "tool");
           if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
         };
         // MCP tools of the user's servers; each new tool asks in the answer first.
@@ -248,6 +270,8 @@ export function chatRoutes(
           cliDir,
           emit,
           activity: () => activity,
+        }).finally(() => {
+          if (running.get(chat.id) === controller) running.delete(chat.id);
         });
         if (task) {
           // A dev server the agent started does not hold the port once it answered (seen: "npm run dev" failed after).

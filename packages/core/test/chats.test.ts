@@ -226,6 +226,36 @@ describe("sending a message", () => {
     expect(events.at(-1).message).toMatchObject({ status: "error", content: "Начал", error: { code: "timeout" } });
   });
 
+  // Seen: leaving a chat while the model answered, then coming back, showed an empty answer that said a clip was
+  // being made, and nothing could stop it. The answer is saved as it goes and stops from anywhere.
+  it("keeps what an answer has so far, and stops it from another window", async () => {
+    const { chat } = await setup({ chunks: Array.from({ length: 40 }, (_, i) => ({ text: `кусок ${i} ` })), delayMs: 100 });
+    const answer = readEvents(await send(chat.id, "Напиши длинно"));
+    const partial = async () => (await (await env.call("GET", `/api/chats/${chat.id}`)).json()).messages.at(-1);
+    let seen: any;
+    for (let i = 0; i < 60; i++) {
+      seen = await partial();
+      if (seen?.status === "streaming" && seen.content.length > 0) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(seen).toMatchObject({ role: "assistant", status: "streaming" });
+    expect(seen.content).toMatch(/^кусок 0 /);
+    expect((await env.call("POST", `/api/chats/${chat.id}/stop`)).status).toBe(200);
+    await answer;
+    expect(await partial()).toMatchObject({ status: "stopped" });
+    // Nothing to stop any more.
+    expect((await env.call("POST", `/api/chats/${chat.id}/stop`)).status).toBe(404);
+  });
+
+  it("marks an answer left mid-way by a closed app as stopped, not writing forever", async () => {
+    const { chat } = await setup();
+    await readEvents(await send(chat.id, "Привет"));
+    env.db.sql.prepare("update messages set status = 'streaming' where role = 'assistant'").run();
+    env.reopen();
+    const last = (await (await env.call("GET", `/api/chats/${chat.id}`)).json()).messages.at(-1);
+    expect(last.status).toBe("stopped");
+  });
+
   it("answers 404 for an unknown chat", async () => {
     await setup();
     expect((await send("nope", "hi")).status).toBe(404);

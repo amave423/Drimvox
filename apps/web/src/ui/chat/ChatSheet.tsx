@@ -118,11 +118,13 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     };
   }, [api, choice?.providerId, choice?.model, kind]);
 
-  // A clip renders for minutes on the provider's side; the chat checks on it until it arrives.
+  // A clip renders for minutes on the provider's side, and an answer goes on after the window that asked left the chat:
+  // the chat checks on them until they are done.
   const pending = !draft && !!chat?.messages.some((m) => m.status === "streaming");
   useEffect(() => {
     if (!pending || !chat) return;
-    const timer = setTimeout(() => void load(chat.id).then(() => void reloadToday()), PENDING_POLL_MS);
+    // A text answer is followed closely; a clip renders for minutes.
+    const timer = setTimeout(() => void load(chat.id).then(() => void reloadToday()), chat.kind === "text" ? 1000 : PENDING_POLL_MS);
     return () => clearTimeout(timer);
   }, [pending, chat]);
 
@@ -162,14 +164,17 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     };
     // Opening the thinking or the actions of an answer is reading: the view stays there instead of running to the
     // bottom with the next words (seen: the opened thinking slid away while the answer was written).
-    const onToggle = (e: Event) => {
-      if (e.target instanceof HTMLDetailsElement && e.target.open && e.target.closest(".messages")) following.current = false;
+    // The click itself, not the "toggle" that follows it: a scroll already on its way would still run in between.
+    const onOpen = (e: Event) => {
+      if (e.target instanceof Element && e.target.closest(".messages summary")) following.current = false;
     };
     d.addEventListener("scroll", onScroll, { passive: true });
-    d.addEventListener("toggle", onToggle, true);
+    d.addEventListener("pointerdown", onOpen, true);
+    d.addEventListener("keydown", onOpen, true);
     return () => {
       d.removeEventListener("scroll", onScroll);
-      d.removeEventListener("toggle", onToggle, true);
+      d.removeEventListener("pointerdown", onOpen, true);
+      d.removeEventListener("keydown", onOpen, true);
     };
   }, [chat?.id]);
   useEffect(() => {
@@ -186,7 +191,8 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     const watch = new ResizeObserver(() => {
       if (!following.current) return;
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(toBottom);
+      // Asked again when the frame comes: the reader may have opened something in between.
+      frame = requestAnimationFrame(() => following.current && toBottom());
     });
     watch.observe(el);
     return () => {
@@ -376,7 +382,10 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
                 reasoning={m.reasoning}
                 model={m.model}
                 message={m}
-                done={m.activity.map((a) => activityLine(t, a.name, a.input))}
+                kind={chat?.kind}
+                // Still being written: its actions so far, as they come; once done, folded.
+                activity={m.status === "streaming" ? m.activity.map((a) => activityLine(t, a.name, a.input)) : undefined}
+                done={m.status === "streaming" ? [] : m.activity.map((a) => activityLine(t, a.name, a.input))}
                 onUndo={draft || chat?.itemId ? undefined : () => void undo(m.id)}
               />
             ),
@@ -412,9 +421,10 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         )}
         <Composer
           disabled={!choice || (kind !== "text" && !mediaModel)}
-          streaming={!!draft}
+          streaming={!!draft || pending}
           onSend={(text) => void send(text)}
-          onStop={() => abort.current?.abort()}
+          // An answer from this window stops with its request; one seen after coming back, through the core.
+          onStop={() => (draft ? abort.current?.abort() : chat && void api.chats[":id"].stop.$post({ param: { id: chat.id } }).then(() => load(chat.id)))}
           attach={{
             files,
             onAdd: (added) => void addFiles(added),

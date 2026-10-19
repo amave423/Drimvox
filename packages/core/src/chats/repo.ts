@@ -226,6 +226,13 @@ export class ChatRepo {
     }));
   }
 
+  /** What an answer being written has so far; it stays "streaming". */
+  saveProgress(id: string, p: { content: string; reasoning: string | null; activity: { name: string; input: string }[] }): void {
+    this.db.sql
+      .prepare("update messages set content = ?, reasoning = ?, activity = ? where id = ? and status = 'streaming'")
+      .run(p.content, p.reasoning, p.activity.length ? JSON.stringify(p.activity) : null, id);
+  }
+
   finishAnswer(id: string, a: FinishedAnswer): MessageView {
     this.db.sql
       .prepare(
