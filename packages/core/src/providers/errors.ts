@@ -1,5 +1,5 @@
 import type { ProviderError, ProviderErrorCode } from "@artel/shared";
-import { APICallError } from "ai";
+import { APICallError, RetryError } from "ai";
 
 /** A provider problem already translated into a code the UI understands. */
 export class ProviderFailure extends Error {
@@ -21,6 +21,9 @@ export function codeForStatus(status: number): ProviderErrorCode {
 
 /** The provider does not serve the user's country (Google's Gemini API from Russia, say); a proxy helps. */
 export const REGION = /location is not supported|unsupported_country|country, region,? or territory|not (currently )?available in your (location|country|region)/i;
+
+/** Google: the model has no free tier for this key ("Quota exceeded … free_tier … limit: 0"); billing helps, waiting does not. */
+const NO_FREE_TIER = /free_tier[\s\S]*limit: 0\b|limit: 0\b[\s\S]*free_tier/i;
 
 /** Pulls the human-readable message out of an OpenAI-style error body. */
 export function detailFromBody(body: unknown): string | undefined {
@@ -47,10 +50,12 @@ export function detailFromBody(body: unknown): string | undefined {
 
 export function describeError(err: unknown): ProviderError {
   if (err instanceof ProviderFailure) return err.info;
+  // After its retries the SDK wraps the provider's last answer: that answer is what to explain.
+  if (RetryError.isInstance(err) && err.lastError) return describeError(err.lastError);
   if (APICallError.isInstance(err)) {
     if (err.statusCode === undefined) return withDetail("unreachable", causeText(err.cause) ?? err.message);
     const detail = detailFromBody(err.data ?? err.responseBody) ?? err.message;
-    return withDetail(REGION.test(detail) ? "region" : codeForStatus(err.statusCode), detail);
+    return withDetail(REGION.test(detail) ? "region" : NO_FREE_TIER.test(detail) ? "no_free_tier" : codeForStatus(err.statusCode), detail);
   }
   if (err instanceof TypeError) return withDetail("unreachable", causeText(err.cause) ?? err.message);
   if (err instanceof Error && err.name === "TimeoutError") return withDetail("unreachable", "timeout");

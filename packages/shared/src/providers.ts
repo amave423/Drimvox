@@ -294,6 +294,8 @@ export const providerErrorCodes = [
   "cli_retired",
   /** The subscription's limit for this model is used up. */
   "cli_limit",
+  /** The model has no free tier for this key (Google): it needs billing. */
+  "no_free_tier",
   /** The provider should go through a proxy, but none is set in the settings. */
   "no_proxy",
   /** The answer stopped where the model ran out of room (its context or its answer limit). */

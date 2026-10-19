@@ -175,3 +175,6 @@
 .work-files ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; font-size: 12.5px; max-height: 160px; overflow-y: auto; }
 .work-files .is-added { color: var(--ok); }
 .work-files .is-deleted { color: var(--pencil); }
+.msg-done { font-size: 13px; margin: 2px 0 6px; }
+.msg-done summary { cursor: pointer; }
+.msg-done .msg-activity { margin-top: 4px; }

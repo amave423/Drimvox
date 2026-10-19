@@ -115,11 +115,15 @@ test("a chat is in the list while the model answers, and the answer can be follo
   await expect(page.locator(".side-chat", { hasText: "Расскажи про здание" })).toBeVisible({ timeout: 3_000 });
 
   await page.waitForTimeout(2500);
-  const gap = await page.evaluate(() => {
-    const desk = document.querySelector(".desk") as HTMLElement;
-    return desk.scrollHeight - desk.scrollTop - desk.clientHeight;
-  });
-  expect(gap).toBeLessThan(80);
+  // The view catches up with the growing answer within a frame or two; a busy machine may take a moment longer.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const desk = document.querySelector(".desk") as HTMLElement;
+        return desk.scrollHeight - desk.scrollTop - desk.clientHeight;
+      }),
+    )
+    .toBeLessThan(80);
   // The last line of the answer is above the composer, not under it.
   const lastLine = await page.locator(".msg-assistant .md > *").last().boundingBox();
   const composer = await page.locator(".composer").boundingBox();

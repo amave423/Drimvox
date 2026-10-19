@@ -50,6 +50,13 @@ describe("a chat with a folder", () => {
     expect(readFileSync(join(folder, "app.js"), "utf8")).toBe("export const a = 2;\n");
     const answer = events.at(-1).message;
     expect(answer).toMatchObject({ content: "Создал hello.txt и поменял a.", canUndo: true });
+    // What the model did stays with the answer: a chat opened later still shows it.
+    const saved = (await (await env.call("GET", `/api/chats/${chat.id}`)).json()).messages.at(-1);
+    expect(saved.activity).toEqual([
+      { name: "read_file", input: "app.js" },
+      { name: "write_file", input: "hello.txt" },
+      { name: "edit_file", input: "app.js" },
+    ]);
     // The model works in the user's files; git stays the user's.
     expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
 

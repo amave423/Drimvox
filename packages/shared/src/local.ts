@@ -86,6 +86,8 @@ export interface HfRepo {
   updatedAt: string | null;
   /** The author says it answers without refusals (by its name or tags); Artel cannot check it. */
   unfiltered: boolean;
+  /** Why it cannot be downloaded here: not a model that talks (a picture or video generator), or too big; null when it can. */
+  unsupported: "not_chat" | "too_big" | null;
 }
 
 /** One quantization of a repository: the file Ollama pulls as hf.co/<repo>:<quant>. */

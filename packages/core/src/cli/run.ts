@@ -113,7 +113,13 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
 }
 
 /** A CLI that is not logged in says so in its own words; everything else is the provider's error. */
-export function classify(message: string): ProviderError {
+export function classify(raw: string): ProviderError {
+  // The CLI's own warnings about the terminal come first and say nothing about the failure (seen: Gemini CLI on Windows 10).
+  const message = raw
+    .split(/\r?\n/)
+    .filter((l) => !/^(Warning: |Ripgrep is not available)/.test(l.trim()))
+    .join("\n")
+    .trim() || raw;
   const detail = message.length > 300 ? `${message.slice(0, 300)}…` : message;
   // Google stopped serving Gemini CLI to personal accounts on June 18, 2026; signing in again does not help.
   if (/no longer supported for Gemini Code Assist|migrate to Antigravity/i.test(message)) return { code: "cli_retired", detail };

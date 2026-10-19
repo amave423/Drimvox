@@ -50,6 +50,8 @@ export interface ReplyInput {
   vision?: boolean;
   /** The chat's folder: the model works in it, and it is snapshotted before the answer so the answer can be undone. */
   folder?: string | null;
+  /** The tools called so far in this answer, kept with it when it is saved. */
+  activity?: () => { name: string; input: string }[];
   /** A project task's conversation (docs/specs/project-work.md): its rules and how many steps an answer may take. */
   work?: { system: string; steps: number };
   emit(event: StreamEvent): Promise<void>;
@@ -203,6 +205,7 @@ export async function reply(i: ReplyInput): Promise<void> {
           ? costOf(price, i.conn.preset, usageOf(usage))
           : null,
     error: stopped ? null : (error ?? (cutOff ? { code: "cut_off" } : null)),
+    activity: i.activity?.(),
   });
   if (!stopped) await i.emit({ type: "done", message });
 }

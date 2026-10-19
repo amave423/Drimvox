@@ -216,6 +216,8 @@ const migrations: string[] = [
    alter table chats add column item_id text;
    alter table backlog add column chat_id text;
    alter table backlog add column checkpoint text;`,
+  // What the model did while answering (its tool calls), kept with the answer.
+  `alter table messages add column activity text;`,
 ];
 
 export interface Database {

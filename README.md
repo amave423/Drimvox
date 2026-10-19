@@ -62,7 +62,7 @@ Artel не продаёт доступ к нейросетям: он работ�
 | RouterAI | Сотни моделей, оплата в рублях, картинки и видео | [routerai.ru](https://routerai.ru/) |
 | OpenRouter | Сотни моделей разных компаний, есть бесплатные | [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) |
 | DeepSeek | Сильные и дешёвые модели для кода | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
-| Google Gemini | Бесплатный дневной лимит на Flash, Flash-Lite, Gemma и 2.5 Pro | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| Google Gemini | Бесплатный дневной лимит на Flash, Flash-Lite и Gemma | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
 | NVIDIA NIM | Бесплатные кредиты на открытые модели | [build.nvidia.com](https://build.nvidia.com/settings/api-keys) |
 | Anthropic, OpenAI, xAI | Claude, GPT, Grok напрямую | [Anthropic](https://console.anthropic.com/settings/keys), [OpenAI](https://platform.openai.com/api-keys), [xAI](https://console.x.ai/) |
 | OpenAI-совместимый | Любой сервис с API в формате OpenAI | адрес и ключ — у сервиса |

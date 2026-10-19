@@ -367,15 +367,20 @@ describe("catalog", () => {
       return undefined;
     });
 
-  it("searches GGUF models on Hugging Face and hides repositories too big for this computer", async () => {
+  // Seen: "qwen-image" found two models where the site has dozens: the rest were left out without a word. They are
+  // listed now, each with why it cannot be downloaded here, after the ones that can.
+  it("searches GGUF models on Hugging Face and says why some cannot be downloaded here", async () => {
     setup({ hf: await hf() });
     const found = await (await env.call("GET", "/api/local/search?q=gemma")).json();
     expect(found).toEqual([
-      { repo: "unsloth/gemma-4-12b-it-GGUF", downloads: 1654466, likes: 903, params: 11_907_350_576, updatedAt: "2026-07-17T12:52:56.000Z", unfiltered: false },
-      { repo: "someone/gemma-tiny-GGUF", downloads: 5, likes: 0, params: null, updatedAt: null, unfiltered: false },
+      { repo: "unsloth/gemma-4-12b-it-GGUF", downloads: 1654466, likes: 903, params: 11_907_350_576, updatedAt: "2026-07-17T12:52:56.000Z", unfiltered: false, unsupported: null },
+      { repo: "someone/gemma-tiny-GGUF", downloads: 5, likes: 0, params: null, updatedAt: null, unfiltered: false, unsupported: null },
       // What the author says, by the name or the tags: Artel cannot check it.
-      { repo: "mlabonne/gemma-4-12b-abliterated-GGUF", downloads: 900, likes: 40, params: 11_907_350_576, updatedAt: null, unfiltered: true },
-      { repo: "someone/gemma-chat-GGUF", downloads: 30, likes: 2, params: null, updatedAt: null, unfiltered: true },
+      { repo: "mlabonne/gemma-4-12b-abliterated-GGUF", downloads: 900, likes: 40, params: 11_907_350_576, updatedAt: null, unfiltered: true, unsupported: null },
+      { repo: "someone/gemma-chat-GGUF", downloads: 30, likes: 2, params: null, updatedAt: null, unfiltered: true, unsupported: null },
+      { repo: "someone/gemma-4-120b-GGUF", downloads: 10, likes: 1, params: 120_000_000_000, updatedAt: null, unfiltered: false, unsupported: "too_big" },
+      { repo: "abenzerps/qwen-image-2.1-uncensoried-quantized", downloads: 400, likes: 9, params: null, updatedAt: null, unfiltered: true, unsupported: "not_chat" },
+      { repo: "city96/gemma-flux-dev-gguf", downloads: 300, likes: 9, params: null, updatedAt: null, unfiltered: false, unsupported: "not_chat" },
     ]);
   });
 

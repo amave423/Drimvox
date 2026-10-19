@@ -123,9 +123,12 @@ export class LocalCatalog {
     });
   }
 
-  /** GGUF repositories on Hugging Face, most downloaded first; those too big for this computer are left out. */
+  /**
+   * GGUF repositories on Hugging Face, most downloaded first: those that run here, then those that cannot, each with
+   * why (seen: "qwen-image" found two where the site lists dozens, the rest left out without a word).
+   */
   async search(query: string, hw: LocalHardware): Promise<HfRepo[]> {
-    const q = new URLSearchParams({ search: query, filter: "gguf", sort: "downloads", limit: "30" });
+    const q = new URLSearchParams({ search: query, filter: "gguf", sort: "downloads", limit: "50" });
     for (const field of ["gguf", "downloads", "likes", "lastModified", "tags", "pipeline_tag"]) q.append("expand[]", field);
     let res: Response;
     try {
@@ -143,14 +146,14 @@ export class LocalCatalog {
       tags?: string[];
       pipeline_tag?: string;
     }[];
-    return items.flatMap((m) => {
-      // Ollama runs language models: a picture, video or speech generator fails to load (seen: qwen-image).
-      if (!talks(m.id, m.pipeline_tag)) return [];
+    const repos = items.map((m): HfRepo => {
       const params = typeof m.gguf?.total === "number" ? m.gguf.total : null;
-      if (params && !fitOf(params * SMALLEST_BYTES_PER_PARAM, hw)) return [];
+      // Ollama runs language models: a picture, video or speech generator fails to load (seen: qwen-image).
+      const unsupported = !talks(m.id, m.pipeline_tag) ? "not_chat" : params && !fitOf(params * SMALLEST_BYTES_PER_PARAM, hw) ? "too_big" : null;
       const unfiltered = UNFILTERED.test(m.id) || (m.tags ?? []).some((t) => UNFILTERED.test(t));
-      return [{ repo: m.id, downloads: m.downloads ?? 0, likes: m.likes ?? 0, params, updatedAt: m.lastModified ?? null, unfiltered }];
+      return { repo: m.id, downloads: m.downloads ?? 0, likes: m.likes ?? 0, params, updatedAt: m.lastModified ?? null, unfiltered, unsupported };
     });
+    return [...repos.filter((r) => !r.unsupported), ...repos.filter((r) => r.unsupported === "too_big"), ...repos.filter((r) => r.unsupported === "not_chat")];
   }
 
   /** A repository's variants that run here, with the advice. */

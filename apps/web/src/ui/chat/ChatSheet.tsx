@@ -34,6 +34,14 @@ import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFil
 /** Tools of a chat with a folder, each with its own line in the answer. */
 const FOLDER_TOOLS = ["list_files", "read_file", "search", "write_file", "edit_file", "run_command", "update_notes"];
 
+/** One line of what the model did: "Reads app.js", "Searches the web: …". */
+function activityLine(t: ReturnType<typeof useApp>["t"], name: string, input: string): string {
+  if (name === "web_search") return t("web.searching", { query: input });
+  if (name === "open_page") return t("web.reading", { url: input });
+  if (FOLDER_TOOLS.includes(name)) return t(`folder.tool.${name}` as MessageKey, { input });
+  return t("chat.mcpCall", { name });
+}
+
 interface Draft {
   user: string;
   text: string;
@@ -270,14 +278,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
           if (e.type === "text") setDraft((d) => d && { ...d, text: d.text + e.text });
           if (e.type === "reasoning") setDraft((d) => d && { ...d, reasoning: d.reasoning + e.text });
           if (e.type === "tool") {
-            const line =
-              e.name === "web_search"
-                ? t("web.searching", { query: e.input })
-                : e.name === "open_page"
-                  ? t("web.reading", { url: e.input })
-                  : FOLDER_TOOLS.includes(e.name)
-                    ? t(`folder.tool.${e.name}` as MessageKey, { input: e.input })
-                    : t("chat.mcpCall", { name: e.name });
+            const line = activityLine(t, e.name, e.input);
             setDraft((d) => d && { ...d, activity: [...d.activity, line] });
           }
           if (e.type === "approval") {
@@ -342,7 +343,15 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
             m.role === "user" ? (
               <UserMessage key={m.id} content={m.content} files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null} />
             ) : (
-              <AssistantMessage key={m.id} content={m.content} reasoning={m.reasoning} model={m.model} message={m} onUndo={draft || chat?.itemId ? undefined : () => void undo(m.id)} />
+              <AssistantMessage
+                key={m.id}
+                content={m.content}
+                reasoning={m.reasoning}
+                model={m.model}
+                message={m}
+                done={m.activity.map((a) => activityLine(t, a.name, a.input))}
+                onUndo={draft || chat?.itemId ? undefined : () => void undo(m.id)}
+              />
             ),
           )}
           {draft && (

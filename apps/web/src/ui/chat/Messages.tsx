@@ -29,6 +29,8 @@ interface AssistantProps {
   making?: ChatKind;
   /** What the model searched and read while answering. */
   activity?: string[];
+  /** What a saved answer did, folded under one line. */
+  done?: string[];
   /** MCP tools asking for permission in this answer. */
   approvals?: ChatApproval[];
   onApprove?(id: string, allow: boolean, always: boolean): void;
@@ -56,6 +58,7 @@ export function AssistantMessage({
   message,
   making,
   activity = [],
+  done = [],
   approvals = [],
   onApprove,
   onUndo,
@@ -87,6 +90,16 @@ export function AssistantMessage({
             <li key={i}>{line}</li>
           ))}
         </ul>
+      )}
+      {done.length > 0 && (
+        <details className="msg-done muted">
+          <summary>{t("msg.actions", { n: done.length })}</summary>
+          <ul className="msg-activity">
+            {done.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        </details>
       )}
       {approvals.map((a) => (
         <div key={a.id} className="approval" role={a.state === "open" ? "alert" : undefined}>

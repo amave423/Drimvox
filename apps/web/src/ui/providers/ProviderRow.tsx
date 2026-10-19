@@ -91,7 +91,15 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
         {check && "error" in check && <ErrorNote error={check.error} />}
       </div>
       {provider.billing === "subscription" && check && "models" in check && <SubscriptionLimits providerId={provider.id} />}
-      {provider.preset === "google" && <p className="muted provider-note">{t("providers.googleFree")}</p>}
+      {provider.preset === "google" && (
+        <p className="muted provider-note">
+          {t("providers.googleFree")}{" "}
+          {/* Google does not tell the API what is left of the free limit; its own page does. */}
+          <a href="https://aistudio.google.com/usage" target="_blank" rel="noreferrer">
+            {t("providers.googleUsage")}
+          </a>
+        </p>
+      )}
 
       <div className="provider-proxy">
         <Toggle checked={provider.useProxy} disabled={!proxySet && !provider.useProxy} onChange={(on) => void switchProxy(on)}>

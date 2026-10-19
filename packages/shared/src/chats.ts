@@ -100,6 +100,8 @@ export interface MessageView {
   canUndo: boolean;
   /** Files the user attached to this message. */
   attachments: AttachmentView[];
+  /** The tools the model called while answering, in order: the name and what it was called on. */
+  activity: { name: string; input: string }[];
   createdAt: number;
 }
 

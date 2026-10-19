@@ -34,6 +34,7 @@ interface MessageRow {
   created_at: number;
   media_job: string | null;
   checkpoint: string | null;
+  activity: string | null;
 }
 
 /** A clip the provider is still rendering for an answer. */
@@ -71,6 +72,8 @@ export interface FinishedAnswer {
   outputTokens: number | null;
   costUsd: number | null;
   error: ProviderError | null;
+  /** The tools called while answering. */
+  activity?: { name: string; input: string }[];
 }
 
 export class ChatRepo {
@@ -180,6 +183,7 @@ export class ChatRepo {
       created_at: Date.now(),
       media_job: null,
       checkpoint: null,
+      activity: null,
     };
     const cols = Object.keys(row);
     this.db.sql
@@ -226,7 +230,8 @@ export class ChatRepo {
     this.db.sql
       .prepare(
         `update messages set content = :content, reasoning = :reasoning, status = :status, input_tokens = :input_tokens,
-         output_tokens = :output_tokens, cost_usd = :cost_usd, error_code = :error_code, error_detail = :error_detail
+         output_tokens = :output_tokens, cost_usd = :cost_usd, error_code = :error_code, error_detail = :error_detail,
+         activity = :activity
          where id = :id`,
       )
       .run({
@@ -239,6 +244,7 @@ export class ChatRepo {
         cost_usd: a.costUsd,
         error_code: a.error?.code ?? null,
         error_detail: a.error?.detail ?? null,
+        activity: a.activity?.length ? JSON.stringify(a.activity) : null,
       });
     return this.message(id)!;
   }
@@ -324,6 +330,7 @@ function toMessage(r: MessageRow, media: MessageView["media"], attachments: Mess
     media,
     canUndo: !!r.checkpoint,
     attachments: attachments.map(({ id, name, type, size, kind }) => ({ id, name, type, size, kind })),
+    activity: r.activity ? (JSON.parse(r.activity) as MessageView["activity"]) : [],
     createdAt: r.created_at,
   };
 }

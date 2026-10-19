@@ -111,8 +111,14 @@ function HfSearch({ status, actions, pullOf }: Props & { pullOf(model: string): 
       {repos && repos.length === 0 && <p className="muted">{t("local.hfNone")}</p>}
       <ul className="local-list">
         {repos?.map((r) => (
-          <li key={r.repo} className="local-repo">
-            <button type="button" className="local-repo-head" aria-expanded={open === r.repo} onClick={() => setOpen(open === r.repo ? null : r.repo)}>
+          <li key={r.repo} className={`local-repo${r.unsupported ? " is-unsupported" : ""}`}>
+            <button
+              type="button"
+              className="local-repo-head"
+              disabled={!!r.unsupported}
+              aria-expanded={r.unsupported ? undefined : open === r.repo}
+              onClick={() => setOpen(open === r.repo ? null : r.repo)}
+            >
               <span className="mono">{r.repo}</span>
               {r.unfiltered && (
                 <span className="local-unfiltered" title={t("local.unfilteredHint")}>
@@ -123,6 +129,7 @@ function HfSearch({ status, actions, pullOf }: Props & { pullOf(model: string): 
                 {r.params ? `${t("local.params", { n: compact.format(r.params) })} · ` : ""}
                 {t("local.downloads", { n: compact.format(r.downloads) })}
               </span>
+              {r.unsupported && <span className="local-why">{t(`local.unsupported.${r.unsupported}`)}</span>}
             </button>
             {open === r.repo && <Variants repo={r.repo} status={status} actions={actions} pullOf={pullOf} />}
           </li>

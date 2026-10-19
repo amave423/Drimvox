@@ -37,12 +37,17 @@ export function availabilityFromError(code: ProviderErrorCode): Availability | n
   return null;
 }
 
-/** Providers whose free models Artel can ask: OpenAI-style APIs on the internet. */
+/**
+ * Providers whose free models Artel can ask: OpenAI-style APIs on the internet, and Google, whose free tier costs a key
+ * without billing nothing (seen: it lists models it no longer serves to new users).
+ */
 export function canCheck(conn: Connection): boolean {
+  if (conn.preset === "google") return true;
   return !isCli(conn.preset) && !NATIVE.includes(conn.preset) && presets[conn.preset].billing !== "free";
 }
 
-const isFreeModel = (m: ModelInfo) => m.priceIn === 0 && m.priceOut === 0;
+/** A model worth asking: free, or on Google's free tier. */
+const isFreeModel = (conn: Connection, m: ModelInfo) => (conn.preset === "google" ? m.freeTier === true : m.priceIn === 0 && m.priceOut === 0);
 
 /** The models with what Artel knows of them. */
 export function withAvailability(conn: Connection, models: ModelInfo[]): ModelInfo[] {
@@ -54,7 +59,7 @@ export function withAvailability(conn: Connection, models: ModelInfo[]): ModelIn
 
 /** Asks every free model it does not remember; a few at a time. */
 export async function checkFree(conn: Connection, models: ModelInfo[]): Promise<Record<string, Availability>> {
-  const free = canCheck(conn) ? models.filter(isFreeModel) : [];
+  const free = canCheck(conn) ? models.filter((m) => isFreeModel(conn, m)) : [];
   const states: Record<string, Availability> = {};
   const queue = free.filter((m) => {
     const known = availabilityOf(conn, m.id);
@@ -77,12 +82,20 @@ export async function checkFree(conn: Connection, models: ModelInfo[]): Promise<
 /** One word from the model. Null when the answer says nothing about the model (a wrong key, a blocked country). */
 async function probe(conn: Connection, model: string): Promise<Availability | null> {
   try {
-    const res = await conn.fetch(`${conn.baseUrl}/chat/completions`, {
+    const res =
+      conn.preset === "google"
+        ? await conn.fetch(`${conn.baseUrl}/models/${model}:generateContent`, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-goog-api-key": conn.apiKey ?? "" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: "Hi" }] }], generationConfig: { maxOutputTokens: 1 } }),
+            signal: AbortSignal.timeout(PROBE_MS),
+          })
+        : await conn.fetch(`${conn.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(conn.apiKey ? { authorization: `Bearer ${conn.apiKey}` } : {}) },
-      body: JSON.stringify({ model, messages: [{ role: "user", content: "Hi" }], max_tokens: 16, stream: false }),
-      signal: AbortSignal.timeout(PROBE_MS),
-    });
+            body: JSON.stringify({ model, messages: [{ role: "user", content: "Hi" }], max_tokens: 16, stream: false }),
+            signal: AbortSignal.timeout(PROBE_MS),
+          });
     const body = await res.text().catch(() => "");
     if (res.ok) return "ok";
     if (res.status === 401 || res.status === 402 || /location is not supported|unsupported_country/i.test(body)) return null;

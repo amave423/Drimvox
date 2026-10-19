@@ -170,7 +170,10 @@ export function chatRoutes(
       return streamSSE(c, async (stream) => {
         const controller = new AbortController();
         stream.onAbort(() => controller.abort());
+        // What the model does is kept with its answer, not only streamed (seen: it vanished once the chat reloaded).
+        const activity: { name: string; input: string }[] = [];
         const emit = async (event: StreamEvent) => {
+          if (event.type === "tool") activity.push({ name: event.name, input: event.input });
           if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
         };
         // MCP tools of the user's servers; each new tool asks in the answer first.
@@ -233,6 +236,7 @@ export function chatRoutes(
           vision,
           cliDir,
           emit,
+          activity: () => activity,
         });
         if (task) {
           // A dev server the agent started does not hold the port once it answered (seen: "npm run dev" failed after).

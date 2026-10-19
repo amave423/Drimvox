@@ -50,7 +50,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
       void loadModels(api, providerId).then(async (r) => {
         if (!live) return;
         setResult(r);
-        const unknown = "models" in r && r.models.some((m) => isFree(m) && !m.available);
+        const unknown = "models" in r && r.models.some((m) => (isFree(m) || m.freeTier === true) && !m.available);
         if (!unknown) return;
         setChecking(true);
         const checked = await checkFree(api, providerId, r);

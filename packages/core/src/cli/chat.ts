@@ -68,6 +68,7 @@ export async function cliReply(i: ReplyInput, dir: string, formatHint: string): 
     // Paid for by the user's subscription to the CLI.
     costUsd: result.done ? 0 : null,
     error: stopped ? null : result.error,
+    activity: i.activity?.(),
   });
   if (!stopped) await i.emit({ type: "done", message });
 }
