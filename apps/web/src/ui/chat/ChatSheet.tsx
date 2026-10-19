@@ -159,18 +159,40 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     const onScroll = () => {
       following.current = d.scrollHeight - d.scrollTop - d.clientHeight < 80;
     };
+    // Opening the thinking or the actions of an answer is reading: the view stays there instead of running to the
+    // bottom with the next words (seen: the opened thinking slid away while the answer was written).
+    const onToggle = (e: Event) => {
+      if (e.target instanceof HTMLDetailsElement && e.target.open && e.target.closest(".messages")) following.current = false;
+    };
     d.addEventListener("scroll", onScroll, { passive: true });
-    return () => d.removeEventListener("scroll", onScroll);
+    d.addEventListener("toggle", onToggle, true);
+    return () => {
+      d.removeEventListener("scroll", onScroll);
+      d.removeEventListener("toggle", onToggle, true);
+    };
   }, [chat?.id]);
   useEffect(() => {
     following.current = true;
     toBottom();
   }, [chat?.messages.length, draft?.user]);
+  // The answer grows letter by letter, after its pieces have come too (lib/smooth.ts): the view follows the messages'
+  // own height, not the pieces (seen: the last line stayed under the composer).
+  const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!following.current) return;
-    const frame = requestAnimationFrame(toBottom);
-    return () => cancelAnimationFrame(frame);
-  }, [draft?.text, draft?.reasoning, draft?.activity.length]);
+    const el = list.current;
+    if (!el) return;
+    let frame = 0;
+    const watch = new ResizeObserver(() => {
+      if (!following.current) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(toBottom);
+    });
+    watch.observe(el);
+    return () => {
+      watch.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [chat?.id]);
 
   const estimateUsd = mediaModel ? estimateCost(mediaModel, options) : null;
   const preset = providers.find((p) => p.id === choice?.providerId)?.preset;
@@ -337,7 +359,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
 
         {empty && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
 
-        <div className="messages">
+        <div className="messages" ref={list}>
           {messages.map((m) =>
             m.role === "user" ? (
               <UserMessage key={m.id} content={m.content} files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null} />

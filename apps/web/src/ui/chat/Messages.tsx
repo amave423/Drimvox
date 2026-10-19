@@ -2,6 +2,7 @@ import type { MessageKey } from "../../i18n";
 import type { ChatKind, MessageView } from "@artel/shared";
 import type { ReactNode } from "react";
 import { useApp } from "../../context";
+import { useSmoothText } from "../../lib/smooth";
 import { formatTokens, formatUsd } from "../../lib/format";
 import { ErrorNote } from "../ErrorNote";
 import { Markdown } from "./Markdown";
@@ -65,6 +66,8 @@ export function AssistantMessage({
 }: AssistantProps) {
   const { t, settings } = useApp();
   const tokens = (n: number) => formatTokens(n, settings.locale);
+  // Letter by letter while it is written, at the speed it comes.
+  const shown = useSmoothText(content, !!streaming);
 
   let meta: string | null = null;
   if (message && message.inputTokens !== null && message.outputTokens !== null) {
@@ -125,7 +128,7 @@ export function AssistantMessage({
         </div>
       ))}
       {reasoning && <Reasoning text={reasoning} thinking={!!streaming && !content} />}
-      {content && <Markdown text={content} streaming={streaming} />}
+      {shown && <Markdown text={shown} streaming={streaming} />}
       {message?.media.map((item) => <MediaView key={item.id} item={item} />)}
       {(making || rendering) && (
         <p className="msg-making">

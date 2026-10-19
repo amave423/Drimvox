@@ -112,6 +112,17 @@ describe("downloading", () => {
     expect([...hf.files.values()]).toEqual([1, 1, 1]);
   });
 
+  // The installer's box, or the sheet's button: the engine alone, before any model.
+  it("downloads the engine alone, with its progress", async () => {
+    const hf = await startFakeHub(servers);
+    setup(hf.url);
+    expect((await env.call("POST", "/api/local/images/engine")).status).toBe(202);
+    const s = await until(status, (v) => v.engine === true);
+    expect(s.enginePull).toMatchObject({ done: true, error: null });
+    expect(hf.files.size).toBe(0);
+    expect(model(s, "z-image-turbo").installed).toBe(false);
+  });
+
   it("deletes a model's files, and the engine stays", async () => {
     const hf = await startFakeHub(servers);
     setup(hf.url);

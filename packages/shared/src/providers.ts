@@ -288,6 +288,7 @@ export type Availability = "ok" | "busy" | "gone";
 
 /** Problems talking to a provider, as codes the UI translates. */
 export const providerErrorCodes = [
+  "account_region",
   "bad_key",
   "no_funds",
   "rate_limited",

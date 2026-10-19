@@ -77,6 +77,12 @@ describe("a task of the list as a conversation in the project's folder", () => {
       { path: "calculator.html", status: "added" },
       { path: "index.html", status: "modified" },
     ]);
+    // Line by line too, as the review of the old pipeline showed it (seen: only file names in a task's review).
+    expect(changes.diff.map((f: any) => [f.path, f.status, f.added, f.removed])).toEqual([
+      ["calculator.html", "added", expect.any(Number), 0],
+      ["index.html", "modified", expect.any(Number), expect.any(Number)],
+    ]);
+    expect(changes.diff[1].hunks[0].lines.some((l: any) => l.kind === "add")).toBe(true);
 
     // The agent was told the project's rules, in the system text of every step.
     const system = JSON.stringify(fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body.messages[0]);

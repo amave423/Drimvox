@@ -1,6 +1,6 @@
 // docs/specs/local-images.md: a picture model downloaded on the local models' sheet draws in a picture chat, for free.
 import { _electron as electron, expect, test, type ElectronApplication } from "@playwright/test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,4 +65,50 @@ test("downloads a picture model on the local models' sheet and draws with it in 
   const picture = page.getByRole("img", { name: "Лиса в шарфе" });
   await expect(picture).toBeVisible({ timeout: 20_000 });
   expect(await picture.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+});
+
+// The installer's "picture engine" box: a note beside the program, and the first start downloads the engine and opens
+// the local models. The note is used once.
+test("downloads the picture engine on the first start when the installer was asked to", async () => {
+  hub = await startFakeHub();
+  const local = {
+    command: null,
+    hardware: { ramBytes: 32 * GB, gpu: { name: "RTX 3080", vramBytes: 10 * GB }, unified: false },
+    registryUrl: "http://127.0.0.1:9",
+    hfUrl: hub.url,
+    hfFiles: [hub.url],
+    images: { engineUrl: `${hub.url}/engine.zip`, serverCommand: [process.execPath, FAKE_SD] },
+  };
+  const program = mkdtempSync(join(tmpdir(), "artel-e2e-program-"));
+  writeFileSync(join(program, "install-images"), "");
+  app = await electron.launch({
+    args: [mainJs],
+    env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PROGRAM_DIR: program, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) },
+  });
+  const page = await app.firstWindow();
+  await expect(page.getByRole("heading", { name: "Локальные модели" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Картинки на этом компьютере" })).toBeVisible();
+  // Downloaded: the sheet no longer offers the engine on its own.
+  await expect(page.getByRole("button", { name: /Скачать движок/ })).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator(".local-card", { hasText: "Z-Image Turbo" })).toBeVisible();
+  expect(existsSync(join(program, "install-images"))).toBe(false);
+});
+
+test("offers the picture engine on its own on the sheet", async () => {
+  hub = await startFakeHub();
+  const local = {
+    command: null,
+    hardware: { ramBytes: 32 * GB, gpu: { name: "RTX 3080", vramBytes: 10 * GB }, unified: false },
+    registryUrl: "http://127.0.0.1:9",
+    hfUrl: hub.url,
+    hfFiles: [hub.url],
+    images: { engineUrl: `${hub.url}/engine.zip`, serverCommand: [process.execPath, FAKE_SD] },
+  };
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) } });
+  const page = await app.firstWindow();
+  await expect(page.getByText("Ядро запущено")).toBeVisible();
+  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await page.getByRole("button", { name: "Скачать движок · 30 МБ" }).click();
+  await expect(page.getByRole("button", { name: /Скачать движок/ })).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByText(/Движок stable-diffusion\.cpp/)).toHaveCount(0);
 });

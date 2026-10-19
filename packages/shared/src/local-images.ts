@@ -22,6 +22,8 @@ export interface LocalImagesStatus {
   supported: boolean;
   /** The engine is downloaded. */
   engine: boolean;
+  /** The engine downloaded alone (the installer's box, the sheet's button), while it goes or after it failed. */
+  enginePull: LocalPull | null;
   /** Its server runs now, and with which model. */
   running: LocalImageModelId | null;
   /** The provider the picture chats use; null until a model is downloaded. */

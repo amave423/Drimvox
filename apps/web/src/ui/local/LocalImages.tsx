@@ -4,6 +4,7 @@ import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { PullControl, type PullActions } from "./PullControl";
+import { useSize } from "./size";
 
 /**
  * Pictures on this computer (docs/specs/local-images.md): the short list sized for it, downloads with the engine,
@@ -11,6 +12,7 @@ import { PullControl, type PullActions } from "./PullControl";
  */
 export function LocalImagesSection() {
   const { api, t, reloadProviders } = useApp();
+  const size = useSize();
   const [status, setStatus] = useState<LocalImagesStatus | null>(null);
   const known = useRef<string | null>(null);
 
@@ -30,7 +32,7 @@ export function LocalImagesSection() {
   useEffect(() => {
     void load();
   }, [load]);
-  const downloading = !!status?.models.some((m) => m.pull && !m.pull.done && !m.pull.paused);
+  const downloading = !!status?.models.some((m) => m.pull && !m.pull.done && !m.pull.paused) || !!(status?.enginePull && !status.enginePull.done);
   useEffect(() => {
     if (!downloading) return;
     const timer = setInterval(() => void load(), 1000);
@@ -49,7 +51,14 @@ export function LocalImagesSection() {
     remove: act((model) => api.local.images.models[":id"].$delete({ param: { id: model } })),
   };
 
+  const getEngine = () =>
+    void api.local.images.engine
+      .$post()
+      .catch(() => null)
+      .then(() => load());
+
   if (!status) return null;
+  const ep = status.enginePull;
   return (
     <>
       <h2 className="sheet-h">{t("localImages.title")}</h2>
@@ -58,7 +67,19 @@ export function LocalImagesSection() {
       {status.supported && status.models.length === 0 && <p className="muted">{t("localImages.none")}</p>}
       {status.supported && status.models.length > 0 && (
         <>
-          {!status.engine && <p className="muted">{t("localImages.engineFirst")}</p>}
+          {!status.engine && (
+            <div className="local-row local-engine">
+              <span>{t("localImages.engine")}</span>
+              {ep && !ep.done ? (
+                <span className="muted">{ep.total > 0 ? t("localImages.engineLoading", { done: size(ep.completed), total: size(ep.total) }) : t("localImages.engineStarting")}</span>
+              ) : (
+                <button type="button" className="btn" onClick={getEngine}>
+                  {t("localImages.engineGet")}
+                </button>
+              )}
+              {ep?.error && <span className="is-pencil-text local-why">{t("localImages.engineFailed")}</span>}
+            </div>
+          )}
           <ul className="local-cards local-image-cards">
             {status.models.map((m) => (
               <li key={m.id} className="local-card">

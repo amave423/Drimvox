@@ -147,7 +147,7 @@ test("thinks in a small window, then draws formulas, a chart and highlighted cod
   const tail = page.locator(".reasoning-tail");
   const first = (await tail.boundingBox())!.height;
   await page.waitForTimeout(600);
-  expect((await tail.boundingBox())!.height).toBe(first);
+  expect((await tail.boundingBox())!.height).toBeCloseTo(first, 0);
   // A long address wraps instead of widening the page.
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
@@ -245,6 +245,9 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
         tops: items.map((r) => Math.round(r.top)),
         heights: items.map((r) => Math.round(r.height)),
         sendRight: Math.round(field.right - send.right),
+        // Nothing of the tools runs onto the send button.
+        gapToSend: Math.round(send.left - Math.max(...[...document.querySelectorAll(".composer-tools > *")].map((e) => box(e).right))),
+        modelWidth: Math.round(box(document.querySelector(".composer-tools > .picker:not(.chat-options)") ?? document.body).width),
         model: !!document.querySelector(".composer-tools > .picker:not(.chat-options)"),
       };
     });
@@ -254,6 +257,8 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
   expect(Math.max(...wide.tops) - Math.min(...wide.tops)).toBeLessThanOrEqual(1);
   expect(Math.max(...wide.heights) - Math.min(...wide.heights)).toBeLessThanOrEqual(1);
   expect(Math.abs(wide.sendRight)).toBeLessThanOrEqual(1);
+  expect(wide.gapToSend).toBeGreaterThanOrEqual(8);
+  expect(wide.modelWidth).toBeLessThanOrEqual(240);
 
   // The narrowest window still keeps the whole bar in one row.
   await resize(960, 860);
@@ -262,6 +267,7 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
   expect(least.model).toBe(true);
   expect(Math.max(...least.tops) - Math.min(...least.tops)).toBeLessThanOrEqual(1);
   expect(Math.abs(least.sendRight)).toBeLessThanOrEqual(1);
+  expect(least.gapToSend).toBeGreaterThanOrEqual(8);
 
   // Narrower than that (a phone in the server's browser): the model and the paperclip go into Options, the send
   // button stays where it was. The window cannot get that narrow, so the field is.

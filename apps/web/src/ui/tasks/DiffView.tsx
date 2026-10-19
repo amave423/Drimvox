@@ -12,8 +12,8 @@ export interface LineComment {
 }
 
 interface Props {
-  /** Pictures in the review are shown from the task's branch. */
-  taskId: string;
+  /** Pictures in the review are shown from the task's branch; without one (a task done in the project's folder) they are named only. */
+  taskId?: string;
   files: DiffFile[];
   comments: LineComment[];
   /** Absent when the review is closed: lines are then read-only. */
@@ -33,7 +33,7 @@ export function DiffView({ taskId, files, comments, onComment }: Props) {
               <span className="is-ink">+{file.added}</span> <span className="is-pencil-text">−{file.removed}</span>
             </span>
           </header>
-          {file.binary && IMAGE.test(file.path) && file.status !== "deleted" ? (
+          {taskId && file.binary && IMAGE.test(file.path) && file.status !== "deleted" ? (
             <DiffImage taskId={taskId} path={file.path} />
           ) : file.binary ? (
             <p className="muted diff-binary">{t("review.binary")}</p>

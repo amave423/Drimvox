@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { DesignBrief } from "./design";
+import type { DiffFile } from "./tasks";
 
 /**
  * The project's task list (docs/specs/backlog-loop.md): after the interview the agent lists everything worth doing,
@@ -41,6 +42,8 @@ export interface WorkStart {
 /** What a task changed in the project's folder since it started. */
 export interface WorkChanges {
   files: { path: string; status: "added" | "modified" | "deleted" }[];
+  /** The same changes line by line, for the review. */
+  diff: DiffFile[];
 }
 
 /** What the project's tasks share: decided in the interview, read by every task of the list. */

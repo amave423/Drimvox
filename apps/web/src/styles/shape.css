@@ -1,0 +1,22 @@
+/*
+ * Rounded corners everywhere (seen: sharp corners on the sheet, the message bubbles, pictures, tables and the diff
+ * looked unfinished next to the rounded buttons). One place for the shapes the other files leave square.
+ */
+.sheet { border-radius: 18px 18px 0 0; }
+.msg-user { border-radius: 16px; }
+
+.media img, .media video, .media-wait, .diff-image img, .lightbox img { border-radius: 12px; }
+.gallery-card .media img, .gallery-card .media video { border-radius: 12px; }
+
+/* Tables keep their lines inside a rounded frame. */
+.md table { border-collapse: separate; border-spacing: 0; border: 1px solid var(--line); border-radius: 10px; width: fit-content; max-width: 100%; }
+.md th, .md td { border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.md tr > :last-child { border-right: 0; }
+.md tbody tr:last-child > td, .md table:not(:has(tbody)) tr:last-child > * { border-bottom: 0; }
+.md code { border-radius: 6px; }
+.diagram svg { border-radius: 10px; }
+
+/* Each file of a diff is a rounded card with its name on top. */
+.diff-file { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.diff-file .diff-head { padding: 8px 12px; background: var(--paper); border-bottom: 1px solid var(--line); }
+.diff-file .diff-hunk, .diff-file .diff-binary { margin: 0; padding: 6px 8px; }

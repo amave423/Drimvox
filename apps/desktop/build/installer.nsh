@@ -1,6 +1,6 @@
 ﻿; The installer's own page (electron-builder.yml, nsis.include): what else to do besides copying the program.
-; A desktop shortcut, and Ollama for free models on this computer; Artel installs Ollama on its first start, with the
-; progress on the local models' sheet (apps/desktop/src/main.ts reads the note left here). Updates run silently and
+; A desktop shortcut, Ollama for free models on this computer, and the picture engine. Artel installs those two on its
+; first start, with the progress on the local models' sheet (apps/desktop/src/main.ts reads the notes left here). Updates run silently and
 ; never show this page, so they change nothing of what was chosen.
 ; Russian or English by the system's language (1049 is Russian).
 
@@ -11,6 +11,8 @@
   Var ArtelOllamaBox
   Var ArtelNoDesktop
   Var ArtelOllama
+  Var ArtelImagesBox
+  Var ArtelImages
 
   ; A welcome page, with Artel's picture beside it like the last one; an update skips it.
   !macro customWelcomePage
@@ -85,6 +87,23 @@
     ${EndIf}
     Pop $0
 
+    ; The picture engine (docs/specs/local-images.md): small, so it may come at once; models are chosen in Artel.
+    ${If} $LANGUAGE == 1049
+      ${NSD_CreateCheckbox} 0 88u 100% 12u "Подготовить картинки на этом компьютере (движок stable-diffusion.cpp)"
+    ${Else}
+      ${NSD_CreateCheckbox} 0 88u 100% 12u "Prepare pictures on this computer (the stable-diffusion.cpp engine)"
+    ${EndIf}
+    Pop $ArtelImagesBox
+    ${If} $ArtelImages == "1"
+      ${NSD_Check} $ArtelImagesBox
+    ${EndIf}
+    ${If} $LANGUAGE == 1049
+      ${NSD_CreateLabel} 12u 102u -12u 26u "Около 30 МБ при первом запуске. Модели картинок (от 6 ГБ) выбираются потом в «Локальных моделях»: бесплатно и без интернета."
+    ${Else}
+      ${NSD_CreateLabel} 12u 102u -12u 26u "About 30 MB on the first start. Picture models (6 GB and more) are chosen later on the Local models sheet: free and offline."
+    ${EndIf}
+    Pop $0
+
     nsDialogs::Show
   FunctionEnd
 
@@ -101,6 +120,12 @@
     ${Else}
       StrCpy $ArtelOllama "0"
     ${EndIf}
+    ${NSD_GetState} $ArtelImagesBox $0
+    ${If} $0 == ${BST_CHECKED}
+      StrCpy $ArtelImages "1"
+    ${Else}
+      StrCpy $ArtelImages "0"
+    ${EndIf}
   FunctionEnd
   !macroend
 
@@ -111,6 +136,10 @@
     ${EndIf}
     ${If} $ArtelOllama == "1"
       FileOpen $0 "$INSTDIR\install-ollama" w
+      FileClose $0
+    ${EndIf}
+    ${If} $ArtelImages == "1"
+      FileOpen $0 "$INSTDIR\install-images" w
       FileClose $0
     ${EndIf}
   !macroend

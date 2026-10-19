@@ -130,6 +130,37 @@ test("a chat is in the list while the model answers, and the answer can be follo
   expect(lastLine!.y + lastLine!.height).toBeLessThanOrEqual(composer!.y + 2);
 });
 
+// Seen: the thinking, opened while the answer was still written, slid away to the bottom with the next words.
+test("opened thinking stays in view while the answer goes on", async () => {
+  const para = "Длинный абзац ответа о здании, его истории и архитектуре. ".repeat(6);
+  const page = await launch([{ reasoning: "Сначала подумаю о здании. ".repeat(40) }, ...Array.from({ length: 60 }, () => ({ text: `${para}\n\n` }))], 150);
+  await ask(page, "Расскажи про здание");
+  // Opened as soon as the answer starts, with the view still following it at the bottom.
+  const summary = page.locator(".reasoning summary");
+  await expect(summary).toBeVisible({ timeout: 10_000 });
+  await summary.click();
+  const before = (await summary.boundingBox())!.y;
+  await page.waitForTimeout(1500);
+  // Still where it was opened: the view no longer runs after the answer.
+  expect(Math.abs((await summary.boundingBox())!.y - before)).toBeLessThan(5);
+  // Long thinking scrolls in its own window.
+  const text = (await page.locator(".reasoning p").boundingBox())!;
+  expect(text.height).toBeLessThanOrEqual(422);
+});
+
+// Seen: the answer came in jerks, a piece at a time. Now its letters come at the speed the model writes.
+test("an answer appears letter by letter, not in pieces", async () => {
+  const piece = "Плавный текст ответа. ".repeat(40);
+  const page = await launch([{ text: piece }, { text: " Конец." }], 2500);
+  await ask(page, "Скажи что-нибудь");
+  const answer = page.locator(".msg-assistant .md");
+  await expect(answer).toBeVisible({ timeout: 10_000 });
+  // The piece came whole, but it is shown in part at first, then all of it well before the next one.
+  const first = (await answer.innerText()).length;
+  expect(first).toBeLessThan(piece.trim().length);
+  await expect.poll(async () => (await answer.innerText()).length, { timeout: 1500 }).toBeGreaterThanOrEqual(piece.trim().length);
+});
+
 test("a code block has a copy button", async () => {
   const page = await launch([{ text: "Вот код:\n\n```js\nconst total = 1;\n```" }]);
   await ask(page, "Покажи код");

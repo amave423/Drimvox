@@ -247,17 +247,23 @@
 .local-row .mono { min-width: 0; overflow-wrap: anywhere; }
 /* The name takes the row; size and actions keep to the right, so every row lines up in columns. */
 .local-row > .mono:first-child { flex: 1 1 240px; }
-.local-row > .local-size { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.local-row > .local-size { min-width: 64px; text-align: right; }
 .local-actions { display: inline-flex; gap: 10px; align-items: center; }
-.local-progress { display: inline-flex; align-items: center; gap: 10px; flex: 1 1 200px; min-width: 0; }
+/* The bar takes the room; the numbers never shrink onto it: short of room they go under it whole (seen: overlapping). */
+.local-progress { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; flex: 1 1 200px; min-width: 0; }
 .local-progress progress { flex: 1 1 120px; min-width: 80px; accent-color: var(--ink); }
 .pull-control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; justify-content: flex-end; }
 .local-pull { flex-wrap: wrap; }
 /* A download row: the name, then the bar, the numbers on one line, and the buttons at the right edge. */
 .local-pull > .mono:first-child { flex: 0 1 auto; }
-.local-pull .pull-control { flex: 1 1 420px; flex-wrap: nowrap; }
-.local-progress .muted { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.local-card .local-progress .muted { white-space: normal; }
+.local-pull .pull-control { flex: 1 1 420px; }
+.local-progress .muted { flex: none; white-space: nowrap; }
+/* A variant: its name, its marks right after it, the button at the right edge; one being downloaded gets a line of its
+   own for the progress under the name. */
+.local-variants .local-row > .mono:first-child { flex: 0 0 auto; min-width: 72px; }
+.local-variants .pull-control { flex: 0 1 auto; margin-left: auto; }
+.local-variants .local-row:has(progress) .pull-control { flex: 1 1 100%; }
+.local-card .local-progress .muted { flex: 1 1 100%; white-space: normal; }
 .local-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); margin-top: 10px; }
 /* Cards in a row have one height; the download control keeps to the bottom of each, so the buttons line up. */
 .local-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--sheet); }

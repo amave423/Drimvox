@@ -2,7 +2,7 @@ import { BATCH_POINTS, pointsOf, type BacklogItem, type TaskView, type WorkChang
 import type { ProjectRepo } from "../agent/repo";
 import { runGit } from "../agent/git";
 import type { AgentRunner } from "../agent/runner";
-import { changesSince, checkpoint, dropCheckpoint, restore } from "../chats/checkpoint";
+import { changesSince, checkpoint, diffSince, dropCheckpoint, restore } from "../chats/checkpoint";
 import type { ChatRepo } from "../chats/repo";
 import { workMessage } from "../work/prompt";
 import type { BacklogRepo } from "./repo";
@@ -87,7 +87,7 @@ export class BacklogService {
   /** What the task changed in the folder since it started. */
   async changes(itemId: string): Promise<WorkChanges> {
     const { folder, snapshot } = this.workOf(itemId);
-    return { files: await changesSince(folder, snapshot) };
+    return { files: await changesSince(folder, snapshot), diff: await diffSince(folder, snapshot) };
   }
 
   /** The task's changes become one commit on the project's current branch; the task is done. */

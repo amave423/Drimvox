@@ -58,6 +58,14 @@ export function localRoutes(local: LocalModels) {
         throw err;
       }
     })
+    .post("/images/engine", (c) => {
+      try {
+        return c.json(local.images.installEngine(), 202);
+      } catch (err) {
+        if (err instanceof EngineError) return c.json({ error: { code: "unsupported" as const, detail: err.message } }, 409);
+        throw err;
+      }
+    })
     .post("/images/pulls/pause", zValidator("json", localImagePullSchema), (c) =>
       local.images.pause(c.req.valid("json").model) ? c.json({ ok: true as const }, 200) : c.json({ error: { code: "not_found" as const } }, 404),
     )

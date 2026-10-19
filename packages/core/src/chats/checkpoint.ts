@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { existsSync, rmSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { DiffFile } from "@artel/shared";
+import { parseDiff } from "../agent/diff";
 import { isRepoRoot, runGit, withoutDependencies } from "../agent/git";
 
 /**
@@ -62,6 +64,12 @@ export async function restore(folder: string, commit: string): Promise<void> {
 
 export async function dropCheckpoint(folder: string, ref: string): Promise<void> {
   await runGit(folder, ["update-ref", "-d", ref], true);
+}
+
+/** What changed in the folder since the snapshot, line by line, as the review shows it. */
+export async function diffSince(folder: string, commit: string): Promise<DiffFile[]> {
+  const now = await treeOf(folder);
+  return parseDiff((await runGit(folder, ["diff", "--no-color", "--no-ext-diff", "--no-renames", commit, now])).stdout);
 }
 
 /** What changed in the folder since the snapshot, file by file. */

@@ -14,4 +14,11 @@ describe("a CLI's failure in plain words", () => {
     expect(error.code).toBe("cli_retired");
     expect(error.detail).toMatch(/^Error authenticating/);
   });
+
+  // Seen live: Antigravity refused the account itself with a VPN and a proxy on: Google ties an account to a country.
+  it("tells the account's country from the place it is used from", () => {
+    const error = classify("Eligibility check failed: Your current account is not eligible for Antigravity, because it is not currently available in your location.");
+    expect(error.code).toBe("account_region");
+    expect(classify("User location is not supported for the API use.").code).toBe("region");
+  });
 });

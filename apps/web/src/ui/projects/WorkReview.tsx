@@ -2,6 +2,7 @@ import type { BacklogItem, WorkChanges, WorkStart } from "@artel/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
+import { DiffView } from "../tasks/DiffView";
 
 /**
  * Above the message box of a project task's conversation (docs/specs/project-work.md): what the task changed, "Accept"
@@ -91,13 +92,10 @@ export function WorkReview({ projectId, itemId, busy, answers }: { projectId: st
       {changes && changes.files.length > 0 && (
         <details className="work-files">
           <summary>{t("work.files", { n: changes.files.length })}</summary>
-          <ul>
-            {changes.files.map((f) => (
-              <li key={f.path} className={`mono is-${f.status}`}>
-                {t(`work.file.${f.status}`)} {f.path}
-              </li>
-            ))}
-          </ul>
+          {/* Line by line, as the review of a task always showed it (seen: only file names here). */}
+          <div className="work-diff">
+            <DiffView files={changes.diff} comments={[]} />
+          </div>
         </details>
       )}
       {errorText}

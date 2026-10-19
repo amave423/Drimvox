@@ -67,8 +67,10 @@ async function launch() {
     origin = devServerUrl ?? `http://127.0.0.1:${port}`;
     registerIpc();
     const ollama = takeInstallerNote("install-ollama");
-    if (ollama) void installOllama(port);
-    await createWindow(ollama ? "local" : undefined);
+    const images = takeInstallerNote("install-images");
+    if (ollama) void callCore(port, "/api/local/install");
+    if (images) void callCore(port, "/api/local/images/engine");
+    await createWindow(ollama || images ? "local" : undefined);
   } catch (err) {
     dialog.showErrorBox("Artel не запустился", err instanceof Error ? err.message : String(err));
     app.quit();
@@ -86,12 +88,15 @@ function takeInstallerNote(name: string): boolean {
   return true;
 }
 
-/** The installer's "Install Ollama" box: the core's own install, with its progress on the local models' sheet. */
-async function installOllama(port: number): Promise<void> {
+/**
+ * The installer's boxes ("Install Ollama", "the picture engine"): the core's own downloads, with their progress on the
+ * local models' sheet.
+ */
+async function callCore(port: number, path: string): Promise<void> {
   try {
-    await fetch(`http://127.0.0.1:${port}/api/local/install`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
+    await fetch(`http://127.0.0.1:${port}${path}`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
   } catch {
-    // The sheet still offers the install.
+    // The sheet still offers it.
   }
 }
 
@@ -235,7 +240,7 @@ function registerIpc() {
       shown.push({ title, body, taskId, click: () => toast.emit("click") });
       return;
     }
-    toast.show();
+    show(toast);
     // The taskbar button blinks too, until the window is in front again: it works even when Focus Assist hides toasts.
     win?.flashFrame(true);
   });
@@ -245,7 +250,7 @@ function registerIpc() {
     if (!fromOurPage(event.senderFrame?.url) || !Notification.isSupported()) return;
     const { title, body } = notice ?? {};
     if (typeof title !== "string" || typeof body !== "string") return;
-    makeToast(title, body).show();
+    show(makeToast(title, body));
   });
 
   const hex = /^#[0-9a-f]{6}$/i;
@@ -312,6 +317,22 @@ app.on("before-quit", (event) => {
   child.postMessage({ type: "quit" });
   setTimeout(() => child.kill(), 3_000).unref();
 });
+
+/**
+ * Notifications being shown. Windows drops a toast whose object was collected: it went straight to the action centre,
+ * without the banner and without the sound (seen on Windows 10 with every setting on). Each one is kept until it closes.
+ */
+const showing = new Set<Notification>();
+
+function show(toast: Notification): void {
+  showing.add(toast);
+  const forget = () => showing.delete(toast);
+  toast.once("close", forget);
+  toast.once("failed", forget);
+  // A toast that went to the action centre never says "close": a minute is longer than any banner stays.
+  setTimeout(forget, 60_000).unref();
+  toast.show();
+}
 
 const xml = (text: string) => text.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
 

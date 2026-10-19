@@ -36,6 +36,9 @@ interface Active {
 /** Pictures on this computer (docs/specs/local-images.md): the short list, the downloads, the engine's server. */
 export class LocalImages {
   private readonly pulls = new Map<LocalImageModelId, Active>();
+  private enginePull: Active | null = null;
+  /** The engine's own download while it goes: a model's download waits for it instead of unpacking it twice. */
+  private engineJob: Promise<unknown> | null = null;
   private server: ImageServer | null = null;
   private starting: Promise<ImageServer> | null = null;
   private lastUse = 0;
@@ -88,6 +91,7 @@ export class LocalImages {
     return {
       supported: this.url !== null,
       engine: !!findServer(this.engineDir),
+      enginePull: this.enginePull ? { ...this.enginePull.pull } : null,
       running: this.server?.running ? (this.server.loaded.model as LocalImageModelId) : null,
       providerId: this.d.providerId(),
       models,
@@ -118,6 +122,35 @@ export class LocalImages {
     };
     this.pulls.set(id, a);
     void this.download(a, v.files);
+    return { ...a.pull };
+  }
+
+  /** Downloads the engine alone, before any model (the installer's box, the sheet's button). */
+  installEngine(): LocalPull {
+    if (this.url === null) throw new EngineError("There is no build of the engine for this system");
+    const going = this.enginePull;
+    if (going && !going.pull.done) return { ...going.pull };
+    const a: Active = {
+      pull: { model: "engine", status: "downloading the engine", completed: 0, total: 0, done: false, error: null, paused: false, bytesPerSecond: null },
+      abort: new AbortController(),
+    };
+    this.enginePull = a;
+    if (findServer(this.engineDir)) {
+      Object.assign(a.pull, { done: true, status: "success" });
+      return { ...a.pull };
+    }
+    this.engineJob = installEngine({
+      url: this.url,
+      dir: this.engineDir,
+      fetch: this.routes()[0]!.fetch,
+      signal: a.abort.signal,
+      progress: (received, total) => Object.assign(a.pull, { completed: received, total: Math.max(total, received) }),
+    }).then(
+      () => Object.assign(a.pull, { done: true, status: "success", completed: a.pull.total }),
+      (err: unknown) => {
+        if (!a.abort.signal.aborted) Object.assign(a.pull, { done: true, error: err instanceof Error ? err.message : String(err) });
+      },
+    );
     return { ...a.pull };
   }
 
@@ -152,6 +185,7 @@ export class LocalImages {
         measure();
       };
 
+      await this.engineJob?.catch(() => {});
       if (!findServer(this.engineDir)) {
         p.status = "downloading the engine";
         await installEngine({
@@ -305,6 +339,7 @@ export class LocalImages {
   }
 
   close(): void {
+    this.enginePull?.abort.abort();
     for (const a of this.pulls.values()) a.abort.abort();
     this.pulls.clear();
     this.stopServer();

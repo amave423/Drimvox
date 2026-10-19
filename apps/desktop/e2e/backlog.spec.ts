@@ -101,6 +101,9 @@ test("a project: the interview, the task list, a batch of three points, review, 
   // The whole task rolls back, not single answers: undoing one after an accepted commit would leave the folder broken.
   await expect(page.getByRole("button", { name: "Откатить", exact: true })).toHaveCount(0);
   await expect(review).toContainText("index.html");
+  // Line by line, the added lines marked, as the old review showed them (seen: only file names here).
+  await expect(review.locator(".diff-file")).toHaveCount(1);
+  await expect(review.locator(".dl-add").first()).toContainText("Старт");
   // It lives under its project in the sidebar, not among the chats.
   await expect(page.locator(".side-projects").getByRole("button", { name: "MVP: таймер 25 минут" })).toBeVisible();
 
