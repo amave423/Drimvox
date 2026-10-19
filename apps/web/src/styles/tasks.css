@@ -245,13 +245,26 @@
 .local-list, .local-cards, .local-variants { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .local-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .local-row .mono { min-width: 0; overflow-wrap: anywhere; }
+/* The name takes the row; size and actions keep to the right, so every row lines up in columns. */
+.local-row > .mono:first-child { flex: 1 1 240px; }
+.local-row > .local-size { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
 .local-actions { display: inline-flex; gap: 10px; align-items: center; }
 .local-progress { display: inline-flex; align-items: center; gap: 10px; flex: 1 1 200px; min-width: 0; }
 .local-progress progress { flex: 1 1 120px; min-width: 80px; accent-color: var(--ink); }
 .pull-control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; justify-content: flex-end; }
 .local-pull { flex-wrap: wrap; }
+/* A download row: the name, then the bar, the numbers on one line, and the buttons at the right edge. */
+.local-pull > .mono:first-child { flex: 0 1 auto; }
+.local-pull .pull-control { flex: 1 1 420px; flex-wrap: nowrap; }
+.local-progress .muted { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.local-card .local-progress .muted { white-space: normal; }
 .local-cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); margin-top: 10px; }
-.local-card { display: grid; gap: 6px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--sheet); }
+/* Cards in a row have one height; the download control keeps to the bottom of each, so the buttons line up. */
+.local-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--sheet); }
+.local-card-head { align-self: stretch; }
+.local-card .pull-control { margin-top: auto; padding-top: 4px; flex: none; justify-content: flex-start; align-self: stretch; }
+.local-card .local-progress { flex: 1 1 100%; flex-wrap: wrap; }
+.local-card .local-progress progress { flex: 1 1 100%; }
 .local-card p { margin: 0; }
 .local-card .btn, .local-card .is-ok-text { justify-self: start; }
 .local-card-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }

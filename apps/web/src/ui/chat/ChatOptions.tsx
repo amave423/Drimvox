@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../../context";
 
-interface Row {
+export interface OptionRow {
   label: string;
   control: ReactNode;
 }
@@ -21,7 +21,7 @@ function SlidersIcon() {
  * The chat's options in one place: the internet, thinking, the folder (seen: four pills under the message box looked
  * crowded). The button names what differs from the usual, so a connected folder is never hidden.
  */
-export function ChatOptions({ rows, changed }: { rows: Row[]; changed: string[] }) {
+export function ChatOptions({ rows, changed, narrow = false }: { rows: OptionRow[]; changed: string[]; narrow?: boolean }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -55,7 +55,7 @@ export function ChatOptions({ rows, changed }: { rows: Row[]; changed: string[] 
         <span aria-hidden>▾</span>
       </button>
       {open && (
-        <div className="picker-panel is-above options-panel" role="dialog" aria-label={t("options.label")}>
+        <div className={`picker-panel is-above options-panel${narrow ? " is-narrow" : ""}`} role="dialog" aria-label={t("options.label")}>
           {rows.map((r) => (
             <div key={r.label} className="options-row">
               <span className="muted">{r.label}</span>

@@ -6,7 +6,7 @@ a { color: var(--ink); }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 8px 18px; border-radius: 999px;
+  min-height: var(--control-h); padding: 0 18px; border-radius: 999px;
   border: 1px solid var(--line); background: var(--sheet);
   font-size: 14px; white-space: nowrap;
 }
@@ -31,6 +31,8 @@ a { color: var(--ink); }
   border: 1px solid var(--line); background: var(--sheet); color: var(--fg);
   font: inherit; font-size: 14px;
 }
+/* One height for everything that sits in a row: buttons, pickers, one-line fields. */
+input.field-input, select.field-input { height: var(--control-h); padding-block: 0; }
 .inline-form .field-input { width: min(360px, 100%); }
 .field-input:focus-visible, textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 

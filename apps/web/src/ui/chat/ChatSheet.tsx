@@ -26,7 +26,6 @@ import { loadModels } from "../../lib/models";
 import { readWebMode, WebSwitch } from "./WebSwitch";
 import { FolderSwitch } from "./FolderSwitch";
 import { readThinking, ThinkingSwitch } from "./ThinkingSwitch";
-import { ChatOptions } from "./ChatOptions";
 import { ChatMargin } from "./ChatMargin";
 import { WorkReview } from "../projects/WorkReview";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
@@ -389,21 +388,20 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
           onSend={(text) => void send(text)}
           onStop={() => abort.current?.abort()}
           attach={kind === "text" ? { files, onAdd: (added) => void addFiles(added), onRemove: (key) => setFiles(files.filter((f) => f.key !== key)) } : undefined}
-          tools={
-            <>
-              <ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />
-              {mediaModel && mediaRows.rows.length > 0 && <ChatOptions changed={mediaRows.changed} rows={mediaRows.rows} />}
-              {kind === "text" && choice && (
-                <ChatOptions
-                  changed={changedOptions}
-                  rows={[
-                    { label: t("web.label"), control: <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} /> },
-                    ...(thinks ? [{ label: t("thinking.label"), control: <ThinkingSwitch value={thinking} onChange={setThinking} /> }] : []),
-                    { label: t("folder.label"), control: <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} /> },
-                  ]}
-                />
-              )}
-            </>
+          picker={<ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} />}
+          options={
+            mediaModel
+              ? mediaRows
+              : kind === "text" && choice
+                ? {
+                    changed: changedOptions,
+                    rows: [
+                      { label: t("web.label"), control: <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} /> },
+                      ...(thinks ? [{ label: t("thinking.label"), control: <ThinkingSwitch value={thinking} onChange={setThinking} /> }] : []),
+                      { label: t("folder.label"), control: <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} /> },
+                    ],
+                  }
+                : { changed: [], rows: [] }
           }
           beforeSend={mediaModel && !confirm && <MediaPrice model={mediaModel} estimateUsd={estimateUsd} />}
           placeholder={kind === "text" ? undefined : t(kind === "image" ? "media.placeholderImage" : "media.placeholderVideo")}

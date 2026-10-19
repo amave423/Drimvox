@@ -201,7 +201,7 @@ test("keeps keys and chats after a restart", async () => {
 
 // Seen live: a local model's page of HTML ran past the sheet, the sheet stayed 900 px on any screen, and a long model
 // name squeezed the internet switch into two lines.
-test("fits code to the sheet, widens the sheet with the window and keeps the composer pills one line high", async () => {
+test("fits code to the sheet, widens the sheet with the window and keeps the composer bar one row", async () => {
   const long = "a-very-long-provider-model-name-that-goes-on-and-on-v2.5-instruct-preview-q4_K_M";
   const css = `.calculator { background: linear-gradient(135deg, rgba(30, 30, 60, 0.95), rgba(60, 20, 90, 0.95)); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1); }`;
   fake = await startFakeProvider({
@@ -232,11 +232,49 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
   });
   expect(fits).toBe(true);
 
-  // Two pills (the model, the options) stay one line high, the model's name cut short rather than squeezing the other.
-  const pills = page.locator(".composer-bar > .picker > .picker-button");
-  const heights = await pills.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-  expect(heights.length).toBe(2);
-  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(2);
+  // The bar is one row: the paperclip, the model, the options and the send button stand on one line, one height,
+  // the model's name cut short; the send button keeps to the right edge of the field.
+  const bar = () =>
+    page.evaluate(() => {
+      const box = (e: Element) => e.getBoundingClientRect();
+      const items = [...document.querySelectorAll(".composer-bar .attach-button, .composer-bar .picker-button, .composer-send")].map(box);
+      const field = box(document.querySelector(".composer textarea")!);
+      const send = box(document.querySelector(".composer-send")!);
+      return {
+        count: items.length,
+        tops: items.map((r) => Math.round(r.top)),
+        heights: items.map((r) => Math.round(r.height)),
+        sendRight: Math.round(field.right - send.right),
+        model: !!document.querySelector(".composer-tools > .picker:not(.chat-options)"),
+      };
+    });
+  const wide = await bar();
+  expect(wide.count).toBe(4);
+  expect(wide.model).toBe(true);
+  expect(Math.max(...wide.tops) - Math.min(...wide.tops)).toBeLessThanOrEqual(1);
+  expect(Math.max(...wide.heights) - Math.min(...wide.heights)).toBeLessThanOrEqual(1);
+  expect(Math.abs(wide.sendRight)).toBeLessThanOrEqual(1);
+
+  // The narrowest window still keeps the whole bar in one row.
+  await resize(960, 860);
+  await page.waitForTimeout(300);
+  const least = await bar();
+  expect(least.model).toBe(true);
+  expect(Math.max(...least.tops) - Math.min(...least.tops)).toBeLessThanOrEqual(1);
+  expect(Math.abs(least.sendRight)).toBeLessThanOrEqual(1);
+
+  // Narrower than that (a phone in the server's browser): the model and the paperclip go into Options, the send
+  // button stays where it was. The window cannot get that narrow, so the field is.
+  await page.locator(".composer").evaluate((el) => ((el as HTMLElement).style.width = "420px"));
+  await page.waitForTimeout(300);
+  const tight = await bar();
+  expect(tight.model).toBe(false);
+  expect(Math.abs(tight.sendRight)).toBeLessThanOrEqual(1);
+  expect(Math.max(...tight.tops) - Math.min(...tight.tops)).toBeLessThanOrEqual(1);
+  await page.getByRole("button", { name: /^Параметры/ }).click();
+  await expect(page.getByRole("dialog", { name: "Параметры" }).getByRole("button", { name: /Long Model|a-very-long/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.locator(".composer").evaluate((el) => ((el as HTMLElement).style.width = ""));
 
   await resize(2400, 1300);
   await page.waitForTimeout(300);

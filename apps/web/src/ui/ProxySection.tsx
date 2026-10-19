@@ -60,7 +60,7 @@ export function ProxySection() {
         aria-label={t("settings.proxyAddress")}
         onChange={(e) => setDraft(e.target.value)}
       />
-      <button className="btn is-primary" disabled={!draft.trim()}>
+      <button className="btn" disabled={!draft.trim()}>
         {t("settings.save")}
       </button>
       {current && (

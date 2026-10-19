@@ -137,7 +137,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   return (
     <div className="picker" ref={root}>
       <button className="picker-button" aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen(!open)}>
-        <span className="mono">{label}</span>
+        <span className={`picker-label${value && providerName ? " mono" : ""}`}>{label}</span>
         <span aria-hidden>▾</span>
       </button>
       {open && (

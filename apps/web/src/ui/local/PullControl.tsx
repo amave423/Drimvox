@@ -103,8 +103,10 @@ export function PullControl(p: { model: string; sizeBytes: number; installed: bo
     );
   }
   return (
-    <button type="button" className="btn" onClick={() => p.actions.pull(p.model)}>
-      {t("local.get", { size: size(p.sizeBytes) })}
-    </button>
+    <span className="pull-control">
+      <button type="button" className="btn" onClick={() => p.actions.pull(p.model)}>
+        {t("local.get", { size: size(p.sizeBytes) })}
+      </button>
+    </span>
   );
 }

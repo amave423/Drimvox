@@ -134,6 +134,15 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 
 .error-detail { margin: 0; padding: 12px 14px; background: var(--pencil-soft); color: var(--pencil); white-space: pre-wrap; }
 
+/* The sheet follows the room the desk gives it, not the window: with the sidebar open a mid-size window left the
+   conversation a third of the sheet (seen). Narrow, the margin goes under the content, and a chat's margin goes. */
+.desk { container-type: inline-size; }
+@container (max-width: 880px) {
+  .sheet { grid-template-columns: minmax(0, 1fr); padding: 26px 24px; }
+  .sheet > .margin { margin-top: 24px; }
+  .sheet.chat > .chat-margin { display: none; }
+}
+
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; }
   .side { display: none; }

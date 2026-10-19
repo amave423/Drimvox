@@ -544,6 +544,8 @@ export const en: Record<keyof typeof ru, string> = {
   "limits.ok": "within the limit",
   "limits.reached": "limit used up",
   "limits.resets": "starts over {at}",
+  "options.model": "Model",
+  "options.files": "Files",
   "options.label": "Options",
   "options.hint": "Internet, thinking and folder for this chat",
   "thinking.label": "Thinking",

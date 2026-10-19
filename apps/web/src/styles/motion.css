@@ -1,0 +1,31 @@
+/*
+ * Motion: short and quiet, so the interface feels alive without getting in the way. Only for those who have not asked
+ * their system for less motion; without it everything simply appears.
+ * Animations fill only backwards: a transform held after the end would make a sheet the frame of the full-screen viewer.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  /* A sheet rises a little into place when it opens. */
+  .sheet { animation: rise 220ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+  /* Each message, and each card of a list, fades in where it stands. */
+  .msg-user, .msg-assistant, .local-card, .preset, .first-steps > ol > li { animation: fade-in 200ms ease-out backwards; }
+  /* Menus and option panels unfold from the button that opened them. */
+  .picker-panel { animation: pop 140ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards; transform-origin: top left; }
+  .picker-panel.is-above { transform-origin: bottom left; }
+  .lightbox { animation: fade-in 160ms ease-out backwards; }
+  .lightbox img { animation: pop 200ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards; transform-origin: center; }
+
+  /* Buttons answer the pointer: colours ease, a press sinks a little. */
+  .btn, .picker-button, .attach-button, .preset, .local-card, .side-item, .link, .lightbox-action {
+    transition: background-color 140ms, border-color 140ms, color 140ms, box-shadow 140ms, transform 90ms;
+  }
+  .btn:active:not(:disabled), .picker-button:active, .attach-button:active:not(:disabled) { transform: scale(0.97); }
+  .preset:hover, .local-card:hover { box-shadow: var(--sheet-shadow); }
+
+  /* What unfolds in a message (thinking, tool calls) slides open. */
+  details[open] > :not(summary) { animation: fade-in 160ms ease-out backwards; }
+  .action summary::before { transition: transform 140ms; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(3px); } }
+  @keyframes pop { from { opacity: 0; transform: scale(0.96); } }
+}

@@ -126,7 +126,7 @@ export function LocalModelsSheet() {
               {status.models.map((m) => (
                 <li key={m.name} className="local-row">
                   <span className="mono">{m.name}</span>
-                  <span className="muted">{size(m.sizeBytes)}</span>
+                  <span className="muted local-size">{size(m.sizeBytes)}</span>
                   {confirm === m.name ? (
                     <span className="local-actions">
                       <button type="button" className="btn is-pencil" onClick={() => void remove(m.name)}>

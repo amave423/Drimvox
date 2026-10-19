@@ -543,6 +543,8 @@ export const ru = {
   "limits.ok": "в пределах лимита",
   "limits.reached": "лимит исчерпан",
   "limits.resets": "обновится {at}",
+  "options.model": "Модель",
+  "options.files": "Файлы",
   "options.label": "Параметры",
   "options.hint": "Интернет, мышление и папка для этого чата",
   "thinking.label": "Мышление",
