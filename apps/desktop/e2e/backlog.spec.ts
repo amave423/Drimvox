@@ -98,6 +98,8 @@ test("a project: the interview, the task list, a batch of three points, review, 
   const review = page.getByRole("region", { name: "Проверка пункта" });
   await expect(review).toContainText("Пункт «MVP: таймер 25 минут» готов.");
   await review.getByText(/Изменённые файлы: 1/).click();
+  // The whole task rolls back, not single answers: undoing one after an accepted commit would leave the folder broken.
+  await expect(page.getByRole("button", { name: "Откатить", exact: true })).toHaveCount(0);
   await expect(review).toContainText("index.html");
   // It lives under its project in the sidebar, not among the chats.
   await expect(page.locator(".side-projects").getByRole("button", { name: "MVP: таймер 25 минут" })).toBeVisible();

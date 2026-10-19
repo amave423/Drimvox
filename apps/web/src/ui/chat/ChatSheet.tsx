@@ -342,7 +342,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
             m.role === "user" ? (
               <UserMessage key={m.id} content={m.content} files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null} />
             ) : (
-              <AssistantMessage key={m.id} content={m.content} reasoning={m.reasoning} model={m.model} message={m} onUndo={draft ? undefined : () => void undo(m.id)} />
+              <AssistantMessage key={m.id} content={m.content} reasoning={m.reasoning} model={m.model} message={m} onUndo={draft || chat?.itemId ? undefined : () => void undo(m.id)} />
             ),
           )}
           {draft && (

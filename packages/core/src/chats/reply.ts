@@ -80,6 +80,8 @@ export async function reply(i: ReplyInput): Promise<void> {
   const snapshot = i.folder ? await checkpoint(i.folder, ref).catch(() => null) : null;
 
   let text = "";
+  /** A step ended: the next text starts a new paragraph. */
+  let newStep = false;
   let reasoning = "";
   let error: ProviderError | null = null;
   let usage: Parameters<typeof usageOf>[0];
@@ -139,14 +141,18 @@ export async function reply(i: ReplyInput): Promise<void> {
     for await (const part of result.fullStream) {
       resetClock();
       if (part.type === "text-delta") {
-        text += part.text;
-        await i.emit({ type: "text", text: part.text });
+        // What the model says after a tool call is a new paragraph (seen live: "…folder.The folder is empty…").
+        const piece = newStep && text && !/\n\s*$/.test(text) ? `\n\n${part.text.trimStart()}` : part.text;
+        newStep = false;
+        text += piece;
+        await i.emit({ type: "text", text: piece });
       } else if (part.type === "reasoning-delta") {
         reasoning += part.text;
         await i.emit({ type: "reasoning", text: part.text });
       } else if (part.type === "error") {
         error = describeError(part.error);
       } else if (part.type === "finish-step") {
+        newStep = true;
         // Each step's own bill, when the provider sends one: an answer with searches takes several steps.
         const step = billedUsd(part.providerMetadata, 1);
         if (step !== null) billed = (billed ?? 0) + step;

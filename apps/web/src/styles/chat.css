@@ -167,7 +167,7 @@
 .pills button.is-on { border-color: var(--ink); color: var(--ink); background: var(--ink-soft); }
 .composer-bar .media-price { font-size: 13px; color: var(--muted); white-space: nowrap; }
 /* A project task's review, above the message box. */
-.work-review { display: grid; gap: 8px; margin: 0 0 10px; padding: 12px 14px; border: 1px solid var(--wait); border-radius: 12px; background: var(--wait-soft); font-size: 14px; }
+.work-review { display: grid; justify-items: start; gap: 8px; margin: 0 0 10px; padding: 12px 14px; border: 1px solid var(--wait); border-radius: 12px; background: var(--wait-soft); font-size: 14px; }
 .work-review.is-closed { border-color: var(--ok); background: var(--ok-soft); }
 .work-review p { margin: 0; }
 .work-review .actions { margin: 0; }

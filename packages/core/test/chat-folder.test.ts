@@ -60,6 +60,14 @@ describe("a chat with a folder", () => {
     expect(after.canUndo).toBe(false);
   });
 
+  // Seen live: "…the project folder.The folder is empty…": what the model said between tool calls ran together.
+  it("keeps what the model says before and after its tool calls apart", async () => {
+    const chat = await chatWith([{ text: "Смотрю папку.", toolCalls: [{ name: "list_files", args: { path: "." } }] }, { text: "Готово." }]);
+    await connect(chat.id, folder);
+    const events = await readEvents(await send(chat.id, "Что в папке?"));
+    expect(events.at(-1).message.content).toBe("Смотрю папку.\n\nГотово.");
+  });
+
   it("offers no undo for an answer that changed nothing, and stays inside the folder", async () => {
     writeFileSync(join(folder, "..", "outside-secret.txt"), "secret\n");
     const chat = await chatWith([call("read_file", { path: "../outside-secret.txt" }), { text: "Не могу прочитать." }]);
