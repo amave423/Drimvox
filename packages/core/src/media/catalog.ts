@@ -2,6 +2,7 @@ import type { MediaKind, MediaModel, PriceLine } from "@artel/shared";
 import { fetchJson } from "../providers/http";
 import type { Connection } from "../providers/repo";
 import { usdPer } from "../rates";
+import { localMediaModels } from "./local";
 
 type Raw = Record<string, unknown>;
 
@@ -18,6 +19,8 @@ const style = (conn: Connection): "separate" | "combined" | null =>
 
 /** Image or video models of a provider, sorted by name, prices in dollars where the catalog has them. */
 export async function listMediaModels(conn: Connection, kind: MediaKind): Promise<MediaModel[]> {
+  // Pictures on this computer: the downloaded models, no catalog to ask.
+  if (conn.preset === "sdcpp") return kind === "image" ? localMediaModels() : [];
   const how = style(conn);
   if (!how) return [];
   const key = `${conn.cacheKey}|${kind}`;

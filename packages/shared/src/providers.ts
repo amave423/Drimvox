@@ -15,6 +15,7 @@ export const presetIds = [
   "nvidia",
   "ollama",
   "lmstudio",
+  "sdcpp",
   "custom",
 ] as const;
 export type PresetId = (typeof presetIds)[number];
@@ -192,6 +193,17 @@ export const presets: Record<PresetId, Preset> = {
     baseUrl: "http://127.0.0.1:1234/v1",
     keyRequired: false,
     editableUrl: true,
+    billing: "free",
+    currency: "USD",
+  },
+  // Pictures on this computer (docs/specs/local-images.md): Artel makes this provider itself and runs the engine
+  // in-process; the address is only a name.
+  sdcpp: {
+    id: "sdcpp",
+    name: "stable-diffusion.cpp",
+    baseUrl: "artel://sdcpp",
+    keyRequired: false,
+    editableUrl: false,
     billing: "free",
     currency: "USD",
   },

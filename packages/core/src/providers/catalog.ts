@@ -104,6 +104,8 @@ const cache = new Map<string, { at: number; models: ModelInfo[] }>();
 export async function listModels(conn: Connection, fresh = false): Promise<ModelInfo[]> {
   // A CLI's list is cheap to build and shows the model its default last turned out to be.
   if (isCli(conn.preset)) return cliModels({ ...conn, preset: conn.preset });
+  // Pictures on this computer have no models to talk to (docs/specs/local-images.md).
+  if (conn.preset === "sdcpp") return [];
   const hit = cache.get(conn.cacheKey);
   if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.models;
   let models: ModelInfo[];

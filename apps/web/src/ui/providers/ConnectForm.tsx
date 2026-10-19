@@ -64,7 +64,8 @@ export function ConnectForm({ kind }: { kind: "key" | "subscription" }) {
       <div className="preset-grid" role="radiogroup" aria-label={t(kind === "key" ? "providers.add" : "providers.subscriptions")}>
         {presetIds
           // Gemini CLI no longer serves personal Google accounts (Google, 2026-06-18): Antigravity CLI replaces it.
-          .filter((id) => id !== "gemini-cli" && (presets[id].billing === "subscription") === (kind === "subscription"))
+          // stable-diffusion.cpp is made by Artel itself when a picture model is downloaded.
+          .filter((id) => id !== "gemini-cli" && id !== "sdcpp" && (presets[id].billing === "subscription") === (kind === "subscription"))
           .map((id) => (
             <button key={id} role="radio" aria-checked={preset === id} className={`preset${preset === id ? " is-on" : ""}`} onClick={() => choose(id)}>
               <span className="preset-name">{presetName(t, id)}</span>

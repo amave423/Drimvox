@@ -29,9 +29,10 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   // Local models and programs on a subscription only talk: no tabs for pictures and video there (seen: empty tabs).
   const preset = providers.find((p) => p.id === providerId)?.preset;
   const talkOnly = preset === "ollama" || preset === "lmstudio" || providers.find((p) => p.id === providerId)?.billing === "subscription";
-  const kinds: ChatKind[] = talkOnly && wanted.includes("text") ? ["text"] : wanted;
+  // stable-diffusion.cpp on this computer only draws pictures (docs/specs/local-images.md).
+  const kinds: ChatKind[] = preset === "sdcpp" ? wanted.filter((k) => k === "image") : talkOnly && wanted.includes("text") ? ["text"] : wanted;
   const [chosenKind, setKind] = useState<ChatKind>(value?.kind && wanted.includes(value.kind) ? value.kind : wanted[0]!);
-  const kind = kinds.includes(chosenKind) ? chosenKind : "text";
+  const kind = kinds.includes(chosenKind) ? chosenKind : (kinds[0] ?? "text");
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<ModelsResult | null>(null);
   const [media, setMedia] = useState<MediaModel[] | null>(null);

@@ -55,7 +55,7 @@ async function findFile(apiUrl: string, repo: string, quant: string, signal: Abo
 }
 
 /** Appends the bytes from `start` on to `part`; resolves when the address sent everything. */
-async function fetchInto(route: Route, url: string, part: string, start: number, total: number, d: HfDownload): Promise<void> {
+async function fetchInto(route: Route, url: string, part: string, start: number, total: number, d: FileDownload): Promise<void> {
   const attempt = new AbortController();
   const stop = () => attempt.abort();
   d.signal.addEventListener("abort", stop, { once: true });
@@ -91,16 +91,26 @@ async function sha256Of(file: string): Promise<string> {
   return hash.digest("hex");
 }
 
+/** A file of a repository by its exact path, as Hugging Face lists it; folders are listed one at a time. */
+export async function fileByPath(apiUrl: string, repo: string, path: string, signal: AbortSignal): Promise<{ path: string; size: number; sha256: string }> {
+  const folder = path.includes("/") ? `/${path.slice(0, path.lastIndexOf("/"))}` : "";
+  const res = await fetch(`${apiUrl}/api/models/${repo}/tree/main${folder}`, { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) }).catch((err: unknown) => {
+    throw new HfDownloadError(`Hugging Face did not answer: ${err instanceof Error ? err.message : String(err)}`);
+  });
+  if (!res.ok) throw new HfDownloadError(`Hugging Face answered ${res.status}`);
+  const files = (await res.json()) as { type: string; path: string; size: number; lfs?: { oid?: string; size?: number } }[];
+  const file = files.find((f) => f.type === "file" && f.path === path);
+  if (!file?.lfs?.oid) throw new HfDownloadError(`No such file on Hugging Face: ${repo}/${path}`);
+  return { path: file.path, size: file.lfs.size ?? file.size, sha256: file.lfs.oid };
+}
+
+export type FileDownload = Omit<HfDownload, "model" | "ollamaUrl">;
+
 /**
- * Downloads hf.co/<repo>:<quant> by Artel itself and makes an Ollama model of it (seen: Ollama's own pull could not
- * reach Hugging Face's CDN). Pausing aborts `signal` and keeps the partial file; the next call goes on with Range.
+ * Downloads one file of a repository into `d.dir` as `<sha256>.part` and checks it; resolves with that path, or with
+ * null when paused. Pausing aborts `signal` and keeps the partial file; the next call goes on with Range.
  */
-export async function downloadHf(d: HfDownload): Promise<void> {
-  const m = /^hf\.co\/([\w.-]+\/[\w.-]+):([\w.-]+)$/i.exec(d.model);
-  if (!m) throw new HfDownloadError(`Not a Hugging Face model name: ${d.model}`);
-  const [, repo, quant] = m as unknown as [string, string, string];
-  d.progress({ status: "pulling manifest", completed: 0, total: 0 });
-  const file = await findFile(d.apiUrl, repo, quant, d.signal);
+export async function downloadFile(d: FileDownload, repo: string, file: { path: string; size: number; sha256: string }): Promise<string | null> {
   mkdirSync(d.dir, { recursive: true });
   const part = join(d.dir, `${file.sha256}.part`);
   d.partial(part);
@@ -111,14 +121,14 @@ export async function downloadHf(d: HfDownload): Promise<void> {
     const order = [...tries.filter((t) => t.key === preferred), ...tries.filter((t) => t.key !== preferred)];
     const failures: string[] = [];
     for (const t of order) {
-      if (d.signal.aborted) return;
+      if (d.signal.aborted) return null;
       d.progress({ status: "downloading", completed: have(), total: file.size });
       try {
-        await fetchInto(t.route, `${t.base}/${repo}/resolve/main/${encodeURIComponent(file.path)}`, part, have(), file.size, d);
+        await fetchInto(t.route, `${t.base}/${repo}/resolve/main/${file.path.split("/").map(encodeURIComponent).join("/")}`, part, have(), file.size, d);
         preferred = t.key;
         break;
       } catch (err) {
-        if (d.signal.aborted) return;
+        if (d.signal.aborted) return null;
         failures.push(`${t.route.label}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
@@ -133,6 +143,21 @@ export async function downloadHf(d: HfDownload): Promise<void> {
     unlinkSync(part);
     throw new HfDownloadError("The downloaded file does not match Hugging Face's checksum; it was deleted. Try again.");
   }
+  return part;
+}
+
+/**
+ * Downloads hf.co/<repo>:<quant> by Artel itself and makes an Ollama model of it (seen: Ollama's own pull could not
+ * reach Hugging Face's CDN).
+ */
+export async function downloadHf(d: HfDownload): Promise<void> {
+  const m = /^hf\.co\/([\w.-]+\/[\w.-]+):([\w.-]+)$/i.exec(d.model);
+  if (!m) throw new HfDownloadError(`Not a Hugging Face model name: ${d.model}`);
+  const [, repo, quant] = m as unknown as [string, string, string];
+  d.progress({ status: "pulling manifest", completed: 0, total: 0 });
+  const file = await findFile(d.apiUrl, repo, quant, d.signal);
+  const part = await downloadFile(d, repo, file);
+  if (!part) return;
 
   // Into Ollama: the file as a blob, then a model made from it (it reads the chat template from the GGUF).
   d.progress({ status: "copying the model to Ollama", completed: file.size, total: file.size });

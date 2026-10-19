@@ -5,6 +5,7 @@ import { useApp } from "../../context";
 import { InstallOllama } from "./InstallOllama";
 import { forgetModels } from "../../lib/models";
 import { LocalCatalogView } from "./LocalCatalog";
+import { LocalImagesSection } from "./LocalImages";
 import { PullControl, type PullActions } from "./PullControl";
 import { useSize } from "./size";
 
@@ -148,6 +149,7 @@ export function LocalModelsSheet() {
         )}
 
         {status?.running && <LocalCatalogView status={status} actions={actions} />}
+        <LocalImagesSection />
       </div>
       <aside className="margin">
         <p className="note">{t("local.marginTip")}</p>

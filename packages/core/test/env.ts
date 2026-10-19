@@ -71,6 +71,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
     hardware: { ramBytes: 32 * 2 ** 30, gpu: { name: "Test GPU", vramBytes: 10 * 2 ** 30 }, unified: false },
     registryUrl: "http://127.0.0.1:9",
     hfUrl: "http://127.0.0.1:9",
+    images: { engineUrl: "http://127.0.0.1:9/engine.zip" },
   };
   let github: GithubOptions = { webUrl: "http://127.0.0.1:9", apiUrl: "http://127.0.0.1:9" };
   let web: WebAccess = {

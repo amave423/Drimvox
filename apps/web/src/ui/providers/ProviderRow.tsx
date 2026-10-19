@@ -26,6 +26,8 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
   const [mode, setMode] = useState<Mode>("idle");
   const [newKey, setNewKey] = useState("");
   const [busy, setBusy] = useState(false);
+  // Pictures on this computer: its models are downloaded on the local models' sheet, nothing to check or proxy here.
+  const local = provider.preset === "sdcpp";
 
   async function runCheck(fresh: boolean) {
     setCheck(null);
@@ -40,7 +42,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
 
   // Checked once per row; key changes re-check explicitly in saveKey.
   useEffect(() => {
-    void runCheck(false);
+    if (!local) void runCheck(false);
   }, [provider.id]);
 
   async function saveKey() {
@@ -78,7 +80,8 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
       </div>
 
       <div className="provider-status" aria-live="polite">
-        {check === null && <span className="muted">{t("providers.checking")}</span>}
+        {local && <span className="muted">{t("providers.sdcpp")}</span>}
+        {!local && check === null && <span className="muted">{t("providers.checking")}</span>}
         {check && "models" in check && (
           <span className="facts">
             <span className="is-ok">✓ {t("providers.models", { count: check.models.length })}</span>
@@ -101,12 +104,14 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
         </p>
       )}
 
-      <div className="provider-proxy">
-        <Toggle checked={provider.useProxy} disabled={!proxySet && !provider.useProxy} onChange={(on) => void switchProxy(on)}>
-          {t("providers.useProxy")}
-        </Toggle>
-        {!proxySet && <span className="muted">{t("providers.proxyNotSet")}</span>}
-      </div>
+      {!local && (
+        <div className="provider-proxy">
+          <Toggle checked={provider.useProxy} disabled={!proxySet && !provider.useProxy} onChange={(on) => void switchProxy(on)}>
+            {t("providers.useProxy")}
+          </Toggle>
+          {!proxySet && <span className="muted">{t("providers.proxyNotSet")}</span>}
+        </div>
+      )}
 
       {mode === "replaceKey" && (
         <form
@@ -151,9 +156,11 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
 
       {mode === "idle" && (
         <div className="provider-actions">
-          <button className="link" onClick={() => void runCheck(true)}>
-            {t("providers.recheck")}
-          </button>
+          {!local && (
+            <button className="link" onClick={() => void runCheck(true)}>
+              {t("providers.recheck")}
+            </button>
+          )}
           {(provider.billing === "paid" || provider.billing === "credits") && (
             <button className="link" onClick={() => setMode("replaceKey")}>
               {t("providers.replaceKey")}

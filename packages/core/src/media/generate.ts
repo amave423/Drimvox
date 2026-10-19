@@ -2,6 +2,7 @@ import type { MediaModel, MediaOptions } from "@artel/shared";
 import { codeForStatus, describeError, detailFromBody, ProviderFailure } from "../providers/errors";
 import type { Connection } from "../providers/repo";
 import { usdPer } from "../rates";
+import { drawLocally } from "./local";
 
 const headers = (conn: Connection, json = true) => ({
   Accept: json ? "application/json" : "*/*",
@@ -45,6 +46,7 @@ export interface Generated {
 
 /** Draws one picture. Pictures take seconds to a minute; five minutes is the limit. */
 export async function generateImage(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal): Promise<Generated> {
+  if (conn.preset === "sdcpp") return drawLocally(model.id, prompt, o.aspectRatio, signal);
   if (model.viaChat) return drawInChat(conn, model, prompt, o, signal);
   const body = await postJson(
     conn,

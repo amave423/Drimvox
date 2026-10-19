@@ -268,6 +268,8 @@
 .local-card p { margin: 0; }
 .local-card .btn, .local-card .is-ok-text { justify-self: start; }
 .local-card-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.local-card-name { font-weight: 500; }
+.local-image-cards + .note { margin-top: 14px; }
 .local-uses { display: flex; flex-wrap: wrap; gap: 4px; }
 .local-use { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); color: var(--muted); }
 .local-fit { font-size: 12px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }

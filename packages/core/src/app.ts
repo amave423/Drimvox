@@ -43,6 +43,7 @@ import { Shots, type Screenshotter } from "./visual/look";
 import { createCipher } from "./secrets";
 import { readSettings, writeSettings } from "./settings";
 import { webHandler } from "./web";
+import { useLocalImages } from "./media/local";
 
 export interface AppOptions {
   db: Database;
@@ -95,8 +96,9 @@ export function createCore(o: AppOptions) {
   const cipher = createCipher(o.secretKey);
   const proxies = new ProxyStore(o.db, cipher);
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
-  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), proxy: () => proxies.url(), ...o.local });
+  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
+  useLocalImages(local.images);
   const github = new GitHub(o.db, cipher, o.github);
   const mcpRepo = new McpRepo(o.db, cipher);
   const mcp = new McpHub(mcpRepo);

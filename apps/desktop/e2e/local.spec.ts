@@ -78,7 +78,8 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   await expect(page.getByText(/видеокарта NVIDIA GeForce RTX 3080, 10 ГБ; память 32 ГБ/)).toBeVisible();
 
   // Only what runs here: the 60 GB model is not offered at all.
-  const cards = page.locator(".local-card");
+  // The picks of Ollama; the picture models below are cards of their own list.
+  const cards = page.locator(".local-cards:not(.local-image-cards) .local-card");
   await expect(cards).toHaveCount(2);
   await expect(cards.nth(0)).toContainText("qwen3:1.7b");
   await expect(cards.nth(0)).toContainText("быстро");

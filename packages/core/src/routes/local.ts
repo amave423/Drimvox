@@ -1,8 +1,9 @@
 import { zValidator } from "@hono/zod-validator";
-import { hfRepoName, localModelName, localPullSchema } from "@artel/shared";
+import { hfRepoName, localImageModelIds, localImagePullSchema, localModelName, localPullSchema } from "@artel/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { CatalogError } from "../local/catalog";
+import { EngineError } from "../local/images/server";
 import type { LocalModels } from "../local/service";
 
 const unreachable = (err: unknown) => ({ error: { code: "hf_unreachable", detail: err instanceof Error ? err.message : String(err) } });
@@ -46,5 +47,25 @@ export function localRoutes(local: LocalModels) {
     )
     .delete("/models", zValidator("query", z.object({ name: localModelName })), async (c) =>
       (await local.remove(c.req.valid("query").name)) ? c.json({ ok: true }, 200) : c.json({ error: { code: "not_found" } }, 404),
-    );
+    )
+    // Pictures on this computer (docs/specs/local-images.md): the short list, downloads of the engine and the models.
+    .get("/images", async (c) => c.json(await local.images.status()))
+    .post("/images/pulls", zValidator("json", localImagePullSchema), async (c) => {
+      try {
+        return c.json(await local.images.pull(c.req.valid("json").model), 202);
+      } catch (err) {
+        if (err instanceof EngineError) return c.json({ error: { code: "unsupported" as const, detail: err.message } }, 409);
+        throw err;
+      }
+    })
+    .post("/images/pulls/pause", zValidator("json", localImagePullSchema), (c) =>
+      local.images.pause(c.req.valid("json").model) ? c.json({ ok: true as const }, 200) : c.json({ error: { code: "not_found" as const } }, 404),
+    )
+    .delete("/images/pulls", zValidator("query", localImagePullSchema), (c) =>
+      local.images.cancel(c.req.valid("query").model) ? c.json({ ok: true as const }, 200) : c.json({ error: { code: "not_found" as const } }, 404),
+    )
+    .delete("/images/models/:id", zValidator("param", z.object({ id: z.enum(localImageModelIds) })), async (c) => {
+      await local.images.remove(c.req.valid("param").id);
+      return c.json({ ok: true as const }, 200);
+    });
 }

@@ -7,6 +7,7 @@ import type { ProviderRepo } from "../providers/repo";
 import { LocalCatalog } from "./catalog";
 import { detectHardware } from "./hardware";
 import { findOllama, OllamaManager } from "./ollama";
+import { LocalImages, type LocalImagesOptions } from "./images/service";
 
 export interface LocalOptions {
   /** What starts `ollama serve`; found on this computer by default, null for "not installed". */
@@ -26,6 +27,10 @@ export interface LocalOptions {
   proxy?: () => string | null;
   /** Tests: where the setup comes from, what runs it, and whether Ollama is there afterwards. */
   install?: { url?: string; skipRun?: boolean; command?: string[]; can?: boolean };
+  /** Where the picture engine and its models live; the data folder's "images" by default. */
+  imagesDir?: string;
+  /** The picture engine (docs/specs/local-images.md); tests give a fake one. */
+  images?: LocalImagesOptions;
 }
 
 /** Local models: Ollama on this computer, the catalog sized for it, and the chat provider that uses it. */
@@ -34,6 +39,7 @@ export class LocalModels {
   private readonly catalog: LocalCatalog;
   private readonly hardware: () => Promise<LocalHardware>;
   readonly installer: OllamaInstaller;
+  readonly images: LocalImages;
   private readonly canInstall: boolean;
 
   constructor(
@@ -64,6 +70,17 @@ export class LocalModels {
         return !!command;
       },
     });
+    const hf = { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "artel-downloads"), proxy: o.proxy ?? (() => null) };
+    this.images = new LocalImages(
+      {
+        dir: o.imagesDir ?? join(tmpdir(), "artel-images"),
+        hardware: this.hardware,
+        hf,
+        providerId: () => this.providers.list().find((p) => p.preset === "sdcpp")?.id ?? null,
+        connect: () => this.providers.list().find((p) => p.preset === "sdcpp")?.id ?? this.providers.create({ preset: "sdcpp" }).id,
+      },
+      o.images,
+    );
     this.catalog = new LocalCatalog({ registryUrl: o.registryUrl ?? "https://registry.ollama.ai", hfUrl: o.hfUrl ?? "https://huggingface.co" });
   }
 
@@ -130,5 +147,6 @@ export class LocalModels {
 
   close(): void {
     this.ollama.close();
+    this.images.close();
   }
 }

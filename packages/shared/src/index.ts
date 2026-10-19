@@ -10,6 +10,7 @@ export * from "./auth";
 export * from "./quality";
 export * from "./design";
 export * from "./local";
+export * from "./local-images";
 export * from "./page";
 export * from "./backlog";
 export * from "./github";
