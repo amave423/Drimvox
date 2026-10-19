@@ -66,3 +66,13 @@
   скачивание с прогрессом, модель появилась в чате и отвечает.
 - Живая проверка: настоящая Ollama на этом компьютере (RTX 3080 10 ГБ, 32 ГБ), маленькая модель из подборки,
   чат на ней, Ollama уходит из фона после простоя.
+
+## Hugging Face files (Artel downloads them)
+- Seen from Russia: huggingface.co answers, but the file server it redirects to (us.aws.cdn.hf.co) does not, so
+  Ollama's own `pull hf.co/...` fails with a TLS timeout. hf-mirror.com only redirects back to huggingface.co.
+- Artel downloads `hf.co/<repo>:<quant>` itself: the file and its sha256 from huggingface.co's API, the bytes straight
+  and, when that fails, through the proxy from the settings. Range requests resume after a pause; the partial file
+  waits in the data folder's `downloads` and is deleted on cancel.
+- The finished file is checked against the sha256, given to Ollama as a blob (`/api/blobs`) and made a model with
+  `/api/create`; Ollama reads the chat template from the GGUF. Vision projectors are not fetched.
+- Without a proxy and with the file server closed, the error says to set one.

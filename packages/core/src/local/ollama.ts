@@ -1,6 +1,8 @@
 import type { LocalHardware, LocalModel, LocalPull } from "@artel/shared";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
+import { downloadHf } from "./hf-download";
+import { fetchVia } from "../proxy";
 import { join } from "node:path";
 import { onPath } from "../cli/resolve";
 import { GB } from "./fit";
@@ -37,6 +39,8 @@ export interface OllamaOptions {
   hardware: () => Promise<LocalHardware>;
   /** A download finished: the chat should see the new model. */
   onPulled?: () => void;
+  /** Hugging Face models are downloaded by Artel itself (see hf-download.ts): from where, and where partial files wait. */
+  hf?: { apiUrl: string; bases: string[]; dir: string; /** The proxy from the settings, tried when the direct way fails. */ proxy(): string | null };
 }
 
 interface Active {
@@ -45,6 +49,8 @@ interface Active {
   layers: Map<string, { total: number; completed: number }>;
   /** The last measure of progress, for the speed. */
   sample?: { at: number; completed: number };
+  /** A Hugging Face download's unfinished file, deleted when the download is cancelled. */
+  partial?: string;
 }
 
 /** How long Ollama gets to come up after Artel starts it. */
@@ -221,6 +227,7 @@ export class OllamaManager {
 
   private async download(a: Active): Promise<void> {
     const p = a.pull;
+    if (this.o.hf && /^hf\.co\//i.test(p.model)) return this.downloadHf(a, this.o.hf);
     try {
       const res = await fetch(`${this.o.apiUrl}/api/pull`, {
         method: "POST",
@@ -240,6 +247,35 @@ export class OllamaManager {
       }
       if (buffer.trim()) this.progress(a, JSON.parse(buffer) as Record<string, unknown>);
       if (!p.done) Object.assign(p, { done: true, error: p.error ?? "Ollama stopped the download" });
+    } catch (err) {
+      if (a.abort.signal.aborted) return;
+      Object.assign(p, { done: true, error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      this.touch();
+    }
+  }
+
+  private async downloadHf(a: Active, hf: NonNullable<OllamaOptions["hf"]>): Promise<void> {
+    const p = a.pull;
+    try {
+      await downloadHf({
+        model: p.model,
+        apiUrl: hf.apiUrl,
+        bases: hf.bases,
+        routes: [{ label: "direct", fetch }, ...(hf.proxy() ? [{ label: "proxy", fetch: fetchVia(hf.proxy()!) }] : [])],
+        ollamaUrl: this.o.apiUrl,
+        dir: hf.dir,
+        signal: a.abort.signal,
+        partial: (path) => (a.partial = path),
+        progress: (s) => {
+          this.touch();
+          Object.assign(p, { status: s.status, completed: s.completed, total: s.total || p.total });
+          this.measure(a);
+        },
+      });
+      if (a.abort.signal.aborted) return;
+      Object.assign(p, { done: true, error: null, status: "success", completed: p.total });
+      this.o.onPulled?.();
     } catch (err) {
       if (a.abort.signal.aborted) return;
       Object.assign(p, { done: true, error: err instanceof Error ? err.message : String(err) });
@@ -296,6 +332,18 @@ export class OllamaManager {
     if (!a) return false;
     a.abort.abort();
     this.pulls.delete(model);
+    // A cancelled Hugging Face download leaves no partial file behind; a paused one keeps it to go on.
+    if (a.partial) {
+      const file = a.partial;
+      // The download lets go of the file a moment after the abort; Windows refuses to delete it before that.
+      setTimeout(() => {
+        try {
+          rmSync(file, { force: true });
+        } catch {
+          // Left for the next download of the same file to reuse.
+        }
+      }, 500).unref();
+    }
     return true;
   }
 

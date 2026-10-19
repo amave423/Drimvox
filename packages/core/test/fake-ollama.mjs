@@ -1,6 +1,7 @@
 // A stand-in for `ollama serve`: listens on OLLAMA_HOST and answers the parts of Ollama's API Artel uses.
 // FAKE_OLLAMA_MODELS: JSON list of installed names. FAKE_OLLAMA_PULL_MS: delay between progress lines.
 // FAKE_OLLAMA_KEEP_MS: how long a model stays loaded after a chat (what /api/ps shows).
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 
 const [host, port] = (process.env.OLLAMA_HOST ?? "127.0.0.1:11434").replace(/^https?:\/\//, "").split(":");
@@ -8,6 +9,7 @@ const pullMs = Number(process.env.FAKE_OLLAMA_PULL_MS ?? 20);
 const keepMs = Number(process.env.FAKE_OLLAMA_KEEP_MS ?? 100);
 const models = new Map((JSON.parse(process.env.FAKE_OLLAMA_MODELS ?? "[]")).map((name) => [name, 1000]));
 const chats = [];
+const blobs = new Set();
 let loadedUntil = 0;
 let loadedModel = "";
 
@@ -33,6 +35,35 @@ createServer(async (req, res) => {
     return json(res, 200, { models: Date.now() < loadedUntil ? [{ name: loadedModel, model: loadedModel, size: 1000 }] : [] });
   }
   if (url.pathname === "/fake/requests") return json(res, 200, chats);
+  // Importing a GGUF Artel downloaded itself: the file as a blob, then a model made from it.
+  if (url.pathname.startsWith("/api/blobs/")) {
+    const digest = decodeURIComponent(url.pathname.slice("/api/blobs/".length));
+    if (req.method === "HEAD") {
+      res.writeHead(blobs.has(digest) ? 200 : 404);
+      return res.end();
+    }
+    const hash = createHash("sha256");
+    for await (const chunk of req) hash.update(chunk);
+    const got = `sha256:${hash.digest("hex")}`;
+    if (got !== digest) return json(res, 400, { error: "digest mismatch" });
+    blobs.add(digest);
+    res.writeHead(201);
+    return res.end();
+  }
+  if (url.pathname === "/fake/blobs") return json(res, 200, [...blobs]);
+  if (url.pathname === "/api/create" && req.method === "POST") {
+    const { model, files } = await read(req);
+    const missing = Object.values(files ?? {}).find((d) => !blobs.has(d));
+    res.writeHead(200, { "content-type": "application/x-ndjson" });
+    if (missing) {
+      res.write(`${JSON.stringify({ error: `blob ${missing} not found` })}\n`);
+      return res.end();
+    }
+    res.write(`${JSON.stringify({ status: "parsing GGUF" })}\n`);
+    models.set(model, 1000);
+    res.write(`${JSON.stringify({ status: "success" })}\n`);
+    return res.end();
+  }
   // What a model can do: llama3.2 and 1.7b models are small, gemma sees pictures.
   if (url.pathname === "/api/show" && req.method === "POST") {
     const { model } = await read(req);

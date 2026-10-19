@@ -23,9 +23,10 @@ export function useTimeLeft(): (pull: LocalPull) => string | null {
 }
 
 /** A download's error in plain words: Ollama's own text is technical (a TLS handshake, a timeout). */
-export function pullError(error: string): "network" | "missing" | "unsupported" | "other" {
+export function pullError(error: string): "network" | "missing" | "unsupported" | "checksum" | "other" {
+  if (/checksum/i.test(error)) return "checksum";
   if (/unknown model architecture|unsupported/i.test(error)) return "unsupported";
-  if (/tls|timeout|timed out|connection|no such host|dial tcp|EOF|reset/i.test(error)) return "network";
+  if (/tls|timeout|timed out|connection|no such host|dial tcp|EOF|reset|did not answer|fetch failed/i.test(error)) return "network";
   if (/does not exist|not found|manifest/i.test(error)) return "missing";
   return "other";
 }

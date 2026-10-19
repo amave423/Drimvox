@@ -95,7 +95,7 @@ export function createCore(o: AppOptions) {
   const cipher = createCipher(o.secretKey);
   const proxies = new ProxyStore(o.db, cipher);
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
-  const local = new LocalModels(providers, providers.urlOf("ollama"), o.local);
+  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
   const github = new GitHub(o.db, cipher, o.github);
   const mcpRepo = new McpRepo(o.db, cipher);

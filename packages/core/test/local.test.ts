@@ -1,11 +1,13 @@
 import type { LocalHardware } from "@artel/shared";
 import { spawn, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { createServer as netServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GB } from "../src/local/fit";
 import { createTestEnv, readEvents, type TestEnv } from "./env";
+import { startFakeProxy } from "./fake-proxy";
 
 const FAKE = fileURLToPath(new URL("./fake-ollama.mjs", import.meta.url));
 const desktop: LocalHardware = { ramBytes: 32 * GB, gpu: { name: "RTX 3080", vramBytes: 10 * GB }, unified: false };
@@ -55,7 +57,7 @@ async function serve(handler: (path: string, url: URL) => unknown): Promise<stri
   return `http://127.0.0.1:${(s.address() as { port: number }).port}`;
 }
 
-function setup(o: { installed?: boolean; idleMs?: number; hardware?: LocalHardware; models?: string[]; pullMs?: number; keepMs?: number; registry?: string; hf?: string } = {}) {
+function setup(o: { installed?: boolean; idleMs?: number; hardware?: LocalHardware; models?: string[]; pullMs?: number; keepMs?: number; registry?: string; hf?: string; hfFiles?: string[] } = {}) {
   env.setPresetUrl("ollama", `${base()}/v1`);
   env.setLocal({
     command: o.installed === false ? null : [process.execPath, FAKE],
@@ -68,6 +70,7 @@ function setup(o: { installed?: boolean; idleMs?: number; hardware?: LocalHardwa
     hardware: o.hardware ?? desktop,
     ...(o.registry ? { registryUrl: o.registry } : {}),
     ...(o.hf ? { hfUrl: o.hf } : {}),
+    ...(o.hfFiles ? { hfFiles: o.hfFiles } : {}),
   });
 }
 const status = async () => (await env.call("GET", "/api/local")).json();
@@ -201,6 +204,106 @@ describe("downloads", () => {
     setup({ models: ["gemma4:e2b", "qwen3:8b"] });
     expect((await env.call("DELETE", "/api/local/models?name=gemma4:e2b")).status).toBe(200);
     expect((await status()).models.map((m: any) => m.name)).toEqual(["qwen3:8b"]);
+  });
+});
+
+// Seen: Hugging Face's own address answers, but the files it sends to (us.aws.cdn.hf.co) do not, with or without a VPN.
+// Artel downloads the file itself, through the proxy from the settings when the direct way fails, checks it against
+// the sha256 that huggingface.co gives, and hands it to Ollama.
+describe("Hugging Face downloads", () => {
+  const FILE = Buffer.from(Array.from({ length: 300_000 }, (_, i) => (i * 7919) % 251));
+  const SHA = createHash("sha256").update(FILE).digest("hex");
+  const MODEL = "hf.co/someone/tiny-GGUF:Q4_K_M";
+
+  const api = () =>
+    serve((path) =>
+      path === "/api/models/someone/tiny-GGUF/tree/main"
+        ? [
+            { type: "file", path: "tiny-Q4_K_M.gguf", size: FILE.length, lfs: { oid: SHA, size: FILE.length } },
+            { type: "file", path: "mmproj-F16.gguf", size: 10, lfs: { oid: "0".repeat(64), size: 10 } },
+          ]
+        : undefined,
+    );
+
+  /**
+   * A file server that sends the file in slow pieces and honours Range; `body` may be swapped for a bad copy. With
+   * `refuseFirst` the first request fails, as the direct way does on a closed network.
+   */
+  async function mirror(body = FILE, refuseFirst = false): Promise<{ url: string; ranges: (string | null)[] }> {
+    const ranges: (string | null)[] = [];
+    let refused = !refuseFirst;
+    const s = createServer(async (req, res) => {
+      if (!/\/someone\/tiny-GGUF\/resolve\/main\/tiny-Q4_K_M\.gguf$/.test(req.url ?? "")) {
+        res.writeHead(404);
+        return res.end();
+      }
+      if (!refused) {
+        refused = true;
+        return req.socket.destroy();
+      }
+      ranges.push(req.headers.range ?? null);
+      const start = Number(/bytes=(\d+)-/.exec(req.headers.range ?? "")?.[1] ?? 0);
+      res.writeHead(start ? 206 : 200, { "content-length": String(body.length - start), "content-type": "application/octet-stream" });
+      for (let at = start; at < body.length; at += 30_000) {
+        if (res.destroyed) return;
+        res.write(body.subarray(at, Math.min(body.length, at + 30_000)));
+        await sleep(40);
+      }
+      res.end();
+    });
+    await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
+    servers.push(s);
+    return { url: `http://127.0.0.1:${(s.address() as { port: number }).port}`, ranges };
+  }
+
+  it("goes through the proxy when the direct way fails, checks the file and hands it to Ollama", async () => {
+    const m = await mirror(FILE, true);
+    const proxy = await startFakeProxy();
+    setup({ hf: await api(), hfFiles: [m.url] });
+    await env.call("PUT", "/api/proxy", { url: proxy.url });
+    expect((await env.call("POST", "/api/local/pulls", { model: MODEL })).status).toBe(202);
+    const mid = await until(status, (v) => v.pulls[0]?.completed > 0 && !v.pulls[0]?.done);
+    expect(mid.pulls[0]).toMatchObject({ total: FILE.length, error: null });
+    const done = await until(status, (v) => v.pulls[0]?.done, 20_000);
+    expect(done.pulls[0]).toMatchObject({ done: true, error: null });
+    expect(done.models.map((x: any) => x.name)).toContain(MODEL);
+    expect(await (await fetch(`${base()}/fake/blobs`)).json()).toContain(`sha256:${SHA}`);
+    // The proxy tunnels to the file server (a CONNECT names only its host and port).
+    expect(proxy.hits.some((h) => h.target.includes(new URL(m.url).port))).toBe(true);
+    await proxy.close();
+  });
+
+  it("says to set a proxy when the file server cannot be reached and none is set", async () => {
+    setup({ hf: await api(), hfFiles: ["http://127.0.0.1:9"] });
+    await env.call("POST", "/api/local/pulls", { model: MODEL });
+    const done = await until(status, (v) => v.pulls[0]?.done, 30_000);
+    expect(done.pulls[0].error).toMatch(/Set a proxy in the settings/);
+  });
+
+  it("pauses and goes on from where it stopped", async () => {
+    const m = await mirror();
+    setup({ hf: await api(), hfFiles: [m.url] });
+    await env.call("POST", "/api/local/pulls", { model: MODEL });
+    await until(status, (v) => v.pulls[0]?.completed >= 60_000);
+    await env.call("POST", "/api/local/pulls/pause", { model: MODEL });
+    const paused = (await status()).pulls[0];
+    expect(paused).toMatchObject({ paused: true, done: false });
+    await env.call("POST", "/api/local/pulls", { model: MODEL });
+    const done = await until(status, (v) => v.pulls[0]?.done, 20_000);
+    expect(done.pulls[0]).toMatchObject({ error: null });
+    expect(m.ranges[0]).toBeNull();
+    expect(m.ranges.at(-1)).toMatch(/^bytes=[1-9]\d*-$/);
+  });
+
+  it("refuses a file that does not match Hugging Face's checksum", async () => {
+    const bad = Buffer.from(FILE);
+    bad[1000] = bad[1000]! ^ 0xff;
+    const m = await mirror(bad);
+    setup({ hf: await api(), hfFiles: [m.url] });
+    await env.call("POST", "/api/local/pulls", { model: MODEL });
+    const done = await until(status, (v) => v.pulls[0]?.done, 20_000);
+    expect(done.pulls[0].error).toMatch(/checksum/i);
+    expect(done.models).toEqual([]);
   });
 });
 

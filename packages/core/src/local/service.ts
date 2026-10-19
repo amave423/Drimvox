@@ -1,3 +1,4 @@
+import { HF_FILE_BASES } from "./hf-download";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OLLAMA_LINUX_COMMAND, OLLAMA_SETUP_URL, OllamaInstaller, runSetup } from "./install";
@@ -17,6 +18,12 @@ export interface LocalOptions {
   hardware?: LocalHardware;
   registryUrl?: string;
   hfUrl?: string;
+  /** Where GGUF files are downloaded from, in order (Hugging Face, then a mirror); tests give their own. */
+  hfFiles?: string[];
+  /** Where unfinished Hugging Face downloads wait between pauses; the data folder's "downloads" by default. */
+  downloadsDir?: string;
+  /** The proxy from the settings: Hugging Face files go through it when the direct way fails. */
+  proxy?: () => string | null;
   /** Tests: where the setup comes from, what runs it, and whether Ollama is there afterwards. */
   install?: { url?: string; skipRun?: boolean; command?: string[]; can?: boolean };
 }
@@ -43,6 +50,7 @@ export class LocalModels {
       idleMs: o.idleMs ?? 10 * 60_000,
       hardware: this.hardware,
       onPulled: () => this.afterPull(),
+      hf: { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "artel-downloads"), proxy: o.proxy ?? (() => null) },
     });
     const test = o.install;
     this.canInstall = test?.can ?? process.platform === "win32";
