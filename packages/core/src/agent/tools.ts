@@ -25,6 +25,9 @@ type Run<S extends z.ZodType> = (input: z.infer<S>, signal?: AbortSignal) => Pro
  * the spec, leaves out everything that changes files or runs commands. "review" mode, for the acceptance
  * agent, reads and runs commands but has no way to edit files or finish the task.
  */
+/** Commands in a row that may run out of time before the answer stops running them. */
+const HUNG_LIMIT = 3;
+
 export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "review" | "write" = "write", extra: ToolSet = {}): ToolSet {
   function wrap<S extends z.ZodType>(name: string, description: string, inputSchema: S, run: Run<S>) {
     return tool({
@@ -78,6 +81,9 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
 
   if (mode === "read") return { ...readTools, ...stepTools };
 
+  // Commands that ran out of time, one after another (seen live: a hidden Word hung every command for two hours and the
+  // model kept killing it and trying again). After a few in a row this answer runs no more commands.
+  let hungInARow = 0;
   const run_command = wrap(
     "run_command",
     "Run a shell command in the project folder, e.g. tests or a build. Returns the exit code and the end of the output.",
@@ -87,11 +93,19 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
       timeout_seconds: z.number().int().min(1).max(600).default(120),
     }),
     async ({ command, purpose, timeout_seconds }, signal) => {
+      if (hungInARow >= HUNG_LIMIT) {
+        return {
+          ok: false,
+          output:
+            "Not run: commands hung three times in a row. Stop running commands now. Tell the user what you tried, that the commands kept hanging (a program may be waiting for input nobody can give, such as a hidden Office window), and suggest another way.",
+        };
+      }
       const verdict = classifyCommand(command, ws.root);
       if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal, purpose))) {
         return { ok: false, output: "The user denied this command. Do not retry it; find another way or explain in finish." };
       }
       const result = await runCommand(command, ws.root, timeout_seconds * 1000, signal);
+      hungInARow = result.timedOut ? hungInARow + 1 : 0;
       const head = result.timedOut ? `Timed out after ${timeout_seconds}s` : `Exit code: ${result.exitCode}`;
       return { ok: result.exitCode === 0 && !result.timedOut, output: `${head}\n${result.output}` };
     },

@@ -273,3 +273,60 @@ describe("systemPrompt", () => {
     expect(systemPrompt("/repo", "linux")).toContain("sh on a Unix-like system");
   });
 });
+
+// Seen live: a hidden Word hung every command for two hours; the model killed it and tried again, forty steps on end.
+// After three commands in a row that ran out of time, the tool says so and runs no more of them in this answer.
+describe("commands that keep hanging", () => {
+  it("stops running commands after three timeouts in a row", async () => {
+    const { folderTools } = await import("../src/chats/folder");
+    const tools = folderTools(root, async () => {}, async () => true);
+    const run = (command: string) =>
+      (tools.run_command!.execute as (input: unknown, o: unknown) => Promise<string>)({ command, timeout_seconds: 1 }, { toolCallId: "t", messages: [] });
+    const hang = `node -e "setTimeout(() => {}, 20000)"`;
+    for (let i = 0; i < 3; i++) expect(await run(hang)).toMatch(/Timed out after 1s/);
+    const refused = await run("node -e \"console.log(1)\"");
+    expect(refused).toMatch(/hung three times in a row/);
+    expect(refused).not.toMatch(/Exit code/);
+  }, 30_000);
+
+  it("counts only timeouts in a row", async () => {
+    const { folderTools } = await import("../src/chats/folder");
+    const tools = folderTools(root, async () => {}, async () => true);
+    const run = (command: string) =>
+      (tools.run_command!.execute as (input: unknown, o: unknown) => Promise<string>)({ command, timeout_seconds: 1 }, { toolCallId: "t", messages: [] });
+    const hang = `node -e "setTimeout(() => {}, 20000)"`;
+    await run(hang);
+    await run(hang);
+    expect(await run("node -e \"console.log(1)\"")).toMatch(/Exit code: 0/);
+    expect(await run(hang)).toMatch(/Timed out/);
+  }, 30_000);
+});
+
+// A hidden Office started by a command (COM automation) is not in the command's process tree: killing the tree left it
+// waiting forever. On a timeout, the Office programs started for automation since the command began go too.
+describe("Office left behind by a command", () => {
+  it("picks only Office started for automation after the command began", async () => {
+    const { officeLeftovers } = await import("../src/agent/office");
+    const since = new Date("2026-10-20T10:00:00Z");
+    const list = [
+      { ProcessId: 1, Name: "WINWORD.EXE", CommandLine: '"C:\Office16\WINWORD.EXE" /Automation -Embedding', Created: "2026-10-20T10:00:05Z" },
+      { ProcessId: 2, Name: "WINWORD.EXE", CommandLine: '"C:\Office16\WINWORD.EXE" "C:\Users\me\report.docx"', Created: "2026-10-20T10:00:06Z" },
+      { ProcessId: 3, Name: "EXCEL.EXE", CommandLine: '"C:\Office16\EXCEL.EXE" -Embedding', Created: "2026-10-20T09:59:00Z" },
+      { ProcessId: 4, Name: "POWERPNT.EXE", CommandLine: '"C:\Office16\POWERPNT.EXE" /Automation -Embedding', Created: "2026-10-20T10:01:00Z" },
+      { ProcessId: 5, Name: "notepad.exe", CommandLine: "notepad.exe -Embedding", Created: "2026-10-20T10:01:00Z" },
+    ];
+    // The user's own Word with a document, and an Excel from before the command, are left alone.
+    expect(officeLeftovers(list, since)).toEqual([1, 4]);
+  });
+});
+
+describe("what a model is told about Office files", () => {
+  it("makes documents with libraries, not by driving Office", async () => {
+    const { folderHint } = await import("../src/chats/folder");
+    const hint = folderHint("C:\work", "win32");
+    expect(hint).toMatch(/python-docx/);
+    expect(hint).toMatch(/openpyxl/);
+    expect(hint).toMatch(/python-pptx/);
+    expect(hint).toMatch(/never.*COM/i);
+  });
+});

@@ -63,5 +63,9 @@ export function folderHint(folder: string, platform = process.platform): string 
     "edit_file (or write_file for new ones). Do what the user asks, run the project's checks when you change code, and say",
     "briefly what you changed. Never commit or push: the user keeps git. Keep the project's notes current with update_notes",
     "when you learn something the next conversation must know.",
+    // Seen live: a model drove a hidden Word through COM; it waited for an answer nobody could give, for two hours.
+    "Office files (.docx, .xlsx, .pptx) are made with libraries: python-docx, openpyxl, python-pptx (or docx, exceljs,",
+    "pptxgenjs in Node). Never drive Word, Excel, PowerPoint or Outlook through COM automation or New-Object -ComObject:",
+    "hidden Office windows wait for answers nobody can give, and the command hangs.",
   ].join("\n");
 }

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { closeOfficeLeftovers } from "./office";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -157,6 +158,8 @@ const LINGER_MS = 2_000;
 /** Runs a shell command in `cwd`; keeps the tail of the output and kills the whole tree on timeout. */
 export function runCommand(command: string, cwd: string, timeoutMs: number, signal?: AbortSignal): Promise<CommandResult> {
   return new Promise((done) => {
+    // A second back: the clock of a process's start is coarser than this one.
+    const startedAt = new Date(Date.now() - 1000);
     const child = spawnShell(command, cwd);
 
     let output = "";
@@ -185,6 +188,8 @@ export function runCommand(command: string, cwd: string, timeoutMs: number, sign
     const soon = (exitCode: number | null) => setTimeout(() => finish(exitCode), LINGER_MS).unref();
     const kill = () => {
       killTree(child);
+      // A hidden Office it started through COM is not in its tree (seen live: Word stayed, waiting for an answer).
+      void closeOfficeLeftovers(startedAt);
       soon(null);
     };
     const timer = setTimeout(() => {
