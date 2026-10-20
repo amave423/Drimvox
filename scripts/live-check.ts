@@ -4,7 +4,8 @@
 // `--team` gives the task to a team of agents instead of one. `--media` draws one cheap picture through
 // OpenRouter or RouterAI (about a cent); `--video` also makes the cheapest clip. `--web` asks a question that
 // needs the internet. `--tools` gives an agent a skill, an MCP tool and a page to look at. `--only=routerai`
-// checks one provider. `--cli` checks Claude Code, Codex and Gemini CLI instead of the keys.
+// checks one provider. `--cli` checks Claude Code, Codex and Gemini CLI instead of the keys. `--project` runs the
+// project's work instead of a task: interview, plan, "Go" and one long run with its checklist.
 import { startServer } from "@artel/core";
 import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@artel/shared";
 import { randomBytes } from "node:crypto";
@@ -12,6 +13,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkAgent } from "./live-agent";
+import { checkProject } from "./live-project";
 import { checkClis } from "./live-cli";
 import { checkMedia } from "./live-media";
 import { checkTeam } from "./live-team";
@@ -142,7 +144,7 @@ try {
       if (!list.some((m) => m.id === target.agentModel)) {
         failures++;
         log(`agent: model ${target.agentModel} is not in the list`);
-      } else if (!(await (process.argv.includes("--team") ? checkTeam : checkAgent)(api, provider.id, target.agentModel, log))) {
+      } else if (!(await (process.argv.includes("--project") ? checkProject : process.argv.includes("--team") ? checkTeam : checkAgent)(api, provider.id, target.agentModel, log))) {
         failures++;
       }
     }
