@@ -1,7 +1,9 @@
 import type { BacklogRepo } from "../backlog/repo";
-import { itemInstructions, LIST_NOW, listInstructions, listTools, saveList, type ListProposal } from "../backlog/plan";
+import { itemInstructions } from "../backlog/plan";
+import type { ProjectWorkRepo } from "../work/repo";
+import { PLAN_NOW, planInstructions as projectPlanInstructions, planTools as projectPlanTools, savePlan, toPlanStep } from "../work/plan";
 import type { Memory } from "./memory";
-import type { DesignBrief, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
+import type { DesignBrief, ProjectPlan, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
@@ -43,8 +45,10 @@ export interface PassContext {
   tasks: TaskRepo;
   projects: ProjectRepo;
   providers: ProviderRepo;
-  /** The project's task list, which a plan's interview fills. */
+  /** Where the project's plan is kept. */
   backlog: BacklogRepo;
+  /** The project's work: who writes the plan, and the checklist the plan starts. */
+  work: ProjectWorkRepo;
   idleTimeoutMs: number;
   strongModel(): { providerId: string; model: string } | null;
   /** The user writes code: the interview may ask about technology. */
@@ -108,7 +112,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   let proposal: SpecProposal | null = null;
   let teamPlan: PlanProposal | null = null;
   let answered: string | null = null;
-  let listed: ListProposal | null = null;
+  let written: ProjectPlan | null = null;
   const planning = row.kind === "goal" && phase === "spec";
   let extraTools: ToolSet | undefined;
   let stopTools: string[] | undefined;
@@ -119,8 +123,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     extraTools = planTools((p) => (teamPlan = p));
     stopTools = ["propose_plan"];
   } else if (phase === "list") {
-    extraTools = listTools((l) => (listed = l));
-    stopTools = ["propose_tasks"];
+    extraTools = projectPlanTools((p) => (written = p));
+    stopTools = ["write_plan"];
   } else if (phase === "spec") {
     extraTools = specTools((p) => (proposal = p));
     stopTools = ["propose_spec"];
@@ -195,7 +199,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       planning
         ? planInstructions()
         : phase === "list"
-          ? listInstructions(ctx.developer())
+          ? projectPlanInstructions(ctx.developer())
           : row.kind === "item"
             ? itemInstructions(JSON.parse(row.checks) as string[])
             : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),
@@ -258,7 +262,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     }
     if (row.kind === "plan") {
       enterPhase(ctx, id, "list");
-      return LIST_NOW;
+      toPlanStep(ctx, id, row);
+      return PLAN_NOW;
     }
     if (stages.spec) {
       enterPhase(ctx, id, "spec");
@@ -295,7 +300,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     return null;
   }
 
-  if (phase === "list") return saveList(ctx, id, row, listed as ListProposal | null, messages);
+  if (phase === "list") return savePlan(ctx, id, row, written as ProjectPlan | null, messages);
 
   if (phase === "spec") {
     if (!proposed) {

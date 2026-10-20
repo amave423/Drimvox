@@ -19,10 +19,11 @@ import { PhaseSteps } from "./Stages";
 import { StatusChip } from "./StatusDot";
 import { GoalLink, SubtaskBoard } from "./Subtasks";
 import { useTaskStream } from "./useTaskStream";
+import { ProjectPlanHere } from "../projects/ProjectPlanHere";
 
 const REVIEW_STATES = new Set(["review", "done_empty", "accepted", "discarded"]);
 /** Waiting states with their own controls below the notice. */
-const ANSWERED_BELOW = new Set(["questions", "spec_review", "plan_review"]);
+const ANSWERED_BELOW = new Set(["questions", "spec_review", "plan_review", "plan_ready"]);
 /** Waiting states where the work stopped short and only "Continue" moves it on. */
 const UNFINISHED = new Set(["budget", "steps", "acceptance_error"]);
 /** Waiting states whose last status line explains what went wrong. */
@@ -44,7 +45,9 @@ export function TaskSheet({ taskId }: { taskId: string }) {
   const answered = task.status === "done_empty" && task.statusReason === "answered";
   // A plan's interview ends in the project's task list: nothing to review here.
   const listed = task.status === "done_empty" && task.statusReason === "listed";
-  const reviewing = task.kind !== "subtask" && !answered && !listed && (REVIEW_STATES.has(task.status) || stuck);
+  // A project's plan went on to the work: it goes on in the project's conversation (docs/specs/project-work.md).
+  const started = task.status === "done_empty" && task.statusReason === "started";
+  const reviewing = task.kind !== "subtask" && !answered && !listed && !started && (REVIEW_STATES.has(task.status) || stuck);
   const waitingFor = task.status === "waiting" ? task.statusReason : null;
   // Failed, stopped or out of budget: what is done so far can be looked at and taken as it is.
   const unfinished =
@@ -86,6 +89,7 @@ export function TaskSheet({ taskId }: { taskId: string }) {
         {waitingFor === "questions" && <Interview key={task.updatedAt} task={task} />}
         {waitingFor === "spec_review" && <SpecReview key={task.spec ?? ""} task={task} />}
         {waitingFor === "plan_review" && <PlanReview key={task.updatedAt} task={task} />}
+        {(waitingFor === "plan_ready" || started) && <ProjectPlanHere projectId={task.projectId} />}
         {task.subtasks.length > 0 && <SubtaskBoard task={task} />}
 
         {answered && <Answer task={task} />}
@@ -97,9 +101,9 @@ export function TaskSheet({ taskId }: { taskId: string }) {
             </button>
           </div>
         )}
-        {answered || listed ? (
+        {answered || listed || started ? (
           <details className="worked">
-            <summary>{t(listed ? "review.howWorked" : "answer.howFound")}</summary>
+            <summary>{t(listed || started ? "review.howWorked" : "answer.howFound")}</summary>
             <Feed items={feed} taskId={task.id} />
           </details>
         ) : reviewing ? (

@@ -29,6 +29,8 @@ const readAsDataUrl = (file: File) =>
  * or the user's own answer. Above them, what the agent understood so far and what it still does not know.
  */
 export function Interview({ task }: { task: TaskView }) {
+  // A project's interview ends in its plan: "decide the rest yourself" (docs/specs/project-work.md).
+  const planning = task.kind === "plan";
   const { api, t } = useApp();
   const initial = () =>
     Object.fromEntries(
@@ -205,11 +207,11 @@ export function Interview({ task }: { task: TaskView }) {
         <button className="btn is-primary" disabled={busy || !complete || badLink} onClick={() => void send(false)}>
           {t("interview.send")}
         </button>
-        <button className="btn" disabled={busy} onClick={() => void send(true)} title={t("interview.enoughHint")}>
-          {t("interview.enough")}
+        <button className="btn" disabled={busy} onClick={() => void send(true)} title={t(planning ? "interview.decideHint" : "interview.enoughHint")}>
+          {t(planning ? "interview.decide" : "interview.enough")}
         </button>
       </div>
-      <p className="muted interview-hint">{t("interview.enoughHint")}</p>
+      <p className="muted interview-hint">{t(planning ? "interview.decideHint" : "interview.enoughHint")}</p>
     </section>
   );
 }

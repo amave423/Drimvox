@@ -1,4 +1,5 @@
 /** Entry of the Electron utility process that runs the core. Same core runs headless in server mode. */
+import type { PageAction } from "@artel/shared";
 import { startServer, type RunningServer } from "@artel/core";
 
 export interface InitMessage {
@@ -30,18 +31,22 @@ process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number
   else waiting?.reject(new Error(data.error ?? "No screenshot"));
 });
 
-function screenshot(url: string, size: { width: number; height: number }): Promise<Buffer> {
+function screenshot(url: string, size: { width: number; height: number }, actions?: PageAction[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const id = nextShot++;
-    const timer = setTimeout(() => {
-      shots.delete(id);
-      reject(new Error("The page did not load in time"));
-    }, 60_000);
+    // A scenario of a few steps takes its time on top of loading the page.
+    const timer = setTimeout(
+      () => {
+        shots.delete(id);
+        reject(new Error("The page did not load in time"));
+      },
+      actions?.length ? 180_000 : 60_000,
+    );
     shots.set(id, {
       resolve: (png) => (clearTimeout(timer), resolve(png)),
       reject: (err) => (clearTimeout(timer), reject(err)),
     });
-    process.parentPort.postMessage({ type: "screenshot", id, url, ...size });
+    process.parentPort.postMessage({ type: "screenshot", id, url, ...size, ...(actions ? { actions } : {}) });
   });
 }
 

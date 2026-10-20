@@ -1,3 +1,4 @@
+import type { PageAction } from "@artel/shared";
 import type { ModelInfo } from "@artel/shared";
 import { streamText } from "ai";
 import { randomUUID } from "node:crypto";
@@ -8,7 +9,8 @@ import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
 
 /** Photographs a page: the desktop app does it with a hidden Electron window. */
-export type Screenshotter = (url: string, size: { width: number; height: number }) => Promise<Buffer>;
+/** Photographs a page; with actions, it first goes through them in order (a scenario, docs/specs/project-work.md). */
+export type Screenshotter = (url: string, size: { width: number; height: number }, actions?: PageAction[]) => Promise<Buffer>;
 
 export interface Vision {
   conn: Connection;

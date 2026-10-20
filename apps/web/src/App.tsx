@@ -1,10 +1,11 @@
-import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@artel/shared";
+import type { ChatView, ProjectView, ProjectWorkView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@artel/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ok, type Api } from "./api";
 import { AppContext, type AppContextValue, type CoreStatus, type View } from "./context";
 import { translate } from "./i18n";
 import { formatUsd, setDisplayCurrency, startOfToday } from "./lib/format";
 import { noticesFor } from "./lib/notices";
+import { workNotices } from "./lib/workNotices";
 import { applyTheme, resolveTheme } from "./theme";
 import { ChatSheet } from "./ui/chat/ChatSheet";
 import { HomeSheet } from "./ui/HomeSheet";
@@ -111,6 +112,31 @@ export function App({ api, token, initialSettings, status }: Props) {
     }
   }, [tasks]);
   useEffect(() => window.artel?.onOpenTask?.((taskId) => setView({ kind: "task", taskId })), []);
+
+  // A project's run that waits for a permission, is done or stopped becomes a notification too (docs/specs/project-work.md):
+  // seen live, a run waited half an hour on a permission nobody saw.
+  const seenWork = useRef<ProjectWorkView[] | null>(null);
+  const [works, setWorks] = useState<ProjectWorkView[]>([]);
+  const working = works.some((w) => w.status === "running" || w.status === "planning");
+  useEffect(() => {
+    const look = async () => {
+      const next = await api.work.$get().then((r) => ok<ProjectWorkView[]>(r)).catch(() => null);
+      if (!next) return;
+      const notices = workNotices(seenWork.current, next);
+      seenWork.current = next;
+      setWorks(next);
+      if (!settings.notifications) return;
+      for (const n of notices) {
+        const title = translate(settings.locale, `notice.work.${n.kind}`);
+        const body = projects.find((p) => p.id === n.projectId)?.name ?? "";
+        if (window.artel?.notify) window.artel.notify({ title, body, taskId: n.taskId ?? "" });
+        else if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) new Notification(title, { body, tag: n.projectId });
+      }
+    };
+    void look();
+    const timer = setInterval(() => void look(), working ? 3000 : 15000);
+    return () => clearInterval(timer);
+  }, [api, working, settings.notifications, settings.locale, projects]);
 
   useEffect(() => {
     void reloadProviders();

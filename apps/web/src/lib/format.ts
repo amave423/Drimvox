@@ -68,3 +68,19 @@ export function formatBudget(value: number): string {
 export function startOfToday(now = new Date()): number {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 }
+
+/** An amount in dollars as the user types it: in rubles when rubles are shown, rounded to whole units above 10. */
+export function toShown(usd: number): number {
+  const v = display.currency === "RUB" ? usd * display.usdRub : usd;
+  return v >= 10 ? Math.round(v) : Math.round(v * 100) / 100;
+}
+
+/** What the user typed, back in dollars. */
+export function fromShown(value: number): number {
+  return display.currency === "RUB" ? value / display.usdRub : value;
+}
+
+/** The sign of the shown currency, for labels. */
+export function shownSign(): string {
+  return display.currency === "RUB" ? "₽" : "$";
+}

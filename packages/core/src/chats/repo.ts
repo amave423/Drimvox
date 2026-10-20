@@ -100,7 +100,7 @@ export class ChatRepo {
   }
 
   /** A new chat; `work` makes it a project task's conversation in the project's folder. */
-  create(providerId: string, model: string, kind: ChatKind = "text", work?: { folder: string; projectId: string; itemId: string; title: string }): ChatView {
+  create(providerId: string, model: string, kind: ChatKind = "text", work?: { folder: string; projectId: string; itemId: string | null; title: string }): ChatView {
     const now = Date.now();
     const row = {
       id: randomUUID(),

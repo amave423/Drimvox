@@ -20,7 +20,7 @@ export interface ChatFiles {
  */
 export function folderTools(folder: string, emit: (event: StreamEvent) => Promise<void>, askApproval: ToolHooks["askApproval"], files?: ChatFiles): ToolSet {
   const hooks: ToolHooks = {
-    onCall: (call) => void emit({ type: "tool", name: call.name, input: describe(call.input) }),
+    onCall: (call) => void emit({ type: "tool", name: call.name, input: describeCall(call.input) }),
     onResult: () => {},
     onFinish: () => {},
     askApproval,
@@ -48,9 +48,10 @@ export function folderTools(folder: string, emit: (event: StreamEvent) => Promis
 }
 
 /** What the activity line shows of a call: the file, the command or the search. */
-function describe(input: unknown): string {
-  const i = (input ?? {}) as { path?: unknown; command?: unknown; pattern?: unknown };
-  const text = typeof i.command === "string" ? i.command : typeof i.pattern === "string" ? i.pattern : typeof i.path === "string" ? i.path : "";
+export function describeCall(input: unknown): string {
+  if (typeof input === "string") return input.length > 200 ? `${input.slice(0, 200)}…` : input;
+  const i = (input ?? {}) as Record<string, unknown>;
+  const text = [i.command, i.pattern, i.url, i.query, i.path, i.name].find((v): v is string => typeof v === "string") ?? "";
   return text.length > 200 ? `${text.slice(0, 200)}…` : text;
 }
 

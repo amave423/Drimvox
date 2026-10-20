@@ -30,17 +30,10 @@ import { readThinking, ThinkingSwitch } from "./ThinkingSwitch";
 import { ChatMargin } from "./ChatMargin";
 import { WorkReview } from "../projects/WorkReview";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
-
-/** Tools of a chat with a folder, each with its own line in the answer. */
-const FOLDER_TOOLS = ["list_files", "read_file", "search", "write_file", "edit_file", "run_command", "update_notes"];
-
-/** One line of what the model did: "Reads app.js", "Searches the web: …". */
-function activityLine(t: ReturnType<typeof useApp>["t"], name: string, input: string): string {
-  if (name === "web_search") return t("web.searching", { query: input });
-  if (name === "open_page") return t("web.reading", { url: input });
-  if (FOLDER_TOOLS.includes(name)) return t(`folder.tool.${name}` as MessageKey, { input });
-  return t("chat.mcpCall", { name });
-}
+import { activityLine } from "./activityLine";
+import { useFollow } from "./useFollow";
+import { WorkPanel } from "../projects/WorkPanel";
+import { useProjectWork } from "../projects/useProjectWork";
 
 interface Draft {
   user: string;
@@ -147,59 +140,19 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     if (last && providers.some((p) => p.id === last.providerId)) setChoice(last);
   }, [chatId, choice, providers]);
 
-  // A new message always brings the view down; a growing answer is followed only while the reader is at the
-  // bottom, so scrolling up to read is not undone with every word. The desk itself scrolls to its very end: aligning
-  // the last line with the window's edge hid it under the composer (seen: the bottom could not be reached).
-  const following = useRef(true);
-  const desk = () => end.current?.closest<HTMLElement>(".desk") ?? null;
-  const toBottom = () => {
-    const d = desk();
-    if (d) d.scrollTop = d.scrollHeight;
-  };
-  useEffect(() => {
-    const d = desk();
-    if (!d) return;
-    const onScroll = () => {
-      following.current = d.scrollHeight - d.scrollTop - d.clientHeight < 80;
-    };
-    // Opening the thinking or the actions of an answer is reading: the view stays there instead of running to the
-    // bottom with the next words (seen: the opened thinking slid away while the answer was written).
-    // The click itself, not the "toggle" that follows it: a scroll already on its way would still run in between.
-    const onOpen = (e: Event) => {
-      if (e.target instanceof Element && e.target.closest(".messages summary")) following.current = false;
-    };
-    d.addEventListener("scroll", onScroll, { passive: true });
-    d.addEventListener("pointerdown", onOpen, true);
-    d.addEventListener("keydown", onOpen, true);
-    return () => {
-      d.removeEventListener("scroll", onScroll);
-      d.removeEventListener("pointerdown", onOpen, true);
-      d.removeEventListener("keydown", onOpen, true);
-    };
-  }, [chat?.id]);
-  useEffect(() => {
-    following.current = true;
-    toBottom();
-  }, [chat?.messages.length, draft?.user]);
-  // The answer grows letter by letter, after its pieces have come too (lib/smooth.ts): the view follows the messages'
-  // own height, not the pieces (seen: the last line stayed under the composer).
   const list = useRef<HTMLDivElement>(null);
+  useFollow(end, list, chat?.id, [chat?.messages.length, draft?.user]);
+
+  // A project's conversation (docs/specs/project-work.md): the run goes on in the core; the chat follows it, messages
+  // join it on the way, and the panel next to it shows the checklist and the limits.
+  const projectId = chat?.projectId && !chat.itemId ? chat.projectId : null;
+  const { work, reload: reloadWork } = useProjectWork(projectId);
+  const running = work?.status === "running";
   useEffect(() => {
-    const el = list.current;
-    if (!el) return;
-    let frame = 0;
-    const watch = new ResizeObserver(() => {
-      if (!following.current) return;
-      cancelAnimationFrame(frame);
-      // Asked again when the frame comes: the reader may have opened something in between.
-      frame = requestAnimationFrame(() => following.current && toBottom());
-    });
-    watch.observe(el);
-    return () => {
-      watch.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, [chat?.id]);
+    if (!running || !chat) return;
+    const timer = setInterval(() => void load(chat.id), 1000);
+    return () => clearInterval(timer);
+  }, [running, chat?.id]);
 
   const estimateUsd = mediaModel ? estimateCost(mediaModel, options) : null;
   const preset = providers.find((p) => p.id === choice?.providerId)?.preset;
@@ -262,7 +215,17 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     return sent;
   }
 
+  /** In a project's conversation a message goes to the run: taken on the way, or starting it again. */
+  async function sendToWork(id: string, content: string) {
+    setFailed(false);
+    const res = await api.projects[":id"].work.message.$post({ param: { id }, json: { content } }).catch(() => null);
+    if (!res?.ok) setFailed(true);
+    await reloadWork();
+    if (chat) await load(chat.id);
+  }
+
   async function send(content: string) {
+    if (projectId) return sendToWork(projectId, content);
     if (!choice) return;
     setFailed(false);
     setAttachError(null);
@@ -423,49 +386,66 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         {chat?.projectId && chat.itemId && (
           <WorkReview projectId={chat.projectId} itemId={chat.itemId} busy={!!draft} answers={answers.length} />
         )}
-        <Composer
-          disabled={!choice || (kind !== "text" && !mediaModel)}
-          streaming={!!draft || pending}
-          onSend={(text) => void send(text)}
-          // An answer from this window stops with its request; one seen after coming back, through the core.
-          onStop={() => (draft ? abort.current?.abort() : chat && void api.chats[":id"].stop.$post({ param: { id: chat.id } }).then(() => load(chat.id)))}
-          attach={{
-            files,
-            onAdd: (added) => void addFiles(added),
-            onRemove: (key) => setFiles(files.filter((f) => f.key !== key)),
-            photos: kind !== "text",
-            blocked: kind !== "text" && mediaModel && !mediaModel.photos ? t("photos.cannot") : undefined,
-          }}
-          picker={<ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} photos={kind !== "text" && files.some(isPhoto)} />}
-          options={
-            mediaModel
-              ? mediaRows
-              : kind === "text" && choice
-                ? {
-                    changed: changedOptions,
-                    rows: [
-                      { label: t("web.label"), control: <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} /> },
-                      ...(thinks ? [{ label: t("thinking.label"), control: <ThinkingSwitch value={thinking} onChange={setThinking} /> }] : []),
-                      { label: t("folder.label"), control: <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} /> },
-                    ],
-                  }
-                : { changed: [], rows: [] }
-          }
-          beforeSend={mediaModel && !confirm && <MediaPrice model={mediaModel} estimateUsd={estimateUsd} />}
-          placeholder={kind === "text" ? undefined : t(kind === "image" ? "media.placeholderImage" : "media.placeholderVideo")}
-          sendLabel={
-            kind === "text"
-              ? undefined
-              : confirm
-                ? estimateUsd === null
-                  ? t("media.startUnknown")
-                  : t("media.startFor", { cost: formatUsd(estimateUsd) })
-                : t("media.make")
-          }
-        />
+        {projectId ? (
+          // A project's conversation: the run goes on while the user writes; Stop is in the panel.
+          <Composer
+            disabled={!work?.startedAt}
+            streaming={false}
+            onSend={(text) => void send(text)}
+            onStop={() => {}}
+            picker={null}
+            options={{ changed: [], rows: [] }}
+            placeholder={t("chat.workPlaceholder")}
+          />
+        ) : (
+          <Composer
+            disabled={!choice || (kind !== "text" && !mediaModel)}
+            streaming={!!draft || pending}
+            onSend={(text) => void send(text)}
+            // An answer from this window stops with its request; one seen after coming back, through the core.
+            onStop={() => (draft ? abort.current?.abort() : chat && void api.chats[":id"].stop.$post({ param: { id: chat.id } }).then(() => load(chat.id)))}
+            attach={{
+              files,
+              onAdd: (added) => void addFiles(added),
+              onRemove: (key) => setFiles(files.filter((f) => f.key !== key)),
+              photos: kind !== "text",
+              blocked: kind !== "text" && mediaModel && !mediaModel.photos ? t("photos.cannot") : undefined,
+            }}
+            picker={<ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} photos={kind !== "text" && files.some(isPhoto)} />}
+            options={
+              mediaModel
+                ? mediaRows
+                : kind === "text" && choice
+                  ? {
+                      changed: changedOptions,
+                      rows: [
+                        { label: t("web.label"), control: <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} /> },
+                        ...(thinks ? [{ label: t("thinking.label"), control: <ThinkingSwitch value={thinking} onChange={setThinking} /> }] : []),
+                        { label: t("folder.label"), control: <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} /> },
+                      ],
+                    }
+                  : { changed: [], rows: [] }
+            }
+            beforeSend={mediaModel && !confirm && <MediaPrice model={mediaModel} estimateUsd={estimateUsd} />}
+            placeholder={kind === "text" ? undefined : t(kind === "image" ? "media.placeholderImage" : "media.placeholderVideo")}
+            sendLabel={
+              kind === "text"
+                ? undefined
+                : confirm
+                  ? estimateUsd === null
+                    ? t("media.startUnknown")
+                    : t("media.startFor", { cost: formatUsd(estimateUsd) })
+                  : t("media.make")
+            }
+          />
+        )}
       </div>
 
-      <ChatMargin choice={choice} answers={answers} onDelete={chat ? () => void remove() : null} />
+      {projectId && work ? (
+        <WorkPanel work={work} messages={messages} line={(name, input) => activityLine(t, name, input)} onChanged={() => void reloadWork().then(() => chat && load(chat.id))} />
+      ) : (
+        <ChatMargin choice={choice} answers={answers} onDelete={chat ? () => void remove() : null} />
+      )}
     </article>
   );
 }

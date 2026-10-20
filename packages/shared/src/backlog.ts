@@ -1,18 +1,13 @@
-import { z } from "zod";
 import type { DesignBrief } from "./design";
 import type { DiffFile } from "./tasks";
 
 /**
- * The project's task list (docs/specs/backlog-loop.md): after the interview the agent lists everything worth doing,
- * the MVP first; the user picks a few at a time, and each one is done, checked and reviewed before the next.
+ * The project's old task list (docs/specs/backlog-loop.md), read only: tasks started before one long run replaced it
+ * (docs/specs/project-work.md).
  */
 export const backlogSizes = ["S", "M", "L"] as const;
 export type BacklogSize = (typeof backlogSizes)[number];
 
-/** How much a task weighs in a batch. */
-export const SIZE_POINTS: Record<BacklogSize, number> = { S: 1, M: 2, L: 3 };
-/** The most a batch may weigh: what one agent does well before the user looks. */
-export const BATCH_POINTS = 3;
 
 export type BacklogStatus = "open" | "picked" | "active" | "review" | "done";
 
@@ -32,12 +27,6 @@ export interface BacklogItem {
   chatId: string | null;
 }
 
-/** A task of the list started: its conversation, and the first message to send in it. */
-export interface WorkStart {
-  itemId: string;
-  chatId: string;
-  message: string;
-}
 
 /** What a task changed in the project's folder since it started. */
 export interface WorkChanges {
@@ -56,24 +45,13 @@ export interface ProjectPlan {
   pages: { url: string; command?: string }[];
   /** The look settled in the interview, when there is an interface. */
   design: DesignBrief | null;
+  /** The plan's steps, short: the run's first checklist (docs/specs/project-work.md). Absent in plans of the old task list. */
+  steps?: string[];
 }
 
-const title = z.string().trim().min(1).max(160);
-const donePoints = z.array(z.string().trim().min(1).max(400)).min(1).max(8);
-
-export const backlogItemInputSchema = z.object({ title, done: donePoints, size: z.enum(backlogSizes) }).strict();
-export type BacklogItemInput = z.infer<typeof backlogItemInputSchema>;
-
-export const backlogUpdateSchema = z.object({ title: title.optional(), done: donePoints.optional(), size: z.enum(backlogSizes).optional() }).strict();
-
-/** The order of the open tasks, top first. */
-export const backlogOrderSchema = z.object({ ids: z.array(z.string().min(1)).min(1).max(200) }).strict();
-
-/** The tasks of the next batch, in the order they are done; they may weigh BATCH_POINTS at most. */
-export const backlogRunSchema = z
-  .object({ ids: z.array(z.string().min(1)).min(1).max(BATCH_POINTS), providerId: z.string().min(1), model: z.string().min(1).max(200) })
-  .strict();
-
-export function pointsOf(items: Pick<BacklogItem, "size">[]): number {
-  return items.reduce((sum, i) => sum + SIZE_POINTS[i.size], 0);
+/** A task as the old interview listed it. */
+export interface BacklogItemInput {
+  title: string;
+  done: string[];
+  size: BacklogSize;
 }

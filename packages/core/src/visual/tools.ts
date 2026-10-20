@@ -1,4 +1,4 @@
-import type { TaskEvent, VisualCheck } from "@artel/shared";
+import { MAX_WAIT_MS, type PageAction, type TaskEvent, type VisualCheck } from "@artel/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Background } from "../agent/background";
@@ -50,9 +50,9 @@ const sleep = (ms: number, signal?: AbortSignal) =>
   });
 
 /** Takes a screenshot, keeps it and asks the vision model; the answer is what the agent or the gate gets. */
-async function look(d: VisualDeps, url: string, question: string, signal?: AbortSignal, width?: number): Promise<{ shot: string; answer: string }> {
+async function look(d: VisualDeps, url: string, question: string, signal?: AbortSignal, width?: number, steps?: PageAction[]): Promise<{ shot: string; answer: string }> {
   if (!d.kit.screenshot || !d.vision) throw new Error("No way to look at pages here");
-  const png = await d.kit.screenshot(url, sizeOf(width));
+  const png = await d.kit.screenshot(url, sizeOf(width), steps?.length ? steps : undefined);
   const shot = d.kit.shots.save(png);
   d.event("screenshot", { id: shot, url });
   const { text, costUsd } = await askAboutPicture(d.vision, png, question, signal);
@@ -108,17 +108,30 @@ export function visualTools(d: VisualDeps, limit: LookLimit = { looks: MAX_LOOKS
   let looks = 0;
   tools.look_at_page = tool({
     description:
-      "Open a page in a browser, take a screenshot and ask a model that sees pictures about it. The window is 1280 px wide; give a width such as 390 to see the phone layout.",
+      "Open a page in a browser, take a screenshot and ask a model that sees pictures about it. The window is 1280 px wide; give a width such as 390 to see the phone layout. " +
+      "To check a scenario as a person would, give steps done before the screenshot: click a button or link by its text, type into a field by its label or placeholder, press a key, wait.",
     inputSchema: z.object({
       url: z.string().min(1).max(2000),
       question: z.string().min(1).max(2000),
       width: z.number().int().min(320).max(1920).optional().describe("Window width in pixels; 390 is a phone"),
+      steps: z
+        .array(
+          z.object({
+            action: z.enum(["click", "type", "press", "wait"]),
+            target: z.string().min(1).max(300).optional().describe("Visible text, label, placeholder or CSS selector"),
+            text: z.string().max(2000).optional().describe("What to type, or the key to press"),
+            ms: z.number().int().min(0).max(MAX_WAIT_MS).optional(),
+          }),
+        )
+        .max(20)
+        .optional()
+        .describe("A scenario done in order before the screenshot"),
     }),
-    execute: ({ url, question, width }, o: Options) =>
-      run(o.toolCallId, "look_at_page", { url, question, width }, async () => {
+    execute: ({ url, question, width, steps }, o: Options) =>
+      run(o.toolCallId, "look_at_page", { url, question, width, steps }, async () => {
         if (!mayLookAt(url)) throw new Error("Only this computer (localhost) and public addresses can be opened");
         if (++looks > limit.looks) throw new Error(`You have looked at pages ${limit.looks} times in this turn. ${limit.then}`);
-        return (await look(d, url, question, o.abortSignal, width)).answer;
+        return (await look(d, url, question, o.abortSignal, width, steps)).answer;
       }),
   });
   return tools;

@@ -1,18 +1,17 @@
-import type { BacklogItem, WorkChanges, WorkStart } from "@artel/shared";
+import type { BacklogItem, WorkChanges } from "@artel/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { DiffView } from "../tasks/DiffView";
 
 /**
- * Above the message box of a project task's conversation (docs/specs/project-work.md): what the task changed, "Accept"
- * as one commit, "Roll back the task", and after accepting, the next task of the batch. Writing in the box sends the
- * agent back to work instead.
+ * Above the message box of a task's conversation from the old task list (docs/specs/backlog-loop.md): what the task
+ * changed, "Accept" as one commit, "Roll back the task". Writing in the box sends the agent back to work instead.
+ * New projects work in one long run without acceptance (docs/specs/project-work.md).
  */
 export function WorkReview({ projectId, itemId, busy, answers }: { projectId: string; itemId: string; busy: boolean; answers: number }) {
-  const { api, t, navigate, reloadChats } = useApp();
+  const { api, t, navigate } = useApp();
   const [item, setItem] = useState<BacklogItem | null>(null);
-  const [next, setNext] = useState<BacklogItem | null>(null);
   const [changes, setChanges] = useState<WorkChanges | null>(null);
   const [confirmUndo, setConfirmUndo] = useState(false);
   const [working, setWorking] = useState(false);
@@ -25,7 +24,6 @@ export function WorkReview({ projectId, itemId, busy, answers }: { projectId: st
     const { items } = (await res.json()) as { items: BacklogItem[] };
     const own = items.find((i) => i.id === itemId) ?? null;
     setItem(own);
-    setNext(items.find((i) => i.status === "picked") ?? null);
     if (own?.status === "review") {
       const c = await api.projects[":id"].backlog[":itemId"].changes.$get({ param: { id: projectId, itemId } }).catch(() => null);
       setChanges(c?.ok ? ((await c.json()) as WorkChanges) : null);
@@ -52,16 +50,6 @@ export function WorkReview({ projectId, itemId, busy, answers }: { projectId: st
     await load();
   }
 
-  async function goNext() {
-    setWorking(true);
-    const res = await api.projects[":id"].backlog.next.$post({ param: { id: projectId } }).catch(() => null);
-    setWorking(false);
-    if (!res?.ok) return setProblem("unknown");
-    const started = (await res.json()) as WorkStart;
-    await reloadChats();
-    navigate({ kind: "chat", chatId: started.chatId, key: started.chatId, send: started.message });
-  }
-
   if (!item) return null;
   const errorText = problem && <p className="error-note">{t(`work.error.${problem}` as MessageKey)}</p>;
 
@@ -69,15 +57,9 @@ export function WorkReview({ projectId, itemId, busy, answers }: { projectId: st
     return (
       <div className="work-review is-closed" role="status">
         <p>{done ?? t(item.status === "done" ? "work.isDone" : "work.isUndone")}</p>
-        {next ? (
-          <button className="btn is-primary" disabled={working} onClick={() => void goNext()}>
-            {t("work.next", { title: next.title })}
-          </button>
-        ) : (
-          <button className="link" onClick={() => navigate({ kind: "project", projectId })}>
-            {t("work.toList")}
-          </button>
-        )}
+        <button className="link" onClick={() => navigate({ kind: "project", projectId })}>
+          {t("work.toList")}
+        </button>
         {errorText}
       </div>
     );

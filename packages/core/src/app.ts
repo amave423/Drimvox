@@ -2,6 +2,11 @@ import { AttachmentRepo } from "./chats/attachment-repo";
 import { BacklogService } from "./backlog/service";
 import { backlogRoutes } from "./routes/backlog";
 import { BacklogRepo } from "./backlog/repo";
+import { ProjectWorkRepo } from "./work/repo";
+import { ProjectWork } from "./work/service";
+import { workRoutes } from "./routes/work";
+import { resolveVision } from "./visual/look";
+import { findModel } from "./providers/catalog";
 import { zValidator } from "@hono/zod-validator";
 import { settingsPatchSchema, type PresetId } from "@artel/shared";
 import { Hono } from "hono";
@@ -110,11 +115,13 @@ export function createCore(o: AppOptions) {
   const projects = new ProjectRepo(o.db);
   const tasks = new TaskRepo(o.db);
   const backlog = new BacklogRepo(o.db);
+  const workRepo = new ProjectWorkRepo(o.db);
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
   const web = o.web ?? duckDuckGo;
   const runner = new AgentRunner({
     tasks,
     backlog,
+    work: workRepo,
     projects,
     providers,
     dataDir: o.dataDir,
@@ -131,7 +138,28 @@ export function createCore(o: AppOptions) {
     skillsDir: join(o.dataDir, "skills"),
     idleTimeoutMs,
   });
-  const backlogService = new BacklogService(backlog, runner, projects, chats);
+  const backlogService = new BacklogService(backlog, projects, chats);
+  const projectWork = new ProjectWork({
+    repo: workRepo,
+    runner,
+    projects,
+    chats,
+    backlog,
+    approvals,
+    cliDir: join(o.dataDir, "cli-chats"),
+    run: {
+      chats,
+      providers,
+      approvals,
+      repo: workRepo,
+      visualKit,
+      web,
+      skillsDir: join(o.dataDir, "skills"),
+      idleTimeoutMs,
+      plan: (projectId) => backlog.plan(projectId),
+      vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel),
+    },
+  });
   const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });
   studio.resume();
 
@@ -171,8 +199,11 @@ export function createCore(o: AppOptions) {
     .route("/usage", usageRoutes(chats))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
+    .route("/projects", workRoutes(projects, providers, projectWork, shots))
     .route("/tasks", taskRoutes(tasks, runner, shots, backlogService))
-    .route("/github", githubRoutes(github, projects));
+    .route("/github", githubRoutes(github, projects))
+    // Every project's work at once: the window's notifications (docs/specs/project-work.md).
+    .get("/work", (c) => c.json(projectWork.list()));
 
   const hosts = new Set(o.allowedHosts ?? defaultHosts);
   const auth = new AuthStore(o.db);
@@ -191,6 +222,7 @@ export function createCore(o: AppOptions) {
     needsPassword: () => !!o.password && !auth.passwordSet(),
     shutdown: async () => {
       studio.shutdown();
+      await projectWork.shutdown();
       await runner.shutdown();
       visualKit.background.shutdown();
       await mcp.shutdown();

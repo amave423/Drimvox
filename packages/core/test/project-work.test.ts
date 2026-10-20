@@ -1,14 +1,15 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTestEnv, readEvents, type TestEnv } from "./env";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { git, makeRepo } from "./git-repo";
 
-// docs/specs/project-work.md: a task of the list is a conversation in the project's folder, like Claude Code.
+// docs/specs/project-work.md: an interview, a plan, "Go", then one long run of the agent with its own checklist.
+vi.setConfig({ testTimeout: 30_000 });
+
 const KEY = "good-key";
 let env: TestEnv;
 let fake: FakeProvider | undefined;
@@ -27,142 +28,232 @@ afterEach(async () => {
 });
 
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
+const noQuestions = call("ask_questions", { questions: [], understood: "Сайт лесопилки", unknown: [] });
+const PLAN = {
+  summary: "Сайт лесопилки: каталог досок и калькулятор заказа.",
+  steps: ["Каталог", "Калькулятор", "Проверить страницы"],
+  checks: ["Каталог открывается", "npm test"],
+  pages: [{ url: "http://localhost:5173/", command: "npm run dev" }],
+};
+const writePlan = call("write_plan", PLAN);
+const PRICED = [{ id: "coder", supported_parameters: ["tools"], pricing: { prompt: "0.000001", completion: "0.000002" } }];
 
-async function setup(script: FakeTurn[]) {
-  fake = await startFakeProvider({ key: KEY, script, models: [{ id: "coder", supported_parameters: ["tools"] }] });
+/** A fake provider answering each model from its own queue: who wrote what shows in the requests. */
+async function setup(queues: Record<string, FakeTurn[]>, models: Record<string, unknown>[] = [{ id: "coder", supported_parameters: ["tools"] }]) {
+  fake = await startFakeProvider({
+    key: KEY,
+    models: [...models, ...Object.keys(queues).filter((id) => !models.some((m) => m.id === id)).map((id) => ({ id, supported_parameters: ["tools"] }))],
+    respond: (body) => queues[body.model]?.shift() ?? { text: "Готово." },
+  });
   const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
   const project = await (await env.call("POST", "/api/projects", { path: folder })).json();
-  const add = async (title: string, size = "S") =>
-    (await (await env.call("POST", `/api/projects/${project.id}/backlog`, { title, done: [`${title}: работает`], size })).json()) as { id: string };
-  const calc = await add("Калькулятор");
-  const cart = await add("Корзина");
-  return { provider, project, calc, cart };
+  const ref = (model: string) => ({ providerId: provider.id as string, model });
+  return { provider, project, ref };
 }
 
-const items = async (projectId: string) => (await (await env.call("GET", `/api/projects/${projectId}/backlog`)).json()).items as any[];
-const say = async (chatId: string, content: string) => readEvents(await env.call("POST", `/api/chats/${chatId}/messages`, { content }));
+const workOf = async (projectId: string) => (await (await env.call("GET", `/api/projects/${projectId}/work`)).json()) as any;
 
-describe("a task of the list as a conversation in the project's folder", () => {
-  it("opens a conversation in the folder, with the task as its first message and a point to roll back to", async () => {
-    const { provider, project, calc, cart } = await setup([]);
-    const res = await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id, cart.id], providerId: provider.id, model: "coder" });
-    expect(res.status).toBe(201);
-    const started = await res.json();
-    expect(started).toMatchObject({ itemId: calc.id, chatId: expect.any(String) });
-    expect(started.message).toContain("Калькулятор");
-    expect(started.message).toContain("Калькулятор: работает");
+async function until(projectId: string, done: (w: any) => boolean) {
+  for (let i = 0; i < 600; i++) {
+    const w = await workOf(projectId);
+    if (done(w)) return w;
+    await new Promise((r) => setTimeout(r, 30));
+  }
+  throw new Error(`stuck: ${JSON.stringify(await workOf(projectId))}`);
+}
 
-    const chat = await (await env.call("GET", `/api/chats/${started.chatId}`)).json();
-    expect(chat).toMatchObject({ folder, projectId: project.id, itemId: calc.id, title: "Калькулятор" });
-    const list = await items(project.id);
-    expect(list.find((i) => i.id === calc.id)).toMatchObject({ status: "active", chatId: started.chatId });
-    expect(list.find((i) => i.id === cart.id)).toMatchObject({ status: "picked" });
-    expect(git(folder, "rev-parse", `refs/artel/item/${calc.id}`)).toMatch(/^[0-9a-f]{40}$/);
+/** The interview with one model, the plan with another; the plan waits for "Go". */
+async function planned(s: Awaited<ReturnType<typeof setup>>, models: { interview?: string; plan?: string; work?: string; strong?: string | null } = {}) {
+  const res = await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
+    task: "Сайт лесопилки",
+    models: {
+      interview: s.ref(models.interview ?? "coder"),
+      plan: s.ref(models.plan ?? "coder"),
+      work: s.ref(models.work ?? "coder"),
+      strong: models.strong ? s.ref(models.strong) : null,
+    },
+  });
+  expect(res.status).toBe(201);
+  return until(s.project.id, (w) => w.status === "ready");
+}
+
+const requestsOf = (model: string) => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === model);
+
+describe("work on a project", () => {
+  it("ends the interview with a plan by the plan's model: its steps are the first checklist, its checks real commands", async () => {
+    const s = await setup({ asker: [noQuestions], planner: [writePlan] });
+    const work = await planned(s, { interview: "asker", plan: "planner" });
+    expect(work.plan).toMatchObject({ context: PLAN.summary, steps: PLAN.steps, checks: ["npm test"] });
+    expect(work.checklist).toEqual(PLAN.steps.map((text) => ({ text, done: false })));
+    expect(requestsOf("asker")).toHaveLength(1);
+    expect(requestsOf("planner")).toHaveLength(1);
+    const task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
+    expect(task).toMatchObject({ kind: "plan", status: "waiting", statusReason: "plan_ready" });
   });
 
-  it("works right in the folder; once it answers, the task waits for review with what changed", async () => {
-    const { provider, project, calc } = await setup([
-      call("write_file", { path: "calculator.html", content: "<form>калькулятор</form>\n" }),
-      call("edit_file", { path: "index.html", old: "<h1>Лесопилка</h1>", new: '<h1>Лесопилка</h1>\n<a href="calculator.html">Калькулятор</a>' }),
-      { text: "Готово: калькулятор на calculator.html. Запуск: откройте index.html." },
-    ]);
-    const started = await (await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id], providerId: provider.id, model: "coder" })).json();
-    const events = await say(started.chatId, started.message);
-    expect(events.at(-1)).toMatchObject({ type: "done", message: { status: "done" } });
-    expect(readFileSync(join(folder, "calculator.html"), "utf8")).toContain("калькулятор");
-
-    expect((await items(project.id)).find((i) => i.id === calc.id)).toMatchObject({ status: "review" });
-    const changes = await (await env.call("GET", `/api/projects/${project.id}/backlog/${calc.id}/changes`)).json();
-    expect(changes.files).toEqual([
-      { path: "calculator.html", status: "added" },
-      { path: "index.html", status: "modified" },
-    ]);
-    // Line by line too, as the review of the old pipeline showed it (seen: only file names in a task's review).
-    expect(changes.diff.map((f: any) => [f.path, f.status, f.added, f.removed])).toEqual([
-      ["calculator.html", "added", expect.any(Number), 0],
-      ["index.html", "modified", expect.any(Number), expect.any(Number)],
-    ]);
-    expect(changes.diff[1].hunks[0].lines.some((l: any) => l.kind === "add")).toBe(true);
-
-    // The agent was told the project's rules, in the system text of every step.
-    const system = JSON.stringify(fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body.messages[0]);
-    expect(system).toMatch(/English/);
-    expect(system).toMatch(/npm install/);
-    expect(system).toMatch(/run/i);
-
-    // A note from the user puts it back to work, and the next answer back to review.
-    // (the script has run out: the model answers "Done.")
-    await say(started.chatId, "Кнопка не видна на телефоне");
-    expect((await items(project.id)).find((i) => i.id === calc.id)).toMatchObject({ status: "review" });
+  it("rewrites the plan with the user's corrections", async () => {
+    const s = await setup({ coder: [noQuestions, writePlan, call("write_plan", { ...PLAN, steps: ["Каталог", "Доставка"] })] });
+    await planned(s);
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Добавь доставку" })).status).toBe(200);
+    const work = await until(s.project.id, (w) => w.status === "ready" && w.plan.steps.includes("Доставка"));
+    expect(work.checklist.map((i: any) => i.text)).toEqual(["Каталог", "Доставка"]);
+    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("Добавь доставку");
   });
 
-  it("accepts the task as one commit and starts the next one in a new conversation", async () => {
-    const { provider, project, calc, cart } = await setup([call("write_file", { path: "calculator.html", content: "<form></form>\n" }), { text: "Готово." }]);
-    const started = await (await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id, cart.id], providerId: provider.id, model: "coder" })).json();
-    await say(started.chatId, started.message);
-
-    const accepted = await env.call("POST", `/api/projects/${project.id}/backlog/${calc.id}/accept`, {});
-    expect(accepted.status).toBe(200);
-    expect(git(folder, "log", "-1", "--format=%s")).toBe("Калькулятор");
-    expect(git(folder, "status", "--porcelain")).toBe("");
-    expect((await items(project.id)).find((i) => i.id === calc.id)).toMatchObject({ status: "done" });
-    expect(() => git(folder, "rev-parse", "--verify", "--quiet", `refs/artel/item/${calc.id}`)).toThrow();
-
-    const next = await (await env.call("POST", `/api/projects/${project.id}/backlog/next`)).json();
-    expect(next).toMatchObject({ itemId: cart.id });
-    expect(next.chatId).not.toBe(started.chatId);
+  it("goes on \"Go\": the project's conversation in its folder, the agent's checklist, files, and done with finish_work", async () => {
+    const s = await setup({
+      coder: [
+        noQuestions,
+        writePlan,
+        call("write_file", { path: "catalog.html", content: "<ul></ul>\n" }),
+        call("update_checklist", { items: [{ text: "Каталог", done: true }, { text: "Калькулятор", done: true }, { text: "Проверить страницы", done: true }] }),
+        call("finish_work", { report: "Сделал каталог и калькулятор. Запуск: npm run dev." }),
+        { text: "Готово: каталог и калькулятор." },
+      ],
+    });
+    await planned(s);
+    const res = await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    expect(res.status).toBe(200);
+    const { chatId } = await res.json();
+    const work = await until(s.project.id, (w) => w.status === "done");
+    expect(work.checklist.every((i: any) => i.done)).toBe(true);
+    expect(work.actions).toBeGreaterThanOrEqual(3);
+    expect(readFileSync(join(folder, "catalog.html"), "utf8")).toBe("<ul></ul>\n");
+    const chat = await (await env.call("GET", `/api/chats/${chatId}`)).json();
+    expect(chat).toMatchObject({ projectId: s.project.id, itemId: null, folder });
+    expect(chat.messages[0]).toMatchObject({ role: "user" });
+    expect(chat.messages[0].content).toContain("Каталог");
+    expect(chat.messages.at(-1)).toMatchObject({ role: "assistant", status: "done" });
+    // Nothing to accept: the work is in the folder, git stays the user's.
+    expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
+    // The plan's task is over once the work started.
+    expect((await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json()).statusReason).toBe("started");
   });
 
-  it("rolls the task back: the folder as it was, the task back in the list", async () => {
-    const { provider, project, calc } = await setup([
-      call("write_file", { path: "calculator.html", content: "<form></form>\n" }),
-      call("write_file", { path: "index.html", content: "<h1>Сломано</h1>\n" }),
-      { text: "Готово." },
-    ]);
-    const started = await (await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id], providerId: provider.id, model: "coder" })).json();
-    await say(started.chatId, started.message);
-
-    expect((await env.call("POST", `/api/projects/${project.id}/backlog/${calc.id}/undo`)).status).toBe(200);
-    expect(existsSync(join(folder, "calculator.html"))).toBe(false);
-    expect(readFileSync(join(folder, "index.html"), "utf8")).toBe("<h1>Лесопилка</h1>\n");
-    expect((await items(project.id)).find((i) => i.id === calc.id)).toMatchObject({ status: "open", chatId: null });
-    expect(execFileSync("git", ["log", "--oneline"], { cwd: folder, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);
+  it("takes a message the user writes while it works into the next answer, and goes on", async () => {
+    const s = await setup({
+      coder: [
+        noQuestions,
+        writePlan,
+        { ...call("list_files", { path: "." }), delayMs: 600 },
+        call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
+        call("finish_work", { report: "Готово, кнопка зелёная." }),
+      ],
+    });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "running");
+    const sent = await (await env.call("POST", `/api/projects/${s.project.id}/work/message`, { content: "Сделай кнопку зелёной" })).json();
+    expect(sent.queued).toBe(true);
+    await until(s.project.id, (w) => w.status === "done");
+    const later = requestsOf("coder").slice(3);
+    expect(later.some((r) => JSON.stringify(r.body.messages).includes("Сделай кнопку зелёной"))).toBe(true);
+    const chat = await (await env.call("GET", `/api/chats/${sent.chatId}`)).json();
+    expect(chat.messages.filter((m: any) => m.role === "user").map((m: any) => m.content)).toContain("Сделай кнопку зелёной");
   });
 
-  it("offers the project's skills, and the agent can open one", async () => {
+  it("asks without waiting: the question is kept and the work goes on", async () => {
+    const s = await setup({
+      coder: [
+        noQuestions,
+        writePlan,
+        call("ask_user", { question: "Нужна доставка?", assumption: "Пока без доставки" }),
+        call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
+        call("finish_work", { report: "Готово." }),
+      ],
+    });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    const work = await until(s.project.id, (w) => w.status === "done");
+    expect(work.questions).toEqual([expect.objectContaining({ question: "Нужна доставка?", assumption: "Пока без доставки" })]);
+  });
+
+  it("stops when the budget runs out, and goes on once it is raised", async () => {
+    const big = { prompt_tokens: 1_000_000, completion_tokens: 0 };
+    const s = await setup(
+      {
+        coder: [
+          noQuestions,
+          writePlan,
+          { ...call("list_files", { path: "." }), usage: big },
+          call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
+          call("finish_work", { report: "Готово." }),
+        ],
+      },
+      PRICED,
+    );
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 0.5, hours: 2 });
+    const paused = await until(s.project.id, (w) => w.status === "paused");
+    expect(paused).toMatchObject({ reason: "budget" });
+    expect(paused.spentUsd).toBeGreaterThanOrEqual(0.5);
+    await env.call("PATCH", `/api/projects/${s.project.id}/work`, { budgetUsd: 5 });
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/continue`)).status).toBe(200);
+    expect(await until(s.project.id, (w) => w.status === "done")).toMatchObject({ budgetUsd: 5 });
+  });
+
+  it("reminds a model that stops without finish_work, then hands the work to the strong model", async () => {
+    const s = await setup({
+      coder: [noQuestions, writePlan, { text: "Сделал." }, { text: "Всё." }, { text: "Готово." }, { text: "Точно готово." }],
+      strong: [call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Доделал." })],
+    });
+    await planned(s, { strong: "strong" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    const work = await until(s.project.id, (w) => w.status === "done" || w.status === "paused");
+    expect(work).toMatchObject({ status: "done", escalated: true });
+    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toMatch(/Open checklist items: Каталог; Калькулятор; Проверить страницы/);
+    expect(requestsOf("strong").length).toBeGreaterThan(0);
+  });
+
+  it("waits as stuck when there is no strong model", async () => {
+    const s = await setup({ coder: [noQuestions, writePlan, { text: "1" }, { text: "2" }, { text: "3" }, { text: "4" }] });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    expect(await until(s.project.id, (w) => w.status === "paused")).toMatchObject({ reason: "stuck" });
+  });
+
+  it("refuses to plan in a folder without git", async () => {
+    const plain = mkdtempSync(join(tmpdir(), "artel-plain-"));
+    const s = await setup({});
+    const project = await (await env.call("POST", "/api/projects", { path: plain })).json();
+    const res = await env.call("POST", `/api/projects/${project.id}/work/plan`, {
+      task: "Сайт",
+      models: { interview: s.ref("coder"), plan: s.ref("coder"), work: s.ref("coder"), strong: null },
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: { code: "not_repo" } });
+    rmSync(plain, { recursive: true, force: true });
+  });
+
+  it("offers the project's skills in the run, and the agent can open one", async () => {
     mkdirSync(join(folder, ".artel", "skills", "style"), { recursive: true });
     writeFileSync(join(folder, ".artel", "skills", "style", "SKILL.md"), ["---", "name: style", "description: When making pages for this site", "---", "Use the brand green.", ""].join("\n"));
-    const { provider, project, calc } = await setup([call("use_skill", { name: "style" }), { text: "Готово." }]);
-    const started = await (await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id], providerId: provider.id, model: "coder" })).json();
-    const events = await say(started.chatId, started.message);
-    const requests = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
-    expect(JSON.stringify(requests[0]!.body.messages[0])).toContain("style: When making pages for this site");
-    expect(JSON.stringify(requests[1]!.body.messages)).toContain("Use the brand green.");
-    // The answer's actions name the skill (seen live: "use_skill" with nothing after it).
-    expect(events).toContainEqual({ type: "tool", name: "use_skill", input: "style" });
+    const s = await setup({
+      coder: [noQuestions, writePlan, call("use_skill", { name: "style" }), call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Готово." })],
+    });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "done");
+    const run = requestsOf("coder").slice(2);
+    expect(JSON.stringify(run[0]!.body.messages[0])).toContain("style: When making pages for this site");
+    expect(JSON.stringify(run[1]!.body.messages)).toContain("Use the brand green.");
   });
 
-  it("names its project and task in the list of chats, so the sidebar shows it under the project", async () => {
-    const { provider, project, calc } = await setup([]);
-    const started = await (await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id], providerId: provider.id, model: "coder" })).json();
-    const all = await (await env.call("GET", "/api/chats")).json();
-    expect(all.find((c: any) => c.id === started.chatId)).toMatchObject({ projectId: project.id, itemId: calc.id });
-  });
-
-  it("is done by Claude Code itself in the project's folder when the model is on a subscription", async () => {
+  it("is done by Claude Code itself in the project's folder when the working model is on a subscription", async () => {
     const dir = mkdtempSync(join(tmpdir(), "artel-fake-cli-"));
     process.env.FAKE_CLI_DIR = dir;
     writeFileSync(join(dir, "script.json"), JSON.stringify([{ text: "Сделал калькулятор.", files: { "calculator.html": "<form></form>\n" } }]));
     env.setCliCommand("claude-code", [process.execPath, fileURLToPath(new URL("./fake-cli.mjs", import.meta.url)), "claude"]);
-    const { project, calc } = await setup([]);
-    const provider = await (await env.call("POST", "/api/providers", { preset: "claude-code" })).json();
-    const started = await (await env.call("POST", `/api/projects/${project.id}/backlog/run`, { ids: [calc.id], providerId: provider.id, model: "default" })).json();
-    await say(started.chatId, started.message);
+    const s = await setup({ coder: [noQuestions, writePlan] });
+    const cli = await (await env.call("POST", "/api/providers", { preset: "claude-code" })).json();
+    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
+      task: "Сайт лесопилки",
+      models: { interview: s.ref("coder"), plan: s.ref("coder"), work: { providerId: cli.id, model: "default" }, strong: null },
+    });
+    await until(s.project.id, (w) => w.status === "ready");
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "done");
     expect(readFileSync(join(folder, "calculator.html"), "utf8")).toBe("<form></form>\n");
-    const run = JSON.parse(readFileSync(join(dir, "calls.jsonl"), "utf8").trim().split("\n")[0]!);
-    expect(run.args).toEqual(expect.arrayContaining(["--permission-mode", "acceptEdits"]));
-    expect(run.prompt).toMatch(/English/);
-    expect((await items(project.id)).find((i) => i.id === calc.id)).toMatchObject({ status: "review" });
     rmSync(dir, { recursive: true, force: true });
   });
 });

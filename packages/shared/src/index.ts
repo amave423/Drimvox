@@ -13,4 +13,5 @@ export * from "./local";
 export * from "./local-images";
 export * from "./page";
 export * from "./backlog";
+export * from "./project-work";
 export * from "./github";

@@ -1,4 +1,6 @@
 import type { BacklogRepo } from "../backlog/repo";
+import type { ProjectWorkRepo } from "../work/repo";
+import { toPlanStep } from "../work/plan";
 import type { Milestone, ModelRef, PlannedSubtask, Question, Requirement, StyleReference, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -26,6 +28,7 @@ export class TaskBusy extends Error {}
 export interface RunnerOptions extends ExtrasOptions {
   tasks: TaskRepo;
   backlog: BacklogRepo;
+  work: ProjectWorkRepo;
   projects: ProjectRepo;
   providers: ProviderRepo;
   dataDir: string;
@@ -37,7 +40,7 @@ export interface RunnerOptions extends ExtrasOptions {
 }
 
 /** Waiting states that need an answer from the user rather than "Continue". */
-const ANSWER_REASONS = new Set(["questions", "spec_review", "plan_review", "approval"]);
+const ANSWER_REASONS = new Set(["questions", "spec_review", "plan_review", "plan_ready", "approval"]);
 
 /** Owns every running agent: starts them, relays their events, answers approvals, stops them. */
 export class AgentRunner {
@@ -118,11 +121,17 @@ export class AgentRunner {
     this.o.tasks.update(id, { questions: "[]" });
     const stages = JSON.parse(row.stages) as TaskStages;
     const more = !enough && row.interview_round < MAX_INTERVIEW_ROUNDS;
-    if (!more) enterPhase(this.context(id, new AbortController()), id, stages.spec ? "spec" : "code");
+    // A project's interview ends in its plan, written by the plan's model (docs/specs/project-work.md).
+    const planning = row.kind === "plan";
+    if (!more) {
+      const ctx = this.context(id, new AbortController());
+      enterPhase(ctx, id, planning ? "list" : stages.spec ? "spec" : "code");
+      if (planning) toPlanStep(ctx, id, row);
+    }
     const message = answersMessage(
       questions,
       answers,
-      more ? { kind: "round", round: row.interview_round + 1 } : { kind: "spec", why: enough ? "enough" : "rounds" },
+      more ? { kind: "round", round: row.interview_round + 1 } : { kind: planning ? "plan" : "spec", why: enough ? "enough" : "rounds" },
     );
     // A style sample is looked at first, inside the task's turn: it can be stopped like the rest.
     this.launch(id, reference ? async (ctx) => `${await describeReference(ctx, id, reference)}\n\n${message}` : message);
@@ -155,6 +164,19 @@ export class AgentRunner {
     const what = plan ? "plan" : "spec";
     this.launch(id, `The user asks to rewrite the ${what}: ${note}\n\nCall propose_${what} again with the new version.`);
     return this.view(id)!;
+  }
+
+  /** The user's corrections to a project's plan: the plan's model writes it again. */
+  revisePlan(id: string, note: string): TaskView {
+    this.requireWaiting(id, "plan_ready");
+    this.launch(id, `The user asks to change the plan: ${note}\n\nCall write_plan again with the whole new plan.`);
+    return this.view(id)!;
+  }
+
+  /** "Go": the project's plan is settled and the work starts in the project's conversation. */
+  closePlan(id: string): void {
+    this.requireWaiting(id, "plan_ready");
+    this.finish(id, "done_empty", "started");
   }
 
   /** The user's OK on a goal's plan, possibly edited: the team starts on the subtasks. */
@@ -347,6 +369,7 @@ export class AgentRunner {
     return {
       tasks: this.o.tasks,
       backlog: this.o.backlog,
+      work: this.o.work,
       projects: this.o.projects,
       providers: this.o.providers,
       idleTimeoutMs: this.o.idleTimeoutMs,

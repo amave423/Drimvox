@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { InitMessage } from "./core-process";
-import { PAGE_HEIGHT_SCRIPT } from "@artel/shared";
+import { PAGE_HEIGHT_SCRIPT, pageActionScript, type PageAction } from "@artel/shared";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
 
@@ -131,10 +131,10 @@ function startCore(): Promise<number> {
       if (msg.type === "ready" && msg.port) resolve(msg.port);
       else reject(new Error(msg.error ?? "Ядро ответило непонятным сообщением"));
     });
-    child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number }) => {
+    child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number; actions?: PageAction[] }) => {
       if (msg.type !== "screenshot" || typeof msg.id !== "number" || typeof msg.url !== "string") return;
       const id = msg.id;
-      photograph(msg.url, msg.width ?? 1280, msg.height ?? 800).then(
+      photograph(msg.url, msg.width ?? 1280, msg.height ?? 800, Array.isArray(msg.actions) ? msg.actions : []).then(
         (png) => child.postMessage({ type: "screenshot-done", id, png: png.toString("base64") }),
         (err: unknown) => child.postMessage({ type: "screenshot-done", id, error: err instanceof Error ? err.message : String(err) }),
       );
@@ -154,7 +154,7 @@ function startCore(): Promise<number> {
 /** Very long pages are cut here; a picture taller than this tells a model little more. */
 const MAX_SHOT_HEIGHT = 8000;
 
-async function photograph(url: string, width: number, height: number): Promise<Buffer> {
+async function photograph(url: string, width: number, height: number, actions: PageAction[] = []): Promise<Buffer> {
   if (!/^https?:\/\//.test(url)) throw new Error("Only http and https pages");
   const preview = session.fromPartition("artel-preview");
   preview.removeAllListeners("will-download");
@@ -178,6 +178,15 @@ async function photograph(url: string, width: number, height: number): Promise<B
     ]);
     // Scripts of single-page apps draw after the load event.
     await new Promise((r) => setTimeout(r, 1000));
+    // A scenario first, as a person would go through it (docs/specs/project-work.md); the page settles after each step.
+    for (const [n, step] of actions.entries()) {
+      try {
+        await shot.webContents.executeJavaScript(pageActionScript(step), true);
+      } catch (err) {
+        throw new Error(`Step ${n + 1} (${step.action} ${step.target ?? step.text ?? ""}): ${err instanceof Error ? err.message.replace(/^.*Error:\s*/, "") : String(err)}`);
+      }
+      await new Promise((r) => setTimeout(r, 700));
+    }
     // The whole page, not only its first screen: a check of a long page needs what is further down too.
     const full = Number(
       await shot.webContents.executeJavaScript(PAGE_HEIGHT_SCRIPT),

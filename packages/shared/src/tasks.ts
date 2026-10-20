@@ -269,7 +269,8 @@ export type TaskEventKind =
   | "milestone"
   | "reference"
   | "design_review"
-  | "backlog";
+  | "backlog"
+  | "project_plan";
 
 export interface TaskEvent {
   seq: number;

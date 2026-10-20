@@ -28,6 +28,10 @@ export interface RunInput {
   ownTools?: ToolSet;
   /** Calling any of these ends the pass, like finish does. */
   stopTools?: string[];
+  /** No finish tool: a project's run ends with its own (docs/specs/project-work.md). */
+  noFinish?: boolean;
+  /** Asked after every step: true ends the pass there (a message from the user waits, the budget changed). */
+  stopWhen?: () => boolean;
   /** What the agent remembers of its older work; with onMemory, a new summary replaces the older part when it grows. */
   memory?: Memory | null;
   onMemory?(memory: Memory, usage: { inputTokens: number; outputTokens: number; costUsd: number }): void;
@@ -94,7 +98,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
     },
     onFinish: (result: { summary: string; commitMessage: string }) => (finished = result),
   };
-  const tools = paused({ ...buildTools(new Workspace(i.worktree), hooks, i.mode, i.extraTools), ...i.ownTools }, {
+  const { finish: finishTool, ...base } = buildTools(new Workspace(i.worktree), hooks, i.mode, i.extraTools);
+  const tools = paused({ ...base, ...(i.noFinish || !finishTool ? {} : { finish: finishTool }), ...i.ownTools }, {
     start: () => {
       running++;
       clearTimeout(timer);
@@ -143,7 +148,13 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         // The same text as long as the notes stay the same: the provider's cache holds.
         return { system: system(), ...(sent === messages ? {} : { messages: sent }) };
       },
-      stopWhen: [hasToolCall("finish"), ...(i.stopTools ?? []).map((name) => hasToolCall(name)), isStepCount(i.maxSteps ?? MAX_STEPS), overBudget],
+      stopWhen: [
+        hasToolCall("finish"),
+        ...(i.stopTools ?? []).map((name) => hasToolCall(name)),
+        isStepCount(i.maxSteps ?? MAX_STEPS),
+        overBudget,
+        ...(i.stopWhen ? [() => i.stopWhen!()] : []),
+      ],
       // Busy providers (429, 5xx) are tried again after 2, 4, 8 and 16 seconds: an agent is in no hurry,
       // and some keys allow one request at a time, which a team of agents runs into.
       maxRetries: 4,

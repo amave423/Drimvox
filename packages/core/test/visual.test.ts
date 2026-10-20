@@ -11,14 +11,18 @@ let fake: FakeProvider | undefined;
 let repo: string;
 const shots: string[] = [];
 const widths: number[] = [];
+const steps: unknown[] = [];
 
 beforeEach(() => {
   env = createTestEnv();
   shots.length = 0;
   widths.length = 0;
-  env.setScreenshot(async (url, size) => {
+  steps.length = 0;
+  env.setScreenshot(async (url, size, actions) => {
     shots.push(url);
     widths.push(size.width);
+    steps.push(actions ?? null);
+    if (actions?.some((a) => a.target === "Нет такой")) throw new Error("Step 1: not found on the page: Нет такой");
     return PNG;
   });
   repo = makeRepo({ "index.html": "<h1>Привет</h1>\n" });
@@ -86,6 +90,28 @@ describe("look_at_page", () => {
     expect(shot.data).toMatchObject({ url: "http://localhost:5173/" });
     const file = await env.call("GET", `/api/tasks/${id}/screenshots/${shot.data.id}`);
     expect(file.headers.get("content-type")).toBe("image/png");
+  });
+
+  // docs/specs/project-work.md: the agent goes through a scenario as a person would, then looks at the result.
+  it("goes through the steps of a scenario before the screenshot, and says which step failed", async () => {
+    const scenario = [
+      { action: "type", target: "Длина, м", text: "6" },
+      { action: "click", target: "В корзину" },
+      { action: "wait", ms: 500 },
+    ];
+    const id = await start(
+      [
+        call("look_at_page", { url: "http://localhost:5173/", question: "В корзине 1 товар?", steps: scenario }),
+        call("look_at_page", { url: "http://localhost:5173/", question: "?", steps: [{ action: "click", target: "Нет такой" }] }),
+        finish,
+      ],
+      ["Да, в корзине одна доска."],
+    );
+    await waitTask(id, (t) => t.status === "done_empty");
+    expect(steps[0]).toEqual(scenario);
+    const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
+    expect(results.map((r) => r.data.ok)).toEqual([true, false]);
+    expect(results[1].data.output).toMatch(/not found on the page: Нет такой/);
   });
 
   // Seen live: an agent told to care about the look kept photographing its page, a dozen times and $0.80 later.

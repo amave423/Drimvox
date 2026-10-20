@@ -7,7 +7,7 @@ import { loadModels } from "../../lib/models";
 import { ModelNote } from "../chat/ModelNote";
 import { ProjectSkills } from "../SkillsSection";
 import { StatusChip } from "../tasks/StatusDot";
-import { Backlog } from "./Backlog";
+import { ProjectWork } from "./ProjectWork";
 import { GithubPublish } from "./GithubPublish";
 
 type GitProblem = "no_identity" | "no_git" | null;
@@ -31,7 +31,7 @@ function useModelInfo(choice: ModelChoice | null): ModelInfo | null {
 export function ProjectSheet({ projectId }: { projectId: string }) {
   const { api, t, projects, tasks, providers, navigate, reloadProjects, reloadTasks } = useApp();
   const project = projects.find((p) => p.id === projectId);
-  const [choice, setChoice] = useState<ModelChoice | null>(() => {
+  const [choice] = useState<ModelChoice | null>(() => {
     const last = readLastModel();
     return last && providers.some((p) => p.id === last.providerId) ? last : null;
   });
@@ -81,7 +81,7 @@ export function ProjectSheet({ projectId }: { projectId: string }) {
           </section>
         ) : (
           <>
-            <Backlog projectId={project.id} choice={choice} onChoice={setChoice} noTools={noTools} />
+            <ProjectWork projectId={project.id} choice={choice} />
             {noTools && <p className="error-note">{t("project.toolsWarning")}</p>}
           </>
         )}

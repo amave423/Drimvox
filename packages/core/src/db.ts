@@ -218,6 +218,24 @@ const migrations: string[] = [
    alter table backlog add column checkpoint text;`,
   // What the model did while answering (its tool calls), kept with the answer.
   `alter table messages add column activity text;`,
+  // Work on a project: the interview, the plan, then one long run in the project's conversation (docs/specs/project-work.md).
+  `create table project_work (
+     project_id text primary key references projects(id) on delete cascade,
+     status text not null default 'idle',
+     reason text,
+     detail text,
+     models text,
+     plan_task_id text,
+     chat_id text,
+     checklist text not null default '[]',
+     questions text not null default '[]',
+     shots text not null default '[]',
+     budget_usd real not null default 1,
+     hours real not null default 2,
+     worked_ms integer not null default 0,
+     escalated integer not null default 0,
+     started_at integer
+   ) strict;`,
 ];
 
 export interface Database {
@@ -238,6 +256,8 @@ export function openDatabase(file: string): Database {
   sql.exec(
     "update tasks set status = 'stopped', status_reason = 'restart' where status = 'running' or (status = 'waiting' and status_reason = 'approval')",
   );
+  // A project's run lives in memory too: after a restart it continues by hand.
+  sql.exec("update project_work set status = 'stopped', reason = 'restart' where status = 'running'");
   return {
     sql,
     schemaVersion: () => readVersion(sql),

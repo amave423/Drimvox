@@ -1,4 +1,4 @@
-import type { BacklogItem, ProjectPlan } from "@artel/shared";
+import type { ProjectPlan } from "@artel/shared";
 import { designInstructions } from "../agent/design";
 
 /** Steps one answer on a task may take: enough for a task of the list; past it, "go on" continues. */
@@ -32,14 +32,50 @@ export function workRules(plan: ProjectPlan | null): string {
   ].join("\n");
 }
 
-/** The first message of a task's conversation: the task, its points and what the project is about. */
-export function workMessage(item: BacklogItem, plan: ProjectPlan | null): string {
+/**
+ * What the agent is told in a project's run (docs/specs/project-work.md): one long loop, alone, from the plan to a
+ * working result, with its own checklist and its own checks.
+ */
+export function projectRules(plan: ProjectPlan | null, canLook: boolean): string {
   return [
-    item.title,
-    "",
-    "Готово, когда:",
-    ...item.done.map((d) => `- ${d}`),
-    ...(plan?.design ? ["- Выглядит по дизайн-брифу проекта на компьютере и телефоне"] : []),
-    ...(plan?.context ? ["", `О проекте: ${plan.context}`] : []),
+    "You build the user's project alone, from the plan to a working result, right in the project's folder, as a careful",
+    "senior engineer would. Nobody accepts steps one by one: the user watches and may write to you at any time.",
+    "Work in a loop: read what you need, change it, run it, look at it, check it. Use read_file and search to read code;",
+    "edit_file for changes, write_file for new files. Keep files under ~400 lines: split by responsibility.",
+    "Your checklist: keep it current with update_checklist (short items, done marked) whenever an item is done or you find",
+    "new work; the user sees it. If you cannot decide something well yourself, ask_user with your assumption and go on: never",
+    "wait for an answer. A message from the user while you work comes as a user message: follow it, then go on.",
+    "Rules:",
+    "- Names in code are English: files, folders, page addresses, variables (calculator, /cart). Never transliterate another",
+    "  language into Latin letters. Text people read stays in the user's language.",
+    "- The project must start for the user with one command. Install the dependencies yourself, make sure the usual command",
+    "  (npm run dev, or what the project uses) starts without errors: run it with start_background, read its output.",
+    "- Check your work for real: write and run tests for the logic; run the build;",
+    canLook
+      ? "  start the interface and look at its pages with look_at_page on a desktop width and a phone width (390); go through the\n  main scenarios as a person would, with look_at_page steps (click, type, wait) — add to cart, order, sign in."
+      : "  start the interface and request its pages to make sure they answer.",
+    "- Never commit or push: git stays the user's.",
+    "- Keep the project's notes current with update_notes: commands, decisions, what is done.",
+    "When every checklist item is done and checked, call finish_work with a short report in the user's language: what is done,",
+    "how to start it.",
+    ...(plan?.context ? [`The plan: ${plan.context}`] : []),
+    ...(plan?.checks.length ? [`The project's checks: ${plan.checks.join("; ")}`] : []),
+    ...(plan?.pages.length ? [`Pages: ${plan.pages.map((p) => `${p.url}${p.command ? ` (served by: ${p.command})` : ""}`).join("; ")}`] : []),
+    ...(plan?.design ? [designInstructions(plan.design)] : []),
   ].join("\n");
+}
+
+/** The first message of a project's run: the plan the user said "Go" to. */
+export function planMessage(plan: ProjectPlan): string {
+  return ["Поехали. План:", "", plan.context, "", ...(plan.steps ?? []).map((s, n) => `${n + 1}. ${s}`)].join("\n");
+}
+
+/** Said when the model stops without finish_work (docs/specs/project-work.md: "stuck"). */
+export function nudgeMessage(open: string[]): string {
+  return open.length
+    ? [
+        `You stopped, but the work is not finished. Open checklist items: ${open.join("; ")}.`,
+        "Go on working. If something blocks you, ask_user with your assumption and go on. When everything is done and checked, call finish_work.",
+      ].join("\n")
+    : "Every checklist item is done. If you have not checked the result for real, do it now, then call finish_work with the report. If the user asked for more, add it to the checklist and do it.";
 }

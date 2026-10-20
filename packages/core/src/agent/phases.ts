@@ -277,7 +277,7 @@ export function specTools(onSpec: (proposal: SpecProposal) => void): ToolSet {
 export function answersMessage(
   questions: Question[],
   answers: { id: string; answer: string }[],
-  next: { kind: "round"; round: number } | { kind: "spec"; why: "complete" | "enough" | "rounds" },
+  next: { kind: "round"; round: number } | { kind: "spec" | "plan"; why: "complete" | "enough" | "rounds" },
 ): string {
   const lines = answers.map((a) => `- ${questions.find((q) => q.id === a.id)?.question ?? a.id} → ${a.answer}`);
   const head = lines.length ? ["The user answered your questions:", ...lines, ""] : [];
@@ -287,6 +287,11 @@ export function answersMessage(
       `Now interview round ${next.round}: if anything essential is still unknown, call ask_questions with the next questions, building on`,
       "these answers. If you have the full picture, call ask_questions with an empty list.",
     ].join("\n");
+  }
+  // A project's interview ends in its plan (docs/specs/project-work.md).
+  if (next.kind === "plan") {
+    const decide = next.why === "enough" ? "The user does not want more questions: decide everything still open yourself." : next.why === "rounds" ? "That was the last interview round: decide anything still open yourself." : "";
+    return [...head, decide, "Write the plan now and call write_plan."].filter(Boolean).join("\n");
   }
   const tail =
     next.why === "enough"
