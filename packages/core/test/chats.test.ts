@@ -133,6 +133,33 @@ describe("sending a message", () => {
       expect(JSON.stringify(requests[1]!.body.messages)).toContain("Сейчас +5 °C, облачно");
     });
 
+    // Seen: sites like the trademark databases draw their results with scripts; open_page saw only "Loading…". A real
+    // browser reads what the page shows, after the steps the model asks for.
+    it("reads a page in a real browser, after steps such as typing a name and pressing search", async () => {
+      const rendered: { url: string; steps: unknown }[] = [];
+      env.setWeb({
+        ...fakeWeb,
+        render: async (url: string, steps?: unknown) => {
+          rendered.push({ url, steps: steps ?? null });
+          return { url, title: "Global Brand Database", text: "Brand name: contains the word 'seppora'\nNo results found!" };
+        },
+      });
+      const steps = [
+        { action: "type", target: "Brand name", text: "seppora" },
+        { action: "press", text: "Enter" },
+        { action: "wait", ms: 3000 },
+      ];
+      const { chat } = await setup({
+        script: [{ toolCalls: [{ name: "browse_page", args: { url: "https://branddb.wipo.int/en/similarname", steps } }] }, { text: "Знаков Seppora нет." }],
+      });
+      const events = await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Проверь знак Seppora", web: "free" }));
+      expect(events.filter((e) => e.type === "tool")).toEqual([{ type: "tool", name: "browse_page", input: "https://branddb.wipo.int/en/similarname" }]);
+      expect(rendered).toEqual([{ url: "https://branddb.wipo.int/en/similarname", steps }]);
+      const requests = fake.requests.filter((r) => r.path === "/v1/chat/completions");
+      expect(requests[0]!.body.tools.map((t: any) => t.function.name)).toEqual(["web_search", "open_page", "browse_page"]);
+      expect(JSON.stringify(requests[1]!.body.messages)).toContain("No results found!");
+    });
+
     // Seen live: the model had nearly finished thinking and searching, and the answer was cut as "silent" — the time
     // Artel's own search took counted as the model's silence.
     it("does not count the time a search takes as the model's silence", async () => {

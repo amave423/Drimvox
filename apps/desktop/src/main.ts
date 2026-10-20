@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { InitMessage } from "./core-process";
-import { PAGE_HEIGHT_SCRIPT, pageActionScript, type PageAction } from "@artel/shared";
+import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, type PageAction } from "@artel/shared";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
 
@@ -132,9 +132,17 @@ function startCore(): Promise<number> {
       else reject(new Error(msg.error ?? "Ядро ответило непонятным сообщением"));
     });
     child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number; actions?: PageAction[] }) => {
-      if (msg.type !== "screenshot" || typeof msg.id !== "number" || typeof msg.url !== "string") return;
+      if ((msg.type !== "screenshot" && msg.type !== "page-text") || typeof msg.id !== "number" || typeof msg.url !== "string") return;
       const id = msg.id;
-      photograph(msg.url, msg.width ?? 1280, msg.height ?? 800, Array.isArray(msg.actions) ? msg.actions : []).then(
+      const steps = Array.isArray(msg.actions) ? msg.actions : [];
+      if (msg.type === "page-text") {
+        readPage(msg.url, steps).then(
+          (page) => child.postMessage({ type: "page-text-done", id, page }),
+          (err: unknown) => child.postMessage({ type: "page-text-done", id, error: err instanceof Error ? err.message : String(err) }),
+        );
+        return;
+      }
+      photograph(msg.url, msg.width ?? 1280, msg.height ?? 800, steps).then(
         (png) => child.postMessage({ type: "screenshot-done", id, png: png.toString("base64") }),
         (err: unknown) => child.postMessage({ type: "screenshot-done", id, error: err instanceof Error ? err.message : String(err) }),
       );
@@ -155,6 +163,78 @@ function startCore(): Promise<number> {
 const MAX_SHOT_HEIGHT = 8000;
 
 async function photograph(url: string, width: number, height: number, actions: PageAction[] = []): Promise<Buffer> {
+  return withPage(url, width, height, actions, async (shot) => {
+    // The whole page, not only its first screen: a check of a long page needs what is further down too.
+    const full = Number(await shot.webContents.executeJavaScript(PAGE_HEIGHT_SCRIPT));
+    if (full > height) {
+      shot.setContentSize(width, Math.min(full, MAX_SHOT_HEIGHT));
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return (await shot.webContents.capturePage()).toPNG();
+  });
+}
+
+/** A page read as a person sees it, scripts run (browse_page): its title, address and visible text. */
+function readPage(url: string, actions: PageAction[] = []): Promise<{ url: string; title: string; text: string }> {
+  return withPage(url, 1280, 900, actions, async (shot) => JSON.parse(String(await shot.webContents.executeJavaScript(PAGE_TEXT_SCRIPT))));
+}
+
+/** Keys a page understands by name, with the codes the browser's input needs. */
+const KEYS: Record<string, { code: string; keyCode: number; text?: string }> = {
+  Enter: { code: "Enter", keyCode: 13, text: "\r" },
+  Tab: { code: "Tab", keyCode: 9 },
+  Escape: { code: "Escape", keyCode: 27 },
+  Backspace: { code: "Backspace", keyCode: 8 },
+  ArrowDown: { code: "ArrowDown", keyCode: 40 },
+  ArrowUp: { code: "ArrowUp", keyCode: 38 },
+};
+
+/** Types the step's text into the focused field, or presses its key, as real input through the DevTools protocol. */
+async function realInput(shot: BrowserWindow, step: PageAction): Promise<void> {
+  const tools = shot.webContents.debugger;
+  if (!tools.isAttached()) {
+    tools.attach("1.3");
+    // A hidden window is never focused; the page must believe it is, or the typed text goes nowhere.
+    await tools.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+  }
+  if (step.action === "type") {
+    await tools.sendCommand("Input.insertText", { text: step.text ?? "" });
+    return;
+  }
+  const name = step.text ?? "Enter";
+  const key = KEYS[name] ?? { code: name, keyCode: name.toUpperCase().charCodeAt(0), text: name.length === 1 ? name : undefined };
+  const base = { key: name, code: key.code, windowsVirtualKeyCode: key.keyCode, nativeVirtualKeyCode: key.keyCode };
+  await tools.sendCommand("Input.dispatchKeyEvent", { type: key.text ? "keyDown" : "rawKeyDown", ...base, ...(key.text ? { text: key.text } : {}) });
+  await tools.sendCommand("Input.dispatchKeyEvent", { type: "keyUp", ...base });
+}
+
+/** One step in the page; "left" when the page went to another address before it answered. */
+async function runStep(shot: BrowserWindow, step: PageAction): Promise<unknown> {
+  let onLeave: ((details: { isMainFrame: boolean; isSameDocument: boolean }) => void) | null = null;
+  return Promise.race([
+    shot.webContents.executeJavaScript(pageActionScript(step), true),
+    new Promise((r) => setTimeout(() => r("left"), MAX_WAIT_MS + 5_000)),
+    new Promise((r) => {
+      onLeave = (details) => details.isMainFrame && !details.isSameDocument && r("left");
+      shot.webContents.on("did-start-navigation", onLeave);
+    }),
+  ]).finally(() => onLeave && shot.webContents.off("did-start-navigation", onLeave));
+}
+
+/** Waits until a page that went to another address has loaded, 30 seconds at most. */
+function settled(shot: BrowserWindow): Promise<void> {
+  if (!shot.webContents.isLoading()) return new Promise((r) => setTimeout(r, 1000));
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, 30_000);
+    shot.webContents.once("did-stop-loading", () => {
+      clearTimeout(timer);
+      setTimeout(resolve, 1000);
+    });
+  });
+}
+
+/** Opens a page in a hidden window of its own session, goes through the steps, and hands the window to `read`. */
+async function withPage<T>(url: string, width: number, height: number, actions: PageAction[], read: (shot: BrowserWindow) => Promise<T>): Promise<T> {
   if (!/^https?:\/\//.test(url)) throw new Error("Only http and https pages");
   const preview = session.fromPartition("artel-preview");
   preview.removeAllListeners("will-download");
@@ -181,21 +261,22 @@ async function photograph(url: string, width: number, height: number, actions: P
     // A scenario first, as a person would go through it (docs/specs/project-work.md); the page settles after each step.
     for (const [n, step] of actions.entries()) {
       try {
-        await shot.webContents.executeJavaScript(pageActionScript(step), true);
+        // The page left for another address while the step ran: a click is expected to do that; anything else was the
+        // page redirecting itself (seen: WIPO adds its parameters right after loading), so the step goes again.
+        let answer = await runStep(shot, step);
+        if (answer === "left" && step.action !== "click") {
+          await settled(shot);
+          answer = await runStep(shot, step);
+        }
+        // Text and keys as real input: pages ignore made-up events (seen: WIPO's search field stayed empty).
+        if (answer === "keyboard") await realInput(shot, step);
+        if (answer === "left" || shot.webContents.isLoading()) await settled(shot);
       } catch (err) {
         throw new Error(`Step ${n + 1} (${step.action} ${step.target ?? step.text ?? ""}): ${err instanceof Error ? err.message.replace(/^.*Error:\s*/, "") : String(err)}`);
       }
       await new Promise((r) => setTimeout(r, 700));
     }
-    // The whole page, not only its first screen: a check of a long page needs what is further down too.
-    const full = Number(
-      await shot.webContents.executeJavaScript(PAGE_HEIGHT_SCRIPT),
-    );
-    if (full > height) {
-      shot.setContentSize(width, Math.min(full, MAX_SHOT_HEIGHT));
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    return (await shot.webContents.capturePage()).toPNG();
+    return await read(shot);
   } finally {
     shot.destroy();
   }

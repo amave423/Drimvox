@@ -1008,5 +1008,6 @@ export const en: Record<keyof typeof ru, string> = {
   "folder.tool.start_background": "Starts in the background: {input}",
   "folder.tool.read_background": "Reads the process output",
   "folder.tool.stop_background": "Stops a process",
+  "folder.tool.browse_page": "Reads in a browser {input}",
   "folder.tool.use_skill": "Opens the skill {input}",
 };

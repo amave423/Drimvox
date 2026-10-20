@@ -19,7 +19,7 @@ import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
 import { authRoutes, sessionGuard } from "./auth/routes";
 import { AuthStore } from "./auth/store";
-import { duckDuckGo, type WebAccess } from "./internet/web";
+import { duckDuckGo, type PageReader, type WebAccess } from "./internet/web";
 import { Background } from "./agent/background";
 import { McpHub } from "./mcp/hub";
 import { McpRepo } from "./mcp/repo";
@@ -79,6 +79,8 @@ export interface AppOptions {
   web?: WebAccess;
   /** Takes screenshots of pages; the desktop app gives one, tests a fake. Without it agents cannot look at pages. */
   screenshot?: Screenshotter;
+  /** Reads a page in a real browser (scripts run): browse_page for models with the internet. */
+  readPage?: PageReader;
   /** How to start Claude Code, Codex and Gemini CLI instead of finding them on PATH; tests run a fake. */
   cliCommands?: Partial<Record<CliId, string[]>>;
   /** What "Check the proxy" opens through it; a small page that answers fast by default. */
@@ -117,7 +119,10 @@ export function createCore(o: AppOptions) {
   const backlog = new BacklogRepo(o.db);
   const workRepo = new ProjectWorkRepo(o.db);
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
-  const web = o.web ?? duckDuckGo;
+  // Sites that draw with scripts (databases, shops) are read in the desktop's or the server's browser.
+  const base = o.web ?? duckDuckGo;
+  const reader = o.readPage;
+  const web: WebAccess = base.render || !reader ? base : { ...base, render: (url, steps) => reader(url, steps) };
   const runner = new AgentRunner({
     tasks,
     backlog,

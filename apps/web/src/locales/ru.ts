@@ -1007,5 +1007,6 @@ export const ru = {
   "folder.tool.start_background": "Запускает в фоне: {input}",
   "folder.tool.read_background": "Читает вывод процесса",
   "folder.tool.stop_background": "Останавливает процесс",
+  "folder.tool.browse_page": "Читает в браузере {input}",
   "folder.tool.use_skill": "Открывает навык {input}",
 } as const;

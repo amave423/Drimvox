@@ -1,4 +1,5 @@
-import { MAX_WAIT_MS, type PageAction, type TaskEvent, type VisualCheck } from "@artel/shared";
+import type { PageAction, TaskEvent, VisualCheck } from "@artel/shared";
+import { pageStepsInput } from "./steps";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Background } from "../agent/background";
@@ -114,18 +115,7 @@ export function visualTools(d: VisualDeps, limit: LookLimit = { looks: MAX_LOOKS
       url: z.string().min(1).max(2000),
       question: z.string().min(1).max(2000),
       width: z.number().int().min(320).max(1920).optional().describe("Window width in pixels; 390 is a phone"),
-      steps: z
-        .array(
-          z.object({
-            action: z.enum(["click", "type", "press", "wait"]),
-            target: z.string().min(1).max(300).optional().describe("Visible text, label, placeholder or CSS selector"),
-            text: z.string().max(2000).optional().describe("What to type, or the key to press"),
-            ms: z.number().int().min(0).max(MAX_WAIT_MS).optional(),
-          }),
-        )
-        .max(20)
-        .optional()
-        .describe("A scenario done in order before the screenshot"),
+      steps: pageStepsInput.describe("A scenario done in order before the screenshot"),
     }),
     execute: ({ url, question, width, steps }, o: Options) =>
       run(o.toolCallId, "look_at_page", { url, question, width, steps }, async () => {

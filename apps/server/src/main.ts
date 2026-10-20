@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { forgetSetupCode, loadSecretKey, loadSetupCode, readConfig, tailscaleName } from "./config";
-import { closeBrowser, screenshot } from "./screenshot";
+import { closeBrowser, readPage, screenshot } from "./screenshot";
 
 /** Injected by build.mjs. */
 declare const __ARTEL_VERSION__: string;
@@ -36,6 +36,7 @@ async function main() {
     allowedHosts: ["127.0.0.1", "localhost", "[::1]", ...(name ? [name] : []), ...config.hosts],
     password: { setupCode: code },
     screenshot,
+    readPage,
   });
 
   console.log(`Artel ${__ARTEL_VERSION__} listens on http://127.0.0.1:${server.port}, data in ${config.dataDir}`);

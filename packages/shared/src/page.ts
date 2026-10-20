@@ -31,11 +31,12 @@ export const MAX_WAIT_MS = 10_000;
 
 /**
  * Script that does one step in the page and resolves when it is done; it throws when the target is not found. The same
- * text runs in the desktop's hidden window and in the server's Chromium.
+ * text runs in the desktop's hidden window and in the server's Chromium. It resolves to "keyboard" when the browser
+ * must type the step's text (into the field it focused) or press its key as real input.
  */
 export function pageActionScript(step: PageAction): string {
   return `(async (a) => {
-  const norm = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const norm = (s) => (s || "").replace(/\\s+/g, " ").trim().toLowerCase();
   const shown = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const wanted = norm(a.target);
   const field = () => {
@@ -43,35 +44,63 @@ export function pageActionScript(step: PageAction): string {
     const byOwn = fields.find((e) => [e.getAttribute("aria-label"), e.getAttribute("placeholder"), e.getAttribute("name"), e.id].some((v) => norm(v) === wanted));
     if (byOwn) return byOwn;
     const label = [...document.querySelectorAll("label")].find((l) => norm(l.textContent).includes(wanted));
-    if (label) return label.control || label.querySelector("input, textarea, select");
-    return fields.find((e) => norm(e.getAttribute("placeholder")).includes(wanted)) || null;
+    const own = label && (label.control || label.querySelector("input, textarea, select"));
+    if (own) return own;
+    const byPlaceholder = fields.find((e) => norm(e.getAttribute("placeholder")).includes(wanted));
+    if (byPlaceholder) return byPlaceholder;
+    // A caption that is not a <label> but plain text next to the field (seen: the WIPO trademark database).
+    const captions = [...document.querySelectorAll("body *")].filter((e) => e.children.length === 0 && shown(e) && norm(e.textContent) === wanted);
+    for (const caption of captions) {
+      let box = caption.parentElement;
+      for (let up = 0; box && up < 4; up++, box = box.parentElement) {
+        const near = fields.find((f) => box.contains(f));
+        if (near) return near;
+      }
+    }
+    return null;
   };
   const clickable = () => {
+    // A button stays disabled until the page has taken the typed text (seen: WIPO's "Search"): it is waited for.
+    // A disabled exact match is waited for, not swapped for a lookalike (seen: "Advanced search" clicked instead).
     const all = [...document.querySelectorAll("button, a, [role=button], [role=link], [role=tab], [role=menuitem], summary, label, input[type=submit], input[type=button], [onclick]")].filter(shown);
+    const usable = (e) => !e.disabled && e.getAttribute("aria-disabled") !== "true";
     const text = (e) => norm(e.innerText || e.value || e.getAttribute("aria-label") || e.title);
-    return all.find((e) => text(e) === wanted) || all.find((e) => text(e).includes(wanted))
-      || [...document.querySelectorAll("body *")].filter(shown).find((e) => e.children.length === 0 && norm(e.textContent) === wanted) || null;
+    const exact = all.filter((e) => text(e) === wanted);
+    if (exact.length) return exact.find(usable) || null;
+    const partial = all.filter((e) => text(e).includes(wanted));
+    if (partial.length) return partial.find(usable) || null;
+    return [...document.querySelectorAll("body *")].filter(shown).find((e) => e.children.length === 0 && norm(e.textContent) === wanted) || null;
   };
   const bySelector = () => { try { return document.querySelector(a.target); } catch { return null; } };
   if (a.action === "wait") { await new Promise((r) => setTimeout(r, Math.min(a.ms || 1000, ${MAX_WAIT_MS}))); return "ok"; }
-  if (a.action === "press") {
-    const el = document.activeElement || document.body;
-    for (const type of ["keydown", "keypress", "keyup"]) el.dispatchEvent(new KeyboardEvent(type, { key: a.text, bubbles: true }));
-    if (a.text === "Enter" && el.form) el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit();
-    return "ok";
+  // Keys and text come from the browser itself as real input (pages ignore made-up events: seen, WIPO's search field).
+  if (a.action === "press") return "keyboard";
+  // Pages drawn by scripts show their fields a while after loading (seen: the WIPO database): wait for the target.
+  const find = () => (a.action === "type" ? field() || bySelector() : clickable() || bySelector());
+  let el = find();
+  for (let waited = 0; !el && waited < ${MAX_WAIT_MS}; waited += 300) {
+    await new Promise((r) => setTimeout(r, 300));
+    el = find();
   }
-  const el = a.action === "type" ? (field() || bySelector()) : (clickable() || bySelector());
   if (!el) throw new Error("not found on the page: " + a.target);
   el.scrollIntoView({ block: "center" });
   if (a.action === "click") { el.click(); return "ok"; }
   el.focus();
-  if (el.isContentEditable) { el.textContent = a.text || ""; }
-  else {
-    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, "value").set.call(el, a.text || "");
+  if (el instanceof HTMLSelectElement) {
+    const option = [...el.options].find((o) => norm(o.textContent) === norm(a.text) || o.value === a.text);
+    if (option) el.value = option.value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    return "ok";
   }
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-  el.dispatchEvent(new Event("change", { bubbles: true }));
-  return "ok";
+  // What was in the field is selected, so the typed text replaces it.
+  if (el.select) el.select();
+  else if (el.isContentEditable) document.execCommand("selectAll");
+  return "keyboard";
 })(${JSON.stringify(step)})`;
 }
+
+/**
+ * Script run in a page to read it as a person sees it (browse_page): the title, the address after redirects and the
+ * visible text, with the scripts' work done. Returns JSON.
+ */
+export const PAGE_TEXT_SCRIPT = `JSON.stringify({ url: location.href, title: document.title, text: document.body ? document.body.innerText : "" })`;

@@ -1,3 +1,4 @@
+import type { PageAction } from "@artel/shared";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -17,6 +18,20 @@ export interface Page {
 export interface WebAccess {
   search(query: string, signal?: AbortSignal): Promise<SearchResult[]>;
   open(url: string, signal?: AbortSignal): Promise<Page>;
+  /**
+   * Opens a page in a real browser, runs its scripts and the steps given, and reads what it shows. Absent where there is
+   * no browser (tests without one); the desktop's hidden window or the server's Chromium otherwise.
+   */
+  render?(url: string, steps?: PageAction[], signal?: AbortSignal): Promise<Page>;
+}
+
+/** Reads a page in a real browser: what the desktop app and the server give the core. */
+export type PageReader = (url: string, steps?: PageAction[]) => Promise<{ url: string; title: string; text: string }>;
+
+/** A rendered page's text, as long as a fetched one may be. */
+export function clipPage(text: string): string {
+  const clean = text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return clean.length > MAX_PAGE_CHARS ? `${clean.slice(0, MAX_PAGE_CHARS)}\n…(the rest of the page is cut off)` : clean;
 }
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
