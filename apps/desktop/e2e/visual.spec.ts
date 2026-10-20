@@ -16,6 +16,8 @@ let repo: string;
 let app: ElectronApplication | undefined;
 let fake: FakeProvider | undefined;
 let site: Server | undefined;
+/** Addresses the served page was asked for: what a scenario's clicks did. */
+const hits: string[] = [];
 
 test.beforeEach(() => {
   userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
@@ -40,7 +42,9 @@ const LONG_PAGE =
   '<div style="height:2200px"></div><footer style="color:white;font:32px sans-serif">Контакты внизу</footer></body>';
 
 async function serveSite(html = LONG_PAGE): Promise<string> {
-  site = createServer((_req, res) => {
+  hits.length = 0;
+  site = createServer((req, res) => {
+    hits.push(req.url ?? "");
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(html);
   });
@@ -51,11 +55,11 @@ async function serveSite(html = LONG_PAGE): Promise<string> {
 }
 
 /** An agent looks at the page; returns the screenshot the model got. */
-async function lookAt(html?: string): Promise<Buffer> {
+async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
   const url = await serveSite(html);
   // The coder sees pictures itself, so it also checks its own screenshots.
   const coder: FakeTurn[] = [
-    { toolCalls: [{ name: "look_at_page", args: { url, question: "Виден заголовок «Привет, Artel»?" } }] },
+    { toolCalls: [{ name: "look_at_page", args: { url, question: "Виден заголовок «Привет, Artel»?", ...(steps ? { steps } : {}) } }] },
     { toolCalls: [{ name: "finish", args: { summary: "Проверил страницу.", commit_message: "Check" } }] },
   ];
   fake = await startFakeProvider({
@@ -108,4 +112,17 @@ test("a page that scrolls inside its own container is photographed whole", async
       '<footer style="color:white;font:32px sans-serif">Подвал</footer></main></body>',
   );
   expect(png.readUInt32BE(20)).toBeGreaterThan(2000);
+});
+
+// docs/specs/project-work.md: the agent goes through a scenario as a person would, in the same hidden window.
+test("an agent goes through a scenario on its page: types into a field by its label, clicks a button by its text", async () => {
+  await lookAt(
+    '<h1>Привет, Artel</h1><label>Длина, м <input id="len"></label>' +
+      "<button onclick=\"fetch('/clicked?len=' + document.getElementById('len').value)\">В корзину</button>",
+    [
+      { action: "type", target: "Длина, м", text: "6" },
+      { action: "click", target: "В корзину" },
+    ],
+  );
+  expect(hits).toContain("/clicked?len=6");
 });
