@@ -200,9 +200,9 @@ export const en: Record<keyof typeof ru, string> = {
   "side.projectsEmpty": "Connect a project folder so an agent can work in it.",
 
   "project.copyNote": "The agent works in a separate copy of the project. Your folder does not change until you accept the work.",
-  "project.notRepoTitle": "This folder has no git yet",
-  "project.notRepoBody": "Artel works with a copy of the project through git. It will make a first commit of every file in the folder in your name; the agent starts from there.",
-  "project.initGit": "Make the first commit",
+  "project.notRepoTitle": "Turn on version history (git)?",
+  "project.notRepoBody": "Artel keeps the project's version history with git, right in this folder on your computer. Nothing goes to GitHub or the internet. Artel makes a first commit of every file in the folder in your name. The agent needs this to start.",
+  "project.initGit": "Turn on git",
   "project.noIdentity": "Git has no name and email for commits. Run these two commands in a terminal and try again:",
   "project.noGit": "Git is not installed. Install it from git-scm.com and restart Artel.",
   "project.newTask": "New task",

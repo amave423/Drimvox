@@ -65,13 +65,17 @@ describe("projects", () => {
     expect(await res.json()).toMatchObject({ path: repo, gitState: "ready" });
   });
 
-  // The user need not know about git: a plain folder gets it when added, dependencies left out.
-  it("starts git in a plain folder on its own when it is added", async () => {
+  // Seen live: git appeared in the user's folder though nobody asked. A plain folder stays plain until the user agrees on
+  // the project's page; then it gets git, dependencies left out.
+  it("starts git in a plain folder only when the user asks", async () => {
     const plain = mkdtempSync(join(tmpdir(), "artel-plain-"));
     writeFileSync(join(plain, "notes.txt"), "hello");
     mkdirSync(join(plain, "node_modules", "x"), { recursive: true });
     writeFileSync(join(plain, "node_modules", "x", "index.js"), "x");
-    const project = await (await env.call("POST", "/api/projects", { path: plain })).json();
+    const added = await (await env.call("POST", "/api/projects", { path: plain })).json();
+    expect(added.gitState).toBe("not_repo");
+    expect(existsSync(join(plain, ".git"))).toBe(false);
+    const project = await (await env.call("POST", `/api/projects/${added.id}/init-git`)).json();
     expect(project.gitState).toBe("ready");
     expect(git(plain, "log", "--format=%s")).toBe("Initial commit");
     expect(git(plain, "show", "--name-only", "--format=")).toBe("notes.txt");
@@ -89,7 +93,8 @@ describe("projects", () => {
     process.env.GIT_CONFIG_GLOBAL = empty;
     process.env.GIT_CONFIG_NOSYSTEM = "1";
     try {
-      const project = await (await env.call("POST", "/api/projects", { path: plain })).json();
+      const added = await (await env.call("POST", "/api/projects", { path: plain })).json();
+      const project = await (await env.call("POST", `/api/projects/${added.id}/init-git`)).json();
       expect(project.gitState).toBe("ready");
       expect(git(plain, "log", "--format=%an")).toBe(userInfo().username);
     } finally {
