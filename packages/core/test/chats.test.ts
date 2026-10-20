@@ -160,6 +160,44 @@ describe("sending a message", () => {
       expect(JSON.stringify(requests[1]!.body.messages)).toContain("No results found!");
     });
 
+    // Seen live: checking a few names took more than 8 steps, and five answers of eight stopped half-way with "go on".
+    it("gives an answer with the internet room for research, far past 8 steps", async () => {
+      env.setWeb(fakeWeb);
+      const search = (n: number) => ({ toolCalls: [{ name: "web_search", args: { query: `name ${n}` } }] });
+      const { chat } = await setup({ script: [...Array.from({ length: 12 }, (_, n) => search(n % 6)), { text: "Проверил все двенадцать." }] });
+      const events = await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Проверь 12 названий", web: "free" }));
+      expect(events.find((e) => e.type === "done").message).toMatchObject({ status: "done", content: "Проверил все двенадцать.", error: null });
+      // The same query again is answered from what was found, not asked of DuckDuckGo twice (it limits bursts).
+      expect(searched.filter((q) => q === "name 1")).toHaveLength(1);
+    });
+
+    // Seen live: a model typed into a field that was not there twelve times in one answer.
+    it("stops a failing browser step repeated as it is, and says what the page has instead", async () => {
+      let tries = 0;
+      env.setWeb({
+        ...fakeWeb,
+        render: async () => {
+          tries++;
+          throw new Error('Step 1 (type Search trademarks): not found on the page: Search trademarks. Fields here: "brand name". Buttons and links: "search"');
+        },
+      });
+      const same = { toolCalls: [{ name: "browse_page", args: { url: "https://branddb.wipo.int/en/quicksearch", steps: [{ action: "type", target: "Search trademarks", text: "velmir" }] } }] };
+      const { chat } = await setup({ script: [same, same, same, same, { text: "Не вышло." }] });
+      await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Проверь Velmir", web: "free" }));
+      expect(tries).toBe(2);
+      const last = JSON.stringify(fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!.body.messages);
+      expect(last).toContain("brand name");
+      expect(last).toMatch(/already failed twice/);
+    });
+
+    // Seen live: "I need names in English" turned the whole conversation into English.
+    it("tells the model to answer in the user's language even when the user asks for words in another", async () => {
+      const { chat } = await setup();
+      await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Придумай названия на английском", web: "free" }));
+      const system = JSON.stringify(fake.requests.find((r) => r.path === "/v1/chat/completions")!.body.messages[0]);
+      expect(system).toMatch(/language the user writes in/);
+    });
+
     // Seen live: the model had nearly finished thinking and searching, and the answer was cut as "silent" — the time
     // Artel's own search took counted as the model's silence.
     it("does not count the time a search takes as the model's silence", async () => {

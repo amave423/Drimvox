@@ -26,6 +26,13 @@ import type { ChatRepo } from "./repo";
 const LAST_STEP =
   "This is the last step of this answer: do not call tools. Write the answer now, in the user's language: what is done, where the results are, and what is left, so the user can say \"go on\".";
 
+/** Steps of an answer with Artel's internet: research takes searches and pages (seen: 8 steps stopped five answers of eight). */
+export const WEB_STEPS = 30;
+
+/** Seen live: "I need names in English" turned the whole conversation into English. */
+const LANGUAGE_HINT =
+  "Answer in the language the user writes in. When the user asks for names, words or a text in another language, only those are in that language; your answer stays in the user's.";
+
 /** How long a model on this computer may stay silent: reading a long context before the first word takes a while. */
 const LOCAL_IDLE_MS = 10 * 60_000;
 
@@ -116,7 +123,7 @@ export async function reply(i: ReplyInput): Promise<void> {
     ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }) : {}),
     ...i.extraTools,
   };
-  const steps = i.work?.steps || (i.folder ? FOLDER_STEPS : 8);
+  const steps = i.work?.steps || (i.folder ? FOLDER_STEPS : i.web === "free" ? WEB_STEPS : 8);
   const memory = i.folder ? memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) : null;
   /** The answer reached its last step: what it says there is a summary of unfinished work. */
   let lastStep = false;
@@ -125,6 +132,7 @@ export async function reply(i: ReplyInput): Promise<void> {
       model: languageModel(i.conn, i.model),
       system: [
         nowLine(),
+        LANGUAGE_HINT,
         FORMAT_HINT,
         i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
         i.folder ? folderHint(i.folder) : "",

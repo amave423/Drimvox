@@ -82,7 +82,23 @@ export function pageActionScript(step: PageAction): string {
     await new Promise((r) => setTimeout(r, 300));
     el = find();
   }
-  if (!el) throw new Error("not found on the page: " + a.target);
+  if (!el) {
+    // What the page has instead, so the next try names it right (seen: a model asked for a missing field twelve times).
+    const fieldNames = [...document.querySelectorAll("input, textarea, select")].filter(shown).map((f) => {
+      const own = f.getAttribute("aria-label") || f.getAttribute("placeholder") || (f.labels && f.labels[0] && f.labels[0].textContent);
+      if (own) return norm(own);
+      let box = f.parentElement;
+      for (let up = 0; box && up < 4; up++, box = box.parentElement) {
+        const caption = norm(box.innerText).slice(0, 40);
+        if (caption) return caption;
+      }
+      return f.name || f.type;
+    });
+    const buttonNames = [...document.querySelectorAll("button, a, [role=button], input[type=submit]")].filter(shown)
+      .map((b) => norm(b.innerText || b.value || b.getAttribute("aria-label")).slice(0, 40)).filter(Boolean);
+    const list = (names) => [...new Set(names)].slice(0, 20).map((n) => '"' + n + '"').join(", ") || "none";
+    throw new Error("not found on the page: " + a.target + ". Fields here: " + list(fieldNames) + ". Buttons and links: " + list(buttonNames));
+  }
   el.scrollIntoView({ block: "center" });
   if (a.action === "click") { el.click(); return "ok"; }
   el.focus();

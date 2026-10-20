@@ -19,10 +19,15 @@ export const WEB_HINT =
   "You can use the internet: web_search finds pages, open_page reads one. Use them for current facts (news, prices, " +
   "weather, versions, documentation) instead of guessing, and name the sources you used. When open_page shows little or " +
   "\"Loading…\" (a site that draws with scripts: databases, shops, search forms), use browse_page if you have it: a real " +
-  "browser that can also type into a search field, press a button and wait before reading.";
+  "browser that can also type into a search field, press a button and wait before reading. Search sparingly: a few " +
+  "precise queries, then open the pages; when you know the site that has the answer, go to it directly.";
 
 /** Search and page reading, free, through Artel itself; for any model that can call tools. */
 export function webTools(web: WebAccess, hooks: WebHooks = {}): ToolSet {
+  // Within one answer: a query asked again is answered from what was found (DuckDuckGo limits bursts), and a browser
+  // call that failed twice exactly as it is is not tried a third time (seen: the same missing field, twelve times).
+  const found = new Map<string, string>();
+  const failed = new Map<string, number>();
   const run = async (callId: string, name: WebCall["name"], input: string, work: () => Promise<string>) => {
     hooks.onCall?.({ callId, name, input });
     let ok = true;
@@ -41,9 +46,14 @@ export function webTools(web: WebAccess, hooks: WebHooks = {}): ToolSet {
       description: "Search the internet. Returns titles, addresses and short snippets of the top results.",
       inputSchema: z.object({ query: z.string().min(1).max(400) }),
       execute: ({ query }, o: { toolCallId: string; abortSignal?: AbortSignal }) =>
-        run(o.toolCallId, "web_search", query, async () =>
-          (await web.search(query, o.abortSignal)).map((r, i) => `${i + 1}. ${r.title}\n${r.url}\n${r.snippet}`).join("\n\n"),
-        ),
+        run(o.toolCallId, "web_search", query, async () => {
+          const key = query.trim().toLowerCase();
+          const known = found.get(key);
+          if (known !== undefined) return known;
+          const text = (await web.search(query, o.abortSignal)).map((r, i) => `${i + 1}. ${r.title}\n${r.url}\n${r.snippet}`).join("\n\n");
+          found.set(key, text);
+          return text;
+        }),
     }),
     open_page: tool({
       description: "Open a public web page and read its text.",
@@ -65,8 +75,19 @@ export function webTools(web: WebAccess, hooks: WebHooks = {}): ToolSet {
     execute: ({ url, steps }, o: { toolCallId: string; abortSignal?: AbortSignal }) =>
       run(o.toolCallId, "browse_page", url, async () => {
         if (!isPublicAddress(url)) throw new Error("Only public internet addresses can be opened");
-        const page = await render(url, steps, o.abortSignal);
-        return `${page.title ? `${page.title}\n` : ""}${page.url}\n\n${clipPage(page.text)}`;
+        const key = JSON.stringify({ url, steps });
+        if ((failed.get(key) ?? 0) >= 2) {
+          throw new Error(
+            "This exact call already failed twice. Change the steps (use the field and button names the error listed), try another page, or tell the user what blocks you.",
+          );
+        }
+        try {
+          const page = await render(url, steps, o.abortSignal);
+          return `${page.title ? `${page.title}\n` : ""}${page.url}\n\n${clipPage(page.text)}`;
+        } catch (err) {
+          failed.set(key, (failed.get(key) ?? 0) + 1);
+          throw err;
+        }
       }),
   });
   return tools;
