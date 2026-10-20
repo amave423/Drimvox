@@ -87,7 +87,8 @@ export class ChatRepo {
     return (this.db.sql.prepare("select * from chats order by updated_at desc").all() as unknown as ChatRow[]).map(toChat);
   }
 
-  get(id: string): ChatWithMessages | null {
+  /** The chat and its messages; the requests its answer waits on live in the core, not here (routes add them). */
+  get(id: string): Omit<ChatWithMessages, "approvals"> | null {
     const row = this.chatRow(id);
     if (!row) return null;
     const messages = this.db.sql

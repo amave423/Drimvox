@@ -157,12 +157,16 @@ describe("tools in a chat", () => {
         if (event.type === "approval" && !answered) {
           answered = true;
           expect(event).toMatchObject({ server: "demo", tool: "echo", input: { text: "привет" } });
+          // A window that comes back to the chat sees the open request too (seen: a task waited hours on a card nobody saw).
+          const open = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
+          expect(open.approvals).toEqual([expect.objectContaining({ id: event.id, server: "demo", tool: "echo" })]);
           const ok = await env.call("POST", `/api/chats/${chat.id}/approvals/${event.id}`, { allow: true });
           expect(ok.status).toBe(200);
         }
       }
     }
     expect(events.find((e) => e.type === "done").message).toMatchObject({ status: "done", content: "Сервер ответил: echo: привет" });
+    expect((await (await env.call("GET", `/api/chats/${chat.id}`)).json()).approvals).toEqual([]);
     const lastChat = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!;
     expect(JSON.stringify(lastChat.body.messages)).toContain("echo: привет");
   });

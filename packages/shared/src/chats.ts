@@ -107,6 +107,18 @@ export interface MessageView {
 
 export interface ChatWithMessages extends ChatView {
   messages: MessageView[];
+  /** Requests the answer being written waits on: a window that comes back to the chat shows them to answer. */
+  approvals: ChatApprovalView[];
+}
+
+/** A tool that asks first: an MCP server's tool, or (with reason) a command in the chat's folder. */
+export interface ChatApprovalView {
+  id: string;
+  server: string;
+  tool: string;
+  input: unknown;
+  reason?: string;
+  purpose?: string;
 }
 
 export interface UsageSummary {

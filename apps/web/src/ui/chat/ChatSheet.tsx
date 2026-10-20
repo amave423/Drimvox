@@ -276,7 +276,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
       if (!id) {
         const created = await ok<ChatView>(await api.chats.$post({ json: target }));
         id = created.id;
-        setChat({ ...created, messages: [] });
+        setChat({ ...created, messages: [], approvals: [] });
         // In the list at once: going elsewhere while the model answers must not lose the chat (seen: it showed up
         // only when the answer was done).
         void reloadChats();
@@ -337,6 +337,12 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     void reloadToday();
   }
 
+  async function approve(approvalId: string, allow: boolean, always: boolean) {
+    if (!chat) return;
+    await api.chats[":id"].approvals[":approvalId"].$post({ param: { id: chat.id, approvalId }, json: { allow, always } }).catch(() => null);
+    if (!draft) await load(chat.id);
+  }
+
   async function remove() {
     if (!chat) return;
     await api.chats[":id"].$delete({ param: { id: chat.id } }).catch(() => null);
@@ -387,6 +393,9 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
                 activity={m.status === "streaming" ? m.activity.map((a) => activityLine(t, a.name, a.input)) : undefined}
                 done={m.status === "streaming" ? [] : m.activity.map((a) => activityLine(t, a.name, a.input))}
                 onUndo={draft || chat?.itemId ? undefined : () => void undo(m.id)}
+                // Seen after coming back to the chat: the requests this answer waits on, to answer here.
+                approvals={m.status === "streaming" && !draft ? chat?.approvals.map((a) => ({ ...a, state: "open" as const })) : undefined}
+                onApprove={approve}
               />
             ),
           )}
@@ -401,12 +410,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
                 making={draft.media ? kind : undefined}
                 activity={draft.activity}
                 approvals={draft.approvals}
-                onApprove={(approvalId, allow, always) =>
-                  chat &&
-                  void api.chats[":id"].approvals[":approvalId"]
-                    .$post({ param: { id: chat.id, approvalId }, json: { allow, always } })
-                    .catch(() => null)
-                }
+                onApprove={approve}
               />
             </>
           )}

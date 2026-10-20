@@ -1,14 +1,16 @@
-import type { StreamEvent } from "@artel/shared";
+import type { ChatApprovalView, StreamEvent } from "@artel/shared";
 import { randomUUID } from "node:crypto";
 
 interface Pending {
   chatId: string;
+  card: ChatApprovalView;
   settle(answer: boolean | "always"): void;
 }
 
 /**
  * Permission requests inside a chat answer: the answer's stream stays open, the card shows in it, and the
- * user's click arrives as a separate request. A closed stream counts as "no".
+ * user's click arrives as a separate request. A closed stream counts as "no". Open requests are kept with their
+ * cards: a window that comes back to the chat shows them (seen: a task waited on a card nobody could see).
  */
 export class ChatApprovals {
   private readonly pending = new Map<string, Pending>();
@@ -19,6 +21,14 @@ export class ChatApprovals {
     call: { server: string; tool: string; input: unknown; reason?: string; purpose?: string; signal?: AbortSignal },
   ): Promise<boolean | "always"> {
     const id = randomUUID();
+    const card: ChatApprovalView = {
+      id,
+      server: call.server,
+      tool: call.tool,
+      input: call.input,
+      ...(call.reason ? { reason: call.reason } : {}),
+      ...(call.purpose ? { purpose: call.purpose } : {}),
+    };
     return new Promise((resolve) => {
       const onAbort = () => settle(false);
       const settle = (answer: boolean | "always") => {
@@ -27,18 +37,15 @@ export class ChatApprovals {
         void emit({ type: "approved", id, allowed: answer !== false });
         resolve(answer);
       };
-      this.pending.set(id, { chatId, settle });
+      this.pending.set(id, { chatId, card, settle });
       call.signal?.addEventListener("abort", onAbort, { once: true });
-      void emit({
-        type: "approval",
-        id,
-        server: call.server,
-        tool: call.tool,
-        input: call.input,
-        ...(call.reason ? { reason: call.reason } : {}),
-        ...(call.purpose ? { purpose: call.purpose } : {}),
-      });
+      void emit({ type: "approval", ...card });
     });
+  }
+
+  /** The requests a chat's answer waits on now. */
+  open(chatId: string): ChatApprovalView[] {
+    return [...this.pending.values()].filter((p) => p.chatId === chatId).map((p) => p.card);
   }
 
   answer(chatId: string, id: string, allow: boolean, always: boolean): boolean {

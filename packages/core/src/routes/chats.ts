@@ -86,7 +86,7 @@ export function chatRoutes(
     })
     .get("/:id", (c) => {
       const chat = chats.get(c.req.param("id"));
-      return chat ? c.json(chat, 200) : c.json(notFound, 404);
+      return chat ? c.json({ ...chat, approvals: approvals.open(chat.id) }, 200) : c.json(notFound, 404);
     })
     .patch("/:id", zValidator("json", chatUpdateSchema), (c) => {
       const patch = c.req.valid("json");
