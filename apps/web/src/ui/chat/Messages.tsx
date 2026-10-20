@@ -134,7 +134,8 @@ export function AssistantMessage({
       {reasoning && <Reasoning text={reasoning} thinking={!!streaming && !content} />}
       {shown && <Markdown text={shown} streaming={streaming} />}
       {message?.media.map((item) => <MediaView key={item.id} item={item} />)}
-      {(making || rendering) && (
+      {/* An answer followed live shows its own caret and words; "answering" is for one only known to be under way. */}
+      {(making || (rendering && !streaming)) && (
         <p className="msg-making">
           <span className="action-spinner" aria-hidden />
           {rendering

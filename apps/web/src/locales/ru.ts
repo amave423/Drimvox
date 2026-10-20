@@ -13,6 +13,8 @@ export const ru = {
   "side.rename": "Переименовать «{title}»",
   "side.renameLabel": "Название чата",
   "side.delete": "Удалить «{title}»",
+  "side.answering": "Модель отвечает",
+  "side.unread": "Новый ответ",
   "side.keys": "Ключи и модели",
 
   "github.title": "GitHub",

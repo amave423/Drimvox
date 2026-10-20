@@ -15,6 +15,8 @@ export const en: Record<keyof typeof ru, string> = {
   "side.rename": "Rename “{title}”",
   "side.renameLabel": "Chat name",
   "side.delete": "Delete “{title}”",
+  "side.answering": "The model is answering",
+  "side.unread": "New answer",
   "side.keys": "Keys and models",
 
   "github.title": "GitHub",

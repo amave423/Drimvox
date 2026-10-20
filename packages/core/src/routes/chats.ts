@@ -9,6 +9,7 @@ import {
   messageSendSchema,
   needsConfirmation,
   presets,
+  type FollowEvent,
   type StreamEvent,
 } from "@artel/shared";
 import { Hono } from "hono";
@@ -77,6 +78,8 @@ export function chatRoutes(
 ) {
   /** Answers being written, by chat: "Stop" reaches them from any window (seen: back in the chat, nothing could stop it). */
   const running = new Map<string, AbortController>();
+  /** What an answer being written has so far, and the windows following it (GET /:id/follow). */
+  const live = new Map<string, { snapshot: Extract<FollowEvent, { type: "snapshot" }>; listeners: Set<(event: FollowEvent | null) => void> }>();
   return new Hono()
     .get("/", (c) => c.json(chats.list()))
     .post("/", zValidator("json", chatCreateSchema), (c) => {
@@ -135,6 +138,34 @@ export function chatRoutes(
       chats.setCheckpoint(message.id, null);
       return c.json({ ok: true as const }, 200);
     })
+    // Back in a chat whose answer is still being written: what it has so far, then the rest as it comes.
+    .get("/:id/follow", (c) =>
+      streamSSE(c, async (stream) => {
+        const answer = live.get(c.req.param("id"));
+        if (!answer) return;
+        const queue: (FollowEvent | null)[] = [{ ...answer.snapshot, activity: [...answer.snapshot.activity] }];
+        let wake: (() => void) | null = null;
+        const listener = (event: FollowEvent | null) => {
+          queue.push(event);
+          wake?.();
+        };
+        answer.listeners.add(listener);
+        stream.onAbort(() => listener(null));
+        try {
+          for (;;) {
+            if (queue.length === 0) await new Promise<void>((r) => (wake = r));
+            wake = null;
+            const event = queue.shift();
+            if (event === null || event === undefined) break;
+            await stream.writeSSE({ data: JSON.stringify(event) });
+            if (event.type === "done") break;
+          }
+        } finally {
+          answer.listeners.delete(listener);
+        }
+      }),
+    )
+    .post("/:id/seen", (c) => (chats.markSeen(c.req.param("id")) ? c.json({ ok: true as const }, 200) : c.json(notFound, 404)))
     .post("/:id/stop", (c) => {
       const answer = running.get(c.req.param("id"));
       if (!answer) return c.json(notFound, 404);
@@ -201,11 +232,16 @@ export function chatRoutes(
           partial.savedAt = Date.now();
           chats.saveProgress(partial.id, { content: partial.content, reasoning: partial.reasoning || null, activity });
         };
+        const following = { snapshot: { type: "snapshot" as const, assistantMessageId: "", content: "", reasoning: "", activity }, listeners: new Set<(event: FollowEvent | null) => void>() };
+        live.set(chat.id, following);
         const emit = async (event: StreamEvent) => {
-          if (event.type === "start") partial.id = event.assistantMessageId;
+          if (event.type === "start") partial.id = following.snapshot.assistantMessageId = event.assistantMessageId;
           if (event.type === "text") partial.content += event.text;
           if (event.type === "reasoning") partial.reasoning += event.text;
           if (event.type === "tool") activity.push({ name: event.name, input: event.input });
+          following.snapshot.content = partial.content;
+          following.snapshot.reasoning = partial.reasoning;
+          for (const listener of following.listeners) listener(event);
           saveProgress(event.type === "tool");
           if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
         };
@@ -272,6 +308,9 @@ export function chatRoutes(
           activity: () => activity,
         }).finally(() => {
           if (running.get(chat.id) === controller) running.delete(chat.id);
+          if (live.get(chat.id) === following) live.delete(chat.id);
+          // A stopped answer sends no "done": its followers end here.
+          for (const listener of following.listeners) listener(null);
         });
         if (task) {
           // A dev server the agent started does not hold the port once it answered (seen: "npm run dev" failed after).

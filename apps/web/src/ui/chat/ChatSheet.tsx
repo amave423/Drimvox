@@ -32,6 +32,7 @@ import { WorkReview } from "../projects/WorkReview";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
+import { useLiveAnswer } from "./useLiveAnswer";
 import { WorkPanel } from "../projects/WorkPanel";
 import { useProjectWork } from "../projects/useProjectWork";
 
@@ -114,12 +115,24 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   // A clip renders for minutes on the provider's side, and an answer goes on after the window that asked left the chat:
   // the chat checks on them until they are done.
   const pending = !draft && !!chat?.messages.some((m) => m.status === "streaming");
+  // A text answer is followed live, letter by letter (useLiveAnswer); the rest (clips, a project's run) by looking again.
+  const live = useLiveAnswer(chat?.id ?? null, pending && chat?.kind === "text" && !chat.projectId, token, () => chat && void load(chat.id).then(() => void reloadToday()));
   useEffect(() => {
-    if (!pending || !chat) return;
+    if (!pending || !chat || live) return;
     // A text answer is followed closely; a clip renders for minutes.
     const timer = setTimeout(() => void load(chat.id).then(() => void reloadToday()), chat.kind === "text" ? 1000 : PENDING_POLL_MS);
     return () => clearTimeout(timer);
-  }, [pending, chat]);
+  }, [pending, chat, live]);
+
+  // Looked at with nothing being written: its answers are read, and the list drops the dot.
+  const settled = !!chat && !draft && !chat.messages.some((m) => m.status === "streaming");
+  useEffect(() => {
+    if (!settled || !chat) return;
+    void api.chats[":id"].seen
+      .$post({ param: { id: chat.id } })
+      .then(() => reloadChats())
+      .catch(() => null);
+  }, [settled, chat?.id, chat?.messages.length]);
 
   useEffect(() => {
     if (chatId && chatId !== chat?.id) void load(chatId);
@@ -347,13 +360,15 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
             ) : (
               <AssistantMessage
                 key={m.id}
-                content={m.content}
-                reasoning={m.reasoning}
+                // Still being written and followed live: the text, the thinking and the actions as they come.
+                content={live?.messageId === m.id ? live.text : m.content}
+                reasoning={live?.messageId === m.id ? live.reasoning || null : m.reasoning}
+                streaming={live?.messageId === m.id}
                 model={m.model}
                 message={m}
                 kind={chat?.kind}
                 // Still being written: its actions so far, as they come; once done, folded.
-                activity={m.status === "streaming" ? m.activity.map((a) => activityLine(t, a.name, a.input)) : undefined}
+                activity={m.status === "streaming" ? (live?.messageId === m.id ? live.activity : m.activity).map((a) => activityLine(t, a.name, a.input)) : undefined}
                 done={m.status === "streaming" ? [] : m.activity.map((a) => activityLine(t, a.name, a.input))}
                 onUndo={draft || chat?.itemId ? undefined : () => void undo(m.id)}
                 // Seen after coming back to the chat: the requests this answer waits on, to answer here.

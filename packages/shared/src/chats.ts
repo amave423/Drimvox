@@ -77,6 +77,10 @@ export interface ChatView {
   itemId: string | null;
   createdAt: number;
   updatedAt: number;
+  /** An answer is being written: the list shows a spinner on the chat. */
+  answering: boolean;
+  /** An answer came while the chat was not open: the list shows a dot until it is. */
+  unread: boolean;
 }
 
 export type MessageStatus = "done" | "streaming" | "stopped" | "error";
@@ -141,3 +145,11 @@ export type StreamEvent =
   | { type: "approval"; id: string; server: string; tool: string; input: unknown; reason?: string; purpose?: string }
   | { type: "approved"; id: string; allowed: boolean }
   | { type: "done"; message: MessageView };
+
+/**
+ * GET /api/chats/:id/follow: a window that comes back to a chat follows the answer being written, from what it has so
+ * far (the snapshot) to the end, as it comes. Ends at once when nothing is being written.
+ */
+export type FollowEvent =
+  | { type: "snapshot"; assistantMessageId: string; content: string; reasoning: string; activity: { name: string; input: string }[] }
+  | StreamEvent;

@@ -146,6 +146,14 @@ export function App({ api, token, initialSettings, status }: Props) {
     void reloadTasks();
   }, [reloadProviders, reloadChats, reloadToday, reloadProjects, reloadTasks]);
 
+  // A chat whose model answers shows a spinner in the list, then a dot when the answer is ready: kept fresh meanwhile.
+  const answering = chats.some((c) => c.answering);
+  useEffect(() => {
+    if (!answering) return;
+    const timer = setInterval(() => void reloadChats(), 1500);
+    return () => clearInterval(timer);
+  }, [answering, reloadChats]);
+
   // Keep the sidebar's task statuses fresh while an agent is busy.
   const busy = tasks.some((t) => t.status === "running" || t.status === "waiting");
   useEffect(() => {

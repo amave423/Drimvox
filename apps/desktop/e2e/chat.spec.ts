@@ -389,3 +389,39 @@ test("an MCP server from the settings gives the chat a tool that asks first", as
   await expect(page.getByText("Разрешены всегда:")).toBeVisible();
   await expect(page.getByRole("button", { name: "echo ×" })).toBeVisible();
 });
+
+// Like ChatGPT and Claude: leave a chat while it answers, see a spinner on it, come back and watch the answer go on;
+// an answer that came while the chat was closed leaves a dot until it is opened.
+test("an answer goes on live after coming back to the chat, with a spinner and then a dot in the list", async () => {
+  fake = await startFakeProvider({
+    key: KEY,
+    models,
+    chunks: [{ reasoning: "Думаю о кусках" }, ...Array.from({ length: 30 }, (_, i) => ({ text: `кусок${i} ` }))],
+    delayMs: 120,
+  });
+  const page = await launch();
+  await connect(page);
+  await expect(page.getByText("Моделей: 1")).toBeVisible();
+  await startChat(page);
+  await say(page, "Длинно");
+  await expect(page.getByText(/кусок1 /)).toBeVisible();
+
+  // Away, in a new chat: the first one is still answering.
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  const row = page.locator(".side-chat", { hasText: "Длинно" });
+  await expect(row.getByRole("img", { name: "Модель отвечает" })).toBeVisible();
+
+  // Back: the answer goes on before the eyes, word after word, not only "the model is answering".
+  await row.getByRole("button", { name: /Длинно/ }).click();
+  await expect(page.getByText(/кусок12 /)).toBeVisible();
+  await expect(page.getByText(/кусок20 /)).toBeVisible();
+  await expect(page.getByText(/кусок29/)).toBeVisible({ timeout: 15_000 });
+  await expect(row.getByRole("img", { name: "Модель отвечает" })).toHaveCount(0);
+
+  // Another answer while the chat is closed: a dot until it is opened.
+  await say(page, "Ещё");
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await expect(row.getByRole("img", { name: "Новый ответ" })).toBeVisible({ timeout: 20_000 });
+  await row.getByRole("button", { name: /Длинно/ }).click();
+  await expect(row.getByRole("img", { name: "Новый ответ" })).toHaveCount(0);
+});

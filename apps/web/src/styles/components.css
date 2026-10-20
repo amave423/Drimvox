@@ -116,3 +116,9 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .model-setting p { margin: 0; }
 .more-settings { margin-top: 16px; }
 .more-settings summary { cursor: pointer; color: var(--ink); font-size: 14px; }
+
+/* A chat whose model answers, and one with an answer not seen yet. */
+/* At the right edge, where the rename and delete buttons show on hover; the spinner turns, so no transform here. */
+.side-chat-state { position: absolute; right: 12px; top: calc(50% - 7px); }
+.side-chat-dot { width: 8px; height: 8px; top: calc(50% - 4px); right: 15px; border-radius: 50%; background: var(--ink); }
+.side-chat:hover .side-chat-state { visibility: hidden; }

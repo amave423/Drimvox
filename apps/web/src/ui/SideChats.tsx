@@ -133,6 +133,12 @@ export function SideChats() {
                   aria-current={chat.id === current ? "page" : undefined}
                 >
                   <span className="side-item-title">{title}</span>
+                  {/* Like ChatGPT and Claude: a spinner while the model answers, a dot once an unseen answer is ready. */}
+                  {chat.answering ? (
+                    <span className="action-spinner side-chat-state" role="img" aria-label={t("side.answering")} />
+                  ) : (
+                    chat.unread && chat.id !== current && <span className="side-chat-dot side-chat-state" role="img" aria-label={t("side.unread")} />
+                  )}
                 </button>
                 {deleting === chat.id ? (
                   <span className="side-chat-actions is-shown">

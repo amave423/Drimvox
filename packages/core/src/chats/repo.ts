@@ -15,6 +15,9 @@ interface ChatRow {
   item_id: string | null;
   created_at: number;
   updated_at: number;
+  /** Only in the list: an answer is being written, and one came after the chat was last looked at. */
+  answering?: number;
+  unread?: number;
 }
 
 interface MessageRow {
@@ -84,7 +87,21 @@ export class ChatRepo {
   ) {}
 
   list(): ChatView[] {
-    return (this.db.sql.prepare("select * from chats order by updated_at desc").all() as unknown as ChatRow[]).map(toChat);
+    // A spinner while an answer is written, a dot for one that came after the chat was last looked at.
+    const rows = this.db.sql
+      .prepare(
+        `select c.*,
+           exists(select 1 from messages m where m.chat_id = c.id and m.status = 'streaming') as answering,
+           coalesce((select max(m.created_at) from messages m where m.chat_id = c.id and m.role = 'assistant' and m.status != 'streaming'), 0) > coalesce(c.seen_at, 0) as unread
+         from chats c order by c.updated_at desc`,
+      )
+      .all() as unknown as ChatRow[];
+    return rows.map(toChat);
+  }
+
+  /** The user looked at the chat: its answers so far are read. */
+  markSeen(id: string): boolean {
+    return Number(this.db.sql.prepare("update chats set seen_at = ? where id = ?").run(Date.now(), id).changes) > 0;
   }
 
   /** The chat and its messages; the requests its answer waits on live in the core, not here (routes add them). */
@@ -319,6 +336,8 @@ function toChat(r: ChatRow): ChatView {
     itemId: r.item_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    answering: !!r.answering,
+    unread: !!r.unread && !r.answering,
   };
 }
 

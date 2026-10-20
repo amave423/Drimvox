@@ -247,6 +247,29 @@ describe("sending a message", () => {
     expect((await env.call("POST", `/api/chats/${chat.id}/stop`)).status).toBe(404);
   });
 
+  // Like ChatGPT and Claude: back in the chat, the answer goes on before the reader's eyes, from what it has so far.
+  it("lets a window coming back follow the answer live: what it has so far, then the rest as it comes", async () => {
+    const { chat } = await setup({ chunks: Array.from({ length: 20 }, (_, i) => ({ text: `кусок ${i} ` })), delayMs: 60 });
+    const answer = readEvents(await send(chat.id, "Напиши длинно"));
+    const list = async () => ((await (await env.call("GET", "/api/chats")).json()) as any[]).find((c) => c.id === chat.id);
+    for (let i = 0; i < 60 && !(await list())?.answering; i++) await new Promise((r) => setTimeout(r, 30));
+    expect(await list()).toMatchObject({ answering: true, unread: false });
+    await new Promise((r) => setTimeout(r, 300));
+    const followed = await readEvents(await env.call("GET", `/api/chats/${chat.id}/follow`));
+    expect(followed[0]).toMatchObject({ type: "snapshot" });
+    expect(followed[0].content).toMatch(/^кусок 0 /);
+    expect(followed.at(-1)).toMatchObject({ type: "done" });
+    const rest = followed.filter((e) => e.type === "text").map((e) => e.text).join("");
+    expect(followed[0].content + rest).toBe(Array.from({ length: 20 }, (_, i) => `кусок ${i} `).join(""));
+    await answer;
+    // Answered while nobody looked: a dot until the chat is opened.
+    expect(await list()).toMatchObject({ answering: false, unread: true });
+    expect((await env.call("POST", `/api/chats/${chat.id}/seen`)).status).toBe(200);
+    expect(await list()).toMatchObject({ unread: false });
+    // Nothing to follow any more: the stream ends at once.
+    expect(await readEvents(await env.call("GET", `/api/chats/${chat.id}/follow`))).toEqual([]);
+  });
+
   it("marks an answer left mid-way by a closed app as stopped, not writing forever", async () => {
     const { chat } = await setup();
     await readEvents(await send(chat.id, "Привет"));

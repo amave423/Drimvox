@@ -236,6 +236,9 @@ const migrations: string[] = [
      escalated integer not null default 0,
      started_at integer
    ) strict;`,
+  // When the chat was last looked at: an answer that came after it shows as unread in the list.
+  `alter table chats add column seen_at integer;
+   update chats set seen_at = updated_at;`,
 ];
 
 export interface Database {
