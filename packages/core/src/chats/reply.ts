@@ -10,7 +10,7 @@ import type { ThinkingLevel, WebMode } from "@artel/shared";
 import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai";
 import { cliReply } from "../cli/chat";
 import { isCli } from "../cli/kinds";
-import { WEB_HINT, webTools } from "../internet/tools";
+import { FAIR_USE_HINT, WEB_HINT, webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";
@@ -26,7 +26,7 @@ import type { ChatRepo } from "./repo";
 const LAST_STEP =
   "This is the last step of this answer: do not call tools. Write the answer now, in the user's language: what is done, where the results are, and what is left, so the user can say \"go on\".";
 
-/** Steps of an answer with Artel's internet: research takes searches and pages (seen: 8 steps stopped five answers of eight). */
+/** Steps of an answer with the internet or the user's tools: research takes searches and pages (seen: 8 steps stopped five answers of eight). */
 export const WEB_STEPS = 30;
 
 /** Seen live: "I need names in English" turned the whole conversation into English. */
@@ -123,7 +123,8 @@ export async function reply(i: ReplyInput): Promise<void> {
     ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }) : {}),
     ...i.extraTools,
   };
-  const steps = i.work?.steps || (i.folder ? FOLDER_STEPS : i.web === "free" ? WEB_STEPS : 8);
+  // Research takes room: the internet, or tools of the user's servers (seen: a browser server stopped at 8 steps).
+  const steps = i.work?.steps || (i.folder ? FOLDER_STEPS : i.web === "free" || Object.keys(i.extraTools ?? {}).length ? WEB_STEPS : 8);
   const memory = i.folder ? memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) : null;
   /** The answer reached its last step: what it says there is a summary of unfinished work. */
   let lastStep = false;
@@ -134,6 +135,8 @@ export async function reply(i: ReplyInput): Promise<void> {
         nowLine(),
         LANGUAGE_HINT,
         FORMAT_HINT,
+        // With the internet the rule comes in WEB_HINT; the user's own tools (a browser server) need it too.
+        Object.keys(tools).length && i.web !== "free" ? FAIR_USE_HINT : "",
         i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
         i.folder ? folderHint(i.folder) : "",
         i.folder ? notesBlock(i.folder) : "",

@@ -1,0 +1,81 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - generic [ref=f1e8]:
+        - generic [ref=f1e9] [cursor=pointer]
+        - link "WIPO" [ref=f1e11] [cursor=pointer]:
+          - /url: https://www.wipo.int/portal/en/
+        - generic [ref=f1e18]: Help
+        - generic [ref=f1e22]: English
+        - generic [ref=f1e26]: IP Portal login
+      - generic "Collapse navigation" [ref=f1e29] [cursor=pointer]
+    - generic [ref=f1e34]:
+      - generic [ref=f1e36]:
+        - heading "Global Brand Database" [level=1] [ref=f1e43]
+        - navigation [ref=f1e51]:
+          - list [ref=f1e52]:
+            - link "BRAND NAME" [ref=f1e54] [cursor=pointer]:
+              - /url: /en/similarname
+            - link "BRAND LOGO" [ref=f1e56] [cursor=pointer]:
+              - /url: /en/similarlogo
+            - link "ADVANCED SEARCH" [ref=f1e58] [cursor=pointer]:
+              - /url: /en/advancedsearch
+            - link "Explore" [ref=f1e60] [cursor=pointer]:
+              - /url: /en/explore/visu
+            - link "↗Vienna assistant" [ref=f1e62] [cursor=pointer]:
+              - /url: /en/vienna
+            - link "↗G&S Explorer" [ref=f1e64] [cursor=pointer]:
+              - /url: /en/gs
+            - link "Reports" [ref=f1e66] [cursor=pointer]:
+              - /url: /en/reports
+          - list
+      - generic [ref=f1e67]:
+        - generic [ref=f1e68]:
+          - generic [ref=f1e70]:
+            - generic [ref=f1e71]:
+              - text: Searching Trademark applications, appellations of origin, emblems and international non-proprietary names. Covering 77,065,384 records from 89 data sources.
+              - link "Check our data coverage" [ref=f1e72] [cursor=pointer]:
+                - /url: /en/coverage
+            - list
+          - generic [ref=f1e73]:
+            - button "Search" [disabled]
+        - generic [ref=f1e77]:
+          - generic [ref=f1e82]:
+            - generic: Brand name
+            - textbox [ref=f1e83]
+          - 'generic "Results will contain the entered term but can also include extra words or letters before and after the term. Example: If we search for \"tree\" we will get matches with \"tree\" but also \"happy tree\", \"treehouses\"." [ref=f1e85]':
+            - generic [ref=f1e87]:
+              - generic: Search strategy
+              - combobox [ref=f1e88]:
+                - option "Embedded (results contain entered term)" [selected]
+                - option "Match exact expression"
+                - option "Fuzzy (results are spelled similarly to entered term)"
+                - option "Phonetic (matches sound like entered term)"
+                - option "Stemming (results share the same stem or root like the entered term)"
+              - text: expand_more
+        - generic [ref=f1e92]:
+          - generic [ref=f1e97]:
+            - generic: Owner name
+            - textbox [ref=f1e98]
+          - generic [ref=f1e103]:
+            - generic: Application / Registration Number
+            - textbox [ref=f1e104]
+        - generic [ref=f1e108]:
+          - generic "Office where the trademark application has been filed." [ref=f1e109]:
+            - generic [ref=f1e111]:
+              - generic [ref=f1e112]: IP office
+              - textbox [ref=f1e114]
+          - generic "The countries or regions where the trademark is protected or where protection is pending." [ref=f1e115]:
+            - generic [ref=f1e117]:
+              - generic [ref=f1e118]: Designation country
+              - textbox [ref=f1e120]
+        - generic [ref=f1e124]:
+          - generic "The Nice Classification is an international classification of goods and services applied to define the scope of protection of a trademark" [ref=f1e125]:
+            - generic [ref=f1e127]:
+              - generic [ref=f1e128]: Nice classification
+              - textbox [ref=f1e130]
+          - generic "A list of terms characterizing the goods and services on which a trademark is intended to be used." [ref=f1e131]:
+            - generic [ref=f1e135]:
+              - generic: Goods and services
+              - textbox [ref=f1e136]
+  - generic "Processing"

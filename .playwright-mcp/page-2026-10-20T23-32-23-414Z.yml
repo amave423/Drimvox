@@ -1,0 +1,78 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - generic [ref=f1e6]:
+        - generic [ref=f1e7] [cursor=pointer]
+        - link "WIPO" [ref=f1e9] [cursor=pointer]:
+          - /url: https://www.wipo.int/portal/en/
+        - generic [ref=f1e16]: Help
+        - generic [ref=f1e20]: English
+        - generic [ref=f1e24]: IP Portal login
+      - generic "Collapse navigation" [ref=f1e27] [cursor=pointer]
+    - generic [ref=f1e33]:
+      - generic [ref=f1e35]:
+        - heading "Global Brand Database" [level=1] [ref=f1e42]
+        - navigation [ref=f1e50]:
+          - list [ref=f1e51]:
+            - link "BRAND NAME" [ref=f1e53] [cursor=pointer]:
+              - /url: /en/similarname
+            - link "BRAND LOGO" [ref=f1e55] [cursor=pointer]:
+              - /url: /en/similarlogo
+            - link "ADVANCED SEARCH" [ref=f1e57] [cursor=pointer]:
+              - /url: /en/advancedsearch
+            - link "Explore" [ref=f1e59] [cursor=pointer]:
+              - /url: /en/explore/visu
+            - link "↗Vienna assistant" [ref=f1e61] [cursor=pointer]:
+              - /url: /en/vienna
+            - link "↗G&S Explorer" [ref=f1e63] [cursor=pointer]:
+              - /url: /en/gs
+            - link "Reports" [ref=f1e65] [cursor=pointer]:
+              - /url: /en/reports
+          - list
+      - generic [ref=f1e66]:
+        - generic [ref=f1e67]:
+          - list [ref=f1e137]:
+            - listitem [ref=f1e138]:
+              - generic [ref=f1e139]: "Brand name:"
+              - text: contains the word 'Ingena'
+          - button "Search" [ref=f1e140] [cursor=pointer]
+        - generic [ref=f1e76]:
+          - generic [ref=f1e81]:
+            - generic: Brand name
+            - textbox [ref=f1e82]: Ingena
+          - 'generic "Results will contain the entered term but can also include extra words or letters before and after the term. Example: If we search for \"tree\" we will get matches with \"tree\" but also \"happy tree\", \"treehouses\"." [ref=f1e84]':
+            - generic [ref=f1e86]:
+              - generic: Search strategy
+              - combobox [ref=f1e87]:
+                - option "Embedded (results contain entered term)" [selected]
+                - option "Match exact expression"
+                - option "Fuzzy (results are spelled similarly to entered term)"
+                - option "Phonetic (matches sound like entered term)"
+                - option "Stemming (results share the same stem or root like the entered term)"
+              - text: expand_more
+        - generic [ref=f1e91]:
+          - generic [ref=f1e96]:
+            - generic: Owner name
+            - textbox [ref=f1e97]
+          - generic [ref=f1e102]:
+            - generic: Application / Registration Number
+            - textbox [ref=f1e103]
+        - generic [ref=f1e107]:
+          - generic "Office where the trademark application has been filed." [ref=f1e108]:
+            - generic [ref=f1e110]:
+              - generic [ref=f1e111]: IP office
+              - textbox [ref=f1e113]
+          - generic "The countries or regions where the trademark is protected or where protection is pending." [ref=f1e114]:
+            - generic [ref=f1e116]:
+              - generic [ref=f1e117]: Designation country
+              - textbox [ref=f1e119]
+        - generic [ref=f1e123]:
+          - generic "The Nice Classification is an international classification of goods and services applied to define the scope of protection of a trademark" [ref=f1e124]:
+            - generic [ref=f1e126]:
+              - generic [ref=f1e127]: Nice classification
+              - textbox [ref=f1e129]
+          - generic "A list of terms characterizing the goods and services on which a trademark is intended to be used." [ref=f1e130]:
+            - generic [ref=f1e134]:
+              - generic: Goods and services
+              - textbox [ref=f1e135]
+  - generic "Processing"

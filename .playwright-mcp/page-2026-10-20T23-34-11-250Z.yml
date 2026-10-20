@@ -1,0 +1,11 @@
+- generic [ref=f1e2]:
+  - generic [ref=f1e4]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7] [cursor=pointer]
+      - link "WIPO" [ref=f1e9] [cursor=pointer]:
+        - /url: https://www.wipo.int/portal/en/
+      - generic [ref=f1e16]: Help
+      - generic [ref=f1e20]: English
+      - generic [ref=f1e24]: IP Portal login
+    - generic "Collapse navigation" [ref=f1e27] [cursor=pointer]
+  - generic "Processing"

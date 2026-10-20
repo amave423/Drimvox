@@ -196,6 +196,8 @@ describe("sending a message", () => {
       await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Придумай названия на английском", web: "free" }));
       const system = JSON.stringify(fake.requests.find((r) => r.path === "/v1/chat/completions")!.body.messages[0]);
       expect(system).toMatch(/language the user writes in/);
+      // Seen live: a model met a site's bot check and started computing its answer to get through.
+      expect(system).toMatch(/never try to get around captchas/i);
     });
 
     // Seen live: the model had nearly finished thinking and searching, and the answer was cut as "silent" — the time

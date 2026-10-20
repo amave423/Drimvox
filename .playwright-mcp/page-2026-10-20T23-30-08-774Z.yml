@@ -1,0 +1,4 @@
+- generic [ref=e5]:
+  - generic [ref=e6]:
+    - checkbox "Verifying..."
+  - generic [ref=e10] [cursor=pointer]: Verifying...

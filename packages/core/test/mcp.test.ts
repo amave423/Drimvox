@@ -170,4 +170,37 @@ describe("tools in a chat", () => {
     const lastChat = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!;
     expect(JSON.stringify(lastChat.body.messages)).toContain("echo: привет");
   });
+
+  // Seen live: a browser server (Playwright MCP) opened the page, typed and clicked, and the answer stopped at 8 steps
+  // before the results came: a chat with MCP tools gets the room of a chat with the internet.
+  it("gives an answer with MCP tools far more than 8 steps", async () => {
+    await addServer();
+    const echo = (n: number) => ({ toolCalls: [{ name: "mcp_demo_echo", args: { text: `шаг ${n}` } }] });
+    fake = await startFakeProvider({ key: KEY, models: [{ id: "chatty" }], script: [...Array.from({ length: 12 }, (_, n) => echo(n)), { text: "Сделал двенадцать шагов." }] });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const chat = await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "chatty" })).json();
+    const res = await env.app().request(`${BASE}/api/chats/${chat.id}/messages`, {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "Двенадцать шагов", web: "off" }),
+    });
+    const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    let done: any = null;
+    for (;;) {
+      const { value, done: ended } = await reader.read();
+      if (ended) break;
+      buffer += value;
+      let end: number;
+      while ((end = buffer.indexOf("\n\n")) !== -1) {
+        const line = buffer.slice(0, end).split("\n").find((l) => l.startsWith("data: "));
+        buffer = buffer.slice(end + 2);
+        if (!line) continue;
+        const event = JSON.parse(line.slice(6));
+        if (event.type === "approval") await env.call("POST", `/api/chats/${chat.id}/approvals/${event.id}`, { allow: true, always: true });
+        if (event.type === "done") done = event.message;
+      }
+    }
+    expect(done).toMatchObject({ status: "done", content: "Сделал двенадцать шагов.", error: null });
+  });
 });

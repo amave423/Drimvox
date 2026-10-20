@@ -15,12 +15,17 @@ export interface WebHooks {
   onResult?(result: { callId: string; name: string; ok: boolean; output: string }): void;
 }
 
+/** Seen live: a model met a site's bot check (a proof-of-work captcha) and started computing its answer to get through. */
+export const FAIR_USE_HINT =
+  "Never try to get around captchas, bot checks, logins or blocks of a site (no solving them, no imitating a person, no other mirrors to dodge a block): say what blocks you and offer another way.";
+
 export const WEB_HINT =
   "You can use the internet: web_search finds pages, open_page reads one. Use them for current facts (news, prices, " +
   "weather, versions, documentation) instead of guessing, and name the sources you used. When open_page shows little or " +
   "\"Loading…\" (a site that draws with scripts: databases, shops, search forms), use browse_page if you have it: a real " +
   "browser that can also type into a search field, press a button and wait before reading. Search sparingly: a few " +
-  "precise queries, then open the pages; when you know the site that has the answer, go to it directly.";
+  "precise queries, then open the pages; when you know the site that has the answer, go to it directly. " +
+  FAIR_USE_HINT;
 
 /** Search and page reading, free, through Artel itself; for any model that can call tools. */
 export function webTools(web: WebAccess, hooks: WebHooks = {}): ToolSet {
