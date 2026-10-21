@@ -21,7 +21,7 @@ describe("what an attachment gives the model", () => {
     expect(await extract("app.ts", "", Buffer.from("export const a = 1;\n"))).toEqual({ kind: "text", text: "export const a = 1;\n" });
     const long = await extract("big.txt", "text/plain", Buffer.from("x".repeat(TEXT_LIMIT + 50)));
     expect(long.text!.length).toBeLessThan(TEXT_LIMIT + 200);
-    expect(long.text).toMatch(/cut by Artel: 50 more characters/);
+    expect(long.text).toMatch(/cut by Drimvox: 50 more characters/);
   });
 
   it("reads the text of a PDF", async () => {

@@ -105,7 +105,7 @@ describe("web ui", () => {
   beforeEach(() => {
     web = join(env.dir, "web");
     mkdirSync(join(web, "assets"), { recursive: true });
-    writeFileSync(join(web, "index.html"), "<!doctype html><title>Artel</title>");
+    writeFileSync(join(web, "index.html"), "<!doctype html><title>Drimvox</title>");
     writeFileSync(join(web, "assets", "app.js"), "console.log(1)");
     writeFileSync(join(env.dir, "secret.txt"), "do not serve");
   });
@@ -114,7 +114,7 @@ describe("web ui", () => {
     const res = await app(web).request(`${BASE}/`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
-    expect(await res.text()).toContain("<title>Artel</title>");
+    expect(await res.text()).toContain("<title>Drimvox</title>");
   });
 
   it("locks the page to its own origin", async () => {
@@ -130,7 +130,7 @@ describe("web ui", () => {
 
   it("falls back to index.html for app routes", async () => {
     const res = await app(web).request(`${BASE}/settings`);
-    expect(await res.text()).toContain("<title>Artel</title>");
+    expect(await res.text()).toContain("<title>Drimvox</title>");
   });
 
   it("never serves files outside the web folder", async () => {

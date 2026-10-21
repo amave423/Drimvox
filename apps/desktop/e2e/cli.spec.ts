@@ -65,7 +65,7 @@ test("connects Claude Code without a key, names its models and chats through it"
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
   await expect(subscriptions.getByText("Моделей: 3")).toBeVisible();
   await expect(subscriptions.getByText(/Остаток лимита программа сообщает после ответа/)).toBeVisible();
-  await expect(page.getByText("По подписке: Artel считает токены, но не деньги")).toBeVisible();
+  await expect(page.getByText("По подписке: Drimvox считает токены, но не деньги")).toBeVisible();
   await expect(page.getByRole("button", { name: "Заменить ключ" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "+ Новый чат" }).click();
@@ -82,7 +82,7 @@ test("connects Claude Code without a key, names its models and chats through it"
   // What is left of the subscription, as Claude Code said it, next to the chat.
   await expect(page.getByRole("list", { name: "Лимит подписки" })).toContainText(/Неделя.*осталось 65%.*обновится/);
 
-  // Now Artel knows what "default" turned out to be.
+  // Now Drimvox knows what "default" turned out to be.
   await page.getByRole("button", { name: /Claude Code \/ По умолчанию/ }).click();
   await expect(page.getByRole("option", { name: /По умолчанию.*сейчас это Claude Fable 5\.1/ })).toBeVisible();
   await page.getByRole("option", { name: /Claude Opus 5\.5/ }).click();

@@ -32,7 +32,7 @@ const until = async (check: () => boolean) => {
   for (let i = 0; i < 200 && !check(); i++) await new Promise((r) => setTimeout(r, 20));
 };
 
-describe("installing Ollama from Artel", () => {
+describe("installing Ollama from Drimvox", () => {
   it("says the download's size before anything starts", async () => {
     const installer = new OllamaInstaller({ url, dir, run: async () => {}, found: () => false });
     expect(await installer.size()).toBe(SETUP.length);

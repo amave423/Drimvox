@@ -4,7 +4,7 @@ import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { Toggle } from "../Toggle";
 
-/** GitHub turns a folder name with spaces or Cyrillic into dashes anyway: Artel offers what it will be. */
+/** GitHub turns a folder name with spaces or Cyrillic into dashes anyway: Drimvox offers what it will be. */
 function repoName(name: string): string {
   return (
     name

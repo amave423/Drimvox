@@ -47,7 +47,7 @@ const WAN_NEGATIVE =
 
 const zImageVae: ImageFile = { role: "vae", repo: "Comfy-Org/z_image_turbo", path: "split_files/vae/ae.safetensors", bytes: 320 * MB };
 
-/** The short list (docs/specs/local-images.md): each model checked with the engine Artel downloads. */
+/** The short list (docs/specs/local-images.md): each model checked with the engine Drimvox downloads. */
 export const IMAGE_MODELS: ImageModelDef[] = [
   {
     id: "z-image-turbo",
@@ -147,7 +147,7 @@ export const VIDEO_DURATIONS = [2, 3, 5];
 
 /**
  * The family of a model found on Hugging Face, by its repository's and file's names: the checked model whose VAE, text
- * encoder and settings it shares. Null for a family Artel does not know: what else it needs cannot be told from a name.
+ * encoder and settings it shares. Null for a family Drimvox does not know: what else it needs cannot be told from a name.
  */
 export function familyOf(name: string): CheckedImageModelId | null {
   if (/z[-_ ]?image[-_ ]?turbo/i.test(name)) return "z-image-turbo";

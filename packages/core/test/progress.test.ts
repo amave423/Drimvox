@@ -59,7 +59,7 @@ async function waitFor(id: string, check: (task: any) => boolean, timeoutMs = 60
 const settled = (t: any) => !["running", "queued"].includes(t.status);
 const chats = () => fake!.requests.filter((r) => r.path === "/v1/chat/completions");
 
-// Seen live: an agent patched a big file in circles for hundreds of steps while the type errors grew; Artel went on
+// Seen live: an agent patched a big file in circles for hundreds of steps while the type errors grew; Drimvox went on
 // past each step limit without looking.
 describe("progress at the step limit", () => {
   it("shows the agent where the checks stand, and stops when sixty more steps brought them no closer", async () => {

@@ -147,7 +147,7 @@ export async function downloadFile(d: FileDownload, repo: string, file: { path: 
       if (have() < file.size && idle > 0) await new Promise((r) => setTimeout(r, RETRY_MS));
     }
     if (have() < file.size) {
-      const hint = d.routes.length > 1 ? "" : " Set a proxy in the settings: Artel then downloads through it.";
+      const hint = d.routes.length > 1 ? "" : " Set a proxy in the settings: Drimvox then downloads through it.";
       throw new HfDownloadError(`Hugging Face's file server did not answer (${failures.join("; ")}).${hint}`);
     }
   }
@@ -161,7 +161,7 @@ export async function downloadFile(d: FileDownload, repo: string, file: { path: 
 }
 
 /**
- * Downloads hf.co/<repo>:<quant> by Artel itself and makes an Ollama model of it (seen: Ollama's own pull could not
+ * Downloads hf.co/<repo>:<quant> by Drimvox itself and makes an Ollama model of it (seen: Ollama's own pull could not
  * reach Hugging Face's CDN).
  */
 export async function downloadHf(d: HfDownload): Promise<void> {

@@ -8,7 +8,7 @@ import { findSkills, parseSkill, skillSlug, toSkillView } from "../skills/skills
 
 const notFound = { error: { code: "not_found" } } as const;
 
-/** Shared skills: in Artel's data folder, for every project. */
+/** Shared skills: in Drimvox's data folder, for every project. */
 export function skillRoutes(sharedDir: string) {
   const shared = () => findSkills([{ dir: sharedDir, scope: "shared" }]);
   return new Hono()

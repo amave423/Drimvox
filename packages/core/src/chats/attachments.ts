@@ -40,7 +40,7 @@ function asText(data: Buffer): string | null {
 }
 
 function clip(text: string, limit: number): string {
-  return text.length > limit ? `${text.slice(0, limit)}\n[… cut by Artel: ${text.length - limit} more characters]` : text;
+  return text.length > limit ? `${text.slice(0, limit)}\n[… cut by Drimvox: ${text.length - limit} more characters]` : text;
 }
 
 async function pdfText(data: Buffer): Promise<string | null> {

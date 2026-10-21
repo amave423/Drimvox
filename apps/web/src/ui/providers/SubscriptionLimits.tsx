@@ -5,7 +5,7 @@ import type { MessageKey } from "../../i18n";
 
 /**
  * What is left of a subscription's limit, as its program said on the last run: "5 hours: 12% used, starts over at
- * 14:00". Before the first run there is nothing to show but how Artel learns it. `seen` re-reads after an answer.
+ * 14:00". Before the first run there is nothing to show but how Drimvox learns it. `seen` re-reads after an answer.
  */
 export function SubscriptionLimits({ providerId, seen = 0 }: { providerId: string; seen?: number }) {
   const { api, t, settings } = useApp();

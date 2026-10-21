@@ -45,7 +45,7 @@ export interface Rework {
 }
 
 /**
- * Green checks: Artel looks at the pages from the spec, then the acceptance agent checks every requirement,
+ * Green checks: Drimvox looks at the pages from the spec, then the acceptance agent checks every requirement,
  * then the work goes to review. Returns the message for the coder when something has to be redone.
  */
 export async function done(
@@ -60,7 +60,7 @@ export async function done(
   const pages = pagesUpTo(JSON.parse(row.visual) as VisualCheck[], row.milestone);
   if (pages.length > 0 && (!visual.vision || !visual.kit.screenshot)) {
     ctx.event("text", {
-      text: "Artel skipped the visual checks: there is no model that sees pictures (pick one in the settings) or no way to take screenshots here.",
+      text: "Drimvox skipped the visual checks: there is no model that sees pictures (pick one in the settings) or no way to take screenshots here.",
     });
   } else if (pages.length > 0) {
     const results = await runVisualChecks(visual, pages, ctx.signal);
@@ -71,7 +71,7 @@ export async function done(
       ctx.tasks.update(id, { visual_attempts: attempts });
       const report = failed.map((f) => `${f.check.url}\nExpected: ${f.check.expect}\nSeen: ${f.answer}`).join("\n\n");
       if (attempts >= MAX_VISUAL_ATTEMPTS) return stop(ctx, "waiting", "visual_failed", report.slice(0, 4000));
-      return `Artel looked at the page and it does not match the spec yet:\n\n${report}\n\nFix it, run the checks, then call finish.`;
+      return `Drimvox looked at the page and it does not match the spec yet:\n\n${report}\n\nFix it, run the checks, then call finish.`;
     }
   }
 

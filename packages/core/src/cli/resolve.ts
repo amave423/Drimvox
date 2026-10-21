@@ -15,7 +15,7 @@ export function setCliCommands(next: Partial<Record<CliId, string[]>> | undefine
 
 /**
  * The program and leading arguments that start a CLI, or null when it is not installed.
- * On Windows npm installs a .cmd wrapper; Artel starts what it wraps directly, so no shell parses the arguments.
+ * On Windows npm installs a .cmd wrapper; Drimvox starts what it wraps directly, so no shell parses the arguments.
  */
 export function resolveCli(id: CliId): string[] | null {
   const given = overrides[id];
@@ -37,7 +37,7 @@ export function resolveCli(id: CliId): string[] | null {
 }
 
 /**
- * Where a CLI's own installer puts it, for when PATH does not have it yet: Artel started before the install sees the
+ * Where a CLI's own installer puts it, for when PATH does not have it yet: Drimvox started before the install sees the
  * old PATH. Antigravity CLI goes to %LOCALAPPDATA%\agy\bin on Windows and ~/.local/bin elsewhere.
  */
 function installedAt(id: CliId): string | null {

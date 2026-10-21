@@ -26,7 +26,7 @@ export class Studio {
 
   constructor(private readonly o: StudioOptions) {}
 
-  /** Picks up clips that were still rendering when Artel closed. */
+  /** Picks up clips that were still rendering when Drimvox closed. */
   resume(): void {
     for (const job of this.o.chats.pendingJobs()) {
       const conn = job.providerId ? this.o.providers.connection(job.providerId) : null;

@@ -1,5 +1,5 @@
 /**
- * Rubles per dollar. Artel keeps every price and cost in dollars; providers that bill in rubles are
+ * Rubles per dollar. Drimvox keeps every price and cost in dollars; providers that bill in rubles are
  * converted on the way in, and the interface converts back when the user picks rubles.
  */
 export type RateSource = () => Promise<number>;

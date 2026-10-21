@@ -17,7 +17,7 @@ interface ArtelBridge {
   installUpdate(): void;
   /** Asks GitHub now instead of at the next check. */
   checkUpdates(): void;
-  /** Opens Artel's shared skills folder in Explorer. */
+  /** Opens Drimvox's shared skills folder in Explorer. */
   openSkillsFolder(): void;
   /** Called when the user clicks a notification; returns a function that stops listening. */
   onOpenTask(listener: (taskId: string) => void): () => void;

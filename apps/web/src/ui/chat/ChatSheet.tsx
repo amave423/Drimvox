@@ -64,7 +64,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   const [options, setOptions] = useState<Options>({});
   const [web, setWeb] = useState(readWebMode);
   const [thinking, setThinking] = useState(readThinking);
-  // Small local models cannot call tools: they chat without Artel's search.
+  // Small local models cannot call tools: they chat without Drimvox's search.
   const [noTools, setNoTools] = useState(false);
   // The folder the model works in; kept locally until the chat exists.
   const [folder, setFolder] = useState<string | null>(null);

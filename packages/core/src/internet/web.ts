@@ -14,7 +14,7 @@ export interface Page {
   text: string;
 }
 
-/** How Artel reaches the internet for models. Tests replace it with a fake. */
+/** How Drimvox reaches the internet for models. Tests replace it with a fake. */
 export interface WebAccess {
   search(query: string, signal?: AbortSignal): Promise<SearchResult[]>;
   open(url: string, signal?: AbortSignal): Promise<Page>;
@@ -56,7 +56,7 @@ export interface SearchClock {
 
 /**
  * DuckDuckGo's HTML results: free, no key. One search at a time for the whole app, kept apart; when DuckDuckGo
- * asks for a pause Artel waits and tries again, and never tries to get past its check.
+ * asks for a pause Drimvox waits and tries again, and never tries to get past its check.
  */
 export function makeDuckDuckGo(clock: SearchClock): WebAccess {
   let queue: Promise<unknown> = Promise.resolve();

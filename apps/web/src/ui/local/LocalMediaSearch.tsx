@@ -5,7 +5,7 @@ import { useApp } from "../../context";
 import { PullControl, type PullActions } from "./PullControl";
 
 /**
- * Hugging Face, only models that make this kind (docs/specs/local-images.md): Artel runs one of a family it knows,
+ * Hugging Face, only models that make this kind (docs/specs/local-images.md): Drimvox runs one of a family it knows,
  * bringing that family's other files; the rest are shown greyed, with why.
  */
 export function LocalMediaSearch({ kind, status, actions }: { kind: "image" | "video"; status: LocalImagesStatus; actions: PullActions }) {

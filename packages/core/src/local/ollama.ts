@@ -21,7 +21,7 @@ export function findOllama(): string[] | null {
   return file ? [file] : null;
 }
 
-/** Ollama's default window makes a model forget a long conversation; Artel gives a bigger one when it starts Ollama itself. */
+/** Ollama's default window makes a model forget a long conversation; Drimvox gives a bigger one when it starts Ollama itself. */
 export function contextFor(hw: LocalHardware): number {
   const vram = hw.unified ? hw.ramBytes * 0.7 : (hw.gpu?.vramBytes ?? 0);
   return vram >= 24 * GB ? 32_768 : 16_384;
@@ -30,16 +30,16 @@ export function contextFor(hw: LocalHardware): number {
 export interface OllamaOptions {
   /** Ollama's own API root, such as http://127.0.0.1:11434. */
   apiUrl: string;
-  /** What starts `ollama serve` (Artel adds "serve"); null when Ollama is not installed. */
+  /** What starts `ollama serve` (Drimvox adds "serve"); null when Ollama is not installed. */
   command: string[] | null;
   /** Extra environment for it; tests pass their fake's settings. */
   commandEnv?: Record<string, string>;
-  /** Without requests, downloads or loaded models for this long, the Ollama Artel started goes away. */
+  /** Without requests, downloads or loaded models for this long, the Ollama Drimvox started goes away. */
   idleMs: number;
   hardware: () => Promise<LocalHardware>;
   /** A download finished: the chat should see the new model. */
   onPulled?: () => void;
-  /** Hugging Face models are downloaded by Artel itself (see hf-download.ts): from where, and where partial files wait. */
+  /** Hugging Face models are downloaded by Drimvox itself (see hf-download.ts): from where, and where partial files wait. */
   hf?: { apiUrl: string; bases: string[]; dir: string; /** The proxy from the settings, tried when the direct way fails. */ proxy(): string | null };
 }
 
@@ -53,11 +53,11 @@ interface Active {
   partial?: string;
 }
 
-/** How long Ollama gets to come up after Artel starts it. */
+/** How long Ollama gets to come up after Drimvox starts it. */
 const START_MS = 30_000;
 
 /**
- * The Ollama on this computer: started by Artel when needed and stopped when idle, unless the user runs it
+ * The Ollama on this computer: started by Drimvox when needed and stopped when idle, unless the user runs it
  * themselves; downloads with progress. See docs/specs/local-models.md.
  */
 export class OllamaManager {
@@ -70,7 +70,7 @@ export class OllamaManager {
 
   constructor(private readonly o: OllamaOptions) {}
 
-  /** Ollama was installed while Artel ran: from now on Artel starts this program. */
+  /** Ollama was installed while Drimvox ran: from now on Drimvox starts this program. */
   setCommand(command: string[]): void {
     this.o.command = command;
   }
@@ -146,7 +146,7 @@ export class OllamaManager {
     return false;
   }
 
-  /** Checks now and then whether the Ollama Artel started may go. */
+  /** Checks now and then whether the Ollama Drimvox started may go. */
   private watchIdle(): void {
     if (this.timer) return;
     this.timer = setInterval(() => void this.idleCheck(), Math.max(50, Math.min(this.o.idleMs / 4, 30_000)));
@@ -173,7 +173,7 @@ export class OllamaManager {
     this.timer = null;
   }
 
-  /** Stops the Ollama Artel started; one the user started is left alone. */
+  /** Stops the Ollama Drimvox started; one the user started is left alone. */
   stop(): void {
     this.stopWatching();
     const child = this.child;

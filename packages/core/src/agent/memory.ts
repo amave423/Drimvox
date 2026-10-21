@@ -92,7 +92,7 @@ export async function remember(
   });
   const files = workingSet(worktree, older);
   const summary = [
-    "[Artel: your earlier work, summarized to save room. Continue from here.]",
+    "[Drimvox: your earlier work, summarized to save room. Continue from here.]",
     result.text.trim(),
     files ? `\nCurrent text of the files you changed earlier:\n${files}` : "",
   ].join("\n");

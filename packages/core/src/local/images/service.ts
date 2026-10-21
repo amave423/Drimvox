@@ -9,7 +9,7 @@ import { ENGINE_TAG, engineUrl, findServer, installEngine } from "./engine";
 import { EngineError, ImageServer } from "./server";
 
 export interface LocalImagesOptions {
-  /** The engine's archive; Artel's pinned build for this system by default, null where there is none. */
+  /** The engine's archive; Drimvox's pinned build for this system by default, null where there is none. */
   engineUrl?: string | null;
   /** Tests: what runs instead of the downloaded server (its options follow). */
   serverCommand?: string[];
@@ -62,7 +62,7 @@ export class LocalImages {
     return [...IMAGE_MODELS, ...this.found.list()];
   }
 
-  /** Models that make pictures or clips on Hugging Face, the ones Artel can run first. */
+  /** Models that make pictures or clips on Hugging Face, the ones Drimvox can run first. */
   search(kind: "image" | "video", query: string): Promise<HfMediaRepo[]> {
     return searchMedia(this.d.hf.apiUrl, kind, query);
   }
@@ -80,7 +80,7 @@ export class LocalImages {
   private async resolveFound(id: string): Promise<ImageModelDef> {
     const m = /^hf:([^:]+):(.+)$/.exec(id);
     const family = m ? IMAGE_MODELS.find((d) => d.id === familyOf(`${m[1]}/${m[2]}`)) : undefined;
-    if (!m || !family) throw new EngineError("Artel does not know what else this model needs");
+    if (!m || !family) throw new EngineError("Drimvox does not know what else this model needs");
     const info = await fileByPath(this.d.hf.apiUrl, m[1]!, m[2]!, AbortSignal.timeout(30_000));
     return foundModel(family, m[1]!, m[2]!, info.size);
   }

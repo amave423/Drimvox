@@ -119,7 +119,7 @@ describe("sending a message", () => {
       open: async (url: string) => ({ url, title: "Москва", text: "Подробный прогноз" }),
     };
 
-    it("searches with Artel's own tools and answers from the results", async () => {
+    it("searches with Drimvox's own tools and answers from the results", async () => {
       env.setWeb(fakeWeb);
       const { chat } = await setup({
         script: [{ toolCalls: [{ name: "web_search", args: { query: "погода Москва" } }] }, { text: "Сейчас в Москве +5 °C." }],
@@ -201,7 +201,7 @@ describe("sending a message", () => {
     });
 
     // Seen live: the model had nearly finished thinking and searching, and the answer was cut as "silent" — the time
-    // Artel's own search took counted as the model's silence.
+    // Drimvox's own search took counted as the model's silence.
     it("does not count the time a search takes as the model's silence", async () => {
       env.setWeb({ ...fakeWeb, search: async (q: string) => (await new Promise((r) => setTimeout(r, 500)), fakeWeb.search(q)) });
       env.setIdleTimeout(200);

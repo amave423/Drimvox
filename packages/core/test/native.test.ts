@@ -7,7 +7,7 @@ let env: TestEnv;
 let vendor: FakeProvider | undefined;
 let catalog: FakeProvider;
 
-/** OpenRouter's public catalog: where Artel takes the prices that vendors' own APIs do not give. */
+/** OpenRouter's public catalog: where Drimvox takes the prices that vendors' own APIs do not give. */
 const priced = [
   { id: "anthropic/claude-sonnet-4.5", context_length: 200000, pricing: { prompt: "0.000003", completion: "0.000015" }, supported_parameters: ["tools"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } },
   { id: "google/gemini-2.5-flash", context_length: 1048576, pricing: { prompt: "0.0000003", completion: "0.0000025" }, supported_parameters: ["tools"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } },
@@ -128,7 +128,7 @@ describe("Google Gemini", () => {
 
 describe("Google's free tier", () => {
   // The pricing page as of 2026-10: Flash, Flash-Lite, Gemma and 2.5 Pro have a free tier; newer Pro, Argon, Omni and
-  // picture models do not. The API does not say it, so Artel marks it by name (seen: the user could not tell).
+  // picture models do not. The API does not say it, so Drimvox marks it by name (seen: the user could not tell).
   it("marks the models that have a free daily limit", async () => {
     const { googleFreeTier } = await import("../src/providers/native");
     const free = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-2.5-pro", "gemma-4-31b-it", "gemini-3-flash-preview"];

@@ -17,7 +17,7 @@ export function itemInstructions(checks: string[]): string {
     "- If there is an interface, start it and look at the page once or twice with look_at_page (also at width 390 for a phone).",
     "  Do not start browsers or measuring scripts yourself.",
     checks.length
-      ? `- Checks (all must exit 0): ${checks.join(" ; ")}. Run them before you finish; Artel runs them again after.`
+      ? `- Checks (all must exit 0): ${checks.join(" ; ")}. Run them before you finish; Drimvox runs them again after.`
       : "- The project has no checks yet. If you set up tests or a build, name the commands in your summary.",
     "- Before you finish, keep the project's notes current with update_notes.",
   ].join("\n");

@@ -66,7 +66,7 @@ export interface PassContext {
   startTeam(): void;
   /** Search and page reading for every step: documentation, versions, current facts. */
   web: WebAccess;
-  /** Shared skills of Artel; the project's own are found in the copy. */
+  /** Shared skills of Drimvox; the project's own are found in the copy. */
   skillsDir: string;
   /** Tools of the user's MCP servers; the first call of each asks the user. */
   mcpTools(hooks: Omit<ToolHooks, "onFinish" | "askApproval">): Promise<ToolSet>;
@@ -94,7 +94,7 @@ export function enterPhase(ctx: PassContext, id: string, phase: TaskPhase): void
 }
 
 /**
- * One model pass in the task's current step, then Artel's own decision about what comes next.
+ * One model pass in the task's current step, then Drimvox's own decision about what comes next.
  * Returns the message that starts the next pass, or null when the task now waits or is done.
  */
 export async function runPass(ctx: PassContext, id: string, userText: string): Promise<string | null> {
@@ -171,7 +171,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   const brief = row.design ? (JSON.parse(row.design) as DesignBrief) : null;
   const designNote =
     phase === "interview" ? lookInstructions() : (phase === "spec" && !planning) || phase === "list" ? briefInstructions() : phase === "code" && brief ? designInstructions(brief) : "";
-  // Claude Code, Codex and Gemini CLI work with their own tools; Artel's own (web, skills, MCP, pictures) are for API models.
+  // Claude Code, Codex and Gemini CLI work with their own tools; Drimvox's own (web, skills, MCP, pictures) are for API models.
   const run = isCli(conn.preset) ? runCliTurn : runAgent;
   const outcome = await run({
     session: row.cli_session,
@@ -189,7 +189,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
       output += usage.outputTokens;
       ctx.tasks.update(id, { memory: JSON.stringify(memory), cost_usd: cost, input_tokens: input, output_tokens: output });
       ctx.tasks.addUsage(id, usage.inputTokens, usage.outputTokens, usage.costUsd, true);
-      ctx.event("text", { text: "Artel summarized the older work to keep the conversation within the model's memory." });
+      ctx.event("text", { text: "Drimvox summarized the older work to keep the conversation within the model's memory." });
     },
     mode,
     extraTools,
@@ -236,7 +236,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
   if (outcome.kind === "steps" && row.step_rounds < MAX_STEP_ROUNDS) {
     const next = await pastStepLimit(ctx, id, ctx.tasks.row(id)!, MAX_STEPS);
     if (next !== GREEN) return next;
-    ctx.event("text", { text: `The checks pass after ${MAX_STEPS} more steps: Artel takes the work as done and reviews it.` });
+    ctx.event("text", { text: `The checks pass after ${MAX_STEPS} more steps: Drimvox takes the work as done and reviews it.` });
     return done(ctx, id, ctx.tasks.row(id)!, visual, lastSummary(ctx, id), null);
   }
   if (outcome.kind === "budget" || outcome.kind === "steps") return finish(ctx, "waiting", outcome.kind);
@@ -323,7 +323,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string): P
     if (stages.approveSpec) return finish(ctx, "waiting", "spec_review");
     const { kept, dropped } = safeChecks(proposed.checks, row.worktree);
     ctx.tasks.update(id, { checks: JSON.stringify(kept) });
-    if (dropped.length) ctx.event("text", { text: `Artel removed checks that would need permission: ${dropped.join(", ")}` });
+    if (dropped.length) ctx.event("text", { text: `Drimvox removed checks that would need permission: ${dropped.join(", ")}` });
     return startWork(ctx, id, stages, specMessage(proposed.spec, kept, false, proposed.requirements, proposed.milestones), kept);
   }
 
@@ -365,7 +365,7 @@ async function testsGate(ctx: PassContext, id: string, row: TaskRow, checks: str
   return "Implement the spec now.";
 }
 
-/** Work counts as done only when Artel's own run of the checks is green. */
+/** Work counts as done only when Drimvox's own run of the checks is green. */
 async function codeGate(
   ctx: PassContext,
   id: string,
@@ -382,7 +382,7 @@ async function codeGate(
   const attempts = row.attempts + 1;
   if (attempts < MAX_ATTEMPTS) {
     ctx.tasks.update(id, { attempts });
-    return `Artel ran the checks and they fail:\n\n${report}\n\nFix the cause (not the tests), run the checks, then call finish.`;
+    return `Drimvox ran the checks and they fail:\n\n${report}\n\nFix the cause (not the tests), run the checks, then call finish.`;
   }
 
   const handOver = escalate(ctx, id, row, `failed ${MAX_ATTEMPTS} times`, report);

@@ -14,7 +14,7 @@ export interface UpdateState {
   url?: string;
   /** What went wrong, for "error". */
   message?: string;
-  /** When Artel last asked GitHub, in milliseconds. */
+  /** When Drimvox last asked GitHub, in milliseconds. */
   checkedAt?: number;
 }
 
@@ -46,7 +46,7 @@ export function startUpdates(window: () => BrowserWindow | null, trusted: (event
     }
   };
   autoUpdater.logger = { info: (m: unknown) => log("info", m), warn: (m: unknown) => log("warn", m), error: (m: unknown) => log("error", m), debug: () => {} };
-  log("info", `Artel ${app.getVersion()} looks for updates`);
+  log("info", `Drimvox ${app.getVersion()} looks for updates`);
 
   // Only Windows' installer and the AppImage can replace themselves; a .deb needs root.
   const manual = process.platform === "linux" && !process.env.APPIMAGE;

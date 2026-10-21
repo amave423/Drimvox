@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** The GitHub account Artel publishes with (docs/specs/github-publish.md). The token never leaves the core. */
+/** The GitHub account Drimvox publishes with (docs/specs/github-publish.md). The token never leaves the core. */
 export interface GithubStatus {
   /** The signed-in account's login; null when nobody is signed in. */
   user: string | null;

@@ -35,7 +35,7 @@ async function withPage<T>(url: string, size: { width: number; height: number },
     .catch((err: unknown) => {
       browser = null;
       throw new Error(
-        `Chromium is not installed on the server; run "npx playwright install --with-deps chromium" in the Artel folder. (${err instanceof Error ? err.message.split("\n")[0] : String(err)})`,
+        `Chromium is not installed on the server; run "npx playwright install --with-deps chromium" in the Drimvox folder. (${err instanceof Error ? err.message.split("\n")[0] : String(err)})`,
       );
     });
   const page = await (await browser).newPage({ viewport: size });

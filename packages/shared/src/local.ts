@@ -32,7 +32,7 @@ export interface LocalPull {
   bytesPerSecond: number | null;
 }
 
-/** Installing Ollama from Artel: the download, then the official setup. */
+/** Installing Ollama from Drimvox: the download, then the official setup. */
 export interface OllamaInstall {
   state: "idle" | "downloading" | "installing" | "done" | "failed";
   received: number;
@@ -45,7 +45,7 @@ export interface LocalStatus {
   /** Ollama's program was found on this computer, or it answers anyway. */
   installed: boolean;
   running: boolean;
-  /** Artel started it and stops it when it is idle. */
+  /** Drimvox started it and stops it when it is idle. */
   managed: boolean;
   version: string | null;
   hardware: LocalHardware;
@@ -53,9 +53,9 @@ export interface LocalStatus {
   pulls: LocalPull[];
   /** The provider that talks to this Ollama, if there is one. */
   providerId: string | null;
-  /** Ollama installed from Artel, as far as it got. */
+  /** Ollama installed from Drimvox, as far as it got. */
   install: OllamaInstall;
-  /** Artel can install Ollama here (Windows); elsewhere it shows the command. */
+  /** Drimvox can install Ollama here (Windows); elsewhere it shows the command. */
   canInstall: boolean;
   installCommand: string | null;
 }
@@ -64,7 +64,7 @@ export interface LocalStatus {
 export const localUses = ["chat", "code", "vision", "tools"] as const;
 export type LocalUse = (typeof localUses)[number];
 
-/** A model from Artel's own short list, sized for this computer. */
+/** A model from Drimvox's own short list, sized for this computer. */
 export interface LocalPick {
   /** The Ollama name, such as gemma4:e4b. */
   model: string;
@@ -84,7 +84,7 @@ export interface HfRepo {
   /** Parameters, when Hugging Face knows them. */
   params: number | null;
   updatedAt: string | null;
-  /** The author says it answers without refusals (by its name or tags); Artel cannot check it. */
+  /** The author says it answers without refusals (by its name or tags); Drimvox cannot check it. */
   unfiltered: boolean;
   /** Why it cannot be downloaded here: not a model that talks (a picture or video generator), or too big; null when it can. */
   unsupported: "not_chat" | "too_big" | null;

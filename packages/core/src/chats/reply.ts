@@ -171,7 +171,7 @@ export async function reply(i: ReplyInput): Promise<void> {
       onError: () => {},
     });
     for await (const part of result.fullStream) {
-      // While Artel itself runs a tool (a search, a page, a command), the model is not silent: the clock waits (seen:
+      // While Drimvox itself runs a tool (a search, a page, a command), the model is not silent: the clock waits (seen:
       // an answer cut as "silent" while a search went on).
       if (part.type === "tool-call") clearTimeout(timer);
       else resetClock();

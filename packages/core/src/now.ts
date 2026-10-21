@@ -1,6 +1,6 @@
 /**
  * Models do not know what day it is. Every chat and agent run is told the date, the time and the time zone
- * of the computer Artel runs on.
+ * of the computer Drimvox runs on.
  */
 export function nowLine(at = new Date()): string {
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;

@@ -27,7 +27,7 @@ test("opens with a working core and remembers theme and language", async () => {
   app = await launch();
   let page = await app.firstWindow();
 
-  await expect(page.getByRole("heading", { name: "Добро пожаловать в Artel" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Добро пожаловать в Drimvox" })).toBeVisible();
   // Someone new sees three first steps, the first with its ways and buttons.
   const steps = page.getByRole("region", { name: "Первые шаги" });
   await expect(steps).toContainText("Подключи нейросеть");
@@ -38,11 +38,11 @@ test("opens with a working core and remembers theme and language", async () => {
   await expect(page.getByText(/«Папка» подключает папку/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   // The bottom bar names the version the app was built as.
-  await expect(page.getByText(/^Artel \d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(page.getByText(/^Drimvox \d+\.\d+\.\d+$/)).toBeVisible();
 
   await page.getByRole("button", { name: "Настройки" }).first().click();
   // Updating says where it stands; a build that is not installed does not check.
-  await expect(page.getByRole("region", { name: "Обновления" })).toContainText("Обновления проверяет только установленный Artel.");
+  await expect(page.getByRole("region", { name: "Обновления" })).toContainText("Обновления проверяет только установленный Drimvox.");
   await expect(page.getByRole("button", { name: "Проверить сейчас" })).toBeDisabled();
   await page.getByRole("radio", { name: "Тёмное" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -56,7 +56,7 @@ test("opens with a working core and remembers theme and language", async () => {
   app = await launch();
   page = await app.firstWindow();
 
-  await expect(page.getByRole("heading", { name: "Welcome to Artel" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to Drimvox" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
 

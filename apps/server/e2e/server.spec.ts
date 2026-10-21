@@ -106,7 +106,7 @@ test("a browser sets the password with the setup code, chats, signs out and back
   await page.getByRole("button", { name: "Настройки" }).click();
   await expect(page.getByRole("switch", { name: /Уведомлять в браузере/ })).toBeVisible();
   await page.getByRole("button", { name: "Выйти" }).click();
-  await expect(page.getByRole("heading", { name: "Вход в Artel" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Вход в Drimvox" })).toBeVisible();
   await page.getByLabel("Пароль").fill("wrong password");
   await page.getByRole("button", { name: "Войти" }).click();
   await expect(page.getByText("Неверный пароль.")).toBeVisible();

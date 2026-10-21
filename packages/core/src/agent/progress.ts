@@ -27,14 +27,14 @@ export function escalate(ctx: PassContext, id: string, row: TaskRow, why: string
 export const GREEN = Symbol("green");
 
 /**
- * At the step limit Artel looks before it goes on (seen live: an agent patched a big file in circles for hundreds of
+ * At the step limit Drimvox looks before it goes on (seen live: an agent patched a big file in circles for hundreds of
  * steps while its type errors grew). It runs the checks and tells the agent where they stand; when sixty more steps
  * brought them no closer, the strong model takes over, or the task waits for the user with the report.
  * Returns the message that goes on, GREEN when the checks pass (the work goes on to its review), or null when the
  * task now waits.
  */
 export async function pastStepLimit(ctx: PassContext, id: string, row: TaskRow, steps: number): Promise<string | null | typeof GREEN> {
-  const going = `Artel continues on its own after ${steps} steps; the budget still limits the spending.`;
+  const going = `Drimvox continues on its own after ${steps} steps; the budget still limits the spending.`;
   const checks = JSON.parse(row.checks) as string[];
   if (row.phase !== "code" || checks.length === 0) {
     ctx.tasks.update(id, { step_rounds: row.step_rounds + 1 });
@@ -59,5 +59,5 @@ export async function pastStepLimit(ctx: PassContext, id: string, row: TaskRow, 
   }
   ctx.tasks.update(id, { step_rounds: row.step_rounds + 1, step_red: red });
   ctx.event("text", { text: going });
-  return `Continue the task. Where the checks stand now:\n\n${report}\n\nWork towards them passing; Artel looks again at the next ${steps} steps.`;
+  return `Continue the task. Where the checks stand now:\n\n${report}\n\nWork towards them passing; Drimvox looks again at the next ${steps} steps.`;
 }

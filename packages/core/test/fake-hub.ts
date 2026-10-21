@@ -33,7 +33,7 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
         "QuantStack/Wan2.2-TI2V-5B-GGUF": ["Wan2.2-TI2V-5B-Q4_K_M.gguf", "Wan2.2-TI2V-5B-Q8_0.gguf"],
         "city96/umt5-xxl-encoder-gguf": ["umt5-xxl-encoder-Q4_K_M.gguf", "umt5-xxl-encoder-Q8_0.gguf"],
         "Comfy-Org/Wan_2.2_ComfyUI_Repackaged": ["split_files/vae/wan2.2_vae.safetensors"],
-        // Found by the search: one of a family Artel knows, one it does not.
+        // Found by the search: one of a family Drimvox knows, one it does not.
         "someone/Z-Image-Turbo-Fun-GGUF": ["z_image_turbo_fun-Q5_K_M.gguf", "z_image_turbo_fun-Q8_0.gguf", "vae/ae.safetensors"],
         "someone/flux-mystery-GGUF": ["flux-mystery-Q4_K_S.gguf"],
         "Comfy-Org/Wan_2.1_ComfyUI_repackaged": ["split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors", "split_files/vae/wan_2.1_vae.safetensors"],

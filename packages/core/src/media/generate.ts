@@ -8,7 +8,7 @@ const headers = (conn: Connection, json = true) => ({
   Accept: json ? "application/json" : "*/*",
   ...(json ? { "Content-Type": "application/json" } : {}),
   ...(conn.apiKey ? { Authorization: `Bearer ${conn.apiKey}` } : {}),
-  ...(conn.preset === "openrouter" ? { "X-Title": "Artel" } : {}),
+  ...(conn.preset === "openrouter" ? { "X-Title": "Drimvox" } : {}),
 });
 
 async function request(conn: Connection, url: string, init: RequestInit, timeoutMs: number): Promise<Response> {

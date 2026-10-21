@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const text = z.string().trim().min(1);
 
-/** An MCP server: a command Artel starts (stdio) or an address it connects to (Streamable HTTP). */
+/** An MCP server: a command Drimvox starts (stdio) or an address it connects to (Streamable HTTP). */
 export const mcpServerCreateSchema = z
   .object({
     name: text.max(60),

@@ -55,7 +55,7 @@ async function hub(url: string): Promise<unknown> {
   return res.json();
 }
 
-/** Repositories of models that make pictures or clips, by downloads; the ones Artel can run first. */
+/** Repositories of models that make pictures or clips, by downloads; the ones Drimvox can run first. */
 export async function searchMedia(apiUrl: string, kind: "image" | "video", query: string): Promise<HfMediaRepo[]> {
   const params = new URLSearchParams({ search: query, pipeline_tag: TASK[kind], sort: "downloads", direction: "-1", limit: "40" });
   const list = (await hub(`${apiUrl}/api/models?${params}`)) as { id?: unknown; downloads?: unknown; likes?: unknown }[];

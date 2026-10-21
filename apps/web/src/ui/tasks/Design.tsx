@@ -74,7 +74,7 @@ export function DesignNote({ brief }: { brief: DesignBrief }) {
   );
 }
 
-/** Artel's look at the finished screens: the verdict, the notes and the screenshots. */
+/** Drimvox's look at the finished screens: the verdict, the notes and the screenshots. */
 export function DesignReviewView({ review, taskId }: { review: DesignReview; taskId: string }) {
   const { t } = useApp();
   return (

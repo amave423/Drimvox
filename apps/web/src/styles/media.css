@@ -31,7 +31,7 @@
 .lightbox-name { margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
 .lightbox-action { color: var(--on-overlay); background: none; border: 1px solid currentColor; border-radius: 999px; padding: 6px 14px; font-size: 13px; text-decoration: none; }
 
-/* Artel's video player. */
+/* Drimvox's video player. */
 .player { position: relative; display: block; max-width: 100%; width: 560px; border-radius: 10px; overflow: hidden; background: var(--overlay); outline: none; }
 .player:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .media .player video { display: block; width: 100%; max-height: 520px; border: 0; background: transparent; cursor: pointer; }

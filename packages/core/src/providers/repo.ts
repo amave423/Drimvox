@@ -38,7 +38,7 @@ interface Row {
 /** A custom address that is really a known service gets that service's preset: prices, currency, media. */
 const KNOWN_HOSTS: Partial<Record<string, PresetId>> = { "routerai.ru": "routerai", "openrouter.ai": "openrouter" };
 
-/** The Ollama Artel looks after: its requests wake it up first. */
+/** The Ollama Drimvox looks after: its requests wake it up first. */
 export interface LocalWaker {
   handles(baseUrl: string): boolean;
   ensureRunning(): Promise<boolean>;
@@ -158,7 +158,7 @@ export class ProviderRepo {
     };
   }
 
-  /** Requests to the Ollama Artel started and stops: it is woken first, and each request keeps it a while longer. */
+  /** Requests to the Ollama Drimvox started and stops: it is woken first, and each request keeps it a while longer. */
   private wake(preset: PresetId, baseUrl: string, inner: typeof fetch): typeof fetch {
     const waker = this.waker;
     if (preset !== "ollama" || !waker?.handles(baseUrl)) return inner;

@@ -32,11 +32,11 @@ const COMMIT_RULE = [
 
 function brief(root: string, mode: "read" | "write"): string {
   return [
-    "You work inside Artel, a desktop app where AI agents write code under the user's review.",
+    "You work inside Drimvox, a desktop app where AI agents write code under the user's review.",
     `You work in a private copy of the user's project at: ${root}`,
     nowLine(),
     "The user's own folder is not touched until they accept your work.",
-    "Never commit, push or change git settings: Artel handles git. Stay inside this folder and install nothing globally.",
+    "Never commit, push or change git settings: Drimvox handles git. Stay inside this folder and install nothing globally.",
     mode === "read" ? "In this step you only read the project: do not change files and do not run commands that change anything." : "",
   ]
     .filter(Boolean)
@@ -155,7 +155,7 @@ export async function runCliTurn(i: CliTurnInput): Promise<RunOutcome> {
   const done = result.done;
   if (done) {
     const reply: ModelMessage[] = done.text ? [{ role: "assistant", content: done.text }] : [];
-    // A subscription: the tokens are counted, the money is not Artel's to count.
+    // A subscription: the tokens are counted, the money is not Drimvox's to count.
     i.onStep({ messages: reply, inputTokens: done.inputTokens, outputTokens: done.outputTokens, costUsd: 0, priced: true });
   }
   if (result.stopped) return { kind: "stopped" };

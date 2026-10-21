@@ -27,11 +27,11 @@ interface Props {
   onChange(mode: WebMode): void;
   /** The provider's own paid search, where the provider has one; its name for the label. */
   providerName: string | null;
-  /** The model cannot call tools: Artel's own search is not offered. */
+  /** The model cannot call tools: Drimvox's own search is not offered. */
   noTools?: boolean;
 }
 
-/** Off, Artel's free search, or the provider's paid search: a pill like the model picker, opening upwards. */
+/** Off, Drimvox's free search, or the provider's paid search: a pill like the model picker, opening upwards. */
 export function WebSwitch({ value, onChange, providerName, noTools = false }: Props) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);

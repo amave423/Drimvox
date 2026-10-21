@@ -31,7 +31,7 @@ export function costOf(model: ModelInfo | undefined, preset: PresetId, usage: To
   return Number(((full * factor) / 1_000_000).toFixed(9));
 }
 
-/** The usage the AI SDK reports for a step or an answer, as Artel prices it. */
+/** The usage the AI SDK reports for a step or an answer, as Drimvox prices it. */
 export function usageOf(u: { inputTokens?: number; outputTokens?: number; inputTokenDetails?: { cacheReadTokens?: number } } | undefined): TokenUsage {
   return { input: u?.inputTokens ?? 0, cacheRead: u?.inputTokenDetails?.cacheReadTokens ?? 0, output: u?.outputTokens ?? 0 };
 }

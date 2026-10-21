@@ -2,7 +2,7 @@ import { useApp } from "../context";
 import type { MessageKey } from "../i18n";
 import { FirstSteps } from "./FirstSteps";
 
-/** How to use Artel, by what the user meets first (seen: testers asked for hints and instructions). */
+/** How to use Drimvox, by what the user meets first (seen: testers asked for hints and instructions). */
 const guide: { title: MessageKey; items: MessageKey[] }[] = [
   { title: "home.guide.models", items: ["home.guide.models1", "home.guide.models2", "home.guide.models3"] },
   { title: "home.guide.chat", items: ["home.guide.chat1", "home.guide.chat2", "home.guide.chat3", "home.guide.chat4"] },

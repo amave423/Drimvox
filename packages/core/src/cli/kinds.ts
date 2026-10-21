@@ -18,7 +18,7 @@ export interface CliLaunch {
   web: boolean;
 }
 
-/** What a CLI's stream means for Artel, whichever CLI it came from. */
+/** What a CLI's stream means for Drimvox, whichever CLI it came from. */
 export type CliEvent =
   | { kind: "session"; id: string; /** The model the CLI runs, when it says. */ model?: string }
   | { kind: "text"; text: string }
@@ -55,7 +55,7 @@ const DANGEROUS = [
   "Start-Process",
 ];
 
-/** Their tools, in the words of Artel's feed. */
+/** Their tools, in the words of Drimvox's feed. */
 function mapTool(name: string, input: Record<string, unknown>, cwd: string): { name: string; input: Record<string, unknown> } {
   const path = (p: unknown) => (typeof p === "string" ? shorten(p, cwd) : "");
   switch (name) {
@@ -325,7 +325,7 @@ const gemini: CliKind = {
  * Antigravity CLI (`agy`), Google's successor to Gemini CLI for personal accounts. Headless: the prompt goes in as a
  * stream-json "user" line (long prompts do not fit an argument on Windows), every output line names its "event".
  * Without --dangerously-skip-permissions it asks for nothing and quietly refuses what needs approval: chats and read
- * steps stay read-only that way. Writing steps run in Artel's copy of the project, with agy's terminal sandbox on.
+ * steps stay read-only that way. Writing steps run in Drimvox's copy of the project, with agy's terminal sandbox on.
  */
 const antigravity: CliKind = {
   args: (l) => [

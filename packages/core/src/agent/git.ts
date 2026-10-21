@@ -54,8 +54,8 @@ function runOnce(cwd: string, args: string[], env?: Record<string, string>): Pro
 
 const out = async (cwd: string, args: string[]) => (await runGit(cwd, args)).stdout.trim();
 
-/** Commits that only exist inside Artel's copies carry Artel's name; accepted work carries the user's. */
-const artelIdentity = ["-c", "user.name=Artel", "-c", "user.email=artel@localhost"];
+/** Commits that only exist inside Drimvox's copies carry Drimvox's name; accepted work carries the user's. */
+const artelIdentity = ["-c", "user.name=Drimvox", "-c", "user.email=artel@localhost"];
 
 /**
  * True when `dir` is the top of a git repository. A folder nested inside another repository is not:
@@ -88,7 +88,7 @@ export async function ensureIdentity(dir: string): Promise<void> {
 export async function initWithCommit(dir: string): Promise<void> {
   await runGit(dir, ["init", "-q"]);
   if ((await runGit(dir, ["var", "GIT_AUTHOR_IDENT"], true)).code !== 0) {
-    const name = userInfo().username || "Artel user";
+    const name = userInfo().username || "Drimvox user";
     await runGit(dir, ["config", "user.name", name]);
     await runGit(dir, ["config", "user.email", `${name.replace(/[^\w.-]/g, "") || "user"}@localhost`]);
   }

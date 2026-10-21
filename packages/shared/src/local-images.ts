@@ -17,7 +17,7 @@ export interface LocalImageModel {
   /** What it makes: pictures, or clips. */
   kind: "image" | "video";
   name: string;
-  /** From Artel's checked list, or found on Hugging Face (then its family's other files come with it). */
+  /** From Drimvox's checked list, or found on Hugging Face (then its family's other files come with it). */
   source: "checked" | "hf";
   fit: LocalFit;
   /** All its files together, the engine not counted. */
@@ -49,7 +49,7 @@ export interface HfMediaRepo {
   repo: string;
   downloads: number;
   likes: number;
-  /** The checked model whose family it belongs to: its other files come from there. Null: Artel cannot run it yet. */
+  /** The checked model whose family it belongs to: its other files come from there. Null: Drimvox cannot run it yet. */
   family: CheckedImageModelId | null;
 }
 

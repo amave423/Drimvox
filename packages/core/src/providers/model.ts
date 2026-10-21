@@ -22,7 +22,7 @@ export function languageModel(conn: Connection, modelId: string): LanguageModel 
     apiKey,
     includeUsage: true,
     fetch,
-    headers: conn.preset === "openrouter" ? { "X-Title": "Artel" } : undefined,
+    headers: conn.preset === "openrouter" ? { "X-Title": "Drimvox" } : undefined,
     metadataExtractor: billed,
   });
   return provider.chatModel(modelId);
@@ -36,7 +36,7 @@ function billOf(body: unknown): number | undefined {
 
 /**
  * The provider's own bill for a request, kept as `providerMetadata.artel.billed`. Seen live: by the catalog's prices
- * Artel counted 126 ₽ where RouterAI took 80 ₽ (its cache costs less than its catalog says).
+ * Drimvox counted 126 ₽ where RouterAI took 80 ₽ (its cache costs less than its catalog says).
  */
 const billed: MetadataExtractor = {
   extractMetadata: async ({ parsedBody }) => {

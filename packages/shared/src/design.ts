@@ -35,7 +35,7 @@ export const designBriefSchema = z.object({
 });
 export type DesignBrief = z.infer<typeof designBriefSchema>;
 
-/** Artel's look at the finished screens against the brief: fine as it is, or one round of polish. */
+/** Drimvox's look at the finished screens against the brief: fine as it is, or one round of polish. */
 export interface DesignReview {
   verdict: "good" | "polish";
   /** Where, what is wrong and how to fix it; most important first. */

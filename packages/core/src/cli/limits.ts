@@ -3,7 +3,7 @@ import type { CliId } from "./kinds";
 
 /**
  * How much of the subscription's limit is used, as each CLI last reported it while it ran. Claude Code says it in
- * its stream ("rate_limit_event"); Codex in "rate_limits". Nothing asks the vendor on its own: Artel only knows after
+ * its stream ("rate_limit_event"); Codex in "rate_limits". Nothing asks the vendor on its own: Drimvox only knows after
  * a run, and forgets on restart.
  */
 const seen = new Map<CliId, Map<string, SubscriptionLimit>>();

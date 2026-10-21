@@ -19,6 +19,7 @@ const token = randomBytes(32).toString("hex");
 
 // Unpackaged Electron would otherwise store data under %APPDATA%\Electron. Dev keeps its own folder;
 // ARTEL_USER_DATA lets tests isolate theirs.
+// The data folder keeps the old name (%APPDATA%\Artel): chats, keys and projects stay where they were after the rename.
 app.setName(devServerUrl ? "Artel Dev" : "Artel");
 app.setPath("userData", process.env.ARTEL_USER_DATA ?? join(app.getPath("appData"), app.getName()));
 // Windows shows toasts only for apps with an identity. The installed app has the installer's (electron-builder.yml),
@@ -28,7 +29,7 @@ app.setAppUserModelId(appId);
 
 /**
  * Windows 10 shows an app's notifications only when a Start menu shortcut carries its AppUserModelID. An installer makes
- * one; `npm start` does not, and then every notification vanishes without an error. Artel keeps its own shortcut.
+ * one; `npm start` does not, and then every notification vanishes without an error. Drimvox keeps its own shortcut.
  */
 function ensureShortcut(): void {
   if (process.platform !== "win32" || app.isPackaged || process.env.ARTEL_USER_DATA) return;
@@ -39,7 +40,7 @@ function ensureShortcut(): void {
     if (now && now.target === wanted.target && now.args === wanted.args && now.appUserModelId === appId) return;
     shell.writeShortcutLink(link, now ? "replace" : "create", wanted);
   } catch {
-    // Without the shortcut Artel still works; only the notifications stay away.
+    // Without the shortcut Drimvox still works; only the notifications stay away.
   }
 }
 
@@ -73,7 +74,7 @@ async function launch() {
     if (images) void callCore(port, "/api/local/images/engine");
     await createWindow(ollama ? "local" : images ? "local-images" : undefined);
   } catch (err) {
-    dialog.showErrorBox("Artel не запустился", err instanceof Error ? err.message : String(err));
+    dialog.showErrorBox("Drimvox не запустился", err instanceof Error ? err.message : String(err));
     app.quit();
   }
 }
@@ -125,7 +126,7 @@ function startCore(): Promise<number> {
   return new Promise((resolve, reject) => {
     // The git the app carries, when the system has none (git-env.ts).
     const env = { ...process.env, ...coreGitEnv(gitDir()) } as Record<string, string>;
-    const child = utilityProcess.fork(join(__dirname, "core.cjs"), [], { serviceName: "Artel core", env });
+    const child = utilityProcess.fork(join(__dirname, "core.cjs"), [], { serviceName: "Drimvox core", env });
     child.postMessage(init);
     child.once("message", (msg: { type: string; port?: number; error?: string }) => {
       if (msg.type === "ready" && msg.port) resolve(msg.port);
@@ -156,7 +157,7 @@ function startCore(): Promise<number> {
 }
 
 /**
- * A page an agent wants to see, in a hidden window of its own session: no preload, no access to Artel's
+ * A page an agent wants to see, in a hidden window of its own session: no preload, no access to Drimvox's
  * token or storage, no pop-ups, downloads or navigation away from http(s).
  */
 /** Very long pages are cut here; a picture taller than this tells a model little more. */
@@ -365,7 +366,7 @@ async function createWindow(view?: "local" | "local-images") {
     minWidth: 960,
     minHeight: 600,
     show: false,
-    title: "Artel",
+    title: "Drimvox",
     backgroundColor: dark ? "#1b1b19" : "#e4e5e0",
     titleBarStyle: "hidden",
     // A little lower than the 44px bar, so its bottom line runs under the window buttons at any display scale.
@@ -413,7 +414,7 @@ app.on("before-quit", (event) => {
 
 /**
  * Windows' Focus Assist: 0 off, 1 priority only, 2 alarms only (seen: "alarms only" sent every notification to the
- * action centre without a banner or a sound, and it looked like Artel's fault). Read from the shell's own state with
+ * action centre without a banner or a sound, and it looked like Drimvox's fault). Read from the shell's own state with
  * PowerShell; null elsewhere or when it cannot be read.
  */
 function focusAssist(): Promise<number | null> {

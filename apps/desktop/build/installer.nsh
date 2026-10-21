@@ -1,5 +1,5 @@
 ﻿; The installer's own page (electron-builder.yml, nsis.include): what else to do besides copying the program.
-; A desktop shortcut, Ollama for free models on this computer, and the picture engine. Artel installs those two on its
+; A desktop shortcut, Ollama for free models on this computer, and the picture engine. Drimvox installs those two on its
 ; first start, with the progress on the local models' sheet (apps/desktop/src/main.ts reads the notes left here). Updates run silently and
 ; never show this page, so they change nothing of what was chosen.
 ; Russian or English by the system's language (1049 is Russian).
@@ -14,7 +14,7 @@
   Var ArtelImagesBox
   Var ArtelImages
 
-  ; A welcome page, with Artel's picture beside it like the last one; an update skips it.
+  ; A welcome page, with Drimvox's picture beside it like the last one; an update skips it.
   !macro customWelcomePage
     !insertmacro skipPageIfUpdated
     !insertmacro MUI_PAGE_WELCOME
@@ -30,9 +30,9 @@
       Abort
     ${EndIf}
     ${If} $LANGUAGE == 1049
-      !insertmacro MUI_HEADER_TEXT "Параметры установки" "Что ещё сделать, кроме установки Artel"
+      !insertmacro MUI_HEADER_TEXT "Параметры установки" "Что ещё сделать, кроме установки Drimvox"
     ${Else}
-      !insertmacro MUI_HEADER_TEXT "Install options" "What else to do besides installing Artel"
+      !insertmacro MUI_HEADER_TEXT "Install options" "What else to do besides installing Drimvox"
     ${EndIf}
 
     nsDialogs::Create 1018
@@ -54,9 +54,9 @@
     ${EndIf}
 
     ${If} $LANGUAGE == 1049
-      ${NSD_CreateLabel} 12u 14u -12u 18u "Ярлык в меню «Пуск» будет всегда: без него Windows не показывает уведомления Artel."
+      ${NSD_CreateLabel} 12u 14u -12u 18u "Ярлык в меню «Пуск» будет всегда: без него Windows не показывает уведомления Drimvox."
     ${Else}
-      ${NSD_CreateLabel} 12u 14u -12u 18u "The Start menu shortcut is always made: without it Windows does not show Artel's notifications."
+      ${NSD_CreateLabel} 12u 14u -12u 18u "The Start menu shortcut is always made: without it Windows does not show Drimvox's notifications."
     ${EndIf}
     Pop $0
 
@@ -74,20 +74,20 @@
       EnableWindow $ArtelOllamaBox 0
       ${NSD_Uncheck} $ArtelOllamaBox
       ${If} $LANGUAGE == 1049
-        ${NSD_CreateLabel} 12u 56u -12u 18u "Ollama уже установлена: Artel найдёт её сам."
+        ${NSD_CreateLabel} 12u 56u -12u 18u "Ollama уже установлена: Drimvox найдёт её сам."
       ${Else}
-        ${NSD_CreateLabel} 12u 56u -12u 18u "Ollama is already installed: Artel will find it."
+        ${NSD_CreateLabel} 12u 56u -12u 18u "Ollama is already installed: Drimvox will find it."
       ${EndIf}
     ${Else}
       ${If} $LANGUAGE == 1049
-        ${NSD_CreateLabel} 12u 56u -12u 26u "Artel скачает её при первом запуске (около 1 ГБ) и покажет, сколько осталось. Можно и позже: «Локальные модели» в Artel."
+        ${NSD_CreateLabel} 12u 56u -12u 26u "Drimvox скачает её при первом запуске (около 1 ГБ) и покажет, сколько осталось. Можно и позже: «Локальные модели» в Drimvox."
       ${Else}
-        ${NSD_CreateLabel} 12u 56u -12u 26u "Artel downloads it on its first start (about 1 GB) and shows how much is left. It can wait too: Local models in Artel."
+        ${NSD_CreateLabel} 12u 56u -12u 26u "Drimvox downloads it on its first start (about 1 GB) and shows how much is left. It can wait too: Local models in Drimvox."
       ${EndIf}
     ${EndIf}
     Pop $0
 
-    ; The picture engine (docs/specs/local-images.md): small, so it may come at once; models are chosen in Artel.
+    ; The picture engine (docs/specs/local-images.md): small, so it may come at once; models are chosen in Drimvox.
     ${If} $LANGUAGE == 1049
       ${NSD_CreateCheckbox} 0 88u 100% 12u "Подготовить картинки на этом компьютере (движок stable-diffusion.cpp)"
     ${Else}

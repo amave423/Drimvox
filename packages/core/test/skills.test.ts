@@ -61,7 +61,7 @@ describe("files", () => {
   });
 });
 
-describe("skills in Artel", () => {
+describe("skills in Drimvox", () => {
   it("creates, lists and deletes a shared skill", async () => {
     const created = await env.call("POST", "/api/skills", { name: "Отчёты", description: "Как оформлять отчёты", instructions: "Сначала вывод, потом детали." });
     expect(created.status).toBe(201);

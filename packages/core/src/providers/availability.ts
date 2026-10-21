@@ -6,7 +6,7 @@ import type { Connection } from "./repo";
 
 /**
  * Whether a free model answers. Providers list models they no longer serve (seen live: 43 of NVIDIA's 59 answered
- * 404) and free ones are often busy or closed to the key (OpenRouter: 429, 403). Artel asks each free model a word
+ * 404) and free ones are often busy or closed to the key (OpenRouter: 429, 403). Drimvox asks each free model a word
  * and remembers the answer for a while; a chat's own errors teach it too. Paid models are never asked.
  */
 const REMEMBER: Record<Availability, number> = { ok: 60 * 60_000, busy: 10 * 60_000, gone: 12 * 60 * 60_000 };
@@ -38,7 +38,7 @@ export function availabilityFromError(code: ProviderErrorCode): Availability | n
 }
 
 /**
- * Providers whose free models Artel can ask: OpenAI-style APIs on the internet, and Google, whose free tier costs a key
+ * Providers whose free models Drimvox can ask: OpenAI-style APIs on the internet, and Google, whose free tier costs a key
  * without billing nothing (seen: it lists models it no longer serves to new users).
  */
 export function canCheck(conn: Connection): boolean {
@@ -49,7 +49,7 @@ export function canCheck(conn: Connection): boolean {
 /** A model worth asking: free, or on Google's free tier. */
 const isFreeModel = (conn: Connection, m: ModelInfo) => (conn.preset === "google" ? m.freeTier === true : m.priceIn === 0 && m.priceOut === 0);
 
-/** The models with what Artel knows of them. */
+/** The models with what Drimvox knows of them. */
 export function withAvailability(conn: Connection, models: ModelInfo[]): ModelInfo[] {
   return models.map((m) => {
     const available = availabilityOf(conn, m.id);

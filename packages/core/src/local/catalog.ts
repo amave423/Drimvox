@@ -2,7 +2,7 @@ import type { HfRepo, HfVariant, LocalHardware, LocalPick, LocalUse } from "@art
 import { fitOf, recommend } from "./fit";
 
 /**
- * Artel's short list from Ollama's catalog, small to large, so that every computer gets something. All of them speak
+ * Drimvox's short list from Ollama's catalog, small to large, so that every computer gets something. All of them speak
  * Russian: Llama 3.2 does not, and in a live chat it mixed languages. Sizes are read from Ollama's registry when shown; a tag the registry no longer has is left out. Checked 2026-10-13.
  */
 export const PICKS: { model: string; uses: LocalUse[] }[] = [

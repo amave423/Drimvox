@@ -1,7 +1,7 @@
 # Installers: Windows (NSIS, per user), Linux (AppImage and .deb). Releases go to GitHub, where the app looks for updates.
 # Build with `npm run dist` (this computer's system) or let .github/workflows/release.yml build both on a version tag.
 appId: com.artel.app
-productName: Artel
+productName: Drimvox
 copyright: Copyright © 2026 amave423
 directories:
   output: release
@@ -23,16 +23,16 @@ nodeGypRebuild: false
 
 win:
   target: nsis
-  artifactName: Artel-Setup-${version}.${ext}
+  artifactName: Drimvox-Setup-${version}.${ext}
 # A wizard rather than one click: where to install, a desktop shortcut, Ollama on the first start (build/installer.nsh),
-# with Artel's own pictures. Per user, no administrator needed; Russian or English by the system's language.
+# with Drimvox's own pictures. Per user, no administrator needed; Russian or English by the system's language.
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Artel
+  shortcutName: Drimvox
   runAfterFinish: true
   deleteAppDataOnUninstall: false
   include: build/installer.nsh
@@ -54,7 +54,7 @@ linux:
   category: Development
   maintainer: amave423 <artem123antropov@mail.ru>
   synopsis: A team of AI agents writes code under your review
-  artifactName: Artel-${version}-${arch}.${ext}
+  artifactName: Drimvox-${version}-${arch}.${ext}
 deb:
   depends:
     - libnotify4

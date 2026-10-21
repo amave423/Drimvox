@@ -29,9 +29,9 @@ export interface VisualDeps {
 const SIZE = { width: 1280, height: 800 };
 /** A window of this width, as tall as a desktop or a phone screen. */
 const sizeOf = (width?: number) => (width ? { width, height: width < 768 ? 844 : 800 } : SIZE);
-/** Looks per turn: enough to check a page and its fix; the polish comes from Artel's design review. */
+/** Looks per turn: enough to check a page and its fix; the polish comes from Drimvox's design review. */
 export const MAX_LOOKS = 4;
-const CODER_LIMIT = `Finish with what you have: Artel's design review looks at the screens after acceptance and sends concrete notes.`;
+const CODER_LIMIT = `Finish with what you have: Drimvox's design review looks at the screens after acceptance and sends concrete notes.`;
 
 /** Who looks: the coder by default; the acceptance agent checks every requirement and gets more looks. */
 export interface LookLimit {
@@ -133,7 +133,7 @@ export interface VisualResult {
   answer: string;
 }
 
-/** Artel's own look at the pages from the spec: start the app if asked, wait for the address, judge the screenshot. */
+/** Drimvox's own look at the pages from the spec: start the app if asked, wait for the address, judge the screenshot. */
 export async function runVisualChecks(d: VisualDeps, checks: VisualCheck[], signal?: AbortSignal): Promise<VisualResult[]> {
   const results: VisualResult[] = [];
   const started: number[] = [];
@@ -143,7 +143,7 @@ export async function runVisualChecks(d: VisualDeps, checks: VisualCheck[], sign
       let answer: string;
       let ok = false;
       if (!mayLookAt(check.url)) answer = "Only this computer (localhost) and public addresses can be opened.";
-      // A server Artel just started needs time to come up; one that already runs is photographed at once.
+      // A server Drimvox just started needs time to come up; one that already runs is photographed at once.
       else if (check.start && !(await reachable(check.url, signal))) answer = `${check.url} did not answer within a minute.`;
       else {
         // Seen live: one page passed and failed by turns over a language switch the screenshot did not show.

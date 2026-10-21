@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 
 /**
- * Git without installing it: Artel works through git (the task's copy, its review and acceptance, undo in a chat), and
+ * Git without installing it: Drimvox works through git (the task's copy, its review and acceptance, undo in a chat), and
  * the desktop app carries its own git (dugite's build, as GitHub Desktop does). A git the user installed wins: it has
  * their settings. Without one, the core and everything it starts get the bundled git first in PATH.
  */

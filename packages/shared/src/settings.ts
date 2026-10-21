@@ -7,7 +7,7 @@ export const currencies = ["RUB", "USD"] as const;
 export const settingsSchema = z.object({
   theme: z.enum(themes),
   locale: z.enum(locales),
-  /** What prices and spending are shown in. Artel stores dollars and converts at the Central Bank rate. */
+  /** What prices and spending are shown in. Drimvox stores dollars and converts at the Central Bank rate. */
   currency: z.enum(currencies),
   /** How much one agent task may spend before it stops and asks. */
   agentBudgetUsd: z.number().min(0.01).max(1000),

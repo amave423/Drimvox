@@ -17,7 +17,7 @@ let dir: string;
 let repo: string;
 let catalog: FakeProvider;
 
-/** OpenRouter's public catalog: where Artel learns the vendors' current models. */
+/** OpenRouter's public catalog: where Drimvox learns the vendors' current models. */
 const CATALOG = [
   { id: "anthropic/claude-haiku-5.5", name: "Anthropic: Claude Haiku 5.5", created: 300 },
   { id: "anthropic/claude-opus-5.5", name: "Anthropic: Claude Opus 5.5", created: 200 },

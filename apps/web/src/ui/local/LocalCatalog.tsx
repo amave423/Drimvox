@@ -10,7 +10,7 @@ interface Props {
   actions: PullActions;
 }
 
-/** What to download: Artel's picks sized for this computer, and a search on Hugging Face. */
+/** What to download: Drimvox's picks sized for this computer, and a search on Hugging Face. */
 export function LocalCatalogView({ status, actions }: Props) {
   const { api, t } = useApp();
   const [picks, setPicks] = useState<LocalPick[] | null>(null);

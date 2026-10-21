@@ -76,7 +76,7 @@ function info(id: string, name: string, resolved?: string | null): ModelInfo {
     priceOut: 0,
     priceEstimated: false,
     tools: true,
-    // Artel cannot hand a CLI its screenshots, so it never looks at pages for the visual checks.
+    // Drimvox cannot hand a CLI its screenshots, so it never looks at pages for the visual checks.
     vision: false,
     ...(resolved !== undefined ? { resolved } : {}),
   };

@@ -104,7 +104,7 @@ test("the agent asks before git push and respects a refusal", async () => {
   // The question sits at the top, next to Stop, not at the bottom of the feed.
   const ask = page.locator(".task-notice").getByRole("alert");
   await expect(ask.getByText("Агент просит разрешения")).toBeVisible();
-  // What the command does, in the agent's words, and why Artel asks.
+  // What the command does, in the agent's words, and why Drimvox asks.
   await expect(ask.getByText("Отправлю изменения на GitHub")).toBeVisible();
   await expect(ask.getByText(/Почему спрашиваю: команда отправит код в удалённый репозиторий/)).toBeVisible();
   await page.getByRole("button", { name: "Запретить" }).click();
@@ -361,7 +361,7 @@ test("the pipeline: interview, spec with an edited check, red tests, green code,
   await page.getByRole("button", { name: "Начать работу" }).click();
 
   await expect(page.getByText("Агент закончил. Посмотри правки")).toBeVisible();
-  await expect(page.getByText("Artel сам запустил проверки — все прошли.")).toBeVisible();
+  await expect(page.getByText("Drimvox сам запустил проверки — все прошли.")).toBeVisible();
   await page.getByText("Как агент работал").click();
   await expect(page.getByText("код 1")).toBeVisible();
   await expect(page.getByText("прошла")).toBeVisible();

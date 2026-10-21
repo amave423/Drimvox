@@ -38,7 +38,7 @@ test.afterEach(async () => {
 /** The app the agent "built": a page on this computer. */
 /** A long page: what is below the first screen must be in the picture too. */
 const LONG_PAGE =
-  '<body style="margin:0;background:#c0392b"><h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Artel</h1>' +
+  '<body style="margin:0;background:#c0392b"><h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Drimvox</h1>' +
   '<div style="height:2200px"></div><footer style="color:white;font:32px sans-serif">Контакты внизу</footer></body>';
 
 async function serveSite(html = LONG_PAGE): Promise<string> {
@@ -59,7 +59,7 @@ async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
   const url = await serveSite(html);
   // The coder sees pictures itself, so it also checks its own screenshots.
   const coder: FakeTurn[] = [
-    { toolCalls: [{ name: "look_at_page", args: { url, question: "Виден заголовок «Привет, Artel»?", ...(steps ? { steps } : {}) } }] },
+    { toolCalls: [{ name: "look_at_page", args: { url, question: "Виден заголовок «Привет, Drimvox»?", ...(steps ? { steps } : {}) } }] },
     { toolCalls: [{ name: "finish", args: { summary: "Проверил страницу.", commit_message: "Check" } }] },
   ];
   fake = await startFakeProvider({
@@ -67,7 +67,7 @@ async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
     models: [{ id: "coder", name: "Coder", supported_parameters: ["tools"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } }],
     respond: (body) =>
       JSON.stringify(body.messages).includes("data:image/png;base64,") && !body.tools
-        ? { text: "Да: белый заголовок «Привет, Artel» на красном фоне." }
+        ? { text: "Да: белый заголовок «Привет, Drimvox» на красном фоне." }
         : (coder.shift() ?? { text: "Done." }),
   });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo } });
@@ -108,7 +108,7 @@ test("an agent looks at its page: a real screenshot goes to the model and into t
 test("a page that scrolls inside its own container is photographed whole", async () => {
   const png = await lookAt(
     '<body style="margin:0;overflow:hidden"><main style="height:100vh;overflow-y:auto;background:#1f2a24">' +
-      '<h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Artel</h1><div style="height:2200px"></div>' +
+      '<h1 style="color:white;font:64px sans-serif;padding:40px">Привет, Drimvox</h1><div style="height:2200px"></div>' +
       '<footer style="color:white;font:32px sans-serif">Подвал</footer></main></body>',
   );
   expect(png.readUInt32BE(20)).toBeGreaterThan(2000);
@@ -117,7 +117,7 @@ test("a page that scrolls inside its own container is photographed whole", async
 // docs/specs/project-work.md: the agent goes through a scenario as a person would, in the same hidden window.
 test("an agent goes through a scenario on its page: types into a field by its label, clicks a button by its text", async () => {
   await lookAt(
-    '<h1>Привет, Artel</h1><label>Длина, м <input id="len"></label>' +
+    '<h1>Привет, Drimvox</h1><label>Длина, м <input id="len"></label>' +
       "<button onclick=\"fetch('/clicked?len=' + document.getElementById('len').value)\">В корзину</button>",
     [
       { action: "type", target: "Длина, м", text: "6" },

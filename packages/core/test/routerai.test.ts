@@ -133,7 +133,7 @@ describe("RouterAI", () => {
     expect(sent).toMatchObject({ model: "google/gemini-2.5-flash-image", modalities: ["image", "text"], image_config: { aspect_ratio: "16:9" } });
   });
 
-  // Seen live: by the catalog's prices Artel counted 126 ₽ where RouterAI took 80 ₽; its own bill comes with each answer.
+  // Seen live: by the catalog's prices Drimvox counted 126 ₽ where RouterAI took 80 ₽; its own bill comes with each answer.
   it("charges a chat by RouterAI's own bill when it sends one", async () => {
     await fake.close();
     fake = await startFakeProvider({ key: KEY, models: catalog, usage: { prompt_tokens: 1000, completion_tokens: 10, cost: 8 } });

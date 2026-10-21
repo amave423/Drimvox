@@ -14,7 +14,7 @@ import {
 import { parseDiff } from "./diff";
 import type { TaskRepo, TaskRow } from "./repo";
 
-export const WIP_MESSAGE = "Artel: work in progress";
+export const WIP_MESSAGE = "Drimvox: work in progress";
 
 /** Why work cannot be accepted right now; the API answers 409 with the files involved. */
 export class AcceptRefused extends Error {

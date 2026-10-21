@@ -149,7 +149,7 @@ function videoCost(model: MediaModel, skus: Record<string, string>, o: MediaOpti
   return Math.max(cost, minimum);
 }
 
-/** A picture or a clip Artel keeps: made in a chat or by an agent. */
+/** A picture or a clip Drimvox keeps: made in a chat or by an agent. */
 export interface MediaItem {
   id: string;
   kind: MediaKind;

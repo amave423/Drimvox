@@ -37,7 +37,7 @@ export const messageSendSchema = z
     options: mediaOptionsSchema.default({}),
     /** The user saw the price and pressed "Start"; needed for video and dear pictures. */
     confirm: z.boolean().default(false),
-    /** Internet for this answer: none, Artel's free search tools, or the provider's paid web search. */
+    /** Internet for this answer: none, Drimvox's free search tools, or the provider's paid web search. */
     web: z.enum(webModes).default("off"),
     thinking: z.enum(thinkingLevels).default("auto"),
     /** Files uploaded to the chat for this message (docs/specs/chat-attachments.md). */
@@ -138,7 +138,7 @@ export type StreamEvent =
   | { type: "start"; userMessage: MessageView; assistantMessageId: string }
   | { type: "reasoning"; text: string }
   | { type: "text"; text: string }
-  /** The model searched or opened a page with Artel's internet tools, or called an MCP tool ("server/tool"). */
+  /** The model searched or opened a page with Drimvox's internet tools, or called an MCP tool ("server/tool"). */
   | { type: "tool"; name: string; input: string }
   /** An MCP tool waits for the user's permission; answered with POST /api/chats/:id/approvals/:id. */
   /** A tool asks first: an MCP server's tool, or (with reason) a command in the chat's folder. */

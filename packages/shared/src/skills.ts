@@ -16,5 +16,5 @@ export const skillCreateSchema = z
   })
   .strict();
 
-/** A folder with SKILL.md to copy into Artel's shared skills. */
+/** A folder with SKILL.md to copy into Drimvox's shared skills. */
 export const skillImportSchema = z.object({ path: z.string().min(1).max(1000) }).strict();

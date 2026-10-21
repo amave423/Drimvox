@@ -5,7 +5,7 @@ import { describeError } from "../src/providers/errors";
 const failure = (status: number, message: string) =>
   new APICallError({ message, url: "https://x/v1/chat/completions", requestBodyValues: {}, statusCode: status, responseBody: JSON.stringify({ error: { message } }) });
 
-// Seen live: free models refused for reasons of their own, and Artel told the user the key was wrong.
+// Seen live: free models refused for reasons of their own, and Drimvox told the user the key was wrong.
 describe("describeError", () => {
   it("tells a wrong key from a model the key may not use", () => {
     expect(describeError(failure(401, "Invalid API key")).code).toBe("bad_key");

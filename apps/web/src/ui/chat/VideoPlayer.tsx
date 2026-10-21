@@ -23,7 +23,7 @@ function Icon({ name }: { name: "play" | "pause" | "sound" | "mute" | "full" }) 
 }
 
 /**
- * Artel's own player for clips (seen: the browser's stock controls looked out of place): a big play button, then a
+ * Drimvox's own player for clips (seen: the browser's stock controls looked out of place): a big play button, then a
  * bar with play, time, a seek line, sound and full screen. Space plays and pauses while the player has the focus.
  */
 export function VideoPlayer({ src, label }: { src: string; label: string }) {

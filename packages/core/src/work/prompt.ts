@@ -23,7 +23,7 @@ export function workRules(plan: ProjectPlan | null): string {
     "- Do the whole task: before you stop, go through every \"done when\" point and check it for real (run, open, look).",
     "- When there is an interface, start it and use look_at_page on a desktop width and a phone width (390).",
     "- Run the project's build and tests when it has them; fix what fails.",
-    "- Never commit or push: the user accepts the task, and Artel commits it.",
+    "- Never commit or push: the user accepts the task, and Drimvox commits it.",
     "- Keep the project's notes current with update_notes: commands, decisions, what is done.",
     "End with a short report in the user's language: each \"done when\" point and how it is met, and how to run the project.",
     ...(plan?.checks.length ? [`The project's checks: ${plan.checks.join("; ")}`] : []),

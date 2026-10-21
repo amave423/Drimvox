@@ -35,7 +35,7 @@ export function lookInstructions(): string {
     "palette (2-6 colours, hex) and the heading and body fonts with their kind (serif, sans, mono or hand). Choose fonts that",
     "are on Google Fonts and support the user's language. If the project already has a style of its own (DESIGN.md, tokens,",
     "settled colours), the recommended option keeps it, with its real colours, next to 1-2 alternatives.",
-    "Instead of an option the user may give a link or a picture of a style they like; Artel then describes it for you.",
+    "Instead of an option the user may give a link or a picture of a style they like; Drimvox then describes it for you.",
   ].join("\n");
 }
 
@@ -43,7 +43,7 @@ export function lookInstructions(): string {
 export function briefInstructions(): string {
   return [
     "If the result has a visible interface, add design: the design brief the coders follow. Build it on the direction the user",
-    "chose or on the style sample Artel described; when nobody chose, choose yourself from the subject and the audience.",
+    "chose or on the style sample Drimvox described; when nobody chose, choose yourself from the subject and the audience.",
     "Give the direction's name, the concept in one sentence, the palette by role (background, surface, text, muted text,",
     "accent and so on) in hex, the heading and body fonts, and rules: shapes, density, the signature detail, pictures and icons.",
     `It must not fall into these habits:\n${list(CLICHES)}`,
@@ -56,7 +56,7 @@ export function teamDesignNote(): string {
   return [
     "If the goal has a visible interface, the first subtask (id design-system) lays the look's foundation from the brief:",
     "the colour and font tokens, the base elements and one reference screen; the subtasks that build screens depend on it.",
-    "Add visual_checks too: how to start the app and the addresses of its main pages, for Artel's design review.",
+    "Add visual_checks too: how to start the app and the addresses of its main pages, for Drimvox's design review.",
   ].join("\n");
 }
 
@@ -77,7 +77,7 @@ export function designInstructions(brief: DesignBrief): string {
     "Put the palette and the fonts in one place first (CSS variables or the theme) and take colours only from there.",
     "Load the fonts with a fallback of the same kind. If the project has no DESIGN.md, save this brief there.",
     "Look at your pages a couple of times, not more: once the first full version stands and once before you finish. Do not chase",
-    "pixels: Artel's design review looks at the screens on a desktop and a phone after acceptance and sends concrete notes.",
+    "pixels: Drimvox's design review looks at the screens on a desktop and a phone after acceptance and sends concrete notes.",
     `Never:\n${list(CLICHES)}`,
     `Always:\n${list(CRAFT)}`,
   ].join("\n");
@@ -86,7 +86,7 @@ export function designInstructions(brief: DesignBrief): string {
 /** What the vision model is asked about the screens. */
 export function reviewQuestion(brief: DesignBrief, pages: number): string {
   return [
-    `This is Artel's design review. The pictures are ${pages} page(s) of a finished interface, each on a desktop (1280 px)`,
+    `This is Drimvox's design review. The pictures are ${pages} page(s) of a finished interface, each on a desktop (1280 px)`,
     "and then on a phone (390 px), full length. Judge them as a demanding designer against this brief:",
     "",
     briefText(brief),
@@ -187,7 +187,7 @@ export function parseReview(answer: string): { verdict: "good" | "polish"; issue
 /** The coder's round of polish after the review. */
 export function polishMessage(issues: string[]): string {
   return [
-    "Artel's design review looked at the screens on a desktop and a phone against the brief and asks for one round of polish:",
+    "Drimvox's design review looked at the screens on a desktop and a phone against the brief and asks for one round of polish:",
     list(issues),
     "Fix these without breaking anything that works and keep to the brief. Run the checks, then call finish.",
   ].join("\n");

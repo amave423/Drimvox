@@ -29,8 +29,8 @@ export function runSetup(file: string): Promise<void> {
 }
 
 /**
- * Installs Ollama from Artel (docs/specs/local-models.md): the user sees the size first, then the download's progress;
- * the official setup runs quietly, and Artel picks Ollama up when it is there.
+ * Installs Ollama from Drimvox (docs/specs/local-models.md): the user sees the size first, then the download's progress;
+ * the official setup runs quietly, and Drimvox picks Ollama up when it is there.
  */
 export class OllamaInstaller {
   private current: OllamaInstall = { state: "idle", received: 0, total: null, error: null };

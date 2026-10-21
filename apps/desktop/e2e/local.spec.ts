@@ -74,7 +74,7 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Локальные модели" }).click();
-  await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Artel/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Drimvox/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/видеокарта NVIDIA GeForce RTX 3080, 10 ГБ; память 32 ГБ/)).toBeVisible();
 
   // Only what runs here: the 60 GB model is not offered at all.
@@ -105,7 +105,7 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   await page.getByRole("button", { name: /^Параметры/ }).click();
   await page.getByRole("button", { name: /^Интернет:/ }).click();
   await expect(page.getByText("Эта модель слишком мала, чтобы искать в интернете: она отвечает сама.")).toBeVisible();
-  await expect(page.getByRole("option", { name: /Поиск Artel/ })).toHaveCount(0);
+  await expect(page.getByRole("option", { name: /Поиск Drimvox/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
   const box = page.getByRole("textbox", { name: /Сообщение/ });
   await box.fill("Привет");
@@ -120,7 +120,7 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
 });
 
 // docs/specs/local-models.md: without Ollama the sheet offers to install it, with the size of the download first.
-test("installs Ollama from the sheet: the size first, then Artel finds it", async () => {
+test("installs Ollama from the sheet: the size first, then Drimvox finds it", async () => {
   const setup = Buffer.alloc(3 * 1024 * 1024, 1);
   registry = createServer((req, res) => {
     res.writeHead(200, { "content-type": "application/octet-stream", "content-length": String(setup.length) });
@@ -143,7 +143,7 @@ test("installs Ollama from the sheet: the size first, then Artel finds it", asyn
   await page.getByRole("button", { name: "Локальные модели" }).click();
   await expect(page.getByText(/Ollama не установлена/)).toBeVisible();
   await page.getByRole("button", { name: "Установить Ollama · 3 МБ" }).click();
-  await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Artel/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Drimvox/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/Ollama не установлена/)).toHaveCount(0);
 });
 
@@ -172,6 +172,6 @@ test("installs Ollama on the first start when the installer was asked to", async
   });
   const page: Page = await app.firstWindow();
   await expect(page.getByRole("heading", { name: "Локальные модели" })).toBeVisible();
-  await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Artel/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Drimvox/)).toBeVisible({ timeout: 30_000 });
   expect(existsSync(join(program, "install-ollama"))).toBe(false);
 });

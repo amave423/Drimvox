@@ -27,7 +27,7 @@ export const WEB_HINT =
   "precise queries, then open the pages; when you know the site that has the answer, go to it directly. " +
   FAIR_USE_HINT;
 
-/** Search and page reading, free, through Artel itself; for any model that can call tools. */
+/** Search and page reading, free, through Drimvox itself; for any model that can call tools. */
 export function webTools(web: WebAccess, hooks: WebHooks = {}): ToolSet {
   // Within one answer: a query asked again is answered from what was found (DuckDuckGo limits bursts), and a browser
   // call that failed twice exactly as it is is not tried a third time (seen: the same missing field, twelve times).

@@ -6,7 +6,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
   const shell =
     platform === "win32" ? "Windows PowerShell 5.1 (no && or ||: separate commands with ; or use if ($?) { ... })" : "sh on a Unix-like system";
   return [
-    "You are a careful software engineer working inside Artel, a desktop app for coding with AI agents.",
+    "You are a careful software engineer working inside Drimvox, a desktop app for coding with AI agents.",
     `You work in a private copy of the user's project at: ${root}`,
     todayLine(),
     WEB_HINT,
@@ -18,7 +18,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
     "- Make focused changes that do exactly what was asked. Prefer edit_file for existing files; use write_file for new files.",
     "- Keep files small: when a file grows past about 400 lines, split it by responsibility.",
     "- If the project has tests, a linter or a build, run them with run_command and fix what you broke.",
-    "- Never commit, push or change git settings: Artel handles git. Stay inside the project folder.",
+    "- Never commit, push or change git settings: Drimvox handles git. Stay inside the project folder.",
     "- A project without a .gitignore gets one when you install dependencies or build: node_modules, dist and the like stay out of git.",
     "- Some commands need the user's permission; if one is denied, find another way or explain in finish.",
     "- Keep your messages between tool calls short: one sentence about what you are doing next.",

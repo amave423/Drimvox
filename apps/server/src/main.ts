@@ -21,7 +21,7 @@ async function main() {
   const config = readConfig(process.env, homedir());
   const here = fileURLToPath(new URL(".", import.meta.url));
   const webDir = resolve(here, "..", "..", "web", "dist");
-  if (!existsSync(join(webDir, "index.html"))) throw new Error(`The UI is not built: ${webDir}. Run "npm run server" from the Artel folder.`);
+  if (!existsSync(join(webDir, "index.html"))) throw new Error(`The UI is not built: ${webDir}. Run "npm run server" from the Drimvox folder.`);
 
   const name = await tailscale();
   const secretKey = loadSecretKey(config.dataDir);
@@ -39,8 +39,8 @@ async function main() {
     readPage,
   });
 
-  console.log(`Artel ${__ARTEL_VERSION__} listens on http://127.0.0.1:${server.port}, data in ${config.dataDir}`);
-  console.log(name ? `Open https://${name} (after "tailscale serve --bg ${server.port}")` : "Tailscale is not running: only this machine can open Artel.");
+  console.log(`Drimvox ${__ARTEL_VERSION__} listens on http://127.0.0.1:${server.port}, data in ${config.dataDir}`);
+  console.log(name ? `Open https://${name} (after "tailscale serve --bg ${server.port}")` : "Tailscale is not running: only this machine can open Drimvox.");
   if (server.needsPassword()) console.log(`No password yet. The code to set it in the browser: ${code}`);
   else forgetSetupCode(config.dataDir);
 

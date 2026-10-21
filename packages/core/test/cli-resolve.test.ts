@@ -46,7 +46,7 @@ describe.runIf(process.platform === "win32")("finding a CLI on Windows", () => {
   });
 });
 
-// Google's installer puts agy in its own folder; a running Artel does not see a PATH changed after it started.
+// Google's installer puts agy in its own folder; a running Drimvox does not see a PATH changed after it started.
 describe("finding Antigravity CLI where its installer puts it", () => {
   it("looks in %LOCALAPPDATA%\agy\bin on Windows and ~/.local/bin elsewhere", () => {
     const home = mkdtempSync(join(tmpdir(), "artel-agy-"));

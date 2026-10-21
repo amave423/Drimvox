@@ -9,7 +9,7 @@ export interface CheckResult {
 
 const CHECK_TIMEOUT_MS = 10 * 60_000;
 
-/** Runs the task's checks in its copy, one after another. Artel's own verdict, not the agent's. */
+/** Runs the task's checks in its copy, one after another. Drimvox's own verdict, not the agent's. */
 export async function runChecks(commands: string[], cwd: string, signal?: AbortSignal): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   for (const command of commands) {

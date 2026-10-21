@@ -3,12 +3,12 @@ import { normalizeModels } from "./catalog";
 import { fetchJson } from "./http";
 import type { Connection } from "./repo";
 
-/** Vendors that speak their own API; Artel reaches them through their AI SDK packages. */
+/** Vendors that speak their own API; Drimvox reaches them through their AI SDK packages. */
 export const NATIVE: PresetId[] = ["anthropic", "openai", "google", "xai"];
 
 /**
  * Vendors do not publish prices through their APIs. OpenRouter's public catalog lists the same models at
- * the vendors' own prices, so Artel takes them from there and marks them as an estimate.
+ * the vendors' own prices, so Drimvox takes them from there and marks them as an estimate.
  */
 let catalogUrl = "https://openrouter.ai/api/v1";
 const PRICES_TTL = 24 * 60 * 60_000;

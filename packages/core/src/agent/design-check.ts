@@ -23,7 +23,7 @@ function spend(ctx: PassContext, id: string, usd: number): void {
 }
 
 /**
- * Artel's design review of the current stage, once, after the acceptance agent accepted every requirement:
+ * Drimvox's design review of the current stage, once, after the acceptance agent accepted every requirement:
  * the pages on a desktop and a phone, judged against the brief. "polish" carries the one round of rework.
  */
 export async function designRound(ctx: PassContext, id: string, visual: VisualDeps): Promise<DesignRound> {
@@ -36,7 +36,7 @@ export async function designRound(ctx: PassContext, id: string, visual: VisualDe
     .filter((p) => mayLookAt(p.url))
     .slice(0, MAX_REVIEW_PAGES);
   const skip = (why: string): DesignRound => {
-    ctx.event("text", { text: `Artel skipped the design review: ${why}.` });
+    ctx.event("text", { text: `Drimvox skipped the design review: ${why}.` });
     return { kind: "pass" };
   };
   if (pages.length === 0) return skip("there are no pages to look at");
@@ -84,7 +84,7 @@ export async function designRound(ctx: PassContext, id: string, visual: VisualDe
 }
 
 /**
- * A site or a picture the user gave as a style sample: Artel photographs or takes it, the vision model describes
+ * A site or a picture the user gave as a style sample: Drimvox photographs or takes it, the vision model describes
  * its style, and the description goes to the agent with the answers. Returns that part of the message.
  */
 export async function describeReference(ctx: PassContext, id: string, ref: StyleReference): Promise<string> {
@@ -116,9 +116,9 @@ export async function describeReference(ctx: PassContext, id: string, ref: Style
   ctx.event("reference", { url: ref.url ?? null, shot, description });
 
   if (description) {
-    return `The user gave ${what} as a sample of the style they like. Artel looked at it:\n${description}\nBase the look on this sample unless the answers say otherwise.`;
+    return `The user gave ${what} as a sample of the style they like. Drimvox looked at it:\n${description}\nBase the look on this sample unless the answers say otherwise.`;
   }
   return ref.url
-    ? `The user gave ${what} as a sample of the style they like, but Artel could not look at it (${why}). Open it with open_page if you need to.`
-    : `The user gave ${what} as a sample of the style they like, but Artel could not look at it (${why}).`;
+    ? `The user gave ${what} as a sample of the style they like, but Drimvox could not look at it (${why}). Open it with open_page if you need to.`
+    : `The user gave ${what} as a sample of the style they like, but Drimvox could not look at it (${why}).`;
 }

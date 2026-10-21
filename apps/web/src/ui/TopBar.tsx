@@ -15,7 +15,7 @@ export function TopBar() {
       <div className="topbar-title">
         <button className="logo" onClick={() => navigate({ kind: "home" })} title={t("top.home")}>
           <img src={logo} alt="" width={22} height={22} />
-          <span className="logo-name">Artel</span>
+          <span className="logo-name">Drimvox</span>
         </button>
         {crumb && (
           <span className="crumb" title={crumb}>

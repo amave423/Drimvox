@@ -109,13 +109,13 @@ export class McpHub {
     if (known) void this.drop(server.id);
 
     const client = (async () => {
-      const c = new Client({ name: "Artel", version: "1.0.0" });
+      const c = new Client({ name: "Drimvox", version: "1.0.0" });
       const transport =
         server.transport === "stdio"
           ? new StdioClientTransport({
               command: server.command!,
               args: server.args,
-              // The server gets the usual system variables plus its own; nothing else of Artel's environment.
+              // The server gets the usual system variables plus its own; nothing else of Drimvox's environment.
               env: { ...getDefaultEnvironment(), ...server.env },
               stderr: "ignore",
             })

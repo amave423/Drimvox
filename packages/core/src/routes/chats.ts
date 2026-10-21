@@ -56,7 +56,7 @@ export interface WorkDeps {
   plan(projectId: string): ProjectPlan | null;
   visualKit: VisualKit;
   visionModel(): { providerId: string; model: string } | null;
-  /** Artel's shared skills; a folder's own (.artel/skills, .claude/skills) come first. */
+  /** Drimvox's shared skills; a folder's own (.artel/skills, .claude/skills) come first. */
   skillsDir: string;
 }
 

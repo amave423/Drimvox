@@ -64,7 +64,7 @@ export function askAboutPicture(vision: Vision, png: Buffer, question: string, s
 
 /** Shows several pictures at once (a page on a desktop and a phone, say) with one question. */
 export async function askAboutPictures(vision: Vision, pictures: Picture[], prompt: string, signal?: AbortSignal): Promise<{ text: string; costUsd: number }> {
-  // Streamed like every other answer in Artel; the text is collected.
+  // Streamed like every other answer in Drimvox; the text is collected.
   const result = streamText({
     model: languageModel(vision.conn, vision.model),
     maxRetries: 1,

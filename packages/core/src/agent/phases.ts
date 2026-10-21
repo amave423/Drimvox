@@ -68,7 +68,7 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[], o: 
         "If the project has no tests yet, plan to add the smallest fitting test runner first (node --test for plain Node,",
         "vitest for Vite projects, pytest for Python) and include its command in the checks.",
         "If the work has a visible interface (a page, a screen), add visual_checks: how to start it, the address and what",
-        "must be visible. Artel opens the page, takes a screenshot of it as it loads (no clicks, no scrolling inside elements)",
+        "must be visible. Drimvox opens the page, takes a screenshot of it as it loads (no clicks, no scrolling inside elements)",
         "and asks a model that sees pictures, after the checks pass: describe only what such a screenshot can show.",
         "That browser has no location, sound or camera: describe the page as it opens without them.",
         "In a task with stages give every visual check the stage that brings it: a stage is looked at only with its own pages",
@@ -90,7 +90,7 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[], o: 
       return [
         "Current step: tests first. Do not implement the feature yet.",
         "In this step create or edit only test files and test configuration. Do not touch the source code the tests cover,",
-        "and do not create scratch files: Artel checks that the tests fail before any code exists.",
+        "and do not create scratch files: Drimvox checks that the tests fail before any code exists.",
         "Write automated tests for the behaviour in the approved spec; set up the test runner first if the plan says so.",
         "Run the checks yourself: the new tests must fail now, because the feature does not exist yet.",
         `Checks:\n${checkList}`,
@@ -100,7 +100,7 @@ export function phaseInstructions(phase: TaskPhase | null, checks: string[], o: 
       return [
         "Current step: implementation. Implement the approved spec so that every check passes.",
         `Checks (all must exit 0):\n${checkList}`,
-        "Run the checks yourself before you finish. Artel runs them again after you call finish and sends you any failure.",
+        "Run the checks yourself before you finish. Drimvox runs them again after you call finish and sends you any failure.",
         "Do not weaken or delete tests to make them pass.",
       ].join("\n");
     default:

@@ -1,4 +1,4 @@
-// docs/specs/local-images.md: pictures on this computer through stable-diffusion.cpp, which Artel downloads itself.
+// docs/specs/local-images.md: pictures on this computer through stable-diffusion.cpp, which Drimvox downloads itself.
 import type { LocalHardware } from "@artel/shared";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Server } from "node:http";
@@ -252,10 +252,10 @@ describe("video", () => {
   });
 });
 
-// docs/specs/local-images.md: models found on Hugging Face, by what they make. Artel runs one when it knows its family:
+// docs/specs/local-images.md: models found on Hugging Face, by what they make. Drimvox runs one when it knows its family:
 // the found file is the model itself, the rest (VAE, text encoder) come from the checked model of that family.
 describe("Hugging Face", () => {
-  it("searches models that make pictures, and says which ones Artel can run", async () => {
+  it("searches models that make pictures, and says which ones Drimvox can run", async () => {
     const hf = await startFakeHub(servers);
     setup(hf.url);
     const found = await (await env.call("GET", "/api/local/images/search?kind=image&q=turbo")).json();

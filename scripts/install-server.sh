@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Installs Artel on Ubuntu as a systemd service and opens it in your tailnet over HTTPS.
-# Run from the Artel folder: npm run server:install. Safe to run again after `git pull` to update.
+# Installs Drimvox on Ubuntu as a systemd service and opens it in your tailnet over HTTPS.
+# Run from the Drimvox folder: npm run server:install. Safe to run again after `git pull` to update.
 #   ARTEL_PORT      port on 127.0.0.1 (4317)
 #   ARTEL_DATA_DIR  data folder (~/.local/share/artel)
 #   ARTEL_CHROMIUM  1 = install Chromium for visual checks without asking, 0 = skip
@@ -25,7 +25,7 @@ if [ -z "$NODE" ] || [ "$("$NODE" -p 'process.versions.node.split(".")[0]')" -lt
   exit 1
 fi
 
-say "Installing packages and building Artel"
+say "Installing packages and building Drimvox"
 npm install --no-audit --no-fund
 npm run build -w @artel/web
 npm run build -w @artel/server
@@ -38,7 +38,7 @@ if command -v tailscale >/dev/null 2>&1; then
     });' || true)"
 fi
 if [ -z "$NAME" ]; then
-  echo "Tailscale is not installed or not logged in: Artel will be reachable only from this machine."
+  echo "Tailscale is not installed or not logged in: Drimvox will be reachable only from this machine."
   echo "Install it (https://tailscale.com/download/linux), run 'sudo tailscale up', then run this script again."
 fi
 
@@ -46,7 +46,7 @@ say "Writing the systemd service"
 # The agents run git, npm, Claude Code and the like: the service gets the PATH of this shell.
 sudo tee /etc/systemd/system/artel.service >/dev/null <<UNIT
 [Unit]
-Description=Artel: AI agents that write code under your review
+Description=Drimvox: AI agents that write code under your review
 After=network-online.target tailscaled.service
 Wants=network-online.target
 
@@ -70,7 +70,7 @@ sudo systemctl enable artel >/dev/null
 sudo systemctl restart artel
 
 if [ -n "$NAME" ]; then
-  say "Opening Artel in the tailnet over HTTPS"
+  say "Opening Drimvox in the tailnet over HTTPS"
   sudo tailscale serve --bg --https=443 "http://127.0.0.1:$PORT"
 fi
 
@@ -84,7 +84,7 @@ if [ "$CHROMIUM" = "1" ]; then
   npx playwright install --with-deps chromium
 fi
 
-say "Waiting for Artel to start"
+say "Waiting for Drimvox to start"
 CODE=""
 for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
@@ -94,11 +94,11 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 if ! curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
-  echo "Artel did not start. See: sudo journalctl -u artel -n 50"
+  echo "Drimvox did not start. See: sudo journalctl -u artel -n 50"
   exit 1
 fi
 
-say "Artel is running"
+say "Drimvox is running"
 if [ -n "$NAME" ]; then echo "Open: https://$NAME"; else echo "Open: http://127.0.0.1:$PORT (on this machine)"; fi
 if [ -n "$CODE" ]; then echo "Setup code for the first password: $CODE"; fi
 echo "Logs: sudo journalctl -u artel -f    Stop: sudo systemctl stop artel"

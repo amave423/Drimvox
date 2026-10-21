@@ -8,7 +8,7 @@ export interface ProjectView {
   id: string;
   name: string;
   path: string;
-  /** "not_repo": the folder has no git yet; Artel offers to start it. */
+  /** "not_repo": the folder has no git yet; Drimvox offers to start it. */
   gitState: "ready" | "not_repo";
   createdAt: number;
 }
@@ -224,7 +224,7 @@ export interface TaskView {
   team: ModelRef | null;
   /** For a goal: the subtasks as planned (and as the user edited them). */
   plannedSubtasks: PlannedSubtask[];
-  /** Pages Artel looks at, through a model that sees pictures, once the checks are green. */
+  /** Pages Drimvox looks at, through a model that sees pictures, once the checks are green. */
   visualChecks: VisualCheck[];
   /** For a goal: the subtasks at work. */
   subtasks: SubtaskCard[];
@@ -242,7 +242,7 @@ export interface TaskView {
   milestone: number;
   /** The look the coders follow, when the result has an interface. */
   design: DesignBrief | null;
-  /** Artel's latest look at the finished screens against the brief. */
+  /** Drimvox's latest look at the finished screens against the brief. */
   designReview: DesignReview | null;
   createdAt: number;
   updatedAt: number;

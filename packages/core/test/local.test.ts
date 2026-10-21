@@ -208,7 +208,7 @@ describe("downloads", () => {
 });
 
 // Seen: Hugging Face's own address answers, but the files it sends to (us.aws.cdn.hf.co) do not, with or without a VPN.
-// Artel downloads the file itself, through the proxy from the settings when the direct way fails, checks it against
+// Drimvox downloads the file itself, through the proxy from the settings when the direct way fails, checks it against
 // the sha256 that huggingface.co gives, and hands it to Ollama.
 describe("Hugging Face downloads", () => {
   const FILE = Buffer.from(Array.from({ length: 300_000 }, (_, i) => (i * 7919) % 251));
@@ -286,7 +286,7 @@ describe("Hugging Face downloads", () => {
     expect(done.pulls[0].error).toMatch(/Set a proxy in the settings/);
   });
 
-  // Seen live: a proxy cut a 3 GB download at 3.4 GB and Artel gave up; the file was half there. Now it goes on from
+  // Seen live: a proxy cut a 3 GB download at 3.4 GB and Drimvox gave up; the file was half there. Now it goes on from
   // where the connection broke, as long as each try brings more of the file.
   it("goes on by itself after the connection is cut in the middle of the file", async () => {
     const m = await mirror(FILE, false, 2);
@@ -392,7 +392,7 @@ describe("catalog", () => {
     expect(found).toEqual([
       { repo: "unsloth/gemma-4-12b-it-GGUF", downloads: 1654466, likes: 903, params: 11_907_350_576, updatedAt: "2026-07-17T12:52:56.000Z", unfiltered: false, unsupported: null },
       { repo: "someone/gemma-tiny-GGUF", downloads: 5, likes: 0, params: null, updatedAt: null, unfiltered: false, unsupported: null },
-      // What the author says, by the name or the tags: Artel cannot check it.
+      // What the author says, by the name or the tags: Drimvox cannot check it.
       { repo: "mlabonne/gemma-4-12b-abliterated-GGUF", downloads: 900, likes: 40, params: 11_907_350_576, updatedAt: null, unfiltered: true, unsupported: null },
       { repo: "someone/gemma-chat-GGUF", downloads: 30, likes: 2, params: null, updatedAt: null, unfiltered: true, unsupported: null },
       { repo: "someone/gemma-4-120b-GGUF", downloads: 10, likes: 1, params: 120_000_000_000, updatedAt: null, unfiltered: false, unsupported: "too_big" },

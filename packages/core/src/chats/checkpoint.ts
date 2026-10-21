@@ -11,7 +11,7 @@ import { isRepoRoot, runGit, withoutDependencies } from "../agent/git";
  * A snapshot is a commit built in a temporary index and kept under refs/artel/chat/…: the user's branches, history,
  * index and files stay as they are. Ignored files and dependency folders are not part of it and are never touched.
  */
-const ARTEL = { GIT_AUTHOR_NAME: "Artel", GIT_AUTHOR_EMAIL: "artel@localhost", GIT_COMMITTER_NAME: "Artel", GIT_COMMITTER_EMAIL: "artel@localhost" };
+const ARTEL = { GIT_AUTHOR_NAME: "Drimvox", GIT_AUTHOR_EMAIL: "artel@localhost", GIT_COMMITTER_NAME: "Drimvox", GIT_COMMITTER_EMAIL: "artel@localhost" };
 
 /** The folder's files as a tree, read through a temporary index. */
 async function treeOf(folder: string): Promise<string> {
@@ -29,7 +29,7 @@ async function treeOf(folder: string): Promise<string> {
 export async function checkpoint(folder: string, ref: string): Promise<string | null> {
   if (!(await isRepoRoot(folder))) return null;
   const tree = await treeOf(folder);
-  const commit = (await runGit(folder, ["commit-tree", tree, "-m", "Artel chat checkpoint"], false, ARTEL)).stdout.trim();
+  const commit = (await runGit(folder, ["commit-tree", tree, "-m", "Drimvox chat checkpoint"], false, ARTEL)).stdout.trim();
   await runGit(folder, ["update-ref", ref, commit]);
   return commit;
 }

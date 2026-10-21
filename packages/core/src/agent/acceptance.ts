@@ -16,7 +16,7 @@ const VERDICT_REMINDER = "You have not given a verdict. Call report_acceptance n
 function systemPrompt(root: string, platform = process.platform): string {
   const shell = platform === "win32" ? "Windows PowerShell 5.1 (no && or ||: separate commands with ; or use if ($?) { ... })" : "sh";
   return [
-    "You are the acceptance agent in Artel. Another agent wrote the code; you did not, and you must not change it.",
+    "You are the acceptance agent in Drimvox. Another agent wrote the code; you did not, and you must not change it.",
     `The work is in a copy of the project at: ${root}`,
     todayLine(),
     `Commands run with ${shell} in that folder.`,

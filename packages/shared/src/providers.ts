@@ -32,9 +32,9 @@ export interface Preset {
   editableUrl: boolean;
   /** How usage is billed: real money, provider credits, the user's subscription to a CLI, or nothing (local). */
   billing: "paid" | "credits" | "subscription" | "free";
-  /** A command-line agent Artel runs instead of calling an API: its program and how to install it. */
+  /** A command-line agent Drimvox runs instead of calling an API: its program and how to install it. */
   cli?: { command: string; install: string; /** When Windows installs it another way. */ installWindows?: string };
-  /** What the provider's prices and costs are in. Artel converts rubles to dollars internally. */
+  /** What the provider's prices and costs are in. Drimvox converts rubles to dollars internally. */
   currency: "USD" | "RUB";
 }
 
@@ -196,7 +196,7 @@ export const presets: Record<PresetId, Preset> = {
     billing: "free",
     currency: "USD",
   },
-  // Pictures on this computer (docs/specs/local-images.md): Artel makes this provider itself and runs the engine
+  // Pictures on this computer (docs/specs/local-images.md): Drimvox makes this provider itself and runs the engine
   // in-process; the address is only a name.
   sdcpp: {
     id: "sdcpp",
@@ -270,14 +270,14 @@ export interface ModelInfo {
   priceOut: number | null;
   /** USD per 1M input tokens the provider serves from its cache, when it publishes such a price. */
   priceCacheRead?: number;
-  /** True when prices come from a table built into Artel rather than from the provider. */
+  /** True when prices come from a table built into Drimvox rather than from the provider. */
   priceEstimated: boolean;
   tools: boolean | null;
   /** Understands pictures in the prompt; null when the catalog does not say. */
   vision: boolean | null;
-  /** For a CLI's "default": the model it actually ran last time, when Artel has seen one. */
+  /** For a CLI's "default": the model it actually ran last time, when Drimvox has seen one. */
   resolved?: string | null;
-  /** Whether a free model answers, when Artel has asked it or chatted with it lately. */
+  /** Whether a free model answers, when Drimvox has asked it or chatted with it lately. */
   available?: Availability;
   /** A key without billing may use it free up to a daily limit (Google); the prices are those past it. */
   freeTier?: boolean;

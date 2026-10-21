@@ -1,6 +1,6 @@
 import { useApp } from "../../context";
 
-/** The commands Artel runs to tell whether the work is done; each one can be edited or removed. */
+/** The commands Drimvox runs to tell whether the work is done; each one can be edited or removed. */
 export function ChecksEditor({ checks, onChange }: { checks: string[]; onChange(checks: string[]): void }) {
   const { t } = useApp();
   return (

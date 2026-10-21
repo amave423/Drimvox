@@ -5,8 +5,8 @@ import { Readable } from "node:stream";
 import { removeTree } from "../../fsx";
 
 /**
- * The engine's release Artel uses (docs/specs/local-images.md): pinned, so a new stable-diffusion.cpp changes
- * nothing until Artel itself is updated with it, checked.
+ * The engine's release Drimvox uses (docs/specs/local-images.md): pinned, so a new stable-diffusion.cpp changes
+ * nothing until Drimvox itself is updated with it, checked.
  */
 export const ENGINE_TAG = "master-975-95b3090";
 const RELEASES = "https://github.com/leejet/stable-diffusion.cpp/releases/download";

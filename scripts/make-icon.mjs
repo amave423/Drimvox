@@ -1,4 +1,4 @@
-// Renders Artel's mark (apps/web/src/assets/logo.svg, the one source of the logo) to apps/desktop/build/icon.png
+// Renders Drimvox's mark (apps/web/src/assets/logo.svg, the one source of the logo) to apps/desktop/build/icon.png
 // at 1024 px; electron-builder makes the Windows .ico and Linux sizes from it.
 // Needs Microsoft Edge or Chrome on this computer. Run: node scripts/make-icon.mjs
 import { createRequire } from "node:module";

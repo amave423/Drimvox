@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 // The app as the installer puts it: built by `npm run dist`. Without a build there is nothing to check.
 const unpacked = fileURLToPath(new URL("../release/", import.meta.url));
-const exe = join(unpacked, process.platform === "win32" ? "win-unpacked/Artel.exe" : "linux-unpacked/artel");
+const exe = join(unpacked, process.platform === "win32" ? "win-unpacked/Drimvox.exe" : "linux-unpacked/artel");
 
 let app: ElectronApplication | undefined;
 let userData: string;
@@ -27,7 +27,7 @@ test("the packaged app starts its core from the archive and shows the interface"
   app = await electron.launch({ executablePath: exe, env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_NO_UPDATES: "1" } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/^Artel \d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(page.getByText(/^Drimvox \d+\.\d+\.\d+$/)).toBeVisible();
   expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(true);
   // Fonts and styles come from resources/web, not from the internet.
   expect(await page.evaluate(() => document.fonts.check('600 16px "Source Serif 4"'))).toBe(true);
@@ -42,7 +42,7 @@ test("the installed app says whether it is the latest version, and what went wro
   const feed = createServer((req, res) => {
     if (req.url?.startsWith("/ok/latest.yml")) {
       res.writeHead(200, { "content-type": "text/yaml" });
-      res.end(["version: 0.0.1", "files:", "  - url: Artel-Setup-0.0.1.exe", "    sha512: x", "    size: 1", "path: Artel-Setup-0.0.1.exe", "sha512: x", ""].join("\n"));
+      res.end(["version: 0.0.1", "files:", "  - url: Drimvox-Setup-0.0.1.exe", "    sha512: x", "    size: 1", "path: Drimvox-Setup-0.0.1.exe", "sha512: x", ""].join("\n"));
     } else {
       res.writeHead(500);
       res.end("down");

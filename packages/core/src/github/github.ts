@@ -3,7 +3,7 @@ import type { Database } from "../db";
 import { currentBranch, GitError, runGit } from "../agent/git";
 import type { Cipher } from "../secrets";
 
-/** Artel's OAuth app on GitHub. Public by design: the device flow has no client secret. */
+/** Drimvox's OAuth app on GitHub. Public by design: the device flow has no client secret. */
 export const CLIENT_ID = "Ov23liuac4Ai8HSL86BH";
 
 export interface GithubOptions {
@@ -219,7 +219,7 @@ export class GitHub {
   }
 }
 
-/** https://github.com/owner/name.git → https://github.com/owner/name; other remotes have no page Artel knows. */
+/** https://github.com/owner/name.git → https://github.com/owner/name; other remotes have no page Drimvox knows. */
 function pageOf(remote: string): string | null {
   const m = /^https:\/\/([^/@]+@)?([^/]+)\/([^/]+)\/([^/]+?)(\.git)?\/?$/i.exec(remote);
   if (m) return `https://${m[2]}/${m[3]}/${m[4]}`;

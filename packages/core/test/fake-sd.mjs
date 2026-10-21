@@ -1,5 +1,5 @@
 // A stand-in for stable-diffusion.cpp's `sd-server`: takes its options, listens on --listen-port and answers the
-// native job API Artel uses. FAKE_SD_MS: how long a picture takes. FAKE_SD_FAIL: a prompt with this word fails the job.
+// native job API Drimvox uses. FAKE_SD_MS: how long a picture takes. FAKE_SD_FAIL: a prompt with this word fails the job.
 // GET /fake/args shows what it was started with; GET /fake/jobs what it was asked to draw. FAKE_SD_PORT_FILE: where to
 // write the port once listening.
 import { writeFileSync } from "node:fs";

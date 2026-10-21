@@ -34,7 +34,7 @@ export async function checkAgent(api: Api, providerId: string, model: string, lo
   const repo = makeProject();
   try {
     const project = (await api("POST", "/projects", { path: repo })).body;
-    // The whole pipeline: interview, spec, tests first, code, Artel's own checks.
+    // The whole pipeline: interview, spec, tests first, code, Drimvox's own checks.
     const stages = { interview: true, spec: true, approveSpec: true, testsFirst: true };
     const started = await api("POST", `/projects/${project.id}/tasks`, { task: TASK, providerId, model, stages });
     if (started.status !== 201) {
@@ -63,7 +63,7 @@ export async function checkAgent(api: Api, providerId: string, model: string, lo
 
     const events = (await api("GET", `/tasks/${id}/events`)).body as TaskEvent[];
     const checks = events.filter((e) => e.kind === "check").map((e) => `${e.data.phase}: ${e.data.command} → ${e.data.ok ? "green" : "red"}`);
-    log("  checks run by Artel:", checks.join("; ") || "none");
+    log("  checks run by Drimvox:", checks.join("; ") || "none");
     const actions = events
       .filter((e) => e.kind === "tool_call")
       .map((e) => `${e.data.name}${e.data.input?.path ? ` ${e.data.input.path}` : e.data.input?.command ? ` "${e.data.input.command}"` : ""}`);

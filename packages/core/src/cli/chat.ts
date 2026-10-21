@@ -26,7 +26,7 @@ export async function cliReply(i: ReplyInput, dir: string, formatHint: string): 
   mkdirSync(cwd, { recursive: true });
   const prompt = resume
     ? i.content
-    : [nowLine(), formatHint, working ? i.work!.system : "You are chatting with the user inside Artel. Answer in the user's language.", transcript(history.slice(0, -1)), i.content]
+    : [nowLine(), formatHint, working ? i.work!.system : "You are chatting with the user inside Drimvox. Answer in the user's language.", transcript(history.slice(0, -1)), i.content]
         .filter(Boolean)
         .join("\n\n");
 

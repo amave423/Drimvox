@@ -1,4 +1,4 @@
-// A stand-in for `ollama serve`: listens on OLLAMA_HOST and answers the parts of Ollama's API Artel uses.
+// A stand-in for `ollama serve`: listens on OLLAMA_HOST and answers the parts of Ollama's API Drimvox uses.
 // FAKE_OLLAMA_MODELS: JSON list of installed names. FAKE_OLLAMA_PULL_MS: delay between progress lines.
 // FAKE_OLLAMA_KEEP_MS: how long a model stays loaded after a chat (what /api/ps shows).
 import { createHash } from "node:crypto";
@@ -35,7 +35,7 @@ createServer(async (req, res) => {
     return json(res, 200, { models: Date.now() < loadedUntil ? [{ name: loadedModel, model: loadedModel, size: 1000 }] : [] });
   }
   if (url.pathname === "/fake/requests") return json(res, 200, chats);
-  // Importing a GGUF Artel downloaded itself: the file as a blob, then a model made from it.
+  // Importing a GGUF Drimvox downloaded itself: the file as a blob, then a model made from it.
   if (url.pathname.startsWith("/api/blobs/")) {
     const digest = decodeURIComponent(url.pathname.slice("/api/blobs/".length));
     if (req.method === "HEAD") {
