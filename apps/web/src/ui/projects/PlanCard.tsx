@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { fromShown, shownSign, toShown } from "../../lib/format";
+import { PlanDetails } from "./PlanDetails";
 
 /** A long project needs more than one task's budget: at least this much, in dollars, unless the settings say more. */
 const MIN_BUDGET_USD = 1;
@@ -50,14 +51,7 @@ export function PlanCard({ work, onChanged }: { work: ProjectWorkView; onChanged
   return (
     <section className="project-plan" aria-label={t("projectWork.planTitle")}>
       <h2 className="sheet-h">{t("projectWork.planTitle")}</h2>
-      <p className="plan-summary">{plan.context}</p>
-      {plan.steps && plan.steps.length > 0 && (
-        <ol className="plan-steps">
-          {plan.steps.map((step, n) => (
-            <li key={n}>{step}</li>
-          ))}
-        </ol>
-      )}
+      <PlanDetails plan={plan} />
       <div className="plan-limits">
         <label className="field">
           <span className="field-label">{t("projectWork.budget", { currency: shownSign() })}</span>

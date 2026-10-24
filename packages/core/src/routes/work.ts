@@ -6,6 +6,7 @@ import type { ProjectRepo } from "../agent/repo";
 import { TaskBusy } from "../agent/runner";
 import type { ProviderRepo } from "../providers/repo";
 import type { Shots } from "../visual/look";
+import { folderChanges } from "../work/changes";
 import { WorkRefused, type ProjectWork } from "../work/service";
 
 const notFound = { error: { code: "not_found" } } as const;
@@ -84,6 +85,10 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
       const patch = c.req.valid("json");
       if (patch.strong && !providers.get(patch.strong.providerId)) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
       return c.json(work.update(id, patch), 200);
+    })
+    .get("/:id/work/changes", async (c) => {
+      const project = projects.get(c.req.param("id"));
+      return project ? c.json(await folderChanges(project.path), 200) : c.json(notFound, 404);
     })
     .get("/:id/work/shots/:shot", async (c) => {
       const id = c.req.param("id");

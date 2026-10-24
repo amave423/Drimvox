@@ -6,6 +6,7 @@ import type { ModelChoice } from "../../lib/lastModel";
 import { PlanCard } from "./PlanCard";
 import { ProjectStart } from "./ProjectStart";
 import { useProjectWork } from "./useProjectWork";
+import { SiteCard } from "./Workspace";
 
 /**
  * The project's work on its page (docs/specs/project-work.md): what to make and the models; the interview; the plan with
@@ -54,22 +55,25 @@ export function ProjectWork({ projectId, choice }: { projectId: string; choice: 
   }
 
   return (
-    <section className="note work-summary">
-      <WorkState work={work} />
-      <p className="muted">{t("projectWork.progress", { done: work.checklist.filter((i) => i.done).length, total: work.checklist.length })}</p>
-      <div className="actions">
-        {work.chatId && (
-          <button className="btn is-primary" onClick={() => navigate({ kind: "chat", chatId: work.chatId!, key: work.chatId! })}>
-            {t("projectWork.openChat")}
-          </button>
-        )}
-        {work.status !== "running" && (
-          <button className="link" onClick={() => setFresh(true)}>
-            {t("projectWork.newTask")}
-          </button>
-        )}
-      </div>
-    </section>
+    <>
+      <SiteCard work={work} onChanged={() => void reload()} />
+      <section className="note work-summary">
+        <WorkState work={work} />
+        <p className="muted">{t("projectWork.progress", { done: work.checklist.filter((i) => i.done).length, total: work.checklist.length })}</p>
+        <div className="actions">
+          {work.chatId && (
+            <button className="btn is-primary" onClick={() => navigate({ kind: "chat", chatId: work.chatId!, key: work.chatId! })}>
+              {t("projectWork.openChat")}
+            </button>
+          )}
+          {work.status !== "running" && (
+            <button className="link" onClick={() => setFresh(true)}>
+              {t("projectWork.newTask")}
+            </button>
+          )}
+        </div>
+      </section>
+    </>
   );
 }
 

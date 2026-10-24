@@ -35,6 +35,7 @@ import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
 import { useLiveAnswer } from "./useLiveAnswer";
 import { WorkPanel } from "../projects/WorkPanel";
+import { ChangesTab, PlanTab, RunTab, WorkTabs, type WorkTab } from "../projects/Workspace";
 import { useProjectWork } from "../projects/useProjectWork";
 
 interface Draft {
@@ -170,6 +171,9 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         : [{ line: activityLine(t, a.name, a.input), at: a.at }],
     );
   const { work, reload: reloadWork } = useProjectWork(projectId);
+  // The project workspace: the work in the conversation, the plan, the changes, the started result.
+  const [tab, setTab] = useState<WorkTab>("work");
+  useEffect(() => setTab("work"), [projectId]);
   const running = work?.status === "running";
   useEffect(() => {
     if (!running || !chat) return;
@@ -358,11 +362,16 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
       <div className="sheet-body chat-body">
         <header className="chat-head">
           <h1>{chat?.title ?? t("chat.emptyTitle")}</h1>
+          {projectId && work && <WorkTabs tab={tab} onTab={setTab} />}
         </header>
+
+        {projectId && work && tab === "plan" && <PlanTab work={work} />}
+        {projectId && work && tab === "changes" && <ChangesTab work={work} />}
+        {projectId && work && tab === "run" && <RunTab work={work} onChanged={() => void reloadWork()} />}
 
         {empty && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
 
-        <div className="messages" ref={list}>
+        <div className="messages" ref={list} hidden={!!projectId && tab !== "work"}>
           {messages.map((m) =>
             m.role === "user" ? (
               <UserMessage key={m.id} content={m.content} files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null} />
@@ -411,7 +420,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         )}
         {projectId ? (
           // A project's conversation: the run goes on while the user writes; Stop is in the panel.
-          <Composer
+          tab === "work" && <Composer
             disabled={!work?.startedAt}
             streaming={false}
             onSend={(text) => void send(text)}
@@ -465,7 +474,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
       </div>
 
       {projectId && work ? (
-        <WorkPanel work={work} messages={messages} line={(name, input) => activityLine(t, name, input)} onChanged={() => void reloadWork().then(() => chat && load(chat.id))} />
+        <WorkPanel work={work} onChanged={() => void reloadWork().then(() => chat && load(chat.id))} />
       ) : (
         <ChatMargin choice={choice} answers={answers} onDelete={chat ? () => void remove() : null} />
       )}

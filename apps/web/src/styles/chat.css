@@ -9,6 +9,7 @@
 
 /* One column no wider than the sheet: a long line of code scrolls inside its box. */
 .messages { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; align-content: start; padding-bottom: 20px; }
+.messages[hidden] { display: none; }
 .msg-user {
   justify-self: end; max-width: 80%;
   background: var(--paper); border: 1px solid var(--line);
@@ -217,13 +218,14 @@
 .work-limits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; align-items: end; }
 .work-limits .btn { grid-column: 1 / -1; justify-self: start; }
 .work-questions { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 8px; }
-.work-shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.work-shot { padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--paper); cursor: zoom-in; aspect-ratio: 4 / 3; }
-.work-shot img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
-.work-shot-empty { display: block; width: 100%; height: 100%; }
-.work-log { margin: 0 0 6px; padding-left: 18px; display: grid; gap: 2px; font-size: 12.5px; overflow-wrap: anywhere; }
-.shot-view { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: var(--overlay); cursor: zoom-out; }
-.shot-view img { max-width: 100%; max-height: 100%; border-radius: 12px; }
+/* The project workspace's tabs over the conversation: the work, the plan, the changes, the started result. */
+.work-tabs { display: flex; gap: 2px; margin-top: 10px; border-bottom: 1px solid var(--line); }
+.work-tab { padding: 8px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; font-size: 14px; color: var(--muted); }
+.work-tab:hover { color: var(--fg); }
+.work-tab.is-active { color: var(--fg); border-bottom-color: var(--ink); }
+.work-tab-body { display: grid; gap: 14px; padding: 4px 0 24px; overflow-y: auto; min-height: 0; }
+.work-site-url { margin: 0; overflow-wrap: anywhere; }
+.work-report h3 { margin-top: 0; }
 
 /* Screenshots of pages in the answer, where they were taken (docs/specs/project-work.md). */
 .msg-shots { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 10px; }

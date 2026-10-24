@@ -1,43 +1,25 @@
-import type { MessageView, ProjectWorkView } from "@drimvox/shared";
+import type { ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd, fromShown, shownSign, toShown } from "../../lib/format";
-import { useAuthorizedUrl } from "../../lib/media";
 import { WorkState } from "./ProjectWork";
 import { hoursAndMinutes } from "./useProjectWork";
-
-/** Actions the log shows before "the whole log". */
-const LOG_SHOWN = 8;
+import { SiteCard } from "./Workspace";
 
 /**
  * Next to a project's conversation (docs/specs/project-work.md): how the run goes, the agent's checklist, the time, money
- * and actions with the limits to change on the way, the agent's questions, the screenshots and the log of actions.
+ * and actions with the limits to change on the way, the agent's questions, and the started result. The actions and the
+ * screenshots are in the conversation, where they happened (seen: a separate log on the right said nothing).
  */
-export function WorkPanel({
-  work,
-  messages,
-  line,
-  onChanged,
-}: {
-  work: ProjectWorkView;
-  messages: MessageView[];
-  /** How an action reads in the log. */
-  line(name: string, input: string): string;
-  onChanged(): void;
-}) {
-  const { api, t, token } = useApp();
+export function WorkPanel({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
+  const { api, t } = useApp();
   const [budget, setBudget] = useState(() => String(toShown(work.budgetUsd)));
   const [hours, setHours] = useState(() => String(work.hours));
-  const [allLog, setAllLog] = useState(false);
-  const [big, setBig] = useState<string | null>(null);
   // The limits typed here stay until saved; the server's change them only when nobody is typing.
   useEffect(() => setBudget(String(toShown(work.budgetUsd))), [work.budgetUsd]);
   useEffect(() => setHours(String(work.hours)), [work.hours]);
 
   const changedLimits = fromShown(Number(budget.replace(",", "."))) !== work.budgetUsd || Number(hours.replace(",", ".")) !== work.hours;
-  const log = messages.filter((m) => m.role === "assistant").flatMap((m) => m.activity);
-  const shown = allLog ? log : log.slice(-LOG_SHOWN);
-  const shotUrl = (id: string) => `/api/projects/${work.projectId}/work/shots/${id}`;
 
   async function saveLimits() {
     const budgetUsd = fromShown(Number(budget.replace(",", ".")));
@@ -71,6 +53,8 @@ export function WorkPanel({
           )}
         </div>
       </div>
+
+      <SiteCard work={work} onChanged={onChanged} />
 
       {work.checklist.length > 0 && (
         <section className="note">
@@ -137,50 +121,6 @@ export function WorkPanel({
           <p className="muted">{t("projectWork.answerHint")}</p>
         </section>
       )}
-
-      {work.shots.length > 0 && (
-        <section className="note">
-          <h3 className="margin-h">{t("projectWork.shots")}</h3>
-          <div className="work-shots">
-            {work.shots
-              .slice(-6)
-              .reverse()
-              .map((s) => (
-                <button key={s.id} className="work-shot" title={s.url} onClick={() => setBig(s.id)}>
-                  <Shot url={shotUrl(s.id)} token={token} alt={s.url} />
-                </button>
-              ))}
-          </div>
-        </section>
-      )}
-
-      {log.length > 0 && (
-        <section className="note">
-          <h3 className="margin-h">{t("projectWork.log")}</h3>
-          <ol className="work-log muted">
-            {shown.map((a, n) => (
-              <li key={n}>{line(a.name, a.input)}</li>
-            ))}
-          </ol>
-          {log.length > LOG_SHOWN && (
-            <button className="link" onClick={() => setAllLog(!allLog)}>
-              {allLog ? t("projectWork.logLess") : t("projectWork.logAll", { n: log.length })}
-            </button>
-          )}
-        </section>
-      )}
-
-      {big && (
-        <div className="shot-view" role="dialog" aria-label={t("projectWork.shots")} onClick={() => setBig(null)}>
-          <Shot url={shotUrl(big)} token={token} alt="" />
-        </div>
-      )}
     </aside>
   );
-}
-
-/** A screenshot comes from the core with the token, which an <img> cannot send. */
-function Shot({ url, token, alt }: { url: string; token: string | null; alt: string }) {
-  const src = useAuthorizedUrl(url, token);
-  return src ? <img src={src} alt={alt} /> : <span className="work-shot-empty" aria-hidden />;
 }

@@ -104,7 +104,16 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(panel).toContainText("2 из 2");
   await expect(panel).toContainText("Нужна доставка?");
   await expect(panel).toContainText("Пока считает: Пока без доставки");
-  await expect(panel).toContainText("Журнал действий");
+  // The workspace's tabs: the actions are in the conversation; the plan, the folder's changes and the report apart.
+  await expect(panel).not.toContainText("Журнал действий");
+  await page.getByRole("tab", { name: "План" }).click();
+  await expect(page.locator(".plan-details")).toContainText("Сайт лесопилки с каталогом досок.");
+  await page.getByRole("tab", { name: "Изменения" }).click();
+  await expect(page.locator(".diff")).toContainText("index.html");
+  await page.getByRole("tab", { name: "Запуск" }).click();
+  await expect(page.locator(".work-report")).toContainText("Каталог готов");
+  await page.getByRole("tab", { name: "Работа" }).click();
+  await expect(page.getByPlaceholder("Напиши агенту — он учтёт на ходу")).toBeVisible();
   expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Доски");
   // Nothing to accept, and git stays the user's.
   expect(execFileSync("git", ["log", "--oneline"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);

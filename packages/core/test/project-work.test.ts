@@ -258,6 +258,20 @@ describe("work on a project", () => {
   });
 
   // Seen live: the report came before the end and the work trailed off in thoughts; the user wants the result started.
+  // The workspace's "Changes": what the agent did to the folder since the last commit, new files too, index untouched.
+  it("shows the folder's changes since the last commit", async () => {
+    const s = await setup({ coder: [noQuestions] });
+    writeFileSync(join(folder, "index.html"), "<h1>Лесопилка «Дуб»</h1>\n");
+    mkdirSync(join(folder, "src"));
+    writeFileSync(join(folder, "src", "app.js"), "export const a = 1;\n");
+    const files = (await (await env.call("GET", `/api/projects/${s.project.id}/work/changes`)).json()) as { path: string; status: string; added: number }[];
+    expect(files.map((f) => [f.path, f.status])).toEqual([
+      ["index.html", "modified"],
+      ["src/app.js", "added"],
+    ]);
+    expect(git(folder, "diff", "--cached", "--name-only")).toBe("");
+  });
+
   it("keeps the report apart and starts the finished project, until it is stopped", async () => {
     const port = 41000 + Math.floor(Math.random() * 2000);
     writeFileSync(join(folder, "server.js"), `require("http").createServer((q, r) => r.end("ok")).listen(${port});\n`);
