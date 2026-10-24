@@ -17,6 +17,9 @@ interface Row {
   worked_ms: number;
   escalated: number;
   started_at: number | null;
+  report: string | null;
+  site_command: string | null;
+  site_url: string | null;
 }
 
 export interface WorkRow {
@@ -35,6 +38,10 @@ export interface WorkRow {
   workedMs: number;
   escalated: boolean;
   startedAt: number | null;
+  /** What the agent said when it finished. */
+  report: string | null;
+  /** How to start what it made, and where to open it. */
+  site: { command: string; url: string } | null;
 }
 
 const toWork = (r: Row): WorkRow => ({
@@ -53,6 +60,8 @@ const toWork = (r: Row): WorkRow => ({
   workedMs: r.worked_ms,
   escalated: r.escalated === 1,
   startedAt: r.started_at,
+  report: r.report ?? null,
+  site: r.site_command && r.site_url ? { command: r.site_command, url: r.site_url } : null,
 });
 
 /** Screenshots kept per project: the newest; older ones stay on disk with the task screenshots. */
@@ -100,6 +109,11 @@ export class ProjectWorkRepo {
     if (patch.workedMs !== undefined) columns.worked_ms = Math.round(patch.workedMs);
     if (patch.escalated !== undefined) columns.escalated = patch.escalated ? 1 : 0;
     if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
+    if (patch.report !== undefined) columns.report = patch.report;
+    if (patch.site !== undefined) {
+      columns.site_command = patch.site?.command ?? null;
+      columns.site_url = patch.site?.url ?? null;
+    }
     const keys = Object.keys(columns);
     if (keys.length) {
       this.db.sql.prepare(`update project_work set ${keys.map((k) => `${k} = :${k}`).join(", ")} where project_id = :id`).run({ ...columns, id: projectId });

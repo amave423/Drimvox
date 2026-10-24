@@ -67,6 +67,16 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
         return c.json(refused(err), 409);
       }
     })
+    .post("/:id/work/site/start", (c) => {
+      const id = c.req.param("id");
+      if (!projects.get(id)) return c.json(notFound, 404);
+      try {
+        return c.json(work.startSite(id), 200);
+      } catch (err) {
+        return c.json(refused(err), 409);
+      }
+    })
+    .post("/:id/work/site/stop", (c) => (projects.get(c.req.param("id")) ? c.json(work.stopSite(c.req.param("id")), 200) : c.json(notFound, 404)))
     .post("/:id/work/stop", (c) => (work.stop(c.req.param("id")) ? c.json({ ok: true as const }, 200) : c.json(notFound, 404)))
     .patch("/:id/work", zValidator("json", projectWorkUpdateSchema), (c) => {
       const id = c.req.param("id");

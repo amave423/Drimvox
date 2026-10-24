@@ -13,10 +13,12 @@ import { WorkRun, type RunDeps } from "./run";
 
 /** Refusals the API turns into 409 with a code the UI explains. */
 export class WorkRefused extends Error {
-  constructor(readonly code: "not_repo" | "no_plan" | "busy" | "not_started" | "no_provider") {
+  constructor(readonly code: "not_repo" | "no_plan" | "busy" | "not_started" | "no_provider" | "no_site") {
     super(code);
   }
 }
+
+const siteKey = (projectId: string) => `site:${projectId}`;
 
 const INTERVIEW = { interview: true, spec: false, approveSpec: false, testsFirst: false };
 
@@ -26,6 +28,8 @@ const INTERVIEW = { interview: true, spec: false, approveSpec: false, testsFirst
  */
 export class ProjectWork {
   private readonly runs = new Map<string, WorkRun>();
+  /** The finished project Drimvox started for the user, by project: its background process. */
+  private readonly sites = new Map<string, number>();
 
   constructor(
     private readonly o: {
@@ -66,7 +70,32 @@ export class ProjectWork {
       waitingApproval: !!chatId && !!live && this.o.approvals.open(chatId).length > 0,
       escalated: row?.escalated ?? false,
       startedAt: row?.startedAt ?? null,
+      report: row?.report ?? null,
+      site: row?.site ? { url: row.site.url, running: this.siteRunning(projectId) } : null,
     };
+  }
+
+  /** Starts what the agent made, as it said to (finish_work's start); it runs until stopped or Drimvox quits. */
+  startSite(projectId: string): ProjectWorkView {
+    const row = this.o.repo.get(projectId);
+    const project = this.o.projects.get(projectId);
+    if (!row?.site || !project) throw new WorkRefused("no_site");
+    if (this.runs.has(projectId)) throw new WorkRefused("busy");
+    this.stopSite(projectId);
+    const p = this.o.run.visualKit.background.start(siteKey(projectId), row.site.command, project.path);
+    this.sites.set(projectId, p.id);
+    return this.view(projectId);
+  }
+
+  stopSite(projectId: string): ProjectWorkView {
+    this.o.run.visualKit.background.stopAll(siteKey(projectId));
+    this.sites.delete(projectId);
+    return this.view(projectId);
+  }
+
+  private siteRunning(projectId: string): boolean {
+    const id = this.sites.get(projectId);
+    return id !== undefined && this.o.run.visualKit.background.get(siteKey(projectId), id)?.exitCode === undefined;
   }
 
   /** Every project's work: what the window watches for notifications. */
@@ -111,7 +140,7 @@ export class ProjectWork {
     const known = row.chatId ? this.o.chats.get(row.chatId) : null;
     const chat = known ?? this.o.chats.create(work.providerId, work.model, "text", { folder: project.path, projectId, itemId: null, title: project.name });
     if (known) this.o.chats.update(chat.id, { providerId: work.providerId, model: work.model });
-    this.o.repo.update(projectId, { chatId: chat.id, ...limits, startedAt: Date.now(), workedMs: 0, escalated: false, questions: [] });
+    this.o.repo.update(projectId, { chatId: chat.id, ...limits, startedAt: Date.now(), workedMs: 0, escalated: false, questions: [], report: null });
     this.launch(projectId, chat.id, project.path, planMessage(plan));
     return { chatId: chat.id };
   }
@@ -158,6 +187,7 @@ export class ProjectWork {
   }
 
   async shutdown(): Promise<void> {
+    for (const id of [...this.sites.keys()]) this.stopSite(id);
     for (const run of this.runs.values()) run.controller.abort();
     await Promise.all([...this.runs.values()].map((r) => r.done.catch(() => {})));
   }
@@ -167,7 +197,22 @@ export class ProjectWork {
     const work = row.models?.work;
     const conn = work ? this.o.run.providers.connection(work.providerId) : null;
     if (!work || !conn) throw new WorkRefused("no_provider");
-    const run = new WorkRun({ ...this.o.run, ended: (id) => this.runs.get(id) === run && this.runs.delete(id) }, projectId, chatId, folder);
+    // The agent works on the project again: the started result frees its port.
+    this.stopSite(projectId);
+    const ended = (id: string) => {
+      if (this.runs.get(id) !== run) return;
+      this.runs.delete(id);
+      // Done with a result to open: Drimvox starts it (the agent's own processes are stopped by now).
+      const now = this.o.repo.get(id);
+      if (now?.status === "done" && now.site) {
+        try {
+          this.startSite(id);
+        } catch {
+          // Shown as not running; the user can start it.
+        }
+      }
+    };
+    const run = new WorkRun({ ...this.o.run, ended }, projectId, chatId, folder);
     this.runs.set(projectId, run);
     // Claude Code and Codex work with their own loop: the message goes to them as it is (reply() keeps it).
     if (isCli(conn.preset)) {

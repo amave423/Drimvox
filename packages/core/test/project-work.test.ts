@@ -91,6 +91,19 @@ describe("work on a project", () => {
     expect(task).toMatchObject({ kind: "plan", status: "waiting", statusReason: "plan_ready" });
   });
 
+  // Seen live: the plan was thin even from a strong model; the user wants the pages, the technology and the look in it.
+  it("keeps the plan's pages with what is on them and the technical decisions with their reasons", async () => {
+    const full = {
+      ...PLAN,
+      screens: [{ name: "Каталог", contents: "Доски по сортам, фильтр по длине, кнопка «В заказ»" }],
+      decisions: [{ what: "Vite + React", why: "быстрый старт и простая сборка" }],
+    };
+    const s = await setup({ coder: [noQuestions, call("write_plan", full)] });
+    const work = await planned(s);
+    expect(work.plan).toMatchObject({ screens: full.screens, decisions: full.decisions });
+    expect(JSON.stringify(requestsOf("coder")[1]!.body.messages[0])).toMatch(/screens.*decisions/s);
+  });
+
   it("rewrites the plan with the user's corrections", async () => {
     const s = await setup({ coder: [noQuestions, writePlan, call("write_plan", { ...PLAN, steps: ["Каталог", "Доставка"] })] });
     await planned(s);
@@ -223,6 +236,58 @@ describe("work on a project", () => {
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: { code: "not_repo" } });
     rmSync(plain, { recursive: true, force: true });
+  });
+
+  // Seen live: after "Go" the agent wrote in English until the user asked in Russian.
+  it("tells the working model to write in the user's language", async () => {
+    const s = await setup({ coder: [noQuestions, writePlan, call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Готово." })] });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "done");
+    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages[0])).toMatch(/language the user writes in/);
+  });
+
+  // Seen live: the checklist stayed unticked for an hour and a half until the user asked why.
+  it("reminds the agent to tick the checklist after many actions without it", async () => {
+    const busy = Array.from({ length: 26 }, () => call("list_files", { path: "." }));
+    const s = await setup({ coder: [noQuestions, writePlan, ...busy, call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Готово." })] });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "done");
+    expect(requestsOf("coder").some((r) => JSON.stringify(r.body.messages).includes("Tick off in the checklist"))).toBe(true);
+  });
+
+  // Seen live: the report came before the end and the work trailed off in thoughts; the user wants the result started.
+  it("keeps the report apart and starts the finished project, until it is stopped", async () => {
+    const port = 41000 + Math.floor(Math.random() * 2000);
+    writeFileSync(join(folder, "server.js"), `require("http").createServer((q, r) => r.end("ok")).listen(${port});\n`);
+    const s = await setup({
+      coder: [
+        noQuestions,
+        writePlan,
+        call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
+        call("finish_work", { report: "Сделал сайт. Запуск: node server.js.", start: { command: "node server.js", url: `http://localhost:${port}/` } }),
+      ],
+    });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    const done = await until(s.project.id, (w) => w.status === "done" && w.site?.running);
+    expect(done).toMatchObject({ report: "Сделал сайт. Запуск: node server.js.", site: { url: `http://localhost:${port}/`, running: true } });
+    // The process runs at once; the server listens a moment later.
+    let answer = "";
+    for (let i = 0; i < 50 && answer !== "ok"; i++) {
+      answer = await fetch(`http://localhost:${port}/`).then((r) => r.text(), () => "");
+      if (answer !== "ok") await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(answer).toBe("ok");
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/site/stop`)).status).toBe(200);
+    expect((await workOf(s.project.id)).site).toMatchObject({ running: false });
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/site/start`)).status).toBe(200);
+    await until(s.project.id, (w) => w.site?.running);
+    await env.call("POST", `/api/projects/${s.project.id}/work/site/stop`);
+    // The folder is free once the process is gone.
+    for (let i = 0; i < 50 && (await fetch(`http://localhost:${port}/`).then(() => true, () => false)); i++) await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 300));
   });
 
   it("offers the project's skills in the run, and the agent can open one", async () => {

@@ -22,11 +22,14 @@ import { workTools } from "./tools";
 export const SEGMENT_STEPS = 60;
 /** Times in a row the model may stop without finish_work, and without ticking anything off, before it counts as stuck. */
 export const MAX_NUDGES = 3;
+/** Actions without touching the checklist before the agent is reminded of it (seen live: unticked for an hour and a half). */
+export const CHECKLIST_EVERY = 25;
+const CHECKLIST_NOTE = "Tick off in the checklist what is done by now with update_checklist, then go on.";
 /** Provider errors in a row before the run stops and waits. */
 const MAX_ERRORS = 2;
 const RETRY_MS = 5000;
 /** Looks at pages per answer: the desktop and the phone, scenarios, and again after fixes. */
-const LOOKS = { looks: 16, then: "You have looked at pages enough in this answer: go on with the work, you can look again in the next one." };
+const LOOKS = { looks: 8, then: "You have looked at pages enough in this answer: go on with the work, you can look again in the next one." };
 
 export interface RunDeps {
   chats: ChatRepo;
@@ -59,6 +62,8 @@ export class WorkRun {
   done: Promise<void> = Promise.resolve();
   private readonly inbox: string[] = [];
   private finished = false;
+  /** Actions since the checklist was last updated. */
+  private sinceChecklist = 0;
 
   constructor(
     private readonly d: RunDeps,
@@ -183,6 +188,7 @@ export class WorkRun {
     let priced = true;
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
     const onCall = (name: string, what: string) => {
+      this.sinceChecklist = name === "update_checklist" ? 0 : this.sinceChecklist + 1;
       activity.push({ name, input: what, at: content.length });
       save();
     };
@@ -223,7 +229,10 @@ export class WorkRun {
         checklist: () => this.row().checklist,
         setChecklist: (items: ChecklistItem[]) => this.d.repo.update(this.projectId, { checklist: items }),
         ask: (question, assumption) => this.d.repo.update(this.projectId, { questions: [...this.row().questions, { question, assumption, at: Date.now() }] }),
-        finish: () => (this.finished = true),
+        finish: (report, start) => {
+          this.finished = true;
+          this.d.repo.update(this.projectId, { report, site: start });
+        },
         onCall,
       }),
     };
@@ -241,6 +250,11 @@ export class WorkRun {
       ownTools: own,
       stopTools: ["finish_work"],
       maxSteps: SEGMENT_STEPS,
+      remind: () => {
+        if (this.sinceChecklist < CHECKLIST_EVERY) return null;
+        this.sinceChecklist = 0;
+        return CHECKLIST_NOTE;
+      },
       stopWhen: () => {
         limited = outOfTime();
         return this.inbox.length > 0 || limited || overBudget();

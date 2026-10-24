@@ -66,6 +66,10 @@ export interface ProjectWorkView {
   /** The strong model took over. */
   escalated: boolean;
   startedAt: number | null;
+  /** What the agent said when it finished, shown apart from the conversation. */
+  report: string | null;
+  /** What it made, started by Drimvox: where to open it and whether it runs now. */
+  site: { url: string; running: boolean } | null;
 }
 
 const limits = { budgetUsd: z.number().min(0.01).max(10_000), hours: z.number().min(0.1).max(200) };

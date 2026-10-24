@@ -47,6 +47,10 @@ export interface ProjectPlan {
   design: DesignBrief | null;
   /** The plan's steps, short: the run's first checklist (docs/specs/project-work.md). Absent in plans of the old task list. */
   steps?: string[];
+  /** The pages or screens and what is on each, what the user can do there. */
+  screens?: { name: string; contents: string }[];
+  /** The technical decisions and why: the stack, where data lives, outside services. */
+  decisions?: { what: string; why: string }[];
 }
 
 /** A task as the old interview listed it. */

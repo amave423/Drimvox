@@ -239,6 +239,10 @@ const migrations: string[] = [
   // When the chat was last looked at: an answer that came after it shows as unread in the list.
   `alter table chats add column seen_at integer;
    update chats set seen_at = updated_at;`,
+  // A project's finished work: the agent's report, and how to start what it made (docs/specs/project-work.md).
+  `alter table project_work add column report text;
+   alter table project_work add column site_command text;
+   alter table project_work add column site_url text;`,
 ];
 
 export interface Database {

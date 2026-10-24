@@ -32,6 +32,8 @@ export interface RunInput {
   noFinish?: boolean;
   /** Asked after every step: true ends the pass there (a message from the user waits, the budget changed). */
   stopWhen?: () => boolean;
+  /** Asked before every step: a reminder that goes with that request only, such as ticking off the checklist. */
+  remind?: () => string | null;
   /** What the agent remembers of its older work; with onMemory, a new summary replaces the older part when it grows. */
   memory?: Memory | null;
   onMemory?(memory: Memory, usage: { inputTokens: number; outputTokens: number; costUsd: number }): void;
@@ -145,6 +147,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
             resetClock();
           }
         }
+        const note = i.remind?.();
+        if (note) sent = [...sent, { role: "user", content: note }];
         // The same text as long as the notes stay the same: the provider's cache holds.
         return { system: system(), ...(sent === messages ? {} : { messages: sent }) };
       },

@@ -53,7 +53,7 @@ describe("a chat with a folder", () => {
     expect(answer).toMatchObject({ content: "Создал hello.txt и поменял a.", canUndo: true });
     // What the model did stays with the answer: a chat opened later still shows it.
     const saved = (await (await env.call("GET", `/api/chats/${chat.id}`)).json()).messages.at(-1);
-    expect(saved.activity).toEqual([
+    expect(saved.activity.map(({ at: _at, ...e }: any) => e)).toEqual([
       { name: "read_file", input: "app.js" },
       { name: "write_file", input: "hello.txt" },
       { name: "edit_file", input: "app.js" },

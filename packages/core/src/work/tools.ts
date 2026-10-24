@@ -8,7 +8,7 @@ export interface WorkToolHooks {
   /** A question the user sees at once; the agent goes on with its assumption. */
   ask(question: string, assumption: string): void;
   /** The work is done: the report ends the run. */
-  finish(report: string): void;
+  finish(report: string, start: { command: string; url: string } | null): void;
   onCall(name: string, input: string): void;
 }
 
@@ -44,13 +44,20 @@ export function workTools(h: WorkToolHooks): ToolSet {
         "Call when the whole work is done and checked for real: every checklist item is done, the project starts, the pages look right and the main scenarios work. The report goes to the user.",
       inputSchema: z.object({
         report: z.string().min(1).max(8000).describe("In the user's language: what is done, how to start it, what is worth knowing"),
+        start: z
+          .object({
+            command: z.string().min(1).max(500).describe("The one command that starts the result in the project's folder, such as npm run dev"),
+            url: z.string().url().max(500).describe("Where to open it once started, such as http://localhost:5173/"),
+          })
+          .optional()
+          .describe("When the result is something to open (a site, a server): Drimvox starts it for the user"),
       }),
-      execute: async ({ report }) => {
+      execute: async ({ report, start }) => {
         const open = h.checklist().filter((i) => !i.done);
         if (open.length) return `These checklist items are not done: ${open.map((i) => i.text).join("; ")}. Finish them, or update the checklist if they are not needed, then call finish_work again.`;
-        h.finish(report.trim());
+        h.finish(report.trim(), start ? { command: start.command.trim(), url: start.url.trim() } : null);
         h.onCall("finish_work", "");
-        return "Done. Write the report to the user now, in a few lines, and stop.";
+        return "Done. The user sees the report: stop now, write nothing more.";
       },
     }),
   };
