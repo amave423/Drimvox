@@ -1,6 +1,7 @@
 import { useApp } from "../context";
 import type { MessageKey } from "../i18n";
 import { FirstSteps } from "./FirstSteps";
+import { LinkedText } from "./LinkedText";
 
 /** How to use Drimvox, by what the user meets first (seen: testers asked for hints and instructions). */
 const guide: { title: MessageKey; items: MessageKey[] }[] = [
@@ -25,7 +26,9 @@ export function HomeSheet() {
               <h3>{t(g.title)}</h3>
               <ul>
                 {g.items.map((key) => (
-                  <li key={key}>{t(key)}</li>
+                  <li key={key}>
+                    <LinkedText text={t(key)} />
+                  </li>
                 ))}
               </ul>
             </section>
