@@ -1008,5 +1008,6 @@ export const ru = {
   "folder.tool.read_background": "Читает вывод процесса",
   "folder.tool.stop_background": "Останавливает процесс",
   "folder.tool.browse_page": "Читает в браузере {input}",
+  "folder.tool.look_at_image": "Смотрит картинку {input}",
   "folder.tool.use_skill": "Открывает навык {input}",
 } as const;

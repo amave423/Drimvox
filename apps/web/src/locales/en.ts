@@ -1009,5 +1009,6 @@ export const en: Record<keyof typeof ru, string> = {
   "folder.tool.read_background": "Reads the process output",
   "folder.tool.stop_background": "Stops a process",
   "folder.tool.browse_page": "Reads in a browser {input}",
+  "folder.tool.look_at_image": "Looks at the picture {input}",
   "folder.tool.use_skill": "Opens the skill {input}",
 };

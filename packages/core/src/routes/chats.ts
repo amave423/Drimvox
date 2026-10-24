@@ -309,6 +309,8 @@ export function chatRoutes(
                   async (command, reason, signal, purpose) =>
                     (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, purpose, signal })) !== false,
                   { list: () => chats.attachments.ofChat(chat.id), file: (id) => chats.attachments.file(id) },
+                  // Pictures in the folder: the settings' vision model, else the chat's own when it sees them.
+                  await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel),
                 )
               : {}),
           },

@@ -115,4 +115,24 @@ describe("a chat with a folder", () => {
     expect(await res.json()).toEqual({ error: { code: "no_tools" } });
     expect((await connect(chat.id, null)).status).toBe(200);
   });
+
+  // Seen live: DeepSeek V4.1 Flash, which sees pictures, said in a chat with a folder that it could not see the pictures
+  // in it and measured their pixels with scripts instead.
+  it("lets the model look at a picture in the folder through a model that sees pictures", async () => {
+    writeFileSync(join(folder, "ref.png"), Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"));
+    const chatTurns: FakeTurn[] = [call("look_at_image", { path: "ref.png", question: "Что на картинке?" }), { text: "На референсе оранжевый круг." }];
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [{ id: "eyes", architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } }],
+      respond: (body) => (JSON.stringify(body.messages).includes("data:image/png") ? { text: "Оранжевый круг на белом фоне." } : (chatTurns.shift() ?? { text: "Готово." })),
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const chat = (await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "eyes" })).json()) as { id: string };
+    await connect(chat.id, folder);
+    const events = await readEvents(await send(chat.id, "Посмотри референс ref.png"));
+    expect(events.filter((e: any) => e.type === "tool").map((e: any) => e.name)).toContain("look_at_image");
+    const last = fake.requests.filter((r) => r.path === "/v1/chat/completions" && !JSON.stringify(r.body.messages).includes("data:image")).at(-1)!;
+    expect(JSON.stringify(last.body.messages)).toContain("Оранжевый круг на белом фоне.");
+    expect(events.at(-1).message).toMatchObject({ content: "На референсе оранжевый круг." });
+  });
 });

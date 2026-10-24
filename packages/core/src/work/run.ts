@@ -197,7 +197,7 @@ export class WorkRun {
     const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]);
     const files = { list: () => this.d.chats.attachments.ofChat(this.chatId), file: (id: string) => this.d.chats.attachments.file(id) };
     const own: ToolSet = {
-      save_attachment: folderTools(this.folder, emit, askApproval, files).save_attachment!,
+      ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
       ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }),
       ...skillTools(skills, this.folder, hooks),
       ...visualTools({ kit: this.d.visualKit, taskId: this.chatId, worktree: this.folder, vision, hooks, onSpend: (usd) => (cost += usd), event: (kind, data) => this.shot(kind, data) }, LOOKS),
@@ -280,4 +280,9 @@ export class WorkRun {
     const s = data as { id: string; url: string };
     this.d.repo.update(this.projectId, { shots: [...this.row().shots, { id: s.id, url: s.url, at: Date.now() }] });
   }
+}
+
+/** Only the named tools of a set, those it has. */
+function pick(tools: ToolSet, names: string[]): ToolSet {
+  return Object.fromEntries(Object.entries(tools).filter(([name]) => names.includes(name)));
 }

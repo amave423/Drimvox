@@ -19,6 +19,7 @@ const OWN_LINES = [
   "stop_background",
   "use_skill",
   "browse_page",
+  "look_at_image",
 ];
 
 /** One line of what the model did: "Reads app.js", "Searches the web: …". */
