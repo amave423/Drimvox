@@ -19,7 +19,7 @@ import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
 import { authRoutes, sessionGuard } from "./auth/routes";
 import { AuthStore } from "./auth/store";
-import { duckDuckGo, type PageReader, type WebAccess } from "./internet/web";
+import { duckDuckGo, type PageReader, type PageShower, type WebAccess } from "./internet/web";
 import { Background } from "./agent/background";
 import { McpHub } from "./mcp/hub";
 import { McpRepo } from "./mcp/repo";
@@ -35,6 +35,8 @@ import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { localRoutes } from "./routes/local";
 import { proxyRoutes } from "./routes/proxy";
+import { searchRoutes } from "./routes/search";
+import { SEARCH_URLS, SearchStore, withSearchService, type SearchUrls } from "./internet/search-service";
 import { githubRoutes } from "./routes/github";
 import { GitHub, type GithubOptions } from "./github/github";
 import { ProxyStore } from "./proxy";
@@ -81,10 +83,14 @@ export interface AppOptions {
   screenshot?: Screenshotter;
   /** Reads a page in a real browser (scripts run): browse_page for models with the internet. */
   readPage?: PageReader;
+  /** Shows a page to the user in a window, for a captcha or a sign-in they pass themselves (the desktop app only). */
+  showPage?: PageShower;
   /** How to start Claude Code, Codex and Gemini CLI instead of finding them on PATH; tests run a fake. */
   cliCommands?: Partial<Record<CliId, string[]>>;
   /** What "Check the proxy" opens through it; a small page that answers fast by default. */
   proxyCheckUrl?: string;
+  /** Where Tavily and Brave answer: fakes in tests. */
+  searchUrls?: SearchUrls;
   /** Ollama and its catalogs; tests give a fake program, fixed hardware and fake catalogs. */
   local?: LocalOptions;
   /** GitHub's addresses; tests give a fake. */
@@ -102,6 +108,8 @@ export function createCore(o: AppOptions) {
   setPriceCatalogUrl(o.presetUrls?.openrouter);
   const cipher = createCipher(o.secretKey);
   const proxies = new ProxyStore(o.db, cipher);
+  const searchStore = new SearchStore(o.db, cipher);
+  const searchUrls = o.searchUrls ?? SEARCH_URLS;
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
   const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
@@ -120,9 +128,15 @@ export function createCore(o: AppOptions) {
   const workRepo = new ProjectWorkRepo(o.db);
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
   // Sites that draw with scripts (databases, shops) are read in the desktop's or the server's browser.
-  const base = o.web ?? duckDuckGo;
+  // A search service's key, when the user set one, replaces the free search (seen live: DuckDuckGo blocked again and again).
+  const base = withSearchService(o.web ?? duckDuckGo, searchStore, searchUrls);
   const reader = o.readPage;
-  const web: WebAccess = base.render || !reader ? base : { ...base, render: (url, steps) => reader(url, steps) };
+  const shower = o.showPage;
+  const web: WebAccess = {
+    ...base,
+    ...(base.render || !reader ? {} : { render: (url: string, steps?: Parameters<PageReader>[1]) => reader(url, steps) }),
+    ...(base.show || !shower ? {} : { show: (url: string, reason: string) => shower(url, reason) }),
+  };
   const runner = new AgentRunner({
     tasks,
     backlog,
@@ -188,6 +202,7 @@ export function createCore(o: AppOptions) {
     .route("/providers", providerRoutes(providers))
     .route("/local", localRoutes(local))
     .route("/proxy", proxyRoutes(proxies, o.proxyCheckUrl ?? "https://www.google.com/generate_204"))
+    .route("/search", searchRoutes(searchStore, searchUrls))
     .route(
       "/chats",
       chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs, join(o.dataDir, "cli-chats"), {

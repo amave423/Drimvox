@@ -1,5 +1,6 @@
 import type { WebMode } from "@drimvox/shared";
 import { useEffect, useRef, useState } from "react";
+import { Hint } from "../Hint";
 import { useApp } from "../../context";
 
 const KEY = "drimvox.web";
@@ -85,8 +86,8 @@ export function WebSwitch({ value, onChange, providerName, noTools = false }: Pr
                 <span className="web-option-name">
                   <span className={`web-dot is-${m}`} aria-hidden />
                   {name(m)}
+                  <Hint inButton text={t(`web.hint.${m}`)} />
                 </span>
-                <small className="muted">{t(`web.hint.${m}`)}</small>
               </button>
             </li>
           ))}

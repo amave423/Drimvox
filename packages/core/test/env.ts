@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { PresetId } from "@drimvox/shared";
 import { createCore, openDatabase, type Database } from "../src";
 import type { WebAccess } from "../src/internet/web";
+import type { SearchUrls } from "../src/internet/search-service";
 import type { Screenshotter } from "../src/visual/look";
 import type { CliId } from "../src/cli/kinds";
 import type { LocalOptions } from "../src/local/service";
@@ -43,6 +44,8 @@ export interface TestEnv {
   setCliCommand(id: CliId, argv: string[]): void;
   /** What checking the proxy opens through it. */
   setProxyCheckUrl(url: string): void;
+  /** Where Tavily and Brave answer. */
+  setSearchUrls(urls: SearchUrls): void;
   /** Ollama and its catalogs: by default nothing is installed and no catalog answers. */
   setLocal(o: LocalOptions): void;
   /** GitHub: by default an address where nothing answers. */
@@ -65,6 +68,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
   let screenshot: Screenshotter | undefined;
   const cliCommands: Partial<Record<CliId, string[]>> = {};
   let proxyCheckUrl = "http://127.0.0.1:9/no-internet-in-tests";
+  let searchUrls: SearchUrls = { tavily: "http://127.0.0.1:9/search", brave: "http://127.0.0.1:9/brave" };
   // Never the real Ollama, Hugging Face or this computer's hardware in tests.
   let local: LocalOptions = {
     command: null,
@@ -99,6 +103,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
       screenshot,
       cliCommands,
       proxyCheckUrl,
+      searchUrls,
       local,
       github,
       ...(o.setupCode ? { password: { setupCode: o.setupCode } } : {}),
@@ -143,6 +148,10 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
     },
     setProxyCheckUrl(url) {
       proxyCheckUrl = url;
+      void dropCore();
+    },
+    setSearchUrls(urls) {
+      searchUrls = urls;
       void dropCore();
     },
     setLocal(next) {

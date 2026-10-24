@@ -57,6 +57,12 @@ async function readPage(url: string, actions?: PageAction[]): Promise<{ url: str
   return data.page as { url: string; title: string; text: string };
 }
 
+/** A page shown to the user until they close it; the user may take their time over a captcha or a sign-in. */
+async function showPage(url: string, reason: string): Promise<{ url: string; title: string; text: string }> {
+  const data = await askBrowser({ type: "show-page", url, reason }, 30 * 60_000);
+  return data.page as { url: string; title: string; text: string };
+}
+
 // Secrets arrive by message rather than environment variables, which other processes can read.
 process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
   startServer({
@@ -68,6 +74,7 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     webDir: data.webDir,
     screenshot,
     readPage,
+    showPage,
     // Tests pin the dollar rate instead of asking the Central Bank.
     usdRub: process.env.DRIMVOX_TEST_USD_RUB ? async () => Number(process.env.DRIMVOX_TEST_USD_RUB) : undefined,
     // Tests run a fake Claude Code, Codex or Gemini CLI: {"claude-code": ["node", "fake-cli.mjs", "claude"]}.

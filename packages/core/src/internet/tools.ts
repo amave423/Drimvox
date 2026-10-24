@@ -6,7 +6,7 @@ import { clipPage, isPublicAddress, type WebAccess } from "./web";
 /** What a model sees from the internet tools; also what the chat shows while it searches. */
 export interface WebCall {
   callId: string;
-  name: "web_search" | "open_page" | "browse_page";
+  name: "web_search" | "open_page" | "browse_page" | "open_for_user";
   input: string;
 }
 
@@ -17,7 +17,8 @@ export interface WebHooks {
 
 /** Seen live: a model met a site's bot check (a proof-of-work captcha) and started computing its answer to get through. */
 export const FAIR_USE_HINT =
-  "Never try to get around captchas, bot checks, logins or blocks of a site (no solving them, no imitating a person, no other mirrors to dodge a block): say what blocks you and offer another way.";
+  "Never try to get around captchas, bot checks, logins or blocks of a site yourself (no solving them, no imitating a person, no other mirrors to dodge a block). " +
+  "When you have open_for_user, open such a page for the user: they pass the check or sign in themselves, and you go on in the same browser. Otherwise say what blocks you and offer another way.";
 
 export const WEB_HINT =
   "You can use the internet: web_search finds pages, open_page reads one. Use them for current facts (news, prices, " +
@@ -70,6 +71,29 @@ export function webTools(web: WebAccess, hooks: WebHooks = {}): ToolSet {
         }),
     }),
   };
+  const show = web.show;
+  // The user passes a captcha or signs in themselves, in a window of the same browser the model reads pages with.
+  if (show) {
+    tools.open_for_user = tool({
+      description:
+        "Open a page for the user in a window when a site asks to prove a person is there (a captcha, a bot check) or needs the user's sign-in. " +
+        "The user passes it and closes the window; you get the page's text then, and browse_page goes on in the same browser.",
+      inputSchema: z.object({
+        url: z.string().url().max(2000),
+        reason: z.string().min(1).max(300).describe("In the user's language: what to do in the window, such as pass the check"),
+      }),
+      execute: ({ url, reason }, o: { toolCallId: string; abortSignal?: AbortSignal }) =>
+        run(o.toolCallId, "open_for_user", url, async () => {
+          if (!isPublicAddress(url)) throw new Error("Only public internet addresses can be opened");
+          const page = await show(url, reason, o.abortSignal);
+          return `The user closed the window.
+${page.title ? `${page.title}
+` : ""}${page.url}
+
+${clipPage(page.text)}`;
+        }),
+    });
+  }
   const render = web.render;
   if (!render) return tools;
   tools.browse_page = tool({

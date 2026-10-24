@@ -1,6 +1,7 @@
 import type { SkillView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
+import { Hint } from "./Hint";
 import { useApp } from "../context";
 
 /** Shared skills: instructions any agent can open when they fit its task. */
@@ -54,8 +55,10 @@ export function SkillsSection() {
 
   return (
     <section className="skills">
-      <h2 className="sheet-h">{t("skills.title")}</h2>
-      <p className="muted">{t("skills.lede")}</p>
+      <h2 className="sheet-h">
+        {t("skills.title")}
+        <Hint text={t("skills.lede")} />
+      </h2>
       {skills.length === 0 ? (
         <p className="muted">{t("skills.empty")}</p>
       ) : (

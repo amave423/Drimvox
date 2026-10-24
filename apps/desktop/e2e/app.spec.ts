@@ -92,11 +92,41 @@ test("the page has no access to Node", async () => {
   expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "getToken", "installUpdate", "notify", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "setTitleBar", "testNotify", "updateState"] });
 });
 
+test("the catalog switches a ready skill on and off, and shows a server's details with the token it needs", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await page.getByRole("tab", { name: "Инструменты" }).click();
+
+  const cards = page.locator(".catalog-card");
+  await expect(cards).toHaveCount(5);
+  for (const name of ["Playwright", "Context7", "GitHub", "Документы", "Дизайн сайтов"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+
+  const documents = cards.filter({ hasText: "Документы" });
+  await documents.getByRole("switch").click({ force: true });
+  await expect(documents.getByRole("switch")).toBeChecked();
+  await expect(page.locator(".skill-list li", { hasText: "documents" })).toContainText("Word, Excel, PowerPoint or PDF");
+  await documents.getByRole("switch").click({ force: true });
+  await expect(documents.getByRole("switch")).not.toBeChecked();
+  await expect(page.getByText("Общих скиллов пока нет.")).toBeVisible();
+
+  // GitHub needs a token: switching it on asks for one in its window; Escape closes the window, nothing is added.
+  await cards.filter({ hasText: "GitHub" }).getByRole("switch").click({ force: true });
+  const dialog = page.getByRole("dialog", { name: "GitHub" });
+  await expect(dialog).toContainText("api.githubcopilot.com/mcp");
+  await expect(dialog.getByLabel("Токен GitHub")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(cards.filter({ hasText: "GitHub" }).getByRole("switch")).not.toBeChecked();
+});
+
 test("creates and deletes a shared skill in the settings", async () => {
   app = await launch();
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Настройки" }).first().click();
+  await page.getByRole("tab", { name: "Инструменты" }).click();
 
   await page.getByRole("button", { name: "Создать скилл" }).click();
   await page.getByLabel("Название").fill("Отчёты");

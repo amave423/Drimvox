@@ -219,10 +219,10 @@
 .work-limits .btn { grid-column: 1 / -1; justify-self: start; }
 .work-questions { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 8px; }
 /* The project workspace's tabs over the conversation: the work, the plan, the changes, the started result. */
-.work-tabs { display: flex; gap: 2px; margin-top: 10px; border-bottom: 1px solid var(--line); }
-.work-tab { padding: 8px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; font-size: 14px; color: var(--muted); }
-.work-tab:hover { color: var(--fg); }
-.work-tab.is-active { color: var(--fg); border-bottom-color: var(--ink); }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 10px; border-bottom: 1px solid var(--line); }
+.tab { padding: 8px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; font-size: 14px; color: var(--muted); }
+.tab:hover { color: var(--fg); }
+.tab.is-active { color: var(--fg); border-bottom-color: var(--ink); }
 .work-tab-body { display: grid; gap: 14px; padding: 4px 0 24px; overflow-y: auto; min-height: 0; }
 .work-site-url { margin: 0; overflow-wrap: anywhere; }
 .work-report h3 { margin-top: 0; }

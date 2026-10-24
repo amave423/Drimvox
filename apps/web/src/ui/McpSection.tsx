@@ -1,6 +1,7 @@
 import type { McpServerView, McpStatus } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
+import { Hint } from "./Hint";
 import { useApp } from "../context";
 import { parsePairs, splitCommand } from "../lib/commandLine";
 import { Toggle } from "./Toggle";
@@ -44,8 +45,10 @@ export function McpSection() {
 
   return (
     <section className="mcp">
-      <h2 className="sheet-h">{t("mcp.title")}</h2>
-      <p className="muted">{t("mcp.lede")}</p>
+      <h2 className="sheet-h">
+        {t("mcp.title")}
+        <Hint text={t("mcp.lede")} />
+      </h2>
       {servers.length === 0 && <p className="muted">{t("mcp.empty")}</p>}
       <ul className="mcp-list">
         {servers.map((s) => {

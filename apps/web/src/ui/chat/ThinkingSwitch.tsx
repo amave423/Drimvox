@@ -1,5 +1,6 @@
 import { thinkingLevels, type ThinkingLevel } from "@drimvox/shared";
 import { useEffect, useRef, useState } from "react";
+import { Hint } from "../Hint";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 
@@ -74,8 +75,10 @@ export function ThinkingSwitch({ value, onChange }: { value: ThinkingLevel; onCh
                   setOpen(false);
                 }}
               >
-                <span className="web-option-name">{name(level)}</span>
-                <small className="muted">{t(`thinking.about.${level}` as MessageKey)}</small>
+                <span className="web-option-name">
+                  {name(level)}
+                  <Hint inButton text={t(`thinking.about.${level}` as MessageKey)} />
+                </span>
               </button>
             </li>
           ))}

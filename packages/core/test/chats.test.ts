@@ -160,6 +160,32 @@ describe("sending a message", () => {
       expect(JSON.stringify(requests[1]!.body.messages)).toContain("No results found!");
     });
 
+    // Seen live: sites answered the hidden browser with a captcha; the user passes it in a window, the model goes on.
+    it("opens a page for the user when a site asks to prove a person is there, and reads it after", async () => {
+      const shown: { url: string; reason: string }[] = [];
+      env.setWeb({
+        ...fakeWeb,
+        render: async (url: string) => ({ url, title: "WIPO", text: "Results: 0" }),
+        show: async (url: string, reason: string) => {
+          shown.push({ url, reason });
+          return { url, title: "WIPO", text: "Brand name: seppora — No results found!" };
+        },
+      });
+      const { chat } = await setup({
+        script: [
+          { toolCalls: [{ name: "open_for_user", args: { url: "https://branddb.wipo.int/", reason: "Сайт просит пройти проверку «я не робот»." } }] },
+          { text: "Проверку прошли, знаков нет." },
+        ],
+      });
+      const events = await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Проверь знак", web: "free" }));
+      expect(events.filter((e) => e.type === "tool")).toEqual([{ type: "tool", name: "open_for_user", input: "https://branddb.wipo.int/" }]);
+      expect(shown).toEqual([{ url: "https://branddb.wipo.int/", reason: "Сайт просит пройти проверку «я не робот»." }]);
+      const requests = fake.requests.filter((r) => r.path === "/v1/chat/completions");
+      expect(requests[0]!.body.tools.map((t: any) => t.function.name)).toContain("open_for_user");
+      expect(JSON.stringify(requests[0]!.body.messages)).toMatch(/open_for_user/);
+      expect(JSON.stringify(requests[1]!.body.messages)).toContain("No results found!");
+    });
+
     // Seen live: checking a few names took more than 8 steps, and five answers of eight stopped half-way with "go on".
     it("gives an answer with the internet room for research, far past 8 steps", async () => {
       env.setWeb(fakeWeb);

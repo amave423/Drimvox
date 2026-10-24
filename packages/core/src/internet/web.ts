@@ -23,7 +23,15 @@ export interface WebAccess {
    * no browser (tests without one); the desktop's hidden window or the server's Chromium otherwise.
    */
   render?(url: string, steps?: PageAction[], signal?: AbortSignal): Promise<Page>;
+  /**
+   * Shows a page to the user in a window of that same browser and waits until they close it: a captcha or a sign-in
+   * the user passes themselves. Only the desktop app has it.
+   */
+  show?(url: string, reason: string, signal?: AbortSignal): Promise<Page>;
 }
+
+/** Shows a page to the user (WebAccess.show): what the desktop app gives the core. */
+export type PageShower = (url: string, reason: string) => Promise<{ url: string; title: string; text: string }>;
 
 /** Reads a page in a real browser: what the desktop app and the server give the core. */
 export type PageReader = (url: string, steps?: PageAction[]) => Promise<{ url: string; title: string; text: string }>;

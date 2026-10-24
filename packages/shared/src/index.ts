@@ -6,6 +6,7 @@ export * from "./skills";
 export * from "./tasks";
 export * from "./media";
 export * from "./proxy";
+export * from "./search";
 export * from "./auth";
 export * from "./quality";
 export * from "./design";

@@ -50,6 +50,12 @@ test("notifications are a switch, the proxy is set once and each provider opts i
   await notify.click({ force: true });
   await expect(notify).not.toBeChecked();
 
+  // The settings are in sections; the internet's has the search service and the proxy, explained by a "?".
+  await page.getByRole("tab", { name: "Интернет" }).click();
+  await expect(page.getByRole("heading", { name: /Поиск в интернете/ })).toBeVisible();
+  await expect(page.getByText("Сейчас — бесплатный поиск", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: /Бесплатный поиск \(DuckDuckGo\) часто блокирует/ }).hover();
+  await expect(page.getByRole("tooltip")).toContainText("Tavily или Brave");
   await page.getByLabel("Адрес прокси").fill(proxy.url);
   await page.getByRole("button", { name: "Сохранить" }).last().click();
   await expect(page.getByText(`http://artem:•••@127.0.0.1:${proxy.port}`)).toBeVisible();

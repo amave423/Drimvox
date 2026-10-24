@@ -1,5 +1,5 @@
 import { currencies, locales, themes, type SettingsPatch } from "@drimvox/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../context";
 import { ProjectModels } from "./ProjectModels";
 import { Segmented } from "./Segmented";
@@ -9,10 +9,30 @@ import { AccountSection } from "./AccountSection";
 import { Toggle } from "./Toggle";
 import { SkillsSection } from "./SkillsSection";
 import { UpdatesSection } from "./UpdatesSection";
+import { Catalog } from "./Catalog";
+import { Hint } from "./Hint";
+import { SearchSection } from "./SearchSection";
+import { Tabs } from "./Tabs";
 
 const localeNames = { ru: "Русский", en: "English" } as const;
 
 type SaveState = "idle" | "saved" | "failed";
+
+/** The settings' sections (seen: one long page of everything was hard to find one's way in). */
+const PARTS = ["general", "models", "internet", "tools"] as const;
+type SettingsPart = (typeof PARTS)[number];
+const PART_KEY = "drimvox.settingsPart";
+
+/** The section opened last, in this window. */
+function initialPart(): SettingsPart {
+  try {
+    const kept = localStorage.getItem(PART_KEY);
+    if (PARTS.includes(kept as SettingsPart)) return kept as SettingsPart;
+  } catch {
+    // No storage (a private window): the first section.
+  }
+  return "general";
+}
 
 export function SettingsSheet() {
   const { t, settings, updateSettings, usdRub } = useApp();
@@ -22,6 +42,16 @@ export function SettingsSheet() {
     void window.drimvox?.focusAssist?.().then((profile) => setFocusAssist(profile === 1 || profile === 2));
   }, []);
   const [state, setState] = useState<SaveState>("idle");
+  const [toolsVersion, setToolsVersion] = useState(0);
+  const [part, setPartState] = useState<SettingsPart>(initialPart);
+  const setPart = (p: SettingsPart) => {
+    setPartState(p);
+    try {
+      localStorage.setItem(PART_KEY, p);
+    } catch {
+      // Kept for this visit only.
+    }
+  };
   // The budget is kept in dollars and edited in the currency on screen.
   const perUsd = settings.currency === "RUB" && usdRub > 0 ? usdRub : 1;
   const shown = (usd: number) => String(Number((usd * perUsd).toFixed(perUsd === 1 ? 2 : 0)));
@@ -32,12 +62,9 @@ export function SettingsSheet() {
     setState((await updateSettings(patch)) ? "saved" : "failed");
   }
 
-  return (
-    <article className="sheet">
-      <div className="sheet-body">
-        <h1>{t("settings.title")}</h1>
-        <p className="lede">{t("settings.lede")}</p>
-
+  const sections: Record<SettingsPart, ReactNode> = {
+    general: (
+      <>
         <h2 className="sheet-h" id="theme-label">
           {t("settings.theme")}
         </h2>
@@ -58,7 +85,10 @@ export function SettingsSheet() {
           onChange={(locale) => save({ locale })}
         />
 
-        <h2 className="sheet-h">{t("settings.notifications")}</h2>
+        <h2 className="sheet-h">
+          {t("settings.notifications")}
+          <Hint text={t(window.drimvox ? "settings.notificationsAbout" : "settings.notificationsAboutBrowser")} />
+        </h2>
         <Toggle
           checked={settings.notifications}
           onChange={(notifications) => {
@@ -71,27 +101,32 @@ export function SettingsSheet() {
         >
           {window.drimvox ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
         </Toggle>
-        <p className="muted setting-hint">
-          {t(window.drimvox ? "settings.notificationsAbout" : "settings.notificationsAboutBrowser")}
-          {window.drimvox && (
-            <>
-              {" "}
-              <button type="button" className="link" onClick={() => window.drimvox?.testNotify({ title: t("notice.test"), body: t("notice.testBody") })}>
-                {t("settings.notificationsTest")}
-              </button>
-            </>
-          )}
-        </p>
+        {window.drimvox && (
+          <p>
+            <button type="button" className="link" onClick={() => window.drimvox?.testNotify({ title: t("notice.test"), body: t("notice.testBody") })}>
+              {t("settings.notificationsTest")}
+            </button>
+          </p>
+        )}
         {focusAssist && <p className="note is-pencil">{t("settings.focusAssist")}</p>}
 
-        <h2 className="sheet-h">{t("settings.developerTitle")}</h2>
+        <h2 className="sheet-h">
+          {t("settings.developerTitle")}
+          <Hint text={t("settings.developerHint")} />
+        </h2>
         <Toggle checked={settings.developer} onChange={(developer) => void save({ developer })}>
           {t("settings.developer")}
         </Toggle>
-        <p className="muted">{t("settings.developerHint")}</p>
 
+        <UpdatesSection />
+        {!window.drimvox && <AccountSection />}
+      </>
+    ),
+    models: (
+      <>
         <h2 className="sheet-h" id="currency-label">
           {t("settings.currency")}
+          {usdRub > 0 && <Hint text={t("settings.currencyHint", { rate: usdRub.toFixed(2).replace(".", ",") })} />}
         </h2>
         <Segmented
           labelledBy="currency-label"
@@ -99,9 +134,11 @@ export function SettingsSheet() {
           options={currencies.map((v) => ({ value: v, label: t(`settings.currency.${v}`) }))}
           onChange={(currency) => save({ currency })}
         />
-        <p className="muted">{usdRub > 0 ? t("settings.currencyHint", { rate: usdRub.toFixed(2).replace(".", ",") }) : null}</p>
 
-        <h2 className="sheet-h">{t(perUsd === 1 ? "settings.agentBudget" : "settings.agentBudgetRub")}</h2>
+        <h2 className="sheet-h">
+          {t(perUsd === 1 ? "settings.agentBudget" : "settings.agentBudgetRub")}
+          <Hint text={t("settings.agentBudgetHint")} />
+        </h2>
         <form
           className="inline-form"
           onSubmit={(e) => {
@@ -121,15 +158,40 @@ export function SettingsSheet() {
             {t("settings.save")}
           </button>
         </form>
-        <p className="muted">{t("settings.agentBudgetHint")}</p>
 
         <ProjectModels save={(patch) => void save(patch)} />
-
-        <UpdatesSection />
-        {!window.drimvox && <AccountSection />}
+      </>
+    ),
+    internet: (
+      <>
+        <SearchSection />
         <ProxySection />
-        <McpSection />
-        <SkillsSection />
+      </>
+    ),
+    tools: (
+      <>
+        {/* The sections below show what a card switched on or off. */}
+        <Catalog onChanged={() => setToolsVersion((v) => v + 1)} />
+        <McpSection key={`mcp-${toolsVersion}`} />
+        <SkillsSection key={`skills-${toolsVersion}`} />
+      </>
+    ),
+  };
+
+  return (
+    <article className="sheet">
+      <div className="sheet-body">
+        <h1>{t("settings.title")}</h1>
+        <Tabs
+          value={part}
+          label={t("settings.title")}
+          options={PARTS.map((p) => ({ value: p, label: t(`settings.part.${p}`) }))}
+          onChange={(p) => {
+            setPart(p);
+            setState("idle");
+          }}
+        />
+        {sections[part]}
       </div>
       <aside className="margin" aria-live="polite">
         {state === "saved" && <p className="note is-ok">{t("settings.saved")}</p>}

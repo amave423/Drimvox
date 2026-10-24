@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import { Markdown } from "../chat/Markdown";
+import { Tabs } from "../Tabs";
 import { DiffView } from "../tasks/DiffView";
 import { PlanDetails } from "./PlanDetails";
 
@@ -12,15 +13,7 @@ const TABS: WorkTab[] = ["work", "plan", "changes", "run"];
 /** The project workspace's tabs over the conversation (docs/specs/project-work.md): the work, the plan, the changes, the result. */
 export function WorkTabs({ tab, onTab }: { tab: WorkTab; onTab(tab: WorkTab): void }) {
   const { t } = useApp();
-  return (
-    <div className="work-tabs" role="tablist" aria-label={t("projectWork.panel")}>
-      {TABS.map((name) => (
-        <button key={name} type="button" role="tab" aria-selected={tab === name} className={tab === name ? "work-tab is-active" : "work-tab"} onClick={() => onTab(name)}>
-          {t(`projectWork.tab.${name}`)}
-        </button>
-      ))}
-    </div>
-  );
+  return <Tabs value={tab} label={t("projectWork.panel")} options={TABS.map((name) => ({ value: name, label: t(`projectWork.tab.${name}`) }))} onChange={onTab} />;
 }
 
 /** The plan the work follows, read only: corrections go to the agent as messages. */

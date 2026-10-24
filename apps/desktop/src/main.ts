@@ -136,9 +136,16 @@ function startCore(): Promise<number> {
       if (msg.type === "ready" && msg.port) resolve(msg.port);
       else reject(new Error(msg.error ?? "Ядро ответило непонятным сообщением"));
     });
-    child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number; actions?: PageAction[] }) => {
-      if ((msg.type !== "screenshot" && msg.type !== "page-text") || typeof msg.id !== "number" || typeof msg.url !== "string") return;
+    child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number; actions?: PageAction[]; reason?: string }) => {
+      if ((msg.type !== "screenshot" && msg.type !== "page-text" && msg.type !== "show-page") || typeof msg.id !== "number" || typeof msg.url !== "string") return;
       const id = msg.id;
+      if (msg.type === "show-page") {
+        showPage(msg.url, msg.reason ?? "").then(
+          (page) => child.postMessage({ type: "page-text-done", id, page }),
+          (err: unknown) => child.postMessage({ type: "page-text-done", id, error: err instanceof Error ? err.message : String(err) }),
+        );
+        return;
+      }
       const steps = Array.isArray(msg.actions) ? msg.actions : [];
       if (msg.type === "page-text") {
         readPage(msg.url, steps).then(
@@ -182,6 +189,48 @@ async function photograph(url: string, width: number, height: number, actions: P
 /** A page read as a person sees it, scripts run (browse_page): its title, address and visible text. */
 function readPage(url: string, actions: PageAction[] = []): Promise<{ url: string; title: string; text: string }> {
   return withPage(url, 1280, 900, actions, async (shot) => JSON.parse(String(await shot.webContents.executeJavaScript(PAGE_TEXT_SCRIPT))));
+}
+
+/**
+ * A page shown to the user in the agents' own browser (open_for_user): they pass a captcha or sign in, close the window,
+ * and the model reads what the page shows then; browse_page goes on with the same cookies (seen live: sites answered the
+ * hidden window with a check only a person may pass).
+ */
+function showPage(url: string, reason: string): Promise<{ url: string; title: string; text: string }> {
+  if (!/^https?:\/\//.test(url)) return Promise.reject(new Error("Only http and https pages"));
+  const page = new BrowserWindow({
+    width: 1100,
+    height: 800,
+    title: reason ? `Drimvox — ${reason}` : "Drimvox",
+    ...(win && !win.isDestroyed() ? { parent: win } : {}),
+    autoHideMenuBar: true,
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, session: session.fromPartition("drimvox-preview") },
+  });
+  // The title says what to do in the window, not what the site calls itself.
+  page.on("page-title-updated", (event) => event.preventDefault());
+  page.webContents.setWindowOpenHandler(({ url: next }) => {
+    if (/^https?:\/\//.test(next)) void page.loadURL(next);
+    return { action: "deny" };
+  });
+  page.webContents.on("will-navigate", (event, next) => {
+    if (!/^https?:\/\//.test(next)) event.preventDefault();
+  });
+  void page.loadURL(url).catch(() => {});
+  page.focus();
+  return new Promise((resolve) => {
+    let read = false;
+    page.on("close", (event) => {
+      if (read) return;
+      // What the page shows as the user leaves it goes to the model.
+      event.preventDefault();
+      read = true;
+      page.webContents
+        .executeJavaScript(PAGE_TEXT_SCRIPT)
+        .then((text) => resolve(JSON.parse(String(text))))
+        .catch(() => resolve({ url: page.webContents.getURL(), title: "", text: "" }))
+        .finally(() => page.destroy());
+    });
+  });
 }
 
 /** Keys a page understands by name, with the codes the browser's input needs. */

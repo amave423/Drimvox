@@ -19,6 +19,7 @@ const OWN_LINES = [
   "stop_background",
   "use_skill",
   "browse_page",
+  "open_for_user",
   "look_at_image",
 ];
 

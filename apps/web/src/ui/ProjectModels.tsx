@@ -1,17 +1,19 @@
 import type { SettingsPatch } from "@drimvox/shared";
-import type { ReactNode } from "react";
 import { useApp } from "../context";
 import type { MessageKey } from "../i18n";
 import { ModelPicker } from "./chat/ModelPicker";
+import { Hint } from "./Hint";
 
 type Ref = { providerId: string; model: string } | null;
 
-function ModelSetting(p: { title: MessageKey; hint: ReactNode; value: Ref; image?: boolean; vision?: boolean; onChange(v: Ref): void }) {
+function ModelSetting(p: { title: MessageKey; hint: string; value: Ref; image?: boolean; vision?: boolean; onChange(v: Ref): void }) {
   const { t } = useApp();
   return (
     <div className="model-setting">
-      <h3>{t(p.title)}</h3>
-      <p className="muted">{p.hint}</p>
+      <h3>
+        {t(p.title)}
+        <Hint text={p.hint} />
+      </h3>
       <div className="actions">
         <ModelPicker
           value={p.value && (p.image ? { ...p.value, kind: "image" } : p.value)}

@@ -125,3 +125,25 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .side-chat-state { position: absolute; right: 12px; top: calc(50% - 7px); }
 .side-chat-dot { width: 8px; height: 8px; top: calc(50% - 4px); right: 15px; border-radius: 50%; background: var(--ink); }
 .side-chat:hover .side-chat-state { visibility: hidden; }
+
+/* "?" with its explanation on hover or focus, instead of text under every switch. */
+.hint { display: inline-grid; place-items: center; width: 17px; height: 17px; margin-left: 6px; border: 1px solid var(--line); border-radius: 50%; font-size: 11px; font-weight: 600; line-height: 1; color: var(--muted); background: var(--sheet); vertical-align: middle; cursor: help; flex: none; }
+.hint:hover, .hint:focus-visible { color: var(--ink); border-color: var(--ink); }
+.hint-tip { position: fixed; z-index: 80; transform: translateY(-100%); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--sheet); color: var(--fg); box-shadow: var(--sheet-shadow); font-size: 13px; font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; pointer-events: none; }
+.hint-tip.is-below { transform: none; }
+
+/* Ready MCP servers and skills as cards, with their details in a window. */
+.catalog-grid { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.catalog-card { display: grid; gap: 6px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.catalog-card p { margin: 0; font-size: 13.5px; line-height: 1.45; }
+.catalog-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.catalog-kind { font-size: 12px; }
+.catalog-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.catalog-dialog { width: min(520px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--sheet); color: var(--fg); box-shadow: var(--sheet-shadow); }
+.catalog-dialog::backdrop { background: var(--overlay-soft); }
+.catalog-dialog h2 { margin: 0 32px 10px 0; }
+.catalog-dialog p { line-height: 1.5; }
+.catalog-close { position: absolute; top: 14px; right: 14px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--muted); }
+.catalog-close:hover { background: var(--paper); color: var(--fg); }
+.catalog-command { overflow-wrap: anywhere; font-size: 13px; }
+.catalog-secret { display: grid; gap: 8px; }
