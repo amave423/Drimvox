@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
 import type { MediaRepo } from "../media/repo";
 import type { AttachmentRepo } from "./attachment-repo";
+import { shortTitle } from "./title";
 
 interface ChatRow {
   id: string;
@@ -178,9 +179,12 @@ export class ChatRepo {
 
   /** Names a chat after its first message: first line, at most 60 characters. */
   nameIfUntitled(id: string, firstMessage: string): void {
-    const line = firstMessage.trim().split("\n")[0]!.trim();
-    const title = line.length > 60 ? `${line.slice(0, 60).replace(/\s+\S*$/, "")}…` : line;
-    this.db.sql.prepare("update chats set title = ? where id = ? and title is null").run(title, id);
+    this.db.sql.prepare("update chats set title = ? where id = ? and title is null").run(shortTitle(firstMessage), id);
+  }
+
+  /** The model's name for the chat, unless the user has named it meanwhile. */
+  retitle(id: string, firstMessage: string, title: string): void {
+    this.db.sql.prepare("update chats set title = ? where id = ? and (title is null or title = ?)").run(title, id, shortTitle(firstMessage));
   }
 
   addMessage(m: NewMessage): MessageView {

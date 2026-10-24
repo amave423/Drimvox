@@ -21,6 +21,8 @@ import { extract, imageType } from "../chats/attachments";
 import { restore } from "../chats/checkpoint";
 import { folderTools } from "../chats/folder";
 import { reply } from "../chats/reply";
+import { makeTitle } from "../chats/title";
+import { isCli } from "../cli/kinds";
 import type { ChatRepo } from "../chats/repo";
 import { mediaModel } from "../media/catalog";
 import { findModel } from "../providers/catalog";
@@ -47,6 +49,8 @@ const describeInput = (input: unknown) => {
 };
 
 const notFound = { error: { code: "not_found" } } as const;
+/** Models on this computer answer one request at a time. */
+const LOCAL_PRESETS = new Set(["ollama", "lmstudio"]);
 /** How often an answer being written is saved: what a window coming back to the chat sees. */
 const PROGRESS_MS = 1000;
 
@@ -215,6 +219,14 @@ export function chatRoutes(
       }
 
       // A model that cannot call tools gets none: no free search, no MCP. The provider's own search needs no tools.
+      // A chat's first message: while the model answers, it also names the chat in a few words (seen live: the whole
+      // first message became the name). Claude Code and Codex cannot be asked aside, and a model on this computer would
+      // make the answer itself wait: their chats keep the short title.
+      if (chat.messages.length === 0 && !chat.title && !isCli(conn.preset) && !LOCAL_PRESETS.has(conn.preset)) {
+        void makeTitle(conn, chat.model, content)
+          .then((title) => title && chats.retitle(chat.id, content, title))
+          .catch(() => {});
+      }
       const info = await findModel(conn, chat.model);
       const toolsOk = info?.tools !== false;
       const vision = info?.vision !== false;

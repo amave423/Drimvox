@@ -236,6 +236,27 @@ describe("sending a message", () => {
     expect(saved.title).toBe("Как настроить Vite с прокси для API?");
   });
 
+  // Seen live: the whole first message became the chat's name in the list.
+  it("gives the chat a short name the model makes up from the first message", async () => {
+    const { chat } = await setup({ title: "«Покраска забора.»", script: [{ text: "Сначала зачистите ржавчину." }] });
+    const long = "у меня есть 1к грунт цинконаполненный, алкидная эмаль и старый ржавый забор, как его лучше покрасить, чтобы держалось лет десять";
+    await readEvents(await send(chat.id, long));
+    let saved: any;
+    for (let i = 0; i < 50; i++) {
+      saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
+      if (saved.title === "Покраска забора") break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(saved.title).toBe("Покраска забора");
+  });
+
+  it("names the chat after a short first sentence, cut at a word, until the model's name comes", async () => {
+    const { chat } = await setup();
+    await readEvents(await send(chat.id, "у меня есть 1к грунт цинконаполненный, алкидная эмаль и старый ржавый забор. Как покрасить?"));
+    const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
+    expect(saved.title).toBe("у меня есть 1к грунт цинконаполненный,…");
+  });
+
   it("saves a provider error on the answer instead of failing the request", async () => {
     const { chat } = await setup({ failWith: { status: 402, message: "Insufficient credits" } });
     const events = await readEvents(await send(chat.id, "Привет"));

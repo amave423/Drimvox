@@ -42,6 +42,8 @@ export interface FakeProviderOptions {
   usage?: FakeUsage;
   /** Delay between streamed chunks, ms. */
   delayMs?: number;
+  /** What the model answers when Drimvox asks it to name a chat; without it that request fails. */
+  title?: string;
   /** Why the streamed answer ends; "stop" by default, "length" when the model ran out of room. */
   finishReason?: string;
   /** Answer chat requests with this status and an OpenAI-style error body. */
@@ -81,12 +83,25 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
     const body = await readBody(req);
     const url = new URL(req.url ?? "/", "http://x");
     const path = url.pathname;
-    requests.push({ path, auth: req.headers.authorization, body: body ? JSON.parse(body) : null, headers: req.headers, query: url.search });
+    const naming = !!body && /Write a title for a chat/.test(body);
+    if (!naming) requests.push({ path, auth: req.headers.authorization, body: body ? JSON.parse(body) : null, headers: req.headers, query: url.search });
 
     const json = (status: number, data: unknown) => {
       res.writeHead(status, { "content-type": "application/json" });
       res.end(JSON.stringify(data));
     };
+    // Drimvox asks aside for a chat's name; it is not part of the scripted conversation (nor of its requests).
+    if (naming) {
+      if (!o.title) return json(500, { error: { message: "no title in this test" } });
+      return json(200, {
+        id: "t",
+        object: "chat.completion",
+        created: 1,
+        model: "m",
+        choices: [{ index: 0, message: { role: "assistant", content: o.title }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 },
+      });
+    }
 
     if (o.routes && path in o.routes) return json(200, o.routes[path]);
     const ok = o.authorized ? o.authorized(req.headers, url) : req.headers.authorization === `Bearer ${key}`;
