@@ -2,7 +2,7 @@ import { withOllamaDetails } from "./ollama-details";
 import { presets, type ModelInfo, type PresetId } from "@drimvox/shared";
 import { fetchJson } from "./http";
 import { usdPer } from "../rates";
-import { NATIVE, nativeModels } from "./native";
+import { NATIVE, nativeModels, withCatalogPrices } from "./native";
 import { isCli } from "../cli/kinds";
 import { cliModels } from "../cli/models";
 import type { Connection } from "./repo";
@@ -115,6 +115,8 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
     const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
     models = normalizeModels(conn.preset, items, await usdPer(conn.currency));
     if (conn.preset === "ollama") models = await withOllamaDetails(conn, models);
+    // OpenRouter and RouterAI price their own models; a model without a price there is priced per request, not missing.
+    if (conn.preset !== "openrouter" && conn.preset !== "routerai") models = await withCatalogPrices(models, conn.fetch);
   }
   cache.set(conn.cacheKey, { at: Date.now(), models });
   return models;

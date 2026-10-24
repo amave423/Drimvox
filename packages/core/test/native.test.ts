@@ -158,3 +158,24 @@ describe("OpenAI and xAI", () => {
     });
   }
 });
+
+// Seen: a custom provider (an OpenAI-style address) listed models with no prices, so nothing was counted.
+describe("a provider that gives no prices", () => {
+  it("gets the catalog's prices for the models it knows, as an estimate, by the model's name whatever the prefix", async () => {
+    vendor = await startFakeProvider({
+      key: KEY,
+      models: [
+        { id: "ag/claude-sonnet-4.5", name: "Claude Sonnet 4.5" },
+        { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+        { id: "house-model-1", name: "House model" },
+      ],
+    });
+    const res = await env.call("POST", "/api/providers", { preset: "custom", baseUrl: vendor.baseUrl, apiKey: KEY });
+    const id = (await res.json()).id as string;
+    const models = (await (await env.call("GET", `/api/providers/${id}/models`)).json()) as { id: string; priceIn: number | null; priceOut: number | null; priceEstimated: boolean; contextLength: number | null }[];
+    const by = (m: string) => models.find((x) => x.id === m)!;
+    expect(by("ag/claude-sonnet-4.5")).toMatchObject({ priceIn: 3, priceOut: 15, priceEstimated: true, contextLength: 200000 });
+    expect(by("gemini-2.5-flash")).toMatchObject({ priceIn: 0.3, priceOut: 2.5, priceEstimated: true });
+    expect(by("house-model-1")).toMatchObject({ priceIn: null, priceOut: null, priceEstimated: false });
+  });
+});

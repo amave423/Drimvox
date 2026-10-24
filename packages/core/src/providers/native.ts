@@ -12,7 +12,8 @@ export const NATIVE: PresetId[] = ["anthropic", "openai", "google", "xai"];
  */
 let catalogUrl = "https://openrouter.ai/api/v1";
 const PRICES_TTL = 24 * 60 * 60_000;
-let prices: { at: number; byKey: Map<string, ModelInfo> } | null = null;
+const CATALOG_WAIT_MS = 3_000;
+let prices: { at: number; byKey: Map<string, ModelInfo>; byName: Map<string, ModelInfo> } | null = null;
 let raw: { at: number; items: Record<string, unknown>[] } | null = null;
 
 export function setPriceCatalogUrl(url: string | undefined): void {
@@ -41,16 +42,49 @@ function key(id: string): string {
     .replace(/[._]/g, "-");
 }
 
-async function priceTable(fetchFn: typeof fetch): Promise<Map<string, ModelInfo>> {
-  if (prices && Date.now() - prices.at < PRICES_TTL) return prices.byKey;
+async function priceTables(fetchFn: typeof fetch): Promise<{ byKey: Map<string, ModelInfo>; byName: Map<string, ModelInfo> }> {
+  if (prices && Date.now() - prices.at < PRICES_TTL) return prices;
   const byKey = new Map<string, ModelInfo>();
+  const byName = new Map<string, ModelInfo>();
   try {
-    for (const m of normalizeModels("openrouter", await catalogItems(fetchFn))) byKey.set(`${m.id.split("/")[0]}|${key(m.id)}`, m);
-    prices = { at: Date.now(), byKey };
+    for (const m of normalizeModels("openrouter", await catalogItems(fetchFn))) {
+      byKey.set(`${m.id.split("/")[0]}|${key(m.id)}`, m);
+      // By the name alone, for providers that put their own prefix or none; a free variant (":free") prices nothing.
+      if (!m.id.includes(":") && !byName.has(key(m.id))) byName.set(key(m.id), m);
+    }
+    prices = { at: Date.now(), byKey, byName };
   } catch {
     // Without the catalog prices are unknown; the next look tries again.
   }
-  return byKey;
+  return { byKey, byName };
+}
+
+const priceTable = async (fetchFn: typeof fetch) => (await priceTables(fetchFn)).byKey;
+
+/**
+ * Prices for models a provider lists without them (seen: a custom OpenAI-style address gave none, and nothing was
+ * counted): OpenRouter's public catalog by the model's name, whatever prefix the provider puts, marked as an estimate.
+ */
+export async function withCatalogPrices(models: ModelInfo[], fetchFn: typeof fetch): Promise<ModelInfo[]> {
+  if (!models.some((m) => m.priceIn === null)) return models;
+  // The list never waits long for an estimate: without the catalog in 3 seconds it comes unpriced, the next look has it.
+  const loading = priceTables(fetchFn);
+  const { byName } = await Promise.race([loading, new Promise<{ byName: Map<string, ModelInfo> }>((r) => setTimeout(() => r({ byName: new Map() }), CATALOG_WAIT_MS).unref())]);
+  return models.map((m) => {
+    if (m.priceIn !== null) return m;
+    const known = byName.get(key(m.id));
+    if (!known || known.priceIn === null) return m;
+    return {
+      ...m,
+      priceIn: known.priceIn,
+      priceOut: known.priceOut,
+      priceEstimated: true,
+      ...(known.priceCacheRead !== undefined ? { priceCacheRead: known.priceCacheRead } : {}),
+      contextLength: m.contextLength ?? known.contextLength,
+      tools: m.tools ?? known.tools,
+      vision: m.vision ?? known.vision,
+    };
+  });
 }
 
 const GOOGLE_NOT_CHAT = /embedding|aqa|imagen|veo|tts|lyria|transcribe|robotics|deep-research|antigravity|computer-use|-latest$/i;

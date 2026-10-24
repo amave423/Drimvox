@@ -64,7 +64,8 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
   // Never the network in tests.
   let usdRub = 80;
   // Never this computer's own Ollama: one may be running on its usual port (seen: it made "installed" true at once).
-  const presetUrls: Partial<Record<PresetId, string>> = { ollama: "http://127.0.0.1:9/v1" };
+  // Nor OpenRouter's public catalog, which prices providers that give no prices.
+  const presetUrls: Partial<Record<PresetId, string>> = { ollama: "http://127.0.0.1:9/v1", openrouter: "http://127.0.0.1:9/v1" };
   let screenshot: Screenshotter | undefined;
   const cliCommands: Partial<Record<CliId, string[]>> = {};
   let proxyCheckUrl = "http://127.0.0.1:9/no-internet-in-tests";
