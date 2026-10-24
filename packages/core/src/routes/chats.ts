@@ -9,6 +9,7 @@ import {
   messageSendSchema,
   needsConfirmation,
   presets,
+  type ActivityEntry,
   type FollowEvent,
   type StreamEvent,
 } from "@drimvox/shared";
@@ -237,7 +238,7 @@ export function chatRoutes(
         running.set(chat.id, controller);
         // What the model does is kept with its answer, not only streamed (seen: it vanished once the chat reloaded), and
         // saved as it goes, so a window that comes back to the chat sees how far the answer got.
-        const activity: { name: string; input: string }[] = [];
+        const activity: ActivityEntry[] = [];
         const partial = { id: "", content: "", reasoning: "", savedAt: 0 };
         const saveProgress = (force = false) => {
           if (!partial.id || (!force && Date.now() - partial.savedAt < PROGRESS_MS)) return;
@@ -250,7 +251,7 @@ export function chatRoutes(
           if (event.type === "start") partial.id = following.snapshot.assistantMessageId = event.assistantMessageId;
           if (event.type === "text") partial.content += event.text;
           if (event.type === "reasoning") partial.reasoning += event.text;
-          if (event.type === "tool") activity.push({ name: event.name, input: event.input });
+          if (event.type === "tool") activity.push({ name: event.name, input: event.input, at: partial.content.length });
           following.snapshot.content = partial.content;
           following.snapshot.reasoning = partial.reasoning;
           for (const listener of following.listeners) listener(event);

@@ -1,4 +1,4 @@
-import type { AttachmentView, ChatKind, ChatUpdate, ChatView, ChatWithMessages, MessageStatus, MessageView, ProviderError, UsageSummary } from "@drimvox/shared";
+import type { ActivityEntry, AttachmentView, ChatKind, ChatUpdate, ChatView, ChatWithMessages, MessageStatus, MessageView, ProviderError, UsageSummary } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
 import type { MediaRepo } from "../media/repo";
@@ -77,7 +77,7 @@ export interface FinishedAnswer {
   costUsd: number | null;
   error: ProviderError | null;
   /** The tools called while answering. */
-  activity?: { name: string; input: string }[];
+  activity?: ActivityEntry[];
 }
 
 export class ChatRepo {
@@ -249,7 +249,7 @@ export class ChatRepo {
   }
 
   /** What an answer being written has so far; it stays "streaming". */
-  saveProgress(id: string, p: { content: string; reasoning: string | null; activity: { name: string; input: string }[] }): void {
+  saveProgress(id: string, p: { content: string; reasoning: string | null; activity: ActivityEntry[] }): void {
     this.db.sql
       .prepare("update messages set content = ?, reasoning = ?, activity = ? where id = ? and status = 'streaming'")
       .run(p.content, p.reasoning, p.activity.length ? JSON.stringify(p.activity) : null, id);

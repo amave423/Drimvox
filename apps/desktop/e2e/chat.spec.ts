@@ -307,9 +307,8 @@ test("works in a connected folder and undoes an answer", async () => {
 
   await say(page, "Создай hello.txt");
   await expect(page.getByText("Создал hello.txt.")).toBeVisible();
-  // What it did stays under the answer, folded (seen: it vanished once the chat reloaded).
-  await page.getByText("Действия: 1").click();
-  await expect(page.getByText("Пишет hello.txt")).toBeVisible();
+  // What it did stays in the answer, in order before the text it led to (seen: it vanished once the chat reloaded).
+  await expect(page.locator(".msg-assistant summary", { hasText: "Пишет hello.txt" })).toBeVisible();
   expect(readFileSync(join(folder, "hello.txt"), "utf8")).toBe("привет\n");
 
   await page.getByRole("button", { name: "Откатить" }).click();

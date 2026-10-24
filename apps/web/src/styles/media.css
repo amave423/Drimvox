@@ -25,11 +25,15 @@
 
 /* A picture that opens over the window. */
 .zoomable { padding: 0; border: 0; background: none; cursor: zoom-in; display: block; }
-.lightbox { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 48px 24px 72px; background: var(--overlay); cursor: zoom-out; }
-.lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: var(--sheet-shadow); cursor: default; }
-.lightbox-bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 18px; padding: 16px 24px; color: var(--on-overlay); font-size: 14px; cursor: default; }
-.lightbox-name { margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; }
-.lightbox-action { color: var(--on-overlay); background: none; border: 1px solid currentColor; border-radius: 999px; padding: 6px 14px; font-size: 13px; text-decoration: none; }
+.lightbox { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--overlay); cursor: zoom-out; }
+/* However large the picture, it fits the window (seen: a big one went past the edges). */
+.lightbox img { max-width: calc(100vw - 48px); max-height: calc(100vh - 48px); width: auto; height: auto; object-fit: contain; box-shadow: var(--sheet-shadow); cursor: default; }
+.lightbox-close { position: fixed; top: calc(var(--topbar-h) + 12px); right: 16px; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 999px; color: var(--on-overlay); background: var(--overlay-soft); cursor: pointer; }
+.lightbox-close svg { width: 18px; height: 18px; }
+.lightbox-close:hover { background: var(--overlay); }
+.picture-menu { position: fixed; z-index: 110; display: grid; min-width: 200px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--sheet); box-shadow: var(--sheet-shadow); }
+.picture-menu-item { display: block; padding: 8px 12px; border-radius: 7px; text-align: left; font-size: 14px; color: var(--fg); text-decoration: none; }
+.picture-menu-item:hover { background: var(--paper); }
 
 /* Drimvox's video player. */
 .player { position: relative; display: block; max-width: 100%; width: 560px; border-radius: 10px; overflow: hidden; background: var(--overlay); outline: none; }

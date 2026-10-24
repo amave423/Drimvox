@@ -85,6 +85,18 @@ export interface ChatView {
 
 export type MessageStatus = "done" | "streaming" | "stopped" | "error";
 
+/**
+ * A tool the model called while answering: its name, what it was called on, and where in the answer's text it happened,
+ * so the answer reads in order (text, the actions, text again) instead of the actions on top (seen: the text jumped down
+ * with every new action). A screenshot of a project's page is an entry too, with its id as the input.
+ */
+export interface ActivityEntry {
+  name: string;
+  input: string;
+  /** How long the answer's text was when the tool was called; absent in answers saved before it was kept. */
+  at?: number;
+}
+
 export interface MessageView {
   id: string;
   role: "user" | "assistant";
@@ -105,7 +117,7 @@ export interface MessageView {
   /** Files the user attached to this message. */
   attachments: AttachmentView[];
   /** The tools the model called while answering, in order: the name and what it was called on. */
-  activity: { name: string; input: string }[];
+  activity: ActivityEntry[];
   createdAt: number;
 }
 
@@ -151,5 +163,5 @@ export type StreamEvent =
  * far (the snapshot) to the end, as it comes. Ends at once when nothing is being written.
  */
 export type FollowEvent =
-  | { type: "snapshot"; assistantMessageId: string; content: string; reasoning: string; activity: { name: string; input: string }[] }
+  | { type: "snapshot"; assistantMessageId: string; content: string; reasoning: string; activity: ActivityEntry[] }
   | StreamEvent;

@@ -1,4 +1,4 @@
-import type { ChecklistItem, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
+import type { ActivityEntry, ChecklistItem, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
 import type { ToolHooks } from "../agent/tools";
@@ -151,7 +151,10 @@ export class WorkRun {
         if (row.models?.strong && !row.escalated) {
           this.d.repo.update(this.projectId, { escalated: true });
           nudges = 0;
-          messages.push({ role: "user", content: `A stronger model takes over the work now. ${nudgeMessage(checklist.filter((i) => !i.done).map((i) => i.text))}` });
+          messages.push({
+            role: "user",
+            content: `A stronger model takes over the work now. ${nudgeMessage(checklist.filter((i) => !i.done).map((i) => i.text))}`,
+          });
           continue;
         }
         return stopWith("paused", "stuck");
@@ -172,7 +175,7 @@ export class WorkRun {
   ): Promise<{ kind: "natural" | "steps" | "budget" | "limit" | "stopped" } | { kind: "error"; error: ProviderError }> {
     const signal = this.controller.signal;
     const answer = this.d.chats.addMessage({ chatId: this.chatId, role: "assistant", content: "", status: "streaming", providerId: conn.id, model });
-    const activity: { name: string; input: string }[] = [];
+    const activity: ActivityEntry[] = [];
     let content = "";
     let input = 0;
     let output = 0;
@@ -180,7 +183,7 @@ export class WorkRun {
     let priced = true;
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
     const onCall = (name: string, what: string) => {
-      activity.push({ name, input: what });
+      activity.push({ name, input: what, at: content.length });
       save();
     };
     // The activity line of a call, and the approvals of risky commands, as in a chat with a folder.
@@ -200,7 +203,22 @@ export class WorkRun {
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
       ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }),
       ...skillTools(skills, this.folder, hooks),
-      ...visualTools({ kit: this.d.visualKit, taskId: this.chatId, worktree: this.folder, vision, hooks, onSpend: (usd) => (cost += usd), event: (kind, data) => this.shot(kind, data) }, LOOKS),
+      ...visualTools(
+        {
+          kit: this.d.visualKit,
+          taskId: this.chatId,
+          worktree: this.folder,
+          vision,
+          hooks,
+          onSpend: (usd) => (cost += usd),
+          event: (kind, data) => {
+            this.shot(kind, data);
+            // The screenshot goes into the conversation where it was taken (seen: on the right, nobody knew when).
+            if (kind === "screenshot") onCall("screenshot", (data as { id: string }).id);
+          },
+        },
+        LOOKS,
+      ),
       ...workTools({
         checklist: () => this.row().checklist,
         setChecklist: (items: ChecklistItem[]) => this.d.repo.update(this.projectId, { checklist: items }),

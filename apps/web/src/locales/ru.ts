@@ -168,6 +168,8 @@ export const ru = {
   "chat.totalsUnpriced": "Часть ответов без цены: провайдер её не публикует.",
   "chat.sendFailed": "Сообщение не ушло: ядро не отвечает.",
 
+  "msg.actionsLatest": "Действия: {n} · {latest}",
+  "msg.screenshot": "Скриншот страницы",
   "msg.actions": "Действия: {n}",
   "msg.meta": "Токены: {input} → {output}, {cost}",
   "msg.metaNoCost": "Токены: {input} → {output}",
@@ -422,6 +424,8 @@ export const ru = {
   "media.seconds": "{n} с",
   "viewer.open": "Открыть {name}",
   "viewer.picture": "картинку",
+  "viewer.save": "Сохранить изображение",
+  "viewer.copy": "Копировать изображение",
   "viewer.close": "Закрыть",
   "player.play": "Смотреть",
   "player.pause": "Пауза",

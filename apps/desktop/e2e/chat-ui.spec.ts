@@ -215,7 +215,14 @@ test("a big photo is made smaller before it goes", async () => {
   await page.getByRole("textbox", { name: /Сообщение/ }).press("Enter");
   await expect(page.getByText("Вижу фото.")).toBeVisible();
   await page.locator(".msg-user").getByRole("button", { name: "Открыть photo.webp" }).click();
-  await expect(page.getByRole("dialog", { name: "photo.webp" }).getByRole("link", { name: "Сохранить файл" })).toBeVisible();
+  // Save and copy come on a right click (seen: the buttons under the picture were awkward), the cross closes it.
+  await page.getByRole("dialog", { name: "photo.webp" }).getByRole("img", { name: "photo.webp" }).click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Сохранить изображение" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Копировать изображение" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.locator(".msg-user").getByRole("button", { name: "Открыть photo.webp" }).click();
   await page.getByRole("button", { name: "Закрыть" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });

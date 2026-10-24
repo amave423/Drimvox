@@ -103,9 +103,12 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .side-new:disabled { opacity: 0.5; }
 .side-chat { position: relative; }
 .side-chat .side-item { padding-right: 60px; }
-.side-chat-actions { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; align-items: center; background: var(--sheet); border-radius: 6px; }
+.side-chat-actions { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; align-items: center; }
 .side-chat:hover .side-chat-actions, .side-chat:focus-within .side-chat-actions, .side-chat-actions.is-shown { display: inline-flex; }
-.side-chat-actions.is-shown { gap: 8px; padding: 0 4px; font-size: 13px; }
+/* While asking "delete?" the row stays lit like on hover, so the two icons sit on its own background. */
+.side-chat:has(.side-chat-actions.is-shown) .side-item { background: var(--sheet); }
+.icon-button.is-pencil { color: var(--pencil); }
+.icon-button.is-pencil:hover { color: var(--pencil); background: var(--pencil-soft); }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; color: var(--muted); }
 .icon-button:hover { color: var(--fg); background: var(--paper); }
 .side-pick { display: flex !important; align-items: center; gap: 8px; cursor: pointer; }

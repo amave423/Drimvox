@@ -1,4 +1,4 @@
-import type { ProjectModels, ProjectWorkView, TaskView } from "@drimvox/shared";
+import type { ActivityEntry, ProjectModels, ProjectWorkView, TaskView } from "@drimvox/shared";
 import type { ProjectRepo } from "../agent/repo";
 import type { AgentRunner } from "../agent/runner";
 import { isRepoRoot } from "../agent/git";
@@ -180,7 +180,8 @@ export class ProjectWork {
   }
 
   private async cliTurn(run: WorkRun, conn: NonNullable<ReturnType<RunDeps["providers"]["connection"]>>, model: string, content: string): Promise<void> {
-    const activity: { name: string; input: string }[] = [];
+    const activity: ActivityEntry[] = [];
+    let written = 0;
     await reply({
       chats: this.o.chats,
       chatId: run.chatId,
@@ -197,7 +198,8 @@ export class ProjectWork {
       cliDir: this.o.cliDir,
       activity: () => activity,
       emit: async (e) => {
-        if (e.type === "tool") activity.push({ name: e.name, input: e.input });
+        if (e.type === "text") written += e.text.length;
+        if (e.type === "tool") activity.push({ name: e.name, input: e.input, at: written });
       },
     });
     const answer = this.o.chats.get(run.chatId)?.messages.at(-1);

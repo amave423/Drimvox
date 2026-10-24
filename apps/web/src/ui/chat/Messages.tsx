@@ -7,6 +7,8 @@ import { formatTokens, formatUsd } from "../../lib/format";
 import { ErrorNote } from "../ErrorNote";
 import { Markdown } from "./Markdown";
 import { MediaView } from "./MediaView";
+import { ZoomableImage } from "../Lightbox";
+import { useAuthorizedUrl } from "../../lib/media";
 import { Reasoning } from "./Reasoning";
 
 export function UserMessage({ content, files }: { content: string; files?: ReactNode }) {
@@ -30,15 +32,23 @@ interface AssistantProps {
   making?: ChatKind;
   /** The chat's kind: what an answer still being written is waiting for (a text, a picture, a clip). */
   kind?: ChatKind;
-  /** What the model searched and read while answering. */
-  activity?: string[];
-  /** What a saved answer did, folded under one line. */
-  done?: string[];
+  /** What the model did while answering, each where it happened in the text (screenshots of pages among them). */
+  actions?: AnswerAction[];
   /** MCP tools asking for permission in this answer. */
   approvals?: ChatApproval[];
   onApprove?(id: string, allow: boolean, always: boolean): void;
   /** Puts the chat's folder back as it was before this answer. */
   onUndo?(): void;
+}
+
+/** One thing the model did, as the answer shows it. */
+export interface AnswerAction {
+  /** "Reads app.js", "Searches: …". */
+  line: string;
+  /** Where in the text it happened; actions of answers saved before this was kept come first. */
+  at?: number;
+  /** A screenshot of a page: its address to show it. */
+  shot?: string;
 }
 
 export interface ChatApproval {
@@ -61,8 +71,7 @@ export function AssistantMessage({
   message,
   making,
   kind,
-  activity = [],
-  done = [],
+  actions = [],
   approvals = [],
   onApprove,
   onUndo,
@@ -91,23 +100,6 @@ export function AssistantMessage({
   return (
     <div className={`msg msg-assistant${streaming ? " is-streaming" : ""}`} aria-busy={streaming}>
       {model && <div className="msg-who mono">{model}</div>}
-      {activity.length > 0 && (
-        <ul className="msg-activity muted">
-          {activity.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ul>
-      )}
-      {done.length > 0 && (
-        <details className="msg-done muted">
-          <summary>{t("msg.actions", { n: done.length })}</summary>
-          <ul className="msg-activity">
-            {done.map((line, i) => (
-              <li key={i}>{line}</li>
-            ))}
-          </ul>
-        </details>
-      )}
       {approvals.map((a) => (
         <div key={a.id} className="approval" role={a.state === "open" ? "alert" : undefined}>
           <strong>{t("approval.title")}</strong>
@@ -132,7 +124,7 @@ export function AssistantMessage({
         </div>
       ))}
       {reasoning && <Reasoning text={reasoning} thinking={!!streaming && !content} />}
-      {shown && <Markdown text={shown} streaming={streaming} />}
+      <AnswerFlow text={shown} actions={actions} streaming={!!streaming} live={!!streaming || rendering} />
       {message?.media.map((item) => <MediaView key={item.id} item={item} />)}
       {/* An answer followed live shows its own caret and words; "answering" is for one only known to be under way. */}
       {(making || (rendering && !streaming)) && (
@@ -156,4 +148,76 @@ export function AssistantMessage({
       )}
     </div>
   );
+}
+
+/**
+ * The answer in order, the way a coding agent shows its work: what the model said, the actions it did then (folded
+ * into one line), what it said next (seen: actions piled on top and the text jumping down with each new one). An action
+ * shows once the text has come as far as where it happened.
+ */
+function AnswerFlow({ text, actions, streaming, live }: { text: string; actions: AnswerAction[]; streaming: boolean; live: boolean }) {
+  const parts: ({ kind: "text"; text: string } | { kind: "actions"; actions: AnswerAction[] })[] = [];
+  let pos = 0;
+  for (const action of actions) {
+    const at = Math.min(action.at ?? 0, text.length);
+    if ((action.at ?? 0) > text.length) break;
+    if (at > pos) {
+      parts.push({ kind: "text", text: text.slice(pos, at) });
+      pos = at;
+    }
+    const last = parts.at(-1);
+    if (last?.kind === "actions") last.actions.push(action);
+    else parts.push({ kind: "actions", actions: [action] });
+  }
+  if (pos < text.length) parts.push({ kind: "text", text: text.slice(pos) });
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.kind === "text" ? (
+          part.text.trim() && <Markdown key={i} text={part.text} streaming={streaming && i === parts.length - 1} />
+        ) : (
+          <ActionGroup key={i} actions={part.actions} open={live && i === parts.length - 1} />
+        ),
+      )}
+    </>
+  );
+}
+
+/** Actions done in a row: one line saying how many and the latest, opened while it is the newest of an answer. */
+function ActionGroup({ actions, open }: { actions: AnswerAction[]; open: boolean }) {
+  const { t } = useApp();
+  const lines = actions.filter((a) => !a.shot);
+  const shots = actions.filter((a) => a.shot);
+  return (
+    <>
+      {lines.length > 0 && (
+        <details className="msg-done muted" open={open || undefined}>
+          <summary>
+            {lines.length === 1 ? lines[0]!.line : t("msg.actionsLatest", { n: lines.length, latest: lines.at(-1)!.line })}
+          </summary>
+          {lines.length > 1 && (
+            <ul className="msg-activity">
+              {lines.map((a, i) => (
+                <li key={i}>{a.line}</li>
+              ))}
+            </ul>
+          )}
+        </details>
+      )}
+      {shots.length > 0 && (
+        <div className="msg-shots">
+          {shots.map((a, i) => (
+            <ShotImage key={i} url={a.shot!} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** A screenshot comes from the core with the token, which an <img> cannot send. */
+function ShotImage({ url }: { url: string }) {
+  const { t, token } = useApp();
+  const src = useAuthorizedUrl(url, token);
+  return src ? <ZoomableImage className="msg-shot" src={src} alt={t("msg.screenshot")} /> : <span className="msg-shot is-empty" aria-hidden />;
 }

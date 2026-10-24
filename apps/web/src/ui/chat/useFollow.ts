@@ -1,11 +1,19 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 /**
- * A new message always brings the view down; a growing answer is followed only while the reader is at the bottom, so
+ * The user's own message always brings the view down; a growing answer is followed only while the reader is at the bottom, so
  * scrolling up to read is not undone with every word. The desk itself scrolls to its very end: aligning the last line
  * with the window's edge hid it under the composer (seen: the bottom could not be reached).
  */
-export function useFollow(end: RefObject<HTMLDivElement | null>, list: RefObject<HTMLDivElement | null>, chatId: string | undefined, newMessage: unknown[]) {
+export function useFollow(
+  end: RefObject<HTMLDivElement | null>,
+  list: RefObject<HTMLDivElement | null>,
+  chatId: string | undefined,
+  /** What brings the view down whatever the reader did: the chat itself, the user's own message. */
+  newMessage: unknown[],
+  /** What changes as an answer is saved: followed only while the reader is at the bottom. */
+  settled: unknown,
+) {
   const following = useRef(true);
   const desk = () => end.current?.closest<HTMLElement>(".desk") ?? null;
   const toBottom = () => {
@@ -33,10 +41,15 @@ export function useFollow(end: RefObject<HTMLDivElement | null>, list: RefObject
       d.removeEventListener("keydown", onOpen, true);
     };
   }, [chatId]);
+  // Down to the end when the chat opens and when the user sends; an answer that ends while the reader has scrolled up
+  // does not pull the view down (seen: reading higher up, the view jumped to the bottom as the answer finished).
   useEffect(() => {
     following.current = true;
     toBottom();
   }, newMessage);
+  useEffect(() => {
+    if (following.current) toBottom();
+  }, [settled]);
   // The answer grows letter by letter, after its pieces have come too (lib/smooth.ts): the view follows the messages'
   // own height, not the pieces (seen: the last line stayed under the composer).
   useEffect(() => {

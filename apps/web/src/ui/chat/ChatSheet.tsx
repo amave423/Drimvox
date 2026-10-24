@@ -10,6 +10,7 @@ import {
   type MediaOptions as Options,
   type StreamEvent,
   type AttachmentView,
+  type ActivityEntry,
 } from "@drimvox/shared";
 import { useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
@@ -20,7 +21,7 @@ import { loadMediaModel } from "../../lib/media";
 import { postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
-import { AssistantMessage, UserMessage, type ChatApproval } from "./Messages";
+import { AssistantMessage, UserMessage, type AnswerAction, type ChatApproval } from "./Messages";
 import { ModelPicker } from "./ModelPicker";
 import { isPhoto, photoProblem } from "./photos";
 import { loadModels } from "../../lib/models";
@@ -44,7 +45,7 @@ interface Draft {
   /** A picture or a clip is being made rather than text streamed. */
   media: boolean;
   /** Searches and pages the model looked at while answering. */
-  activity: string[];
+  activity: ActivityEntry[];
   /** MCP tools waiting for, or given, the user's permission. */
   approvals: ChatApproval[];
   /** Files sent with the question. */
@@ -154,11 +155,20 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   }, [chatId, choice, providers]);
 
   const list = useRef<HTMLDivElement>(null);
-  useFollow(end, list, chat?.id, [chat?.messages.length, draft?.user]);
+  useFollow(end, list, chat?.id, [chat?.id, draft?.user], chat?.messages.length);
 
   // A project's conversation (docs/specs/project-work.md): the run goes on in the core; the chat follows it, messages
   // join it on the way, and the panel next to it shows the checklist and the limits.
   const projectId = chat?.projectId && !chat.itemId ? chat.projectId : null;
+  /** What the model did, as the answer shows it in order; a project's screenshots by their address. */
+  const toActions = (entries: ActivityEntry[]): AnswerAction[] =>
+    entries.flatMap((a) =>
+      a.name === "screenshot"
+        ? projectId
+          ? [{ line: "", at: a.at, shot: `/api/projects/${projectId}/work/shots/${a.input}` }]
+          : []
+        : [{ line: activityLine(t, a.name, a.input), at: a.at }],
+    );
   const { work, reload: reloadWork } = useProjectWork(projectId);
   const running = work?.status === "running";
   useEffect(() => {
@@ -287,8 +297,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
           if (e.type === "text") setDraft((d) => d && { ...d, text: d.text + e.text });
           if (e.type === "reasoning") setDraft((d) => d && { ...d, reasoning: d.reasoning + e.text });
           if (e.type === "tool") {
-            const line = activityLine(t, e.name, e.input);
-            setDraft((d) => d && { ...d, activity: [...d.activity, line] });
+            setDraft((d) => d && { ...d, activity: [...d.activity, { name: e.name, input: e.input, at: d.text.length }] });
           }
           if (e.type === "approval") {
             const card: ChatApproval = { id: e.id, server: e.server, tool: e.tool, input: e.input, reason: e.reason, purpose: e.purpose, state: "open" };
@@ -368,8 +377,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
                 message={m}
                 kind={chat?.kind}
                 // Still being written: its actions so far, as they come; once done, folded.
-                activity={m.status === "streaming" ? (live?.messageId === m.id ? live.activity : m.activity).map((a) => activityLine(t, a.name, a.input)) : undefined}
-                done={m.status === "streaming" ? [] : m.activity.map((a) => activityLine(t, a.name, a.input))}
+                actions={toActions(live?.messageId === m.id ? live.activity : m.activity)}
                 onUndo={draft || chat?.itemId ? undefined : () => void undo(m.id)}
                 // Seen after coming back to the chat: the requests this answer waits on, to answer here.
                 approvals={m.status === "streaming" && !draft ? chat?.approvals.map((a) => ({ ...a, state: "open" as const })) : undefined}
@@ -386,7 +394,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
                 model={draft.model}
                 streaming
                 making={draft.media ? kind : undefined}
-                activity={draft.activity}
+                actions={toActions(draft.activity)}
                 approvals={draft.approvals}
                 onApprove={approve}
               />

@@ -169,6 +169,8 @@ export const en: Record<keyof typeof ru, string> = {
   "chat.totalsUnpriced": "Some answers have no price: the provider does not publish it.",
   "chat.sendFailed": "The message was not sent: the core is not responding.",
 
+  "msg.actionsLatest": "Actions: {n} · {latest}",
+  "msg.screenshot": "Screenshot of the page",
   "msg.actions": "Actions: {n}",
   "msg.meta": "Tokens: {input} → {output}, {cost}",
   "msg.metaNoCost": "Tokens: {input} → {output}",
@@ -423,6 +425,8 @@ export const en: Record<keyof typeof ru, string> = {
   "media.seconds": "{n} s",
   "viewer.open": "Open {name}",
   "viewer.picture": "the picture",
+  "viewer.save": "Save picture",
+  "viewer.copy": "Copy picture",
   "viewer.close": "Close",
   "player.play": "Play",
   "player.pause": "Pause",

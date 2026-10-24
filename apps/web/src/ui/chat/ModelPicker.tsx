@@ -246,9 +246,15 @@ function MediaPrice({ providerId, kind, model }: { providerId: string; kind: Exc
 /** What a model does with a photo, on its line in the list: a reference, a first frame; "needs a photo" where it must. */
 function PhotoMark({ photos }: { photos: PhotoInput }) {
   const { t } = useApp();
+  // A camera instead of words (seen: "из фото" made the lines long); what it means is in the hint and for screen readers.
+  const name = t(photos.min > 0 ? "photos.required" : photos.use === "reference" ? "photos.reference" : "photos.firstFrame");
+  const hint = t(photos.use === "reference" ? "photos.referenceHint" : "photos.firstFrameHint");
   return (
-    <span className="picker-photo" title={t(photos.use === "reference" ? "photos.referenceHint" : "photos.firstFrameHint")}>
-      {t(photos.min > 0 ? "photos.required" : photos.use === "reference" ? "photos.reference" : "photos.firstFrame")}
+    <span className={`picker-photo${photos.min > 0 ? " is-required" : ""}`} title={`${name}: ${hint}`} role="img" aria-label={name}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+        <circle cx="12" cy="13" r="3.2" />
+      </svg>
     </span>
   );
 }

@@ -7,6 +7,7 @@ import { ChatOptions, type OptionRow } from "./ChatOptions";
 const NARROW = 480;
 
 interface Props {
+  /** Nothing can be sent yet (no model chosen, say); the text can still be written (seen: typing waited for a model). */
   disabled: boolean;
   streaming: boolean;
   onSend(text: string): void;
@@ -118,7 +119,6 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
           e.preventDefault();
           attach.onAdd(files);
         }}
-        disabled={disabled}
       />
       {extra}
       {attach && (
