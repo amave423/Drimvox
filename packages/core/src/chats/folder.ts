@@ -4,8 +4,8 @@ import { z } from "zod";
 import { buildTools, type ToolHooks } from "../agent/tools";
 import { Workspace } from "../agent/workspace";
 
-/** Steps one answer may take in a folder: enough to read, change, run and check; then "go on" continues. */
-export const FOLDER_STEPS = 40;
+/** Steps one answer may take in a folder: a whole piece of work (seen live: 40 stopped four answers of thirteen mid-way). */
+export const FOLDER_STEPS = 100;
 
 /** The files attached in the chat, for save_attachment. */
 export interface ChatFiles {

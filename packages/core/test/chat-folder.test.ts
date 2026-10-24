@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestEnv, readEvents, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { git, makeRepo } from "./git-repo";
+import { FOLDER_STEPS } from "../src/chats/folder";
 
 const KEY = "good-key";
 let env: TestEnv;
@@ -70,7 +71,7 @@ describe("a chat with a folder", () => {
   // Seen live: a task took all 40 steps on tools, the last one too, and the answer came empty, called "thought a lot and
   // did not answer" though the files were made. The last step is for the summary: no tools, a word on what is done.
   it("ends with a summary when the steps run out, not with an empty answer", async () => {
-    const chat = await chatWith([...Array.from({ length: 39 }, () => call("list_files", { path: "." })), { text: "Сделал шаблон; осталось проверить сноски." }]);
+    const chat = await chatWith([...Array.from({ length: FOLDER_STEPS - 1 }, () => call("list_files", { path: "." })), { text: "Сделал шаблон; осталось проверить сноски." }]);
     await connect(chat.id, folder);
     const events = await readEvents(await send(chat.id, "Сделай шаблон"));
     const answer = events.at(-1).message;

@@ -277,10 +277,21 @@ describe("sending a message", () => {
   });
 
   // Seen live: a local model with a small context stopped mid-answer, and the answer looked finished.
-  it("says when the model ran out of room, and keeps the answer in the conversation so it can go on", async () => {
+  // Seen live: a long page of code stopped mid-tag at the answer's length; the model would have gone on.
+  it("goes on by itself, in the same answer, when the model stops at the answer's length", async () => {
+    const { chat } = await setup({ script: [{ text: "<div>начало", finishReason: "length" }, { text: " и конец</div>" }] });
+    const events = await readEvents(await send(chat.id, "Напиши страницу"));
+    expect(events.at(-1).message).toMatchObject({ status: "done", content: "<div>начало и конец</div>", error: null });
+    const second = fake.requests.filter((r) => r.path === "/v1/chat/completions")[1]!.body.messages;
+    expect(second.at(-2)).toMatchObject({ role: "assistant" });
+    expect(second.at(-1).content).toMatch(/Continue exactly where it stopped/);
+  });
+
+  it("says when the model ran out of room even after going on twice, and keeps the answer so it can go on", async () => {
     const { chat } = await setup({ chunks: [{ text: "Начало кода" }], finishReason: "length" });
     const events = await readEvents(await send(chat.id, "Напиши сайт"));
-    expect(events.at(-1).message).toMatchObject({ status: "done", content: "Начало кода", error: { code: "cut_off" } });
+    expect(events.at(-1).message).toMatchObject({ status: "done", content: "Начало кодаНачало кодаНачало кода", error: { code: "cut_off" } });
+    expect(fake.requests.filter((r) => r.path === "/v1/chat/completions")).toHaveLength(3);
     await readEvents(await send(chat.id, "Продолжи"));
     const sent = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)?.body.messages.slice(1);
     expect(sent).toContainEqual({ role: "assistant", content: "Начало кода" });

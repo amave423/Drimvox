@@ -23,6 +23,8 @@ export interface FakeTurn {
   delayMs?: number;
   /** Answer with this status and an OpenAI-style error body instead. */
   fail?: { status: number; message: string };
+  /** Why the answer ends when it is not a tool call: "stop" by default, "length" when the model ran out of room. */
+  finishReason?: string;
 }
 
 export interface FakeProviderOptions {
@@ -145,7 +147,7 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
           res.write(chunk({ tool_calls: [{ index, id, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) } }] }));
         });
         const usage = turn.usage ?? { prompt_tokens: 100, completion_tokens: 20 };
-        const finish = turn.toolCalls?.length ? "tool_calls" : "stop";
+        const finish = turn.toolCalls?.length ? "tool_calls" : (turn.finishReason ?? "stop");
         res.write(chunk({}, { usage: { ...usage, total_tokens: usage.prompt_tokens + usage.completion_tokens } }, finish));
         res.end("data: [DONE]\n\n");
         return;

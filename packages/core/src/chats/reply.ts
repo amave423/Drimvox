@@ -24,10 +24,14 @@ import type { ChatRepo } from "./repo";
 /** What the chat can show, so models use it instead of ASCII art. */
 /** Told on the last step an answer may take: no tools, a summary, so it never ends empty. */
 const LAST_STEP =
-  "This is the last step of this answer: do not call tools. Write the answer now, in the user's language: what is done, where the results are, and what is left, so the user can say \"go on\".";
+  'This is the last step of this answer: do not call tools. Write the answer now, in the user\'s language: what is done, where the results are, and what is left, so the user can say "go on".';
 
 /** Steps of an answer with the internet or the user's tools: research takes searches and pages (seen: 8 steps stopped five answers of eight). */
-export const WEB_STEPS = 30;
+export const WEB_STEPS = 60;
+
+/** Rounds an answer cut by its length may go on for, in the same message. */
+const MAX_CONTINUES = 2;
+const CONTINUE = "Your answer was cut off by its length. Continue exactly where it stopped: no repeating, no introduction.";
 
 /** Seen live: "I need names in English" turned the whole conversation into English. */
 const LANGUAGE_HINT =
@@ -128,78 +132,91 @@ export async function reply(i: ReplyInput): Promise<void> {
   const memory = i.folder ? memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) : null;
   /** The answer reached its last step: what it says there is a summary of unfinished work. */
   let lastStep = false;
-  try {
-    const result = streamText({
-      model: languageModel(i.conn, i.model),
-      system: [
-        nowLine(),
-        LANGUAGE_HINT,
-        FORMAT_HINT,
-        // With the internet the rule comes in WEB_HINT; the user's own tools (a browser server) need it too.
-        Object.keys(tools).length && i.web !== "free" ? FAIR_USE_HINT : "",
-        i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
-        i.folder ? folderHint(i.folder) : "",
-        i.folder ? notesBlock(i.folder) : "",
-        i.work?.system ?? "",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      messages: history,
-      ...(Object.keys(tools).length
-        ? {
-            tools,
-            // Search, read a page or two, call a tool or two, answer.
-            stopWhen: isStepCount(steps),
-            // Long work in a folder: once the answer nears the model's context, its older part becomes a summary. The
-            // last step is for the summary (seen live: all 40 steps went on tools, the answer came empty).
-            prepareStep: async (o: { stepNumber: number; messages: ModelMessage[] }) => {
-              const base: { messages?: ModelMessage[] } = memory ? await memory(o) : {};
-              if (o.stepNumber < steps - 1) return base;
-              lastStep = true;
-              return { ...base, toolChoice: "none" as const, messages: [...(base.messages ?? o.messages), { role: "user" as const, content: LAST_STEP }] };
-            },
-          }
-        : {}),
-      // OpenRouter and RouterAI search on their side for a fee; the plugin goes into the request body.
-      // How much the model thinks, and the provider's own search, go into the request body.
-      providerOptions: mergeOptions(
-        i.web === "provider" ? { [i.conn.preset]: { plugins: [{ id: "web", max_results: 5 }] } } : undefined,
-        thinkingOptions(i.conn.preset, i.thinking ?? "auto"),
-      ),
-      maxRetries: 1,
-      abortSignal: AbortSignal.any([i.signal, silence.signal]),
-      onError: () => {},
-    });
-    for await (const part of result.fullStream) {
-      // While Drimvox itself runs a tool (a search, a page, a command), the model is not silent: the clock waits (seen:
-      // an answer cut as "silent" while a search went on).
-      if (part.type === "tool-call") clearTimeout(timer);
-      else resetClock();
-      if (part.type === "text-delta") {
-        // What the model says after a tool call is a new paragraph (seen live: "…folder.The folder is empty…").
-        const piece = newStep && text && !/\n\s*$/.test(text) ? `\n\n${part.text.trimStart()}` : part.text;
-        newStep = false;
-        text += piece;
-        await i.emit({ type: "text", text: piece });
-      } else if (part.type === "reasoning-delta") {
-        reasoning += part.text;
-        await i.emit({ type: "reasoning", text: part.text });
-      } else if (part.type === "error") {
-        error = describeError(part.error);
-      } else if (part.type === "finish-step") {
-        newStep = true;
-        // Each step's own bill, when the provider sends one: an answer with searches takes several steps.
-        const step = billedUsd(part.providerMetadata, 1);
-        if (step !== null) billed = (billed ?? 0) + step;
-      } else if (part.type === "finish") {
-        usage = part.totalUsage;
-        finishReason = part.finishReason;
+  /** What the earlier rounds said and did: a round cut by the answer's length goes on from there. */
+  const said: ModelMessage[] = [];
+  for (let round = 0; round <= MAX_CONTINUES; round++) {
+    resetClock();
+    // The next round goes on mid-sentence, not as a new paragraph.
+    newStep = false;
+    try {
+      const result = streamText({
+        model: languageModel(i.conn, i.model),
+        system: [
+          nowLine(),
+          LANGUAGE_HINT,
+          FORMAT_HINT,
+          // With the internet the rule comes in WEB_HINT; the user's own tools (a browser server) need it too.
+          Object.keys(tools).length && i.web !== "free" ? FAIR_USE_HINT : "",
+          i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
+          i.folder ? folderHint(i.folder) : "",
+          i.folder ? notesBlock(i.folder) : "",
+          i.work?.system ?? "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        messages: round === 0 ? history : [...history, ...said, { role: "user" as const, content: CONTINUE }],
+        ...(Object.keys(tools).length
+          ? {
+              tools,
+              // Search, read a page or two, call a tool or two, answer.
+              stopWhen: isStepCount(steps),
+              // Long work in a folder: once the answer nears the model's context, its older part becomes a summary. The
+              // last step is for the summary (seen live: all 40 steps went on tools, the answer came empty).
+              prepareStep: async (o: { stepNumber: number; messages: ModelMessage[] }) => {
+                const base: { messages?: ModelMessage[] } = memory ? await memory(o) : {};
+                if (o.stepNumber < steps - 1) return base;
+                lastStep = true;
+                return { ...base, toolChoice: "none" as const, messages: [...(base.messages ?? o.messages), { role: "user" as const, content: LAST_STEP }] };
+              },
+            }
+          : {}),
+        // OpenRouter and RouterAI search on their side for a fee; the plugin goes into the request body.
+        // How much the model thinks, and the provider's own search, go into the request body.
+        providerOptions: mergeOptions(
+          i.web === "provider" ? { [i.conn.preset]: { plugins: [{ id: "web", max_results: 5 }] } } : undefined,
+          thinkingOptions(i.conn.preset, i.thinking ?? "auto"),
+        ),
+        maxRetries: 1,
+        abortSignal: AbortSignal.any([i.signal, silence.signal]),
+        onError: () => {},
+      });
+      for await (const part of result.fullStream) {
+        // While Drimvox itself runs a tool (a search, a page, a command), the model is not silent: the clock waits (seen:
+        // an answer cut as "silent" while a search went on).
+        if (part.type === "tool-call") clearTimeout(timer);
+        else resetClock();
+        if (part.type === "text-delta") {
+          // What the model says after a tool call is a new paragraph (seen live: "…folder.The folder is empty…").
+          const piece = newStep && text && !/\n\s*$/.test(text) ? `\n\n${part.text.trimStart()}` : part.text;
+          newStep = false;
+          text += piece;
+          await i.emit({ type: "text", text: piece });
+        } else if (part.type === "reasoning-delta") {
+          reasoning += part.text;
+          await i.emit({ type: "reasoning", text: part.text });
+        } else if (part.type === "error") {
+          error = describeError(part.error);
+        } else if (part.type === "finish-step") {
+          newStep = true;
+          // Each step's own bill, when the provider sends one: an answer with searches takes several steps.
+          const step = billedUsd(part.providerMetadata, 1);
+          if (step !== null) billed = (billed ?? 0) + step;
+        } else if (part.type === "finish") {
+          usage = addTotals(usage, part.totalUsage);
+          finishReason = part.finishReason;
+        }
       }
+      // Cut by the answer's length (seen live: a long page of code stopped mid-tag): the next round goes on from there.
+      if (finishReason === "length" && !error && text.trim() && round < MAX_CONTINUES && !i.signal.aborted) {
+        said.push(...((await result.response).messages as ModelMessage[]));
+        continue;
+      }
+    } catch (err) {
+      if (!i.signal.aborted) error = describeError(err);
+    } finally {
+      clearTimeout(timer);
     }
-  } catch (err) {
-    if (!i.signal.aborted) error = describeError(err);
-  } finally {
-    clearTimeout(timer);
+    break;
   }
 
   const stopped = i.signal.aborted;
@@ -245,7 +262,20 @@ export async function reply(i: ReplyInput): Promise<void> {
   if (!stopped) await i.emit({ type: "done", message });
 }
 
+type Totals = Parameters<typeof usageOf>[0];
 
+/** The usage of the rounds of one answer, together. */
+function addTotals(a: Totals, b: Totals): Totals {
+  if (!a) return b;
+  if (!b) return a;
+  const sum = (x?: number, y?: number) => (x === undefined && y === undefined ? undefined : (x ?? 0) + (y ?? 0));
+  return {
+    ...b,
+    inputTokens: sum(a.inputTokens, b.inputTokens),
+    outputTokens: sum(a.outputTokens, b.outputTokens),
+    inputTokenDetails: { cacheReadTokens: sum(a.inputTokenDetails?.cacheReadTokens, b.inputTokenDetails?.cacheReadTokens) },
+  } as Totals;
+}
 
 const addUsage = (a: { inputTokens: number; outputTokens: number }, b: { inputTokens: number; outputTokens: number }) => ({
   inputTokens: a.inputTokens + b.inputTokens,
