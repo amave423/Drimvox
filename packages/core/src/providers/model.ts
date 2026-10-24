@@ -35,13 +35,13 @@ function billOf(body: unknown): number | undefined {
 }
 
 /**
- * The provider's own bill for a request, kept as `providerMetadata.artel.billed`. Seen live: by the catalog's prices
+ * The provider's own bill for a request, kept as `providerMetadata.drimvox.billed`. Seen live: by the catalog's prices
  * Drimvox counted 126 ₽ where RouterAI took 80 ₽ (its cache costs less than its catalog says).
  */
 const billed: MetadataExtractor = {
   extractMetadata: async ({ parsedBody }) => {
     const cost = billOf(parsedBody);
-    return cost === undefined ? undefined : { artel: { billed: cost } };
+    return cost === undefined ? undefined : { drimvox: { billed: cost } };
   },
   createStreamExtractor: () => {
     let cost: number | undefined;
@@ -49,7 +49,7 @@ const billed: MetadataExtractor = {
       processChunk: (chunk) => {
         cost = billOf(chunk) ?? cost;
       },
-      buildMetadata: () => (cost === undefined ? undefined : { artel: { billed: cost } }),
+      buildMetadata: () => (cost === undefined ? undefined : { drimvox: { billed: cost } }),
     };
   },
 };

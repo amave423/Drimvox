@@ -1,4 +1,4 @@
-import type { ProjectModels, ProjectWorkView, TaskView } from "@artel/shared";
+import type { ProjectModels, ProjectWorkView, TaskView } from "@drimvox/shared";
 import type { ProjectRepo } from "../agent/repo";
 import type { AgentRunner } from "../agent/runner";
 import { isRepoRoot } from "../agent/git";

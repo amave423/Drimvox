@@ -5,7 +5,7 @@
 
 ## Что это
 
-Тот же Artel на Ubuntu-ноутбуке без окна: ядро (`packages/core`) и собранный интерфейс (`apps/web`)
+Тот же Drimvox на Ubuntu-ноутбуке без окна: ядро (`packages/core`) и собранный интерфейс (`apps/web`)
 отдаёт `apps/server`. Открываешь в браузере с любого устройства в своей сети Tailscale. Все данные —
 провайдеры, чаты, проекты, копии агентов — лежат на сервере. Десктоп на Windows работает как раньше,
 со своими данными; к серверу он не подключается.
@@ -13,14 +13,14 @@
 ## Установка и запуск
 
 ```
-git clone https://github.com/amave423/artel && cd artel
+git clone https://github.com/amave423/Drimvox && cd drimvox
 npm install
 npm run server:install        # сборка, служба systemd, tailscale serve
 ```
 
 - `npm run server` — собрать и запустить в текущем терминале (для проверки).
 - `npm run server:install` (скрипт `scripts/install-server.sh`, нужен sudo): собирает интерфейс и сервер,
-  пишет `/etc/systemd/system/artel.service` (от имени текущего пользователя, `Restart=on-failure`),
+  пишет `/etc/systemd/system/drimvox.service` (от имени текущего пользователя, `Restart=on-failure`),
   включает и запускает службу, затем `tailscale serve --bg --https=443 http://127.0.0.1:4317`.
   В конце печатает адрес вида `https://<машина>.<tailnet>.ts.net` и код первого входа.
   По желанию ставит Chromium для визуальных проверок (`npx playwright install --with-deps chromium`).
@@ -29,17 +29,17 @@ npm run server:install        # сборка, служба systemd, tailscale se
 
 ## Сеть
 
-- Сервер слушает только `127.0.0.1:4317` (`ARTEL_PORT` меняет порт). Наружу — только через `tailscale serve`:
+- Сервер слушает только `127.0.0.1:4317` (`DRIMVOX_PORT` меняет порт). Наружу — только через `tailscale serve`:
   настоящий сертификат, из локальной сети и интернета напрямую недоступен.
 - Проверка Host: `localhost`, `127.0.0.1` и имя машины в Tailscale — его сервер узнаёт из
-  `tailscale status --json` при запуске; `ARTEL_HOSTS` добавляет свои имена.
+  `tailscale status --json` при запуске; `DRIMVOX_HOSTS` добавляет свои имена.
 
 ## Вход
 
 - Пароля ещё нет: страница «Задай пароль» с кодом первого входа. Код (6 цифр) сервер придумывает при
-  запуске, пока пароль не задан, и пишет в журнал (`journalctl -u artel`) — без него никто в сети
+  запуске, пока пароль не задан, и пишет в журнал (`journalctl -u drimvox`) — без него никто в сети
   не займёт сервер первым. Пароль — от 8 символов.
-- Дальше — страница входа по паролю. Сессия — cookie `artel_session`: HttpOnly, SameSite=Strict,
+- Дальше — страница входа по паролю. Сессия — cookie `drimvox_session`: HttpOnly, SameSite=Strict,
   Secure за HTTPS, на 30 дней. В базе — только хэш сессии; пароль — scrypt с солью.
 - Пять неверных паролей подряд с одного адреса — минута ожидания (429).
 - Запросы, меняющие данные, с чужим `Origin` отклоняются (403).
@@ -50,7 +50,7 @@ npm run server:install        # сборка, служба systemd, tailscale se
 
 - Ключи провайдеров и пароль прокси шифруются ключом из файла `<data>/secret.key` (32 байта, права 600),
   который сервер создаёт при первом запуске. Сервер стартует сам после перезагрузки.
-- Данные: `~/.local/share/artel` (`ARTEL_DATA_DIR` меняет).
+- Данные: `~/.local/share/drimvox` (`DRIMVOX_DATA_DIR` меняет).
 
 ## Что меняется в интерфейсе в браузере
 

@@ -1,24 +1,24 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld("artel", {
-  getToken: (): Promise<string> => ipcRenderer.invoke("artel:token"),
-  setTitleBar: (colors: { background: string; symbols: string }) => ipcRenderer.send("artel:titlebar", colors),
-  pickFolder: (): Promise<string | null> => ipcRenderer.invoke("artel:pick-folder"),
-  openSkillsFolder: () => ipcRenderer.send("artel:open-skills"),
-  notify: (notice: { title: string; body: string; taskId: string }) => ipcRenderer.send("artel:notify", notice),
-  testNotify: (notice: { title: string; body: string }) => ipcRenderer.send("artel:notify-test", notice),
-  focusAssist: (): Promise<number | null> => ipcRenderer.invoke("artel:focus-assist"),
-  updateState: () => ipcRenderer.invoke("artel:update-state"),
+contextBridge.exposeInMainWorld("drimvox", {
+  getToken: (): Promise<string> => ipcRenderer.invoke("drimvox:token"),
+  setTitleBar: (colors: { background: string; symbols: string }) => ipcRenderer.send("drimvox:titlebar", colors),
+  pickFolder: (): Promise<string | null> => ipcRenderer.invoke("drimvox:pick-folder"),
+  openSkillsFolder: () => ipcRenderer.send("drimvox:open-skills"),
+  notify: (notice: { title: string; body: string; taskId: string }) => ipcRenderer.send("drimvox:notify", notice),
+  testNotify: (notice: { title: string; body: string }) => ipcRenderer.send("drimvox:notify-test", notice),
+  focusAssist: (): Promise<number | null> => ipcRenderer.invoke("drimvox:focus-assist"),
+  updateState: () => ipcRenderer.invoke("drimvox:update-state"),
   onUpdate: (listener: (state: unknown) => void) => {
     const handler = (_event: unknown, state: unknown) => listener(state);
-    ipcRenderer.on("artel:update", handler);
-    return () => void ipcRenderer.removeListener("artel:update", handler);
+    ipcRenderer.on("drimvox:update", handler);
+    return () => void ipcRenderer.removeListener("drimvox:update", handler);
   },
-  installUpdate: () => ipcRenderer.send("artel:update-install"),
-  checkUpdates: () => ipcRenderer.send("artel:update-check"),
+  installUpdate: () => ipcRenderer.send("drimvox:update-install"),
+  checkUpdates: () => ipcRenderer.send("drimvox:update-check"),
   onOpenTask: (listener: (taskId: string) => void) => {
     const handler = (_event: unknown, taskId: unknown) => typeof taskId === "string" && listener(taskId);
-    ipcRenderer.on("artel:open-task", handler);
-    return () => void ipcRenderer.removeListener("artel:open-task", handler);
+    ipcRenderer.on("drimvox:open-task", handler);
+    return () => void ipcRenderer.removeListener("drimvox:open-task", handler);
   },
 });

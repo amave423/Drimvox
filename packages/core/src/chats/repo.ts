@@ -1,4 +1,4 @@
-import type { AttachmentView, ChatKind, ChatUpdate, ChatView, ChatWithMessages, MessageStatus, MessageView, ProviderError, UsageSummary } from "@artel/shared";
+import type { AttachmentView, ChatKind, ChatUpdate, ChatView, ChatWithMessages, MessageStatus, MessageView, ProviderError, UsageSummary } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
 import type { MediaRepo } from "../media/repo";

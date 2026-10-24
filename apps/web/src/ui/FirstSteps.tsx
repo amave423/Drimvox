@@ -68,7 +68,7 @@ export function FirstSteps() {
           <div>
             <h3>{t("start.project")}</h3>
             <p className="muted">{t("start.projectHow")}</p>
-            {done[0] && !done[2] && window.artel?.pickFolder && (
+            {done[0] && !done[2] && window.drimvox?.pickFolder && (
               <button className="btn" onClick={() => void project.pick()}>
                 {t("start.pickFolder")}
               </button>

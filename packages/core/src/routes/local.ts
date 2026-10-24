@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@artel/shared";
+import { hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { CatalogError } from "../local/catalog";

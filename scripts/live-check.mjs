@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const outfile = join(mkdtempSync(join(tmpdir(), "artel-live-build-")), "live-check.mjs");
+const outfile = join(mkdtempSync(join(tmpdir(), "drimvox-live-build-")), "live-check.mjs");
 await build({
   entryPoints: [fileURLToPath(new URL("./live-check.ts", import.meta.url))],
   outfile,
@@ -15,6 +15,6 @@ await build({
   target: "node22",
   logLevel: "warning",
   // A name of its own: bundled code (pdf.js in unpdf) declares its own createRequire.
-  banner: { js: "import { createRequire as artelCreateRequire } from 'node:module'; const require = artelCreateRequire(import.meta.url);" },
+  banner: { js: "import { createRequire as drimvoxCreateRequire } from 'node:module'; const require = drimvoxCreateRequire(import.meta.url);" },
 });
 await import(pathToFileURL(outfile).href);

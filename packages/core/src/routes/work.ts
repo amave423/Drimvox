@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { projectPlanReviseSchema, projectPlanStartSchema, projectWorkMessageSchema, projectWorkStartSchema, projectWorkUpdateSchema } from "@artel/shared";
+import { projectPlanReviseSchema, projectPlanStartSchema, projectWorkMessageSchema, projectWorkStartSchema, projectWorkUpdateSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { readFile } from "node:fs/promises";
 import type { ProjectRepo } from "../agent/repo";

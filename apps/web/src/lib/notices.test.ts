@@ -1,4 +1,4 @@
-import type { TaskView } from "@artel/shared";
+import type { TaskView } from "@drimvox/shared";
 import { describe, expect, it } from "vitest";
 import { noticesFor } from "./notices";
 

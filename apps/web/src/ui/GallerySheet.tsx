@@ -1,4 +1,4 @@
-import type { MediaItem } from "@artel/shared";
+import type { MediaItem } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";

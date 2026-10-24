@@ -1,5 +1,5 @@
 // Team part of the live check (`--team`): a real lead model plans two subtasks and real workers do them.
-import type { TaskView } from "@artel/shared";
+import type { TaskView } from "@drimvox/shared";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,7 +14,7 @@ const GOAL =
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
 
 function makeProject(): string {
-  const dir = mkdtempSync(join(tmpdir(), "artel-live-team-"));
+  const dir = mkdtempSync(join(tmpdir(), "drimvox-live-team-"));
   writeFileSync(join(dir, "package.json"), '{ "type": "module" }\n');
   writeFileSync(join(dir, "README.md"), "# Utils\n");
   git(dir, "init", "-q", "-b", "main");

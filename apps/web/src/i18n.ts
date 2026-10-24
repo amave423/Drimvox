@@ -1,4 +1,4 @@
-import type { Locale } from "@artel/shared";
+import type { Locale } from "@drimvox/shared";
 import { en } from "./locales/en";
 import { ru } from "./locales/ru";
 

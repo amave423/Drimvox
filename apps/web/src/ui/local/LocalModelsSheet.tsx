@@ -1,4 +1,4 @@
-import type { LocalPull, LocalStatus } from "@artel/shared";
+import type { LocalPull, LocalStatus } from "@drimvox/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";

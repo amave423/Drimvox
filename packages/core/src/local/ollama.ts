@@ -1,4 +1,4 @@
-import type { LocalHardware, LocalModel, LocalPull } from "@artel/shared";
+import type { LocalHardware, LocalModel, LocalPull } from "@drimvox/shared";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { downloadHf } from "./hf-download";

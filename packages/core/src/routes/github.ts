@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { githubPublishSchema } from "@artel/shared";
+import { githubPublishSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { existsSync } from "node:fs";
 import type { ProjectRepo } from "../agent/repo";

@@ -1,9 +1,9 @@
-import { thinkingLevels, type ThinkingLevel } from "@artel/shared";
+import { thinkingLevels, type ThinkingLevel } from "@drimvox/shared";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 
-const KEY = "artel.thinking";
+const KEY = "drimvox.thinking";
 
 /** The thinking level of the last message on this device; the provider's own by default. */
 export function readThinking(): ThinkingLevel {

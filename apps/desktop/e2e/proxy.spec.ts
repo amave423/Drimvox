@@ -16,7 +16,7 @@ let page204: FakeProvider;
 let proxy: FakeProxy;
 
 test.beforeEach(async () => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
   fake = await startFakeProvider({ key: KEY, models: [{ id: "m1", name: "Model 1" }] });
   // Its own address: the proxy keeps a tunnel per address open, and the provider's requests must open their own.
   page204 = await startFakeProvider({ routes: { "/ping": { ok: true } } });
@@ -35,7 +35,7 @@ test.afterEach(async () => {
 async function launch(): Promise<Page> {
   app = await electron.launch({
     args: [mainJs],
-    env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PROXY_CHECK_URL: `${page204.origin}/ping` },
+    env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PROXY_CHECK_URL: `${page204.origin}/ping` },
   });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();

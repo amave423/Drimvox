@@ -1,9 +1,9 @@
-import type { TaskStages, TaskView } from "@artel/shared";
+import type { TaskStages, TaskView } from "@drimvox/shared";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { Segmented } from "../Segmented";
 
-const KEY = "artel.stages";
+const KEY = "drimvox.stages";
 const ALL_ON: TaskStages = { interview: true, spec: true, approveSpec: true, testsFirst: true };
 
 /** The stage switches a new task starts with: the user's last choice on this device. */

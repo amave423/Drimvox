@@ -1,4 +1,4 @@
-import type { AgentQuestion, ChecklistItem, ProjectModels, ProjectWorkReason, ProjectWorkStatus, WorkShot } from "@artel/shared";
+import type { AgentQuestion, ChecklistItem, ProjectModels, ProjectWorkReason, ProjectWorkStatus, WorkShot } from "@drimvox/shared";
 import type { Database } from "../db";
 
 interface Row {

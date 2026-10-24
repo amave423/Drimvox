@@ -51,7 +51,7 @@ beforeEach(async () => {
   env = createTestEnv();
   catalog = await startFakeProvider({ models: CATALOG, authorized: () => true });
   env.setPresetUrl("openrouter", catalog.baseUrl);
-  dir = mkdtempSync(join(tmpdir(), "artel-fake-cli-"));
+  dir = mkdtempSync(join(tmpdir(), "drimvox-fake-cli-"));
   process.env.FAKE_CLI_DIR = dir;
   for (const [id, kind] of [["claude-code", "claude"], ["codex", "codex"], ["gemini-cli", "gemini"], ["antigravity", "agy"]] as const) {
     env.setCliCommand(id, [process.execPath, FAKE, kind]);

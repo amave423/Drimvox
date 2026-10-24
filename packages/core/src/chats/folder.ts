@@ -1,4 +1,4 @@
-import type { AttachmentView, StreamEvent } from "@artel/shared";
+import type { AttachmentView, StreamEvent } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { buildTools, type ToolHooks } from "../agent/tools";

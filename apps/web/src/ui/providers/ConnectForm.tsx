@@ -1,4 +1,4 @@
-import { installCommand, presetIds, presets, type PresetId } from "@artel/shared";
+import { installCommand, presetIds, presets, type PresetId } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";

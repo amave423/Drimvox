@@ -1,4 +1,4 @@
-import type { MediaKind, MediaModel, PriceLine } from "@artel/shared";
+import type { MediaKind, MediaModel, PriceLine } from "@drimvox/shared";
 import { fetchJson } from "../providers/http";
 import type { Connection } from "../providers/repo";
 import { usdPer } from "../rates";

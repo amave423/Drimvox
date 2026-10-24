@@ -1,4 +1,4 @@
-import type { AcceptanceReport as Report, Milestone, Requirement } from "@artel/shared";
+import type { AcceptanceReport as Report, Milestone, Requirement } from "@drimvox/shared";
 import { useApp } from "../../context";
 
 /** The acceptance agent's checklist: every requirement with its mark, what is wrong, and the evidence on request. */

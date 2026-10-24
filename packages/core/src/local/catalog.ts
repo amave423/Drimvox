@@ -1,4 +1,4 @@
-import type { HfRepo, HfVariant, LocalHardware, LocalPick, LocalUse } from "@artel/shared";
+import type { HfRepo, HfVariant, LocalHardware, LocalPick, LocalUse } from "@drimvox/shared";
 import { fitOf, recommend } from "./fit";
 
 /**

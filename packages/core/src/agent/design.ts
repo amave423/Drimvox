@@ -1,4 +1,4 @@
-import { designBriefSchema, lookSchema, type DesignBrief, type FontKind, type Look } from "@artel/shared";
+import { designBriefSchema, lookSchema, type DesignBrief, type FontKind, type Look } from "@drimvox/shared";
 import { z } from "zod";
 
 /**

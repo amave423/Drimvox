@@ -23,16 +23,23 @@ import { BootError } from "./ui/BootError";
 import { SignIn } from "./ui/SignIn";
 import { createApi, ok } from "./api";
 import { guessLocale } from "./i18n";
-import type { Settings } from "@artel/shared";
+import type { Settings } from "@drimvox/shared";
 import type { CoreStatus } from "./context";
+import { moveLegacyStorage } from "./lib/legacyStorage";
 
 async function boot() {
+  // What the window remembered under the app's old name (Artel) comes along.
+  try {
+    moveLegacyStorage(localStorage);
+  } catch {
+    // No storage here: nothing to bring along.
+  }
   const root = createRoot(document.getElementById("root")!);
   const locale = guessLocale(navigator.languages);
 
   try {
     // The desktop window has a token; a browser on the server signs in with the password and keeps a cookie.
-    const token = window.artel ? await window.artel.getToken() : null;
+    const token = window.drimvox ? await window.drimvox.getToken() : null;
     const api = createApi(token);
     if (!token) {
       const res = await api.auth.state.$get().catch(() => null);

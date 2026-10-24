@@ -1,4 +1,4 @@
-import type { Locale } from "@artel/shared";
+import type { Locale } from "@drimvox/shared";
 import { translate } from "../i18n";
 
 interface Props {

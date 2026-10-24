@@ -1,4 +1,4 @@
-import type { ProjectWorkView } from "@artel/shared";
+import type { ProjectWorkView } from "@drimvox/shared";
 import { describe, expect, it } from "vitest";
 import { workNotices } from "./workNotices";
 

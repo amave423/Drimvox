@@ -1,4 +1,4 @@
-import { presets, type PresetId, type ProviderCreate, type ProviderUpdate, type ProviderView } from "@artel/shared";
+import { presets, type PresetId, type ProviderCreate, type ProviderUpdate, type ProviderView } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
 import { fetchVia, noProxyFetch, type ProxyStore } from "../proxy";

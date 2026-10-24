@@ -24,7 +24,7 @@ let app: ElectronApplication | undefined;
 let fake: FakeProvider | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
   repo = makeRepo({
     "src/app.ts": "export const greeting = 'hi';\n",
     "package.json": '{ "type": "module" }\n',
@@ -44,7 +44,7 @@ test.afterEach(async () => {
 
 async function launch(script: FakeTurn[], env: Record<string, string> = {}): Promise<Page> {
   fake = await startFakeProvider({ key: KEY, models, script });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo, ...env } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo, ...env } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
@@ -60,7 +60,7 @@ async function launch(script: FakeTurn[], env: Record<string, string> = {}): Pro
 /** Direct mode unless asked otherwise: these tests cover the agent, the pipeline has its own test. */
 async function startTask(page: Page, task: string, pipeline = false) {
   await page.getByRole("button", { name: "+ Проект" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/artel-repo-/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/drimvox-repo-/);
   const all = { interview: true, spec: true, approveSpec: true, testsFirst: true };
   await start(page, { task, model: "coder", stages: pipeline ? all : undefined });
 }
@@ -155,7 +155,7 @@ test("a question about the project gets an answer, not a spec", async () => {
   await page.getByLabel("Спросить ещё про проект…").fill("Сколько там тестов?");
   await page.getByRole("button", { name: "Спросить", exact: true }).click();
   await expect(page.getByText("Тест один: проверяет, что add(2, 3) = 5.")).toBeVisible();
-  expect(git(repo, "branch", "--list", "artel/*")).not.toBe("");
+  expect(git(repo, "branch", "--list", "drimvox/*")).not.toBe("");
 });
 
 test("a Windows notification says the task is ready, and a click opens it", async () => {
@@ -165,18 +165,18 @@ test("a Windows notification says the task is ready, and a click opens it", asyn
       { toolCalls: [{ name: "finish", args: { summary: "Добавил notes.txt.", commit_message: "Add notes" } }] },
     ],
     // The window counts as being in the background.
-    { ARTEL_TEST_UNFOCUSED: "1" },
+    { DRIMVOX_TEST_UNFOCUSED: "1" },
   );
   await startTask(page, "Добавь notes.txt");
   await expect(page.getByText("Добавил notes.txt.")).toBeVisible();
 
   const notices = async () =>
-    app!.evaluate(() => ((globalThis as any).artelNotices ?? []).map((n: any) => ({ title: n.title, body: n.body })));
+    app!.evaluate(() => ((globalThis as any).drimvoxNotices ?? []).map((n: any) => ({ title: n.title, body: n.body })));
   await expect.poll(notices, { timeout: 10_000 }).toEqual([{ title: "Готово, можно смотреть правки", body: "Добавь notes.txt" }]);
 
   await page.getByRole("button", { name: "Настройки" }).first().click();
   await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
-  await app!.evaluate(() => (globalThis as any).artelNotices[0].click());
+  await app!.evaluate(() => (globalThis as any).drimvoxNotices[0].click());
   await expect(page.getByRole("heading", { level: 1, name: "Добавь notes.txt" })).toBeVisible();
 });
 
@@ -210,7 +210,7 @@ test("discarding removes the copy and leaves the project alone", async () => {
   await page.getByRole("button", { name: "Отказаться от правок" }).click();
   await expect(page.getByText("Правки отменены, копия удалена.")).toBeVisible();
   expect(existsSync(join(repo, "extra.txt"))).toBe(false);
-  expect(git(repo, "branch", "--list", "artel/*")).toBe("");
+  expect(git(repo, "branch", "--list", "drimvox/*")).toBe("");
 });
 
 test("requirements in the spec, an acceptance round that sends work back, and the report in review", async () => {

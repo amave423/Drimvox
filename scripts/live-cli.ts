@@ -1,6 +1,6 @@
 // CLI part of the live check (`--cli`): Claude Code, Codex and Gemini CLI that are installed and logged in answer
 // in a chat and do the agent's task through the whole pipeline. Paid by the user's subscriptions, not by keys.
-import type { ModelInfo, PresetId, ProviderView } from "@artel/shared";
+import type { ModelInfo, PresetId, ProviderView } from "@drimvox/shared";
 import { checkAgent } from "./live-agent";
 
 type Api = (method: string, path: string, body?: unknown) => Promise<{ status: number; body: any }>;

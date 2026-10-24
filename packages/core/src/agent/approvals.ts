@@ -1,4 +1,4 @@
-import type { PendingApproval } from "@artel/shared";
+import type { PendingApproval } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 
 export type ApprovalAnswer = boolean | "always";

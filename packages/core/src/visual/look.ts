@@ -1,5 +1,5 @@
-import type { PageAction } from "@artel/shared";
-import type { ModelInfo } from "@artel/shared";
+import type { PageAction } from "@drimvox/shared";
+import type { ModelInfo } from "@drimvox/shared";
 import { streamText } from "ai";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";

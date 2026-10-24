@@ -1,4 +1,4 @@
-import type { MessageView, ProjectWorkView } from "@artel/shared";
+import type { MessageView, ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd, fromShown, shownSign, toShown } from "../../lib/format";

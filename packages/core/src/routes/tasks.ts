@@ -10,7 +10,7 @@ import {
   taskContinueSchema,
   taskFeedbackSchema,
   type TaskUpdate,
-} from "@artel/shared";
+} from "@drimvox/shared";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";

@@ -1,7 +1,7 @@
 import type { BacklogRepo } from "../backlog/repo";
 import type { ProjectWorkRepo } from "../work/repo";
 import { toPlanStep } from "../work/plan";
-import type { Milestone, ModelRef, PlannedSubtask, Question, Requirement, StyleReference, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@artel/shared";
+import type { Milestone, ModelRef, PlannedSubtask, Question, Requirement, StyleReference, TaskEvent, TaskFeedback, TaskPhase, TaskStages, TaskUpdate, TaskView, VisualCheck } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { ProviderRepo } from "../providers/repo";
@@ -79,7 +79,7 @@ export class AgentRunner {
     const project = this.o.projects.get(projectId);
     if (!project) throw new Error("Unknown project");
     const id = randomUUID();
-    const branch = `artel/${id.slice(0, 8)}`;
+    const branch = `drimvox/${id.slice(0, 8)}`;
     const worktree = join(this.o.dataDir, "worktrees", id);
     const base = await headCommit(project.path);
     await addWorktree(project.path, worktree, branch, base);

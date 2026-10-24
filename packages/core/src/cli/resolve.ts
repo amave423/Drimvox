@@ -1,4 +1,4 @@
-import { presets } from "@artel/shared";
+import { presets } from "@drimvox/shared";
 import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, extname, isAbsolute, join } from "node:path";

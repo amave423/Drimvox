@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@artel/shared";
+import type { ModelInfo } from "@drimvox/shared";
 import type { Connection } from "./repo";
 
 /**

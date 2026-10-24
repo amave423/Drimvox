@@ -1,4 +1,4 @@
-import { MAX_WAIT_MS } from "@artel/shared";
+import { MAX_WAIT_MS } from "@drimvox/shared";
 import { z } from "zod";
 
 /** Steps done on a page before it is read or photographed, as a person would: click, type, press a key, wait. */

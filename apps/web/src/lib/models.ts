@@ -1,4 +1,4 @@
-import type { ModelInfo, ProviderError } from "@artel/shared";
+import type { ModelInfo, ProviderError } from "@drimvox/shared";
 import type { Api } from "../api";
 
 export type ModelsResult = { models: ModelInfo[] } | { error: ProviderError };

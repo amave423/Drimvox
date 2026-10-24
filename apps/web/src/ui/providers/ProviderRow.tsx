@@ -1,5 +1,5 @@
 import { SubscriptionLimits } from "./SubscriptionLimits";
-import type { Balance, ProviderView } from "@artel/shared";
+import type { Balance, ProviderView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";

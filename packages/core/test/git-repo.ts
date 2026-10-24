@@ -15,7 +15,7 @@ export function git(cwd: string, ...args: string[]): string {
 
 /** A fresh repository with the given files committed on `main`. */
 export function makeRepo(files: Record<string, string> = { "README.md": "# Demo\n" }): string {
-  const dir = mkdtempSync(join(tmpdir(), "artel-repo-"));
+  const dir = mkdtempSync(join(tmpdir(), "drimvox-repo-"));
   git(dir, "init", "-q", "-b", "main");
   git(dir, "config", "core.autocrlf", "false");
   writeFiles(dir, files);

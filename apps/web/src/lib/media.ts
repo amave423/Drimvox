@@ -1,5 +1,5 @@
 import { authHeaders } from "../api";
-import type { MediaKind, MediaModel } from "@artel/shared";
+import type { MediaKind, MediaModel } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import type { Api } from "../api";
 
@@ -67,6 +67,6 @@ export const mediaUrl = (id: string) => `/api/media/${id}/content`;
 /** A name for "Save as": the start of the prompt and the right extension. */
 export function fileName(prompt: string, mime: string): string {
   const ext = mime.split("/")[1]?.replace("jpeg", "jpg").replace("svg+xml", "svg") ?? "bin";
-  const base = prompt.trim().slice(0, 40).replace(/[\\/:*?"<>|\s]+/g, "-").replace(/^-+|-+$/g, "") || "artel";
+  const base = prompt.trim().slice(0, 40).replace(/[\\/:*?"<>|\s]+/g, "-").replace(/^-+|-+$/g, "") || "drimvox";
   return `${base}.${ext}`;
 }

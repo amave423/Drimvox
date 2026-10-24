@@ -6,25 +6,29 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { InitMessage } from "./core-process";
-import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, type PageAction } from "@artel/shared";
+import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, type PageAction } from "@drimvox/shared";
+import { dataFolder } from "./data-folder";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
 /** Injected by build.mjs; app.getVersion() reports Electron's version when running unpackaged. */
-declare const __ARTEL_VERSION__: string;
-const devServerUrl = process.env.ARTEL_DEV_SERVER_URL;
+declare const __DRIMVOX_VERSION__: string;
+const devServerUrl = process.env.DRIMVOX_DEV_SERVER_URL;
 const token = randomBytes(32).toString("hex");
 
 // Unpackaged Electron would otherwise store data under %APPDATA%\Electron. Dev keeps its own folder;
-// ARTEL_USER_DATA lets tests isolate theirs.
-// The data folder keeps the old name (%APPDATA%\Artel): chats, keys and projects stay where they were after the rename.
-app.setName(devServerUrl ? "Artel Dev" : "Artel");
-app.setPath("userData", process.env.ARTEL_USER_DATA ?? join(app.getPath("appData"), app.getName()));
+// DRIMVOX_USER_DATA lets tests isolate theirs.
+// The folder of the app's old name (Artel) becomes Drimvox's on the first start, with everything in it.
+app.setName(devServerUrl ? "Drimvox Dev" : "Drimvox");
+app.setPath(
+  "userData",
+  process.env.DRIMVOX_USER_DATA ?? dataFolder(join(app.getPath("appData"), app.getName()), join(app.getPath("appData"), devServerUrl ? "Artel Dev" : "Artel")),
+);
 // Windows shows toasts only for apps with an identity. The installed app has the installer's (electron-builder.yml),
 // a run from the sources its own, so their Start menu shortcuts do not overwrite each other.
-const appId = app.isPackaged ? "com.artel.app" : devServerUrl ? "Artel Dev" : "Artel";
+const appId = app.isPackaged ? "com.artel.app" : devServerUrl ? "Drimvox Dev" : "Drimvox";
 app.setAppUserModelId(appId);
 
 /**
@@ -32,7 +36,7 @@ app.setAppUserModelId(appId);
  * one; `npm start` does not, and then every notification vanishes without an error. Drimvox keeps its own shortcut.
  */
 function ensureShortcut(): void {
-  if (process.platform !== "win32" || app.isPackaged || process.env.ARTEL_USER_DATA) return;
+  if (process.platform !== "win32" || app.isPackaged || process.env.DRIMVOX_USER_DATA) return;
   const link = join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", `${appId} (npm start).lnk`);
   const wanted = { target: process.execPath, args: app.isPackaged ? "" : `"${app.getAppPath()}"`, appUserModelId: appId, description: appId };
   try {
@@ -84,7 +88,7 @@ async function launch() {
  * first start acts on it once.
  */
 function takeInstallerNote(name: string): boolean {
-  const note = join(process.env.ARTEL_TEST_PROGRAM_DIR ?? dirname(process.execPath), name);
+  const note = join(process.env.DRIMVOX_TEST_PROGRAM_DIR ?? dirname(process.execPath), name);
   if (!existsSync(note)) return false;
   rmSync(note, { force: true });
   return true;
@@ -118,7 +122,7 @@ function startCore(): Promise<number> {
     token,
     secretKey: loadSecretKey(dataDir).toString("base64"),
     dataDir,
-    version: __ARTEL_VERSION__,
+    version: __DRIMVOX_VERSION__,
     port: devServerUrl ? DEV_CORE_PORT : 0,
     webDir: devServerUrl ? undefined : webDir(),
   };
@@ -237,7 +241,7 @@ function settled(shot: BrowserWindow): Promise<void> {
 /** Opens a page in a hidden window of its own session, goes through the steps, and hands the window to `read`. */
 async function withPage<T>(url: string, width: number, height: number, actions: PageAction[], read: (shot: BrowserWindow) => Promise<T>): Promise<T> {
   if (!/^https?:\/\//.test(url)) throw new Error("Only http and https pages");
-  const preview = session.fromPartition("artel-preview");
+  const preview = session.fromPartition("drimvox-preview");
   preview.removeAllListeners("will-download");
   preview.on("will-download", (_event, item) => item.cancel());
   const shot = new BrowserWindow({
@@ -288,15 +292,15 @@ function fromOurPage(url: string | undefined): boolean {
 }
 
 function registerIpc() {
-  ipcMain.handle("artel:token", (event) => {
+  ipcMain.handle("drimvox:token", (event) => {
     if (!fromOurPage(event.senderFrame?.url)) throw new Error("Forbidden");
     return token;
   });
 
-  ipcMain.handle("artel:pick-folder", async (event) => {
+  ipcMain.handle("drimvox:pick-folder", async (event) => {
     if (!fromOurPage(event.senderFrame?.url)) throw new Error("Forbidden");
     // Tests cannot click a native dialog; they hand the folder over through the environment.
-    if (process.env.ARTEL_TEST_PICK_FOLDER) return process.env.ARTEL_TEST_PICK_FOLDER;
+    if (process.env.DRIMVOX_TEST_PICK_FOLDER) return process.env.DRIMVOX_TEST_PICK_FOLDER;
     const owner = BrowserWindow.fromWebContents(event.sender);
     const options = { properties: ["openDirectory", "createDirectory"] as ("openDirectory" | "createDirectory")[] };
     const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
@@ -304,19 +308,19 @@ function registerIpc() {
   });
 
   // Only this one folder: the page cannot ask the main process to open arbitrary paths.
-  ipcMain.on("artel:open-skills", (event) => {
+  ipcMain.on("drimvox:open-skills", (event) => {
     if (!fromOurPage(event.senderFrame?.url)) return;
     const dir = join(app.getPath("userData"), "skills");
     mkdirSync(dir, { recursive: true });
     void shell.openPath(dir);
   });
 
-  ipcMain.on("artel:notify", (event, notice: { title?: unknown; body?: unknown; taskId?: unknown }) => {
+  ipcMain.on("drimvox:notify", (event, notice: { title?: unknown; body?: unknown; taskId?: unknown }) => {
     if (!fromOurPage(event.senderFrame?.url)) return;
     const { title, body, taskId } = notice ?? {};
     if (typeof title !== "string" || typeof body !== "string" || typeof taskId !== "string") return;
     // Tests cannot take the focus away from the window; they say it is elsewhere.
-    const away = process.env.ARTEL_TEST_UNFOCUSED === "1" || !win?.isFocused();
+    const away = process.env.DRIMVOX_TEST_UNFOCUSED === "1" || !win?.isFocused();
     if (!away || !Notification.isSupported()) return;
     const toast = makeToast(title, body);
     toast.on("click", () => {
@@ -324,11 +328,11 @@ function registerIpc() {
       if (win.isMinimized()) win.restore();
       win.show();
       win.focus();
-      win.webContents.send("artel:open-task", taskId);
+      win.webContents.send("drimvox:open-task", taskId);
     });
-    if (process.env.ARTEL_TEST_UNFOCUSED === "1") {
+    if (process.env.DRIMVOX_TEST_UNFOCUSED === "1") {
       // Tests read and click notifications here instead of on the desktop.
-      const shown = ((globalThis as { artelNotices?: unknown[] }).artelNotices ??= []);
+      const shown = ((globalThis as { drimvoxNotices?: unknown[] }).drimvoxNotices ??= []);
       shown.push({ title, body, taskId, click: () => toast.emit("click") });
       return;
     }
@@ -337,10 +341,10 @@ function registerIpc() {
     win?.flashFrame(true);
   });
 
-  ipcMain.handle("artel:focus-assist", (event) => (fromOurPage(event.senderFrame?.url) ? focusAssist() : null));
+  ipcMain.handle("drimvox:focus-assist", (event) => (fromOurPage(event.senderFrame?.url) ? focusAssist() : null));
 
   // Settings: one notification now, whatever window is in front, to see that they reach the desktop.
-  ipcMain.on("artel:notify-test", (event, notice: { title?: unknown; body?: unknown }) => {
+  ipcMain.on("drimvox:notify-test", (event, notice: { title?: unknown; body?: unknown }) => {
     if (!fromOurPage(event.senderFrame?.url) || !Notification.isSupported()) return;
     const { title, body } = notice ?? {};
     if (typeof title !== "string" || typeof body !== "string") return;
@@ -348,7 +352,7 @@ function registerIpc() {
   });
 
   const hex = /^#[0-9a-f]{6}$/i;
-  ipcMain.on("artel:titlebar", (event, colors: { background?: unknown; symbols?: unknown }) => {
+  ipcMain.on("drimvox:titlebar", (event, colors: { background?: unknown; symbols?: unknown }) => {
     const { background, symbols } = colors ?? {};
     if (typeof background !== "string" || typeof symbols !== "string") return;
     if (!hex.test(background) || !hex.test(symbols)) return;
@@ -418,7 +422,7 @@ app.on("before-quit", (event) => {
  * PowerShell; null elsewhere or when it cannot be read.
  */
 function focusAssist(): Promise<number | null> {
-  if (process.env.ARTEL_TEST_FOCUS_ASSIST) return Promise.resolve(Number(process.env.ARTEL_TEST_FOCUS_ASSIST));
+  if (process.env.DRIMVOX_TEST_FOCUS_ASSIST) return Promise.resolve(Number(process.env.DRIMVOX_TEST_FOCUS_ASSIST));
   if (process.platform !== "win32") return Promise.resolve(null);
   const script = [
     `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class Wnf { [DllImport("ntdll.dll")] public static extern int NtQueryWnfStateData(ref ulong n, IntPtr t, IntPtr s, out uint c, byte[] b, ref uint z); }'`,

@@ -1,4 +1,4 @@
-import type { TaskView } from "@artel/shared";
+import type { TaskView } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";

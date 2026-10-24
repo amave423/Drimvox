@@ -1,4 +1,4 @@
-import type { ProjectView } from "@artel/shared";
+import type { ProjectView } from "@drimvox/shared";
 import { useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
@@ -27,11 +27,11 @@ export function useAddProject() {
   }
 
   async function pick() {
-    if (!window.artel?.pickFolder) {
+    if (!window.drimvox?.pickFolder) {
       setTyping(true);
       return;
     }
-    const folder = await window.artel.pickFolder();
+    const folder = await window.drimvox.pickFolder();
     if (folder) await add(folder);
   }
 

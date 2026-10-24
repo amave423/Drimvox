@@ -1,5 +1,5 @@
 /** Bridge exposed by the desktop preload script. Absent when the UI runs in a plain browser. */
-interface ArtelBridge {
+interface DrimvoxBridge {
   getToken(): Promise<string>;
   setTitleBar(colors: { background: string; symbols: string }): void;
   /** Native folder picker; null when the user cancels. */
@@ -33,5 +33,5 @@ interface UpdateState {
 }
 
 interface Window {
-  artel?: ArtelBridge;
+  drimvox?: DrimvoxBridge;
 }

@@ -1,4 +1,4 @@
-import type { HfMediaFile, HfMediaRepo, LocalImagesStatus } from "@artel/shared";
+import type { HfMediaFile, HfMediaRepo, LocalImagesStatus } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";

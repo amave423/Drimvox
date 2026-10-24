@@ -1,4 +1,4 @@
-import type { Theme } from "@artel/shared";
+import type { Theme } from "@drimvox/shared";
 
 export type ResolvedTheme = "light" | "dark";
 
@@ -11,7 +11,7 @@ export function applyTheme(resolved: ResolvedTheme): void {
   const root = document.documentElement;
   root.dataset.theme = resolved;
   const css = getComputedStyle(root);
-  window.artel?.setTitleBar({
+  window.drimvox?.setTitleBar({
     background: css.getPropertyValue("--paper").trim(),
     symbols: css.getPropertyValue("--fg").trim(),
   });

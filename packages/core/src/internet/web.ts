@@ -1,4 +1,4 @@
-import type { PageAction } from "@artel/shared";
+import type { PageAction } from "@drimvox/shared";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 

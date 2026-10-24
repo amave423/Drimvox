@@ -1,4 +1,4 @@
-import type { TaskView } from "@artel/shared";
+import type { TaskView } from "@drimvox/shared";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
 import { StatusChip } from "./StatusDot";

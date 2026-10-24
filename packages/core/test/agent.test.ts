@@ -68,7 +68,7 @@ describe("projects", () => {
   // Seen live: git appeared in the user's folder though nobody asked. A plain folder stays plain until the user agrees on
   // the project's page; then it gets git, dependencies left out.
   it("starts git in a plain folder only when the user asks", async () => {
-    const plain = mkdtempSync(join(tmpdir(), "artel-plain-"));
+    const plain = mkdtempSync(join(tmpdir(), "drimvox-plain-"));
     writeFileSync(join(plain, "notes.txt"), "hello");
     mkdirSync(join(plain, "node_modules", "x"), { recursive: true });
     writeFileSync(join(plain, "node_modules", "x", "index.js"), "x");
@@ -83,9 +83,9 @@ describe("projects", () => {
   });
 
   it("commits under the computer's user name when git has none set", async () => {
-    const plain = mkdtempSync(join(tmpdir(), "artel-plain-"));
+    const plain = mkdtempSync(join(tmpdir(), "drimvox-plain-"));
     writeFileSync(join(plain, "notes.txt"), "hello");
-    const empty = join(plain, "..", `artel-empty-gitconfig-${Date.now()}`);
+    const empty = join(plain, "..", `drimvox-empty-gitconfig-${Date.now()}`);
     writeFileSync(empty, "");
     const keys = ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM", "GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"];
     const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
@@ -180,9 +180,9 @@ describe("a task", () => {
   });
 
   it("turns a path outside the copy into an error for the model", async () => {
-    const outside = join(repo, "..", "artel-escape.txt");
+    const outside = join(repo, "..", "drimvox-escape.txt");
     setupResult = setup([
-      { toolCalls: [{ name: "write_file", args: { path: "../artel-escape.txt", content: "x" } }] },
+      { toolCalls: [{ name: "write_file", args: { path: "../drimvox-escape.txt", content: "x" } }] },
       { toolCalls: [finish()] },
     ]);
     const { id } = await startTask();

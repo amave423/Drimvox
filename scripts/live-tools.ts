@@ -1,5 +1,5 @@
 // Tools part of the live check (`--tools`): one real agent task that opens a skill, calls an MCP tool and looks at a page.
-import type { TaskEvent, TaskView } from "@artel/shared";
+import type { TaskEvent, TaskView } from "@drimvox/shared";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,7 +24,7 @@ export async function weatherCard(): Promise<Buffer> {
 }
 
 export async function checkTools(api: Api, providerId: string, model: string, log: (...p: unknown[]) => void): Promise<boolean> {
-  const repo = mkdtempSync(join(tmpdir(), "artel-live-tools-"));
+  const repo = mkdtempSync(join(tmpdir(), "drimvox-live-tools-"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, stdio: "pipe" });
   try {
     writeFileSync(join(repo, "README.md"), "# Tools\n");

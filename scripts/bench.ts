@@ -4,8 +4,8 @@
 // `--budget=1.5` the task budget in dollars. Keys come from .env and never reach the output.
 // The interview is answered with the recommended options, specs and stages are approved, risky commands denied.
 // Each run's events go to .bench/<task>-<time>.json for replay tests.
-import { startServer } from "@artel/core";
-import { PAGE_HEIGHT_SCRIPT, type MessageView, type StreamEvent, type TaskEvent, type TaskView } from "@artel/shared";
+import { startServer } from "@drimvox/core";
+import { PAGE_HEIGHT_SCRIPT, type MessageView, type StreamEvent, type TaskEvent, type TaskView } from "@drimvox/shared";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -98,7 +98,7 @@ async function screenshot(url: string, size: { width: number; height: number }):
   }
 }
 
-const dataDir = mkdtempSync(join(tmpdir(), "artel-bench-"));
+const dataDir = mkdtempSync(join(tmpdir(), "drimvox-bench-"));
 const token = randomBytes(16).toString("hex");
 const server = await startServer({ token, secretKey: randomBytes(32), dataDir, version: "bench", screenshot });
 const base = `http://127.0.0.1:${server.port}/api`;
@@ -290,7 +290,7 @@ async function drive(id: string, until: number): Promise<{ task: TaskView; event
 }
 
 function makeProject(files: Record<string, string>): string {
-  const dir = mkdtempSync(join(tmpdir(), "artel-bench-repo-"));
+  const dir = mkdtempSync(join(tmpdir(), "drimvox-bench-repo-"));
   for (const [path, text] of Object.entries(files)) writeFileSync(join(dir, path), text);
   const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, stdio: "pipe" });
   git("init", "-q", "-b", "main");

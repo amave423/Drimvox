@@ -16,7 +16,7 @@ export const options = {
   format: "cjs",
   target: "node24",
   external: ["electron"],
-  define: { __ARTEL_VERSION__: JSON.stringify(version) },
+  define: { __DRIMVOX_VERSION__: JSON.stringify(version) },
   sourcemap: true,
   logLevel: "info",
 };

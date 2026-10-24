@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@artel/shared";
+import type { TaskStatus } from "@drimvox/shared";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 

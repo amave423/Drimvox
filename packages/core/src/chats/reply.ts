@@ -5,8 +5,8 @@ import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
 import { FOLDER_STEPS, folderHint } from "./folder";
 import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory } from "../agent/memory";
 import { availabilityFromError, canCheck, noteAvailability } from "../providers/availability";
-import type { ModelInfo, ProviderError, StreamEvent } from "@artel/shared";
-import type { ThinkingLevel, WebMode } from "@artel/shared";
+import type { ModelInfo, ProviderError, StreamEvent } from "@drimvox/shared";
+import type { ThinkingLevel, WebMode } from "@drimvox/shared";
 import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai";
 import { cliReply } from "../cli/chat";
 import { isCli } from "../cli/kinds";
@@ -96,7 +96,7 @@ export async function reply(i: ReplyInput): Promise<void> {
   });
   await i.emit({ type: "start", userMessage, assistantMessageId: answer.id });
   // The folder as it was before this answer: "Undo" brings it back. No git, no snapshot.
-  const ref = `refs/artel/chat/${i.chatId}/${answer.id}`;
+  const ref = `refs/drimvox/chat/${i.chatId}/${answer.id}`;
   const snapshot = i.folder ? await checkpoint(i.folder, ref).catch(() => null) : null;
 
   let text = "";

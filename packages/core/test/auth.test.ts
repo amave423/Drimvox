@@ -39,7 +39,7 @@ describe("password sign-in", () => {
     const res = await send("POST", "/api/auth/setup", { password: PASSWORD, code: CODE });
     expect(res.status).toBe(200);
     const header = res.headers.get("set-cookie")!;
-    expect(header).toMatch(/^artel_session=/);
+    expect(header).toMatch(/^drimvox_session=/);
     expect(header).toMatch(/HttpOnly/i);
     expect(header).toMatch(/SameSite=Strict/i);
     expect(header).toMatch(/Max-Age=2592000/);

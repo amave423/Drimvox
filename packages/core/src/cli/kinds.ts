@@ -1,4 +1,4 @@
-import type { SubscriptionLimit } from "@artel/shared";
+import type { SubscriptionLimit } from "@drimvox/shared";
 import { realpathSync } from "node:fs";
 import { windowName } from "./limits";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";

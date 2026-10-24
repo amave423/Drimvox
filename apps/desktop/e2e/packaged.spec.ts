@@ -7,13 +7,13 @@ import { fileURLToPath } from "node:url";
 
 // The app as the installer puts it: built by `npm run dist`. Without a build there is nothing to check.
 const unpacked = fileURLToPath(new URL("../release/", import.meta.url));
-const exe = join(unpacked, process.platform === "win32" ? "win-unpacked/Drimvox.exe" : "linux-unpacked/artel");
+const exe = join(unpacked, process.platform === "win32" ? "win-unpacked/Drimvox.exe" : "linux-unpacked/drimvox");
 
 let app: ElectronApplication | undefined;
 let userData: string;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
 });
 
 test.afterEach(async () => {
@@ -24,7 +24,7 @@ test.afterEach(async () => {
 
 test("the packaged app starts its core from the archive and shows the interface", async () => {
   test.skip(!existsSync(exe), "no packaged build: run npm run dist");
-  app = await electron.launch({ executablePath: exe, env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_NO_UPDATES: "1" } });
+  app = await electron.launch({ executablePath: exe, env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_NO_UPDATES: "1" } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/^Drimvox \d+\.\d+\.\d+$/)).toBeVisible();
@@ -52,7 +52,7 @@ test("the installed app says whether it is the latest version, and what went wro
   const base = `http://127.0.0.1:${(feed.address() as { port: number }).port}`;
   try {
     for (const [path, expected] of [["ok", /Это последняя версия/], ["broken", /Не получилось проверить обновления/]] as const) {
-      app = await electron.launch({ executablePath: exe, env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_UPDATE_URL: `${base}/${path}` } });
+      app = await electron.launch({ executablePath: exe, env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_UPDATE_URL: `${base}/${path}` } });
       const page = await app.firstWindow();
       await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible({ timeout: 30_000 });
       await page.getByRole("button", { name: "Настройки" }).click();

@@ -1,4 +1,4 @@
-import type { DiffFile, DiffLine } from "@artel/shared";
+import type { DiffFile, DiffLine } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import { useAuthorizedUrl } from "../../lib/media";

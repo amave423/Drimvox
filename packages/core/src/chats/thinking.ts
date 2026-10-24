@@ -1,4 +1,4 @@
-import type { PresetId, ThinkingLevel } from "@artel/shared";
+import type { PresetId, ThinkingLevel } from "@drimvox/shared";
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 /** Options for the request body, per provider, as the AI SDK takes them. */

@@ -18,6 +18,6 @@ await build({
   logLevel: "warning",
   external: ["playwright-core", "electron"],
   // A name of its own: bundled code (pdf.js in unpdf) declares its own createRequire.
-  banner: { js: "import { createRequire as artelCreateRequire } from 'node:module'; const require = artelCreateRequire(import.meta.url);" },
+  banner: { js: "import { createRequire as drimvoxCreateRequire } from 'node:module'; const require = drimvoxCreateRequire(import.meta.url);" },
 });
 await import(pathToFileURL(outfile).href);

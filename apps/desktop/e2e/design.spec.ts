@@ -18,7 +18,7 @@ let fake: FakeProvider | undefined;
 let site: Server | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
   repo = makeRepo({ "index.html": "<h1>Меню</h1>\n" });
 });
 
@@ -106,7 +106,7 @@ test("the look: samples in the interview, the user's own sample, the brief, a de
       return coder.shift() ?? { text: "Done." };
     },
   });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo } });
   const page: Page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 

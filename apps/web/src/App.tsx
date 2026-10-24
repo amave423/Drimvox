@@ -1,4 +1,4 @@
-import type { ChatView, ProjectView, ProjectWorkView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@artel/shared";
+import type { ChatView, ProjectView, ProjectWorkView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@drimvox/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ok, type Api } from "./api";
 import { AppContext, type AppContextValue, type CoreStatus, type View } from "./context";
@@ -99,7 +99,7 @@ export function App({ api, token, initialSettings, status }: Props) {
     if (!settings.notifications) return;
     for (const n of notices) {
       const title = translate(settings.locale, `notice.${n.kind}`);
-      if (window.artel?.notify) window.artel.notify({ title, body: n.title, taskId: n.taskId });
+      if (window.drimvox?.notify) window.drimvox.notify({ title, body: n.title, taskId: n.taskId });
       // In a browser: the browser's own notifications, once allowed, while the tab is in the background.
       else if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
         const shown = new Notification(title, { body: n.title, tag: n.taskId });
@@ -111,7 +111,7 @@ export function App({ api, token, initialSettings, status }: Props) {
       }
     }
   }, [tasks]);
-  useEffect(() => window.artel?.onOpenTask?.((taskId) => setView({ kind: "task", taskId })), []);
+  useEffect(() => window.drimvox?.onOpenTask?.((taskId) => setView({ kind: "task", taskId })), []);
 
   // A project's run that waits for a permission, is done or stopped becomes a notification too (docs/specs/project-work.md):
   // seen live, a run waited half an hour on a permission nobody saw.
@@ -129,7 +129,7 @@ export function App({ api, token, initialSettings, status }: Props) {
       for (const n of notices) {
         const title = translate(settings.locale, `notice.work.${n.kind}`);
         const body = projects.find((p) => p.id === n.projectId)?.name ?? "";
-        if (window.artel?.notify) window.artel.notify({ title, body, taskId: n.taskId ?? "" });
+        if (window.drimvox?.notify) window.drimvox.notify({ title, body, taskId: n.taskId ?? "" });
         else if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) new Notification(title, { body, tag: n.projectId });
       }
     };

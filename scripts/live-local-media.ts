@@ -1,9 +1,9 @@
 // Live check of pictures and clips on this computer (docs/specs/local-images.md): the real engine and real models from
 // Hugging Face, through the real core API. `npm run live-local-media -- --model=z-image-turbo` (a clip:
 // `--kind=video --model=wan2.1-t2v-1.3b`) downloads the model
-// (gigabytes: once, into .live-local/), draws a picture and saves it next to the log. The proxy from ARTEL_PROXY is used
+// (gigabytes: once, into .live-local/), draws a picture and saves it next to the log. The proxy from DRIMVOX_PROXY is used
 // when Hugging Face cannot be reached directly.
-import { startServer } from "@artel/core";
+import { startServer } from "@drimvox/core";
 import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -31,7 +31,7 @@ const log = (...p: unknown[]) => console.log(new Date().toISOString().slice(11, 
 const gb = (n: number) => (n / 2 ** 30).toFixed(2);
 
 try {
-  if (process.env.ARTEL_PROXY) await api("PUT", "/proxy", { url: process.env.ARTEL_PROXY });
+  if (process.env.DRIMVOX_PROXY) await api("PUT", "/proxy", { url: process.env.DRIMVOX_PROXY });
   // Pictures and clips share one engine and one list.
   const statusPath = "/local/images";
   let s = (await api("GET", statusPath)).body;

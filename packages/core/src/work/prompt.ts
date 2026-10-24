@@ -1,4 +1,4 @@
-import type { ProjectPlan } from "@artel/shared";
+import type { ProjectPlan } from "@drimvox/shared";
 import { designInstructions } from "../agent/design";
 
 /** Steps one answer on a task may take: enough for a task of the list; past it, "go on" continues. */

@@ -1,4 +1,4 @@
-import type { Balance, PresetId } from "@artel/shared";
+import type { Balance, PresetId } from "@drimvox/shared";
 import { fetchJson } from "./http";
 
 /** Remaining money on the account, where the provider exposes it. Null when it does not. */

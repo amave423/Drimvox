@@ -10,7 +10,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
-const REF = "refs/artel/chat/c1/m1";
+const REF = "refs/drimvox/chat/c1/m1";
 
 describe("chat folder snapshots", () => {
   it("snapshots without touching branches, history or the user's staged work", async () => {

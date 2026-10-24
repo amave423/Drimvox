@@ -1,4 +1,4 @@
-import type { BacklogItem, WorkChanges } from "@artel/shared";
+import type { BacklogItem, WorkChanges } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";

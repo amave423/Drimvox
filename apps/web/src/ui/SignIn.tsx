@@ -1,4 +1,4 @@
-import type { Locale } from "@artel/shared";
+import type { Locale } from "@drimvox/shared";
 import { useState } from "react";
 import type { Api } from "../api";
 import { translate, type MessageKey } from "../i18n";
@@ -56,7 +56,7 @@ export function SignIn({ api, locale, passwordSet }: Props) {
           <p className="lede">{passwordSet ? t("signin.lede") : t("signin.setupLede")}</p>
           {!passwordSet && (
             <>
-              <code className="mono cli-install">sudo journalctl -u artel | grep -i code</code>
+              <code className="mono cli-install">sudo journalctl -u drimvox | grep -i code</code>
               <label className="field">
                 <span>{t("signin.code")}</span>
                 <input className="field-input mono" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />

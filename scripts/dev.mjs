@@ -10,8 +10,8 @@ const isWindows = process.platform === "win32";
 
 // npm is a .cmd shim on Windows, so it needs a shell; a single command string avoids Node's DEP0190 warning.
 const vite = isWindows
-  ? spawn("npm run dev -w @artel/web", { stdio: "inherit", shell: true })
-  : spawn("npm", ["run", "dev", "-w", "@artel/web"], { stdio: "inherit" });
+  ? spawn("npm run dev -w @drimvox/web", { stdio: "inherit", shell: true })
+  : spawn("npm", ["run", "dev", "-w", "@drimvox/web"], { stdio: "inherit" });
 await waitFor(DEV_URL);
 
 let electron = null;
@@ -20,7 +20,7 @@ let restarting = false;
 function startElectron() {
   electron = spawn(electronPath, ["apps/desktop/dist/main.cjs"], {
     stdio: "inherit",
-    env: { ...process.env, ARTEL_DEV_SERVER_URL: DEV_URL },
+    env: { ...process.env, DRIMVOX_DEV_SERVER_URL: DEV_URL },
   });
   electron.on("exit", () => {
     if (!restarting) void shutdown();

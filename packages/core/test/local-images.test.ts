@@ -1,5 +1,5 @@
 // docs/specs/local-images.md: pictures on this computer through stable-diffusion.cpp, which Drimvox downloads itself.
-import type { LocalHardware } from "@artel/shared";
+import type { LocalHardware } from "@drimvox/shared";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { join } from "node:path";

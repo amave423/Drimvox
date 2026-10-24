@@ -20,7 +20,7 @@ let site: Server | undefined;
 const hits: string[] = [];
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
   repo = makeRepo({ "index.html": "<h1>Привет</h1>\n" });
 });
 
@@ -70,7 +70,7 @@ async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
         ? { text: "Да: белый заголовок «Привет, Drimvox» на красном фоне." }
         : (coder.shift() ?? { text: "Done." }),
   });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo } });
   const page: Page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 

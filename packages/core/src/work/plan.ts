@@ -1,4 +1,4 @@
-import type { ProjectPlan } from "@artel/shared";
+import type { ProjectPlan } from "@drimvox/shared";
 import { tool, type ModelMessage, type ToolSet } from "ai";
 import { z } from "zod";
 import { briefInput, toBrief } from "../agent/design";

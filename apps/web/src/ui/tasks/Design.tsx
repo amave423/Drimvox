@@ -1,4 +1,4 @@
-import type { DesignBrief, DesignReview, FontKind, Look } from "@artel/shared";
+import type { DesignBrief, DesignReview, FontKind, Look } from "@drimvox/shared";
 import { useApp } from "../../context";
 import { useAuthorizedUrl } from "../../lib/media";
 

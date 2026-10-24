@@ -1,5 +1,5 @@
 // Agent part of the live check: a real model gets a tiny real task in a temporary git repository.
-import type { DiffFile, TaskEvent, TaskView } from "@artel/shared";
+import type { DiffFile, TaskEvent, TaskView } from "@drimvox/shared";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,7 +14,7 @@ const TASK =
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
 
 function makeProject(): string {
-  const dir = mkdtempSync(join(tmpdir(), "artel-live-repo-"));
+  const dir = mkdtempSync(join(tmpdir(), "drimvox-live-repo-"));
   writeFileSync(join(dir, "package.json"), '{ "type": "module" }\n');
   writeFileSync(join(dir, "math.js"), "export function add(a, b) {\n  return a + b;\n}\n");
   writeFileSync(

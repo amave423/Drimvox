@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { skillCreateSchema, skillImportSchema } from "@artel/shared";
+import { skillCreateSchema, skillImportSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";

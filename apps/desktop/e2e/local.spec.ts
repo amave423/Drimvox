@@ -15,7 +15,7 @@ let app: ElectronApplication | undefined;
 let registry: Server | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
 });
 
 test.afterEach(async () => {
@@ -68,7 +68,7 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   };
   app = await electron.launch({
     args: [mainJs],
-    env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, ARTEL_TEST_LOCAL: JSON.stringify(local) },
+    env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, DRIMVOX_TEST_LOCAL: JSON.stringify(local) },
   });
   const page: Page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
@@ -136,7 +136,7 @@ test("installs Ollama from the sheet: the size first, then Drimvox finds it", as
     // After the setup, the fake Ollama is the one found.
     install: { url: `http://127.0.0.1:${(registry.address() as { port: number }).port}/OllamaSetup.exe`, skipRun: true, command: [process.execPath, FAKE_OLLAMA], can: true },
   };
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, ARTEL_TEST_LOCAL: JSON.stringify(local) } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page: Page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
@@ -164,11 +164,11 @@ test("installs Ollama on the first start when the installer was asked to", async
     hfUrl: "http://127.0.0.1:9",
     install: { url: `http://127.0.0.1:${(registry.address() as { port: number }).port}/OllamaSetup.exe`, skipRun: true, command: [process.execPath, FAKE_OLLAMA], can: true },
   };
-  const program = mkdtempSync(join(tmpdir(), "artel-e2e-program-"));
+  const program = mkdtempSync(join(tmpdir(), "drimvox-e2e-program-"));
   writeFileSync(join(program, "install-ollama"), "");
   app = await electron.launch({
     args: [mainJs],
-    env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PROGRAM_DIR: program, ARTEL_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, ARTEL_TEST_LOCAL: JSON.stringify(local) },
+    env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PROGRAM_DIR: program, DRIMVOX_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, DRIMVOX_TEST_LOCAL: JSON.stringify(local) },
   });
   const page: Page = await app.firstWindow();
   await expect(page.getByRole("heading", { name: "Локальные модели" })).toBeVisible();

@@ -1,4 +1,4 @@
-import type { ModelRef, TaskView } from "@artel/shared";
+import type { ModelRef, TaskView } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";

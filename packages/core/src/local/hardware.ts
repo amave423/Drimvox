@@ -1,4 +1,4 @@
-import type { LocalHardware } from "@artel/shared";
+import type { LocalHardware } from "@drimvox/shared";
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { arch, platform, totalmem } from "node:os";

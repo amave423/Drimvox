@@ -1,5 +1,5 @@
 import type { MessageKey } from "../../i18n";
-import type { ChatKind, MessageView } from "@artel/shared";
+import type { ChatKind, MessageView } from "@drimvox/shared";
 import type { ReactNode } from "react";
 import { useApp } from "../../context";
 import { useSmoothText } from "../../lib/smooth";

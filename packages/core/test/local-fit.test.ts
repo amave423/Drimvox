@@ -1,4 +1,4 @@
-import type { LocalHardware } from "@artel/shared";
+import type { LocalHardware } from "@drimvox/shared";
 import { describe, expect, it } from "vitest";
 import { fitOf, GB, recommend } from "../src/local/fit";
 import { parseNvidiaSmi, parseWindowsVideo } from "../src/local/hardware";

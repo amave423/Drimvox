@@ -1,4 +1,4 @@
-import type { ProjectWorkView } from "@artel/shared";
+import type { ProjectWorkView } from "@drimvox/shared";
 
 export type WorkNoticeKind = "approval" | "done" | "paused";
 

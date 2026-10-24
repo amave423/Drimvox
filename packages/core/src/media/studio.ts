@@ -1,4 +1,4 @@
-import type { MediaModel, MediaOptions, ProviderError, StreamEvent } from "@artel/shared";
+import type { MediaModel, MediaOptions, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { ChatRepo, PendingJob } from "../chats/repo";
 import { describeError } from "../providers/errors";
 import type { Connection, ProviderRepo } from "../providers/repo";

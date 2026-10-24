@@ -1,4 +1,4 @@
-import type { MediaModel } from "@artel/shared";
+import type { MediaModel } from "@drimvox/shared";
 import { IMAGE_SIZES, VIDEO_DURATIONS, VIDEO_SIZES } from "../local/images/catalog";
 import { EngineError } from "../local/images/server";
 import type { LocalImages } from "../local/images/service";

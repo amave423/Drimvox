@@ -1,4 +1,4 @@
-import type { GithubProject, GithubStatus } from "@artel/shared";
+import type { GithubProject, GithubStatus } from "@drimvox/shared";
 import type { Database } from "../db";
 import { currentBranch, GitError, runGit } from "../agent/git";
 import type { Cipher } from "../secrets";

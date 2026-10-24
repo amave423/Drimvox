@@ -1,6 +1,6 @@
 /** Entry of the Electron utility process that runs the core. Same core runs headless in server mode. */
-import type { PageAction } from "@artel/shared";
-import { startServer, type RunningServer } from "@artel/core";
+import type { PageAction } from "@drimvox/shared";
+import { startServer, type RunningServer } from "@drimvox/core";
 
 export interface InitMessage {
   type: "init";
@@ -69,19 +69,19 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     screenshot,
     readPage,
     // Tests pin the dollar rate instead of asking the Central Bank.
-    usdRub: process.env.ARTEL_TEST_USD_RUB ? async () => Number(process.env.ARTEL_TEST_USD_RUB) : undefined,
+    usdRub: process.env.DRIMVOX_TEST_USD_RUB ? async () => Number(process.env.DRIMVOX_TEST_USD_RUB) : undefined,
     // Tests run a fake Claude Code, Codex or Gemini CLI: {"claude-code": ["node", "fake-cli.mjs", "claude"]}.
-    cliCommands: process.env.ARTEL_TEST_CLI ? JSON.parse(process.env.ARTEL_TEST_CLI) : undefined,
+    cliCommands: process.env.DRIMVOX_TEST_CLI ? JSON.parse(process.env.DRIMVOX_TEST_CLI) : undefined,
     // Tests: a fake public model catalog and a fake page to check the proxy against.
     presetUrls: {
-      ...(process.env.ARTEL_TEST_OPENROUTER_URL ? { openrouter: process.env.ARTEL_TEST_OPENROUTER_URL } : {}),
-      ...(process.env.ARTEL_TEST_OLLAMA_URL ? { ollama: process.env.ARTEL_TEST_OLLAMA_URL } : {}),
+      ...(process.env.DRIMVOX_TEST_OPENROUTER_URL ? { openrouter: process.env.DRIMVOX_TEST_OPENROUTER_URL } : {}),
+      ...(process.env.DRIMVOX_TEST_OLLAMA_URL ? { ollama: process.env.DRIMVOX_TEST_OLLAMA_URL } : {}),
     },
-    proxyCheckUrl: process.env.ARTEL_TEST_PROXY_CHECK_URL,
+    proxyCheckUrl: process.env.DRIMVOX_TEST_PROXY_CHECK_URL,
     // Tests: a fake Ollama program, fixed hardware and fake catalogs, as JSON of LocalOptions.
-    local: process.env.ARTEL_TEST_LOCAL ? JSON.parse(process.env.ARTEL_TEST_LOCAL) : undefined,
+    local: process.env.DRIMVOX_TEST_LOCAL ? JSON.parse(process.env.DRIMVOX_TEST_LOCAL) : undefined,
     // Tests: a fake GitHub, as JSON of GithubOptions.
-    github: process.env.ARTEL_TEST_GITHUB ? JSON.parse(process.env.ARTEL_TEST_GITHUB) : undefined,
+    github: process.env.DRIMVOX_TEST_GITHUB ? JSON.parse(process.env.DRIMVOX_TEST_GITHUB) : undefined,
   })
     .then((server) => {
       running = server;

@@ -1,4 +1,4 @@
-import type { DesignBrief, DesignReview, StyleReference, VisualCheck } from "@artel/shared";
+import type { DesignBrief, DesignReview, StyleReference, VisualCheck } from "@drimvox/shared";
 import { askAboutPictures, mayLookAt, type Picture } from "../visual/look";
 import { reachable, type VisualDeps } from "../visual/tools";
 import { parseReview, polishMessage, reviewQuestion, STYLE_QUESTION } from "./design";

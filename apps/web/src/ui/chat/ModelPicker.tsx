@@ -1,4 +1,4 @@
-import { estimateCost, type ChatKind, type MediaModel, type ModelInfo, type PhotoInput, type ProviderView } from "@artel/shared";
+import { estimateCost, type ChatKind, type MediaModel, type ModelInfo, type PhotoInput, type ProviderView } from "@drimvox/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
 import { formatPrice, formatTokens, formatUsd } from "../../lib/format";

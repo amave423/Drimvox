@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@artel/shared";
+import type { ModelInfo } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { formatPrice, formatTokens } from "../../lib/format";

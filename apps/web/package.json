@@ -1,5 +1,5 @@
 {
-  "name": "@artel/web",
+  "name": "@drimvox/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,13 +9,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@artel/core": "^0.1.0",
+    "@drimvox/core": "^0.1.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2"
   },
   "dependencies": {
-    "@artel/shared": "^0.1.0",
+    "@drimvox/shared": "^0.1.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/onest": "^5.3.1",
     "@fontsource/source-serif-4": "^5.3.1",

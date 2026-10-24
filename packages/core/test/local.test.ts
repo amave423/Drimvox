@@ -1,4 +1,4 @@
-import type { LocalHardware } from "@artel/shared";
+import type { LocalHardware } from "@drimvox/shared";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";

@@ -1,4 +1,4 @@
-import type { MediaItem, MediaKind } from "@artel/shared";
+import type { MediaItem, MediaKind } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { installCommand } from "@artel/shared";
+import { installCommand } from "@drimvox/shared";
 import { resolveCli, setCliCommands } from "../src/cli/resolve";
 
 const savedPath = process.env.PATH;
@@ -13,7 +13,7 @@ afterEach(() => {
 
 /** A folder like %APPDATA%\npm, under a non-Latin name as on the author's machine. */
 function npmDir(): string {
-  const dir = join(mkdtempSync(join(tmpdir(), "artel-cli-")), "Артём npm");
+  const dir = join(mkdtempSync(join(tmpdir(), "drimvox-cli-")), "Артём npm");
   mkdirSync(dir, { recursive: true });
   process.env.PATH = dir;
   return dir;
@@ -49,7 +49,7 @@ describe.runIf(process.platform === "win32")("finding a CLI on Windows", () => {
 // Google's installer puts agy in its own folder; a running Drimvox does not see a PATH changed after it started.
 describe("finding Antigravity CLI where its installer puts it", () => {
   it("looks in %LOCALAPPDATA%\agy\bin on Windows and ~/.local/bin elsewhere", () => {
-    const home = mkdtempSync(join(tmpdir(), "artel-agy-"));
+    const home = mkdtempSync(join(tmpdir(), "drimvox-agy-"));
     const saved = { LOCALAPPDATA: process.env.LOCALAPPDATA, HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
     process.env.PATH = join(home, "nothing-here");
     process.env.LOCALAPPDATA = home;

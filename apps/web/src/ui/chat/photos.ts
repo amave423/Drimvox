@@ -1,4 +1,4 @@
-import type { MediaModel } from "@artel/shared";
+import type { MediaModel } from "@drimvox/shared";
 import type { PendingFile } from "./Attachments";
 
 /** What is wrong with the files for a picture or a clip, before they go (the core checks the same, docs/specs/media.md). */

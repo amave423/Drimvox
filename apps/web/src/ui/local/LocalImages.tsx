@@ -1,4 +1,4 @@
-import type { LocalImageModelId, LocalImagesStatus } from "@artel/shared";
+import type { LocalImageModelId, LocalImagesStatus } from "@drimvox/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";

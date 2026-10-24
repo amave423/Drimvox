@@ -15,8 +15,8 @@ let app: ElectronApplication | undefined;
 let fake: FakeProvider | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
-  repo = mkdtempSync(join(tmpdir(), "artel-repo-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
+  repo = mkdtempSync(join(tmpdir(), "drimvox-repo-"));
   writeFileSync(join(repo, "README.md"), "# Лесопилка\n");
   const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, stdio: "pipe" });
   git("init", "-q", "-b", "main");
@@ -44,7 +44,7 @@ async function launch(script: FakeTurn[]): Promise<Page> {
     models: [{ id: "coder", name: "Coder", supported_parameters: ["tools"] }],
     respond: () => queue.shift() ?? { text: "Готово." },
   });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Ключи и модели" }).click();

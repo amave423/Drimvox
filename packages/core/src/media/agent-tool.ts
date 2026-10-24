@@ -1,4 +1,4 @@
-import { estimateCost, needsConfirmation, type MediaModel } from "@artel/shared";
+import { estimateCost, needsConfirmation, type MediaModel } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";

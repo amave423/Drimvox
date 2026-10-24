@@ -11,7 +11,7 @@ let url: string;
 let dir: string;
 
 beforeEach(async () => {
-  dir = mkdtempSync(join(tmpdir(), "artel-install-"));
+  dir = mkdtempSync(join(tmpdir(), "drimvox-install-"));
   server = createServer((req, res) => {
     res.writeHead(200, { "content-type": "application/octet-stream", "content-length": String(SETUP.length) });
     if (req.method === "HEAD") return res.end();
@@ -75,7 +75,7 @@ describe("installing Ollama through the API", () => {
         hardware: { ramBytes: 16 * 2 ** 30, gpu: null, unified: false },
         registryUrl: "http://127.0.0.1:9",
         hfUrl: "http://127.0.0.1:9",
-        install: { url, skipRun: true, command: ["artel-no-such-ollama"], can: true },
+        install: { url, skipRun: true, command: ["drimvox-no-such-ollama"], can: true },
       });
       expect((await env.call("POST", "/api/local/install")).status).toBe(202);
       const started = Date.now();

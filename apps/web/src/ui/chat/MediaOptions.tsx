@@ -1,4 +1,4 @@
-import { isRoughEstimate, type MediaModel, type MediaOptions as Options } from "@artel/shared";
+import { isRoughEstimate, type MediaModel, type MediaOptions as Options } from "@drimvox/shared";
 import type { ReactNode } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";

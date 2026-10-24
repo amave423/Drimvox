@@ -1,4 +1,4 @@
-import type { DiffFile } from "@artel/shared";
+import type { DiffFile } from "@drimvox/shared";
 import {
   changedFiles,
   commitAll,

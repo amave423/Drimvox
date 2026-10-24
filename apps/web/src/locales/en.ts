@@ -588,7 +588,7 @@ export const en: Record<keyof typeof ru, string> = {
   "settings.notificationsOn": "Notify in Windows",
 
   "skills.title": "Skills",
-  "skills.lede": "Ready instructions for agents: how to write reports or tests, the house style. An agent sees the list and opens the one it needs. A skill is a folder with SKILL.md, as in Claude Code; a project's own skills live in its .artel/skills and .claude/skills folders.",
+  "skills.lede": "Ready instructions for agents: how to write reports or tests, the house style. An agent sees the list and opens the one it needs. A skill is a folder with SKILL.md, as in Claude Code; a project's own skills live in its .drimvox/skills and .claude/skills folders.",
   "skills.empty": "No shared skills yet.",
   "skills.create": "Create a skill",
   "skills.import": "Add from a folder",

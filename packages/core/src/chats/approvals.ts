@@ -1,4 +1,4 @@
-import type { ChatApprovalView, StreamEvent } from "@artel/shared";
+import type { ChatApprovalView, StreamEvent } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 
 interface Pending {

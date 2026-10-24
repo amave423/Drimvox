@@ -1,4 +1,4 @@
-import type { SubscriptionLimit } from "@artel/shared";
+import type { SubscriptionLimit } from "@drimvox/shared";
 import type { CliId } from "./kinds";
 
 /**

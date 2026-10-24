@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { findSkills, projectSkillRoots, toSkillView } from "../skills/skills";
-import { projectCreateSchema, taskCreateSchema, type ProjectView } from "@artel/shared";
+import { projectCreateSchema, taskCreateSchema, type ProjectView } from "@drimvox/shared";
 import { Hono } from "hono";
 import { existsSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";

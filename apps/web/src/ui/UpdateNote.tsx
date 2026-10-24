@@ -6,7 +6,7 @@ export function UpdateNote() {
   const { t } = useApp();
   const [update, setUpdate] = useState<UpdateState | null>(null);
   useEffect(() => {
-    const bridge = window.artel;
+    const bridge = window.drimvox;
     if (!bridge?.updateState) return;
     void bridge.updateState().then((s) => s && setUpdate(s));
     return bridge.onUpdate(setUpdate);
@@ -29,7 +29,7 @@ export function UpdateNote() {
   return (
     <span className="update-note">
       {t("update.ready", { version: update.version })}{" "}
-      <button type="button" className="link" onClick={() => window.artel?.installUpdate()}>
+      <button type="button" className="link" onClick={() => window.drimvox?.installUpdate()}>
         {t("update.restart")}
       </button>
     </span>

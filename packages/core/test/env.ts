@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { PresetId } from "@artel/shared";
+import type { PresetId } from "@drimvox/shared";
 import { createCore, openDatabase, type Database } from "../src";
 import type { WebAccess } from "../src/internet/web";
 import type { Screenshotter } from "../src/visual/look";
@@ -54,7 +54,7 @@ export interface TestEnv {
 
 /** `setupCode` turns on the server's password sign-in instead of the desktop's token. */
 export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
-  const dir = mkdtempSync(join(tmpdir(), "artel-core-"));
+  const dir = mkdtempSync(join(tmpdir(), "drimvox-core-"));
   const secretKey = randomBytes(32);
   let idleTimeoutMs: number | undefined;
   let mediaPollMs: number | undefined;
@@ -114,7 +114,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
   };
   const env: TestEnv = {
     dir,
-    db: openDatabase(join(dir, "artel.db")),
+    db: openDatabase(join(dir, "drimvox.db")),
     secretKey,
     app: (webDir) => coreFor(webDir).app,
     setIdleTimeout(ms) {
@@ -173,7 +173,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
       void core?.shutdown();
       core = undefined;
       env.db.close();
-      env.db = openDatabase(join(dir, "artel.db"));
+      env.db = openDatabase(join(dir, "drimvox.db"));
     },
     close() {
       void core?.shutdown();

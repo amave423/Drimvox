@@ -1,4 +1,4 @@
-import type { FollowEvent } from "@artel/shared";
+import type { FollowEvent } from "@drimvox/shared";
 import { useEffect, useRef, useState } from "react";
 import { getStream } from "../../lib/sse";
 

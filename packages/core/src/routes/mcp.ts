@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { mcpServerCreateSchema, mcpServerUpdateSchema } from "@artel/shared";
+import { mcpServerCreateSchema, mcpServerUpdateSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import type { McpHub } from "../mcp/hub";
 import type { McpRepo } from "../mcp/repo";

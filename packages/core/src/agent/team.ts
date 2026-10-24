@@ -1,7 +1,7 @@
-import type { AcceptanceReport, Milestone, Requirement } from "@artel/shared";
+import type { AcceptanceReport, Milestone, Requirement } from "@drimvox/shared";
 import { accepted } from "./acceptance";
 import type { Rework } from "./landing";
-import type { ModelRef, PlannedSubtask, TaskEvent, TaskStages } from "@artel/shared";
+import type { ModelRef, PlannedSubtask, TaskEvent, TaskStages } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { failureReport, runChecks } from "./checks";
@@ -173,7 +173,7 @@ export class Team {
         provider_id: team?.providerId ?? goal.provider_id,
         model: team?.model ?? goal.model,
         status: "queued",
-        branch: `artel/${id.slice(0, 8)}`,
+        branch: `drimvox/${id.slice(0, 8)}`,
         worktree: join(this.h.dataDir, "worktrees", id),
         base_commit: "",
         budget_usd: goal.budget_usd,

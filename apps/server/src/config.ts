@@ -12,19 +12,23 @@ export interface ServerConfig {
 }
 
 export function readConfig(env: Record<string, string | undefined>, home: string): ServerConfig {
-  const port = env.ARTEL_PORT ? Number(env.ARTEL_PORT) : 4317;
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`ARTEL_PORT must be a port number, got "${env.ARTEL_PORT}"`);
+  // A server installed before the rename (Artel) has ARTEL_* in its service and its data under the old name.
+  const get = (name: string) => env[`DRIMVOX_${name}`] ?? env[`ARTEL_${name}`];
+  const portText = get("PORT");
+  const port = portText ? Number(portText) : 4317;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`DRIMVOX_PORT must be a port number, got "${portText}"`);
+  const share = join(home, ".local", "share");
   return {
-    dataDir: env.ARTEL_DATA_DIR || join(home, ".local", "share", "artel"),
+    dataDir: get("DATA_DIR") || (!existsSync(join(share, "drimvox")) && existsSync(join(share, "artel")) ? join(share, "artel") : join(share, "drimvox")),
     port,
-    hosts: (env.ARTEL_HOSTS ?? "")
+    hosts: (get("HOSTS") ?? "")
       .split(",")
       .map((h) => h.trim())
       .filter(Boolean),
   };
 }
 
-/** "artel-box.tail1234.ts.net" from `tailscale status --json`; null when Tailscale is not running. */
+/** "drimvox-box.tail1234.ts.net" from `tailscale status --json`; null when Tailscale is not running. */
 export function tailscaleName(statusJson: string): string | null {
   try {
     const status = JSON.parse(statusJson) as { BackendState?: string; Self?: { DNSName?: string } };

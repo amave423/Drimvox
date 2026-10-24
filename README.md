@@ -28,7 +28,7 @@ ChatGPT subscription, or local models.*
 
 ## Установка
 
-Скачай установщик последней версии на странице [Releases](https://github.com/amave423/artel/releases).
+Скачай установщик последней версии на странице [Releases](https://github.com/amave423/Drimvox/releases).
 
 **Windows 10/11** — `Drimvox-Setup-<версия>.exe`. Ставится в профиль пользователя, права администратора не нужны.
 Установщик спросит папку, нужен ли ярлык на рабочем столе и ставить ли Ollama: с этой галочкой Drimvox при первом
@@ -40,7 +40,7 @@ ChatGPT subscription, or local models.*
 - **Защитник Windows пометил файл как угрозу** — это ложное срабатывание на неподписанную программу. Открой
   «Безопасность Windows» → «Защита от вирусов и угроз» → «Журнал защиты», найди файл и выбери «Разрешить
   на устройстве». Исходный код открыт: установщик собирается на GitHub из этого репозитория
-  ([сборки](https://github.com/amave423/artel/actions)).
+  ([сборки](https://github.com/amave423/Drimvox/actions)).
 
 **Linux** — `Drimvox-<версия>-x86_64.AppImage` (любой дистрибутив: `chmod +x` и запустить) или
 `Drimvox-<версия>-amd64.deb` для Ubuntu и Debian: `sudo apt install ./Drimvox-<версия>-amd64.deb`.
@@ -162,7 +162,7 @@ Ollama умеет только отвечать текстом и смотрет
 
 - **Создать:** «Настройки» → «Скиллы» → «Создать скилл»: название, когда он нужен, инструкция.
 - **Из папки:** скилл — это папка с файлом `SKILL.md` (формат как в Claude Code). Положи её в общую папку скиллов
-  («Открыть папку скиллов») или в проект: `.artel/skills/<имя>/SKILL.md` или `.claude/skills/<имя>/SKILL.md`.
+  («Открыть папку скиллов») или в проект: `.drimvox/skills/<имя>/SKILL.md` или `.claude/skills/<имя>/SKILL.md`.
 
 ```markdown
 ---
@@ -218,21 +218,21 @@ Drimvox можно поставить на Linux-сервер и открыва�
 (в админке Tailscale: DNS → HTTPS Certificates).
 
 ```bash
-git clone https://github.com/amave423/artel.git
-cd artel
+git clone https://github.com/amave423/Drimvox.git
+cd drimvox
 npm run server:install
 ```
 
-Скрипт поставит службу `artel` и напечатает адрес вида `https://<машина>.<сеть>.ts.net` и код первого входа.
-Обновление — `git pull` и снова `npm run server:install`. Журнал: `sudo journalctl -u artel -f`.
+Скрипт поставит службу `drimvox` и напечатает адрес вида `https://<машина>.<сеть>.ts.net` и код первого входа.
+Обновление — `git pull` и снова `npm run server:install`. Журнал: `sudo journalctl -u drimvox -f`.
 
 ## Разработка
 
 Нужны [Node.js](https://nodejs.org) 22.13 или новее и git.
 
 ```bash
-git clone https://github.com/amave423/artel.git
-cd artel
+git clone https://github.com/amave423/Drimvox.git
+cd drimvox
 npm install
 npm run dev         # интерфейс с горячей перезагрузкой
 npm run verify      # типы, юнит-тесты, сборка и сквозные тесты на настоящем окне

@@ -9,12 +9,12 @@ export function UpdatesSection() {
   const { t, status, settings } = useApp();
   const [update, setUpdate] = useState<UpdateState | null>(null);
   useEffect(() => {
-    const bridge = window.artel;
+    const bridge = window.drimvox;
     if (!bridge?.updateState) return;
     void bridge.updateState().then((s) => s && setUpdate(s));
     return bridge.onUpdate(setUpdate);
   }, []);
-  if (!window.artel) return null;
+  if (!window.drimvox) return null;
 
   const when = (ms: number) => new Date(ms).toLocaleTimeString(settings.locale === "ru" ? "ru-RU" : "en-GB", { hour: "2-digit", minute: "2-digit" });
   const state = update?.state ?? "off";
@@ -52,11 +52,11 @@ export function UpdatesSection() {
       )}
       <div className="actions">
         {state === "ready" ? (
-          <button className="btn is-primary" onClick={() => window.artel?.installUpdate()}>
+          <button className="btn is-primary" onClick={() => window.drimvox?.installUpdate()}>
             {t("update.restart")}
           </button>
         ) : (
-          <button className="btn" disabled={state === "off" || state === "checking" || state === "downloading"} onClick={() => window.artel?.checkUpdates()}>
+          <button className="btn" disabled={state === "off" || state === "checking" || state === "downloading"} onClick={() => window.drimvox?.checkUpdates()}>
             {t("updates.check")}
           </button>
         )}

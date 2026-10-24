@@ -8,7 +8,7 @@ import { workRoutes } from "./routes/work";
 import { resolveVision } from "./visual/look";
 import { findModel } from "./providers/catalog";
 import { zValidator } from "@hono/zod-validator";
-import { settingsPatchSchema, type PresetId } from "@artel/shared";
+import { settingsPatchSchema, type PresetId } from "@drimvox/shared";
 import { Hono } from "hono";
 import { join } from "node:path";
 import { ProjectRepo, TaskRepo } from "./agent/repo";

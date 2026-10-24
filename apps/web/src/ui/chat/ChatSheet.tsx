@@ -10,7 +10,7 @@ import {
   type MediaOptions as Options,
   type StreamEvent,
   type AttachmentView,
-} from "@artel/shared";
+} from "@drimvox/shared";
 import { useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";

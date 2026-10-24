@@ -1,4 +1,4 @@
-import type { Currency, Locale } from "@artel/shared";
+import type { Currency, Locale } from "@drimvox/shared";
 
 /**
  * Amounts arrive in dollars. With rubles chosen in the settings they are shown in rubles at the rate the core

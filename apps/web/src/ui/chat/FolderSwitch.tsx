@@ -43,8 +43,8 @@ export function FolderSwitch({ value, onChange, noTools = false }: Props) {
   }, [open]);
 
   async function pick() {
-    if (window.artel?.pickFolder) {
-      const folder = await window.artel.pickFolder();
+    if (window.drimvox?.pickFolder) {
+      const folder = await window.drimvox.pickFolder();
       if (folder) onChange(folder);
       setOpen(false);
     } else setOpen(true);
@@ -67,7 +67,7 @@ export function FolderSwitch({ value, onChange, noTools = false }: Props) {
       {open && (
         <div className="picker-panel is-above folder-panel">
           {value && <p className="mono muted folder-path">{value}</p>}
-          {!window.artel?.pickFolder && (
+          {!window.drimvox?.pickFolder && (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -79,7 +79,7 @@ export function FolderSwitch({ value, onChange, noTools = false }: Props) {
             </form>
           )}
           <div className="actions">
-            {window.artel?.pickFolder && (
+            {window.drimvox?.pickFolder && (
               <button type="button" className="btn" onClick={() => void pick()}>
                 {t("folder.change")}
               </button>

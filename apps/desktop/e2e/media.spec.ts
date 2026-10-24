@@ -15,7 +15,7 @@ let app: ElectronApplication | undefined;
 let fake: FakeProvider | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
 });
 
 test.afterEach(async () => {
@@ -58,7 +58,7 @@ async function launch(): Promise<Page> {
       return undefined;
     },
   });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_USD_RUB: "80" } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_USD_RUB: "80" } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 

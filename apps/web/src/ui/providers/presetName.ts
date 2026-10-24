@@ -1,4 +1,4 @@
-import { presets, type PresetId } from "@artel/shared";
+import { presets, type PresetId } from "@drimvox/shared";
 import type { AppContextValue } from "../../context";
 
 /** Brand names stay as they are; only the generic preset is translated. */

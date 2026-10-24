@@ -1,4 +1,4 @@
-import type { SkillView } from "@artel/shared";
+import type { SkillView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";
@@ -39,7 +39,7 @@ export function SkillsSection() {
 
   async function importFolder() {
     setProblem(null);
-    const folder = await window.artel?.pickFolder?.();
+    const folder = await window.drimvox?.pickFolder?.();
     if (!folder) return;
     const res = await api.skills.import.$post({ json: { path: folder } }).catch(() => null);
     if (!res?.ok) return failed(res as Response | null);
@@ -112,13 +112,13 @@ export function SkillsSection() {
           <button className="btn" onClick={() => setCreating(true)}>
             {t("skills.create")}
           </button>
-          {window.artel?.pickFolder && (
+          {window.drimvox?.pickFolder && (
             <button className="btn" onClick={() => void importFolder()}>
               {t("skills.import")}
             </button>
           )}
-          {window.artel?.openSkillsFolder && (
-            <button className="link" onClick={() => window.artel?.openSkillsFolder()}>
+          {window.drimvox?.openSkillsFolder && (
+            <button className="link" onClick={() => window.drimvox?.openSkillsFolder()}>
               {t("skills.openFolder")}
             </button>
           )}
@@ -129,7 +129,7 @@ export function SkillsSection() {
   );
 }
 
-/** A project's own skills, from `.artel/skills` and `.claude/skills` in its folder. */
+/** A project's own skills, from `.drimvox/skills` and `.claude/skills` in its folder. */
 export function ProjectSkills({ projectId }: { projectId: string }) {
   const { api, t } = useApp();
   const [skills, setSkills] = useState<SkillView[]>([]);

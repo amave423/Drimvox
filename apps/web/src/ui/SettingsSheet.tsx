@@ -1,4 +1,4 @@
-import { currencies, locales, themes, type SettingsPatch } from "@artel/shared";
+import { currencies, locales, themes, type SettingsPatch } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../context";
 import { ProjectModels } from "./ProjectModels";
@@ -19,7 +19,7 @@ export function SettingsSheet() {
   // Windows' Focus Assist hides every app's notifications: said here, where notifications are switched on.
   const [focusAssist, setFocusAssist] = useState(false);
   useEffect(() => {
-    void window.artel?.focusAssist?.().then((profile) => setFocusAssist(profile === 1 || profile === 2));
+    void window.drimvox?.focusAssist?.().then((profile) => setFocusAssist(profile === 1 || profile === 2));
   }, []);
   const [state, setState] = useState<SaveState>("idle");
   // The budget is kept in dollars and edited in the currency on screen.
@@ -63,20 +63,20 @@ export function SettingsSheet() {
           checked={settings.notifications}
           onChange={(notifications) => {
             // A browser asks the user once before it shows anything.
-            if (notifications && !window.artel && typeof Notification !== "undefined" && Notification.permission === "default") {
+            if (notifications && !window.drimvox && typeof Notification !== "undefined" && Notification.permission === "default") {
               void Notification.requestPermission();
             }
             void save({ notifications });
           }}
         >
-          {window.artel ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
+          {window.drimvox ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
         </Toggle>
         <p className="muted setting-hint">
-          {t(window.artel ? "settings.notificationsAbout" : "settings.notificationsAboutBrowser")}
-          {window.artel && (
+          {t(window.drimvox ? "settings.notificationsAbout" : "settings.notificationsAboutBrowser")}
+          {window.drimvox && (
             <>
               {" "}
-              <button type="button" className="link" onClick={() => window.artel?.testNotify({ title: t("notice.test"), body: t("notice.testBody") })}>
+              <button type="button" className="link" onClick={() => window.drimvox?.testNotify({ title: t("notice.test"), body: t("notice.testBody") })}>
                 {t("settings.notificationsTest")}
               </button>
             </>
@@ -126,7 +126,7 @@ export function SettingsSheet() {
         <ProjectModels save={(patch) => void save(patch)} />
 
         <UpdatesSection />
-        {!window.artel && <AccountSection />}
+        {!window.drimvox && <AccountSection />}
         <ProxySection />
         <McpSection />
         <SkillsSection />

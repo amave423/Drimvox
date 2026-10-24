@@ -7,12 +7,12 @@
 !ifndef BUILD_UNINSTALLER
   !include nsDialogs.nsh
 
-  Var ArtelDesktopBox
-  Var ArtelOllamaBox
-  Var ArtelNoDesktop
-  Var ArtelOllama
-  Var ArtelImagesBox
-  Var ArtelImages
+  Var DrimvoxDesktopBox
+  Var DrimvoxOllamaBox
+  Var DrimvoxNoDesktop
+  Var DrimvoxOllama
+  Var DrimvoxImagesBox
+  Var DrimvoxImages
 
   ; A welcome page, with Drimvox's picture beside it like the last one; an update skips it.
   !macro customWelcomePage
@@ -23,9 +23,9 @@
   ; The page's functions live in the macro: this file is read before electron-builder's helpers (isUpdated and the
   ; rest), the macro is expanded after them.
   !macro customPageAfterChangeDir
-    Page custom ArtelOptionsPage ArtelOptionsLeave
+    Page custom DrimvoxOptionsPage DrimvoxOptionsLeave
 
-  Function ArtelOptionsPage
+  Function DrimvoxOptionsPage
     ${If} ${isUpdated}
       Abort
     ${EndIf}
@@ -46,11 +46,11 @@
     ${Else}
       ${NSD_CreateCheckbox} 0 0 100% 12u "Desktop shortcut"
     ${EndIf}
-    Pop $ArtelDesktopBox
-    ${If} $ArtelNoDesktop == "1"
-      ${NSD_Uncheck} $ArtelDesktopBox
+    Pop $DrimvoxDesktopBox
+    ${If} $DrimvoxNoDesktop == "1"
+      ${NSD_Uncheck} $DrimvoxDesktopBox
     ${Else}
-      ${NSD_Check} $ArtelDesktopBox
+      ${NSD_Check} $DrimvoxDesktopBox
     ${EndIf}
 
     ${If} $LANGUAGE == 1049
@@ -65,14 +65,14 @@
     ${Else}
       ${NSD_CreateCheckbox} 0 42u 100% 12u "Install Ollama: free AI models right on this computer"
     ${EndIf}
-    Pop $ArtelOllamaBox
-    ${If} $ArtelOllama == "1"
-      ${NSD_Check} $ArtelOllamaBox
+    Pop $DrimvoxOllamaBox
+    ${If} $DrimvoxOllama == "1"
+      ${NSD_Check} $DrimvoxOllamaBox
     ${EndIf}
 
     ${If} ${FileExists} "$LOCALAPPDATA\Programs\Ollama\ollama.exe"
-      EnableWindow $ArtelOllamaBox 0
-      ${NSD_Uncheck} $ArtelOllamaBox
+      EnableWindow $DrimvoxOllamaBox 0
+      ${NSD_Uncheck} $DrimvoxOllamaBox
       ${If} $LANGUAGE == 1049
         ${NSD_CreateLabel} 12u 56u -12u 18u "Ollama уже установлена: Drimvox найдёт её сам."
       ${Else}
@@ -93,9 +93,9 @@
     ${Else}
       ${NSD_CreateCheckbox} 0 88u 100% 12u "Prepare pictures on this computer (the stable-diffusion.cpp engine)"
     ${EndIf}
-    Pop $ArtelImagesBox
-    ${If} $ArtelImages == "1"
-      ${NSD_Check} $ArtelImagesBox
+    Pop $DrimvoxImagesBox
+    ${If} $DrimvoxImages == "1"
+      ${NSD_Check} $DrimvoxImagesBox
     ${EndIf}
     ${If} $LANGUAGE == 1049
       ${NSD_CreateLabel} 12u 102u -12u 26u "Около 30 МБ при первом запуске. Модели картинок (от 6 ГБ) выбираются потом в «Локальных моделях»: бесплатно и без интернета."
@@ -107,38 +107,38 @@
     nsDialogs::Show
   FunctionEnd
 
-  Function ArtelOptionsLeave
-    ${NSD_GetState} $ArtelDesktopBox $0
+  Function DrimvoxOptionsLeave
+    ${NSD_GetState} $DrimvoxDesktopBox $0
     ${If} $0 == ${BST_CHECKED}
-      StrCpy $ArtelNoDesktop "0"
+      StrCpy $DrimvoxNoDesktop "0"
     ${Else}
-      StrCpy $ArtelNoDesktop "1"
+      StrCpy $DrimvoxNoDesktop "1"
     ${EndIf}
-    ${NSD_GetState} $ArtelOllamaBox $0
+    ${NSD_GetState} $DrimvoxOllamaBox $0
     ${If} $0 == ${BST_CHECKED}
-      StrCpy $ArtelOllama "1"
+      StrCpy $DrimvoxOllama "1"
     ${Else}
-      StrCpy $ArtelOllama "0"
+      StrCpy $DrimvoxOllama "0"
     ${EndIf}
-    ${NSD_GetState} $ArtelImagesBox $0
+    ${NSD_GetState} $DrimvoxImagesBox $0
     ${If} $0 == ${BST_CHECKED}
-      StrCpy $ArtelImages "1"
+      StrCpy $DrimvoxImages "1"
     ${Else}
-      StrCpy $ArtelImages "0"
+      StrCpy $DrimvoxImages "0"
     ${EndIf}
   FunctionEnd
   !macroend
 
   !macro customInstall
-    ${If} $ArtelNoDesktop == "1"
+    ${If} $DrimvoxNoDesktop == "1"
       WinShell::UninstShortcut "$newDesktopLink"
       Delete "$newDesktopLink"
     ${EndIf}
-    ${If} $ArtelOllama == "1"
+    ${If} $DrimvoxOllama == "1"
       FileOpen $0 "$INSTDIR\install-ollama" w
       FileClose $0
     ${EndIf}
-    ${If} $ArtelImages == "1"
+    ${If} $DrimvoxImages == "1"
       FileOpen $0 "$INSTDIR\install-images" w
       FileClose $0
     ${EndIf}

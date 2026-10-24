@@ -1,4 +1,4 @@
-import type { DiffFile, DiffHunk } from "@artel/shared";
+import type { DiffFile, DiffHunk } from "@drimvox/shared";
 
 /** Parses `git diff` output into files, hunks and numbered lines for the review screen. */
 export function parseDiff(text: string): DiffFile[] {

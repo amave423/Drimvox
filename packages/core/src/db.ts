@@ -259,6 +259,8 @@ export function openDatabase(file: string): Database {
   sql.exec(
     "update tasks set status = 'stopped', status_reason = 'restart' where status = 'running' or (status = 'waiting' and status_reason = 'approval')",
   );
+  // The local picture engine had an address under the app's old name (Artel).
+  sql.exec("update providers set base_url = 'drimvox://sdcpp' where base_url = 'artel://sdcpp'");
   // A project's run lives in memory too: after a restart it continues by hand.
   sql.exec("update project_work set status = 'stopped', reason = 'restart' where status = 'running'");
   return {

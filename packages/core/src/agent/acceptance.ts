@@ -1,4 +1,4 @@
-import type { AcceptanceReport, AcceptanceResult, ModelInfo, ProviderError, Requirement } from "@artel/shared";
+import type { AcceptanceReport, AcceptanceResult, ModelInfo, ProviderError, Requirement } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { isCli } from "../cli/kinds";

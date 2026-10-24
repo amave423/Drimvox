@@ -1,4 +1,4 @@
-import type { AttachmentView } from "@artel/shared";
+import type { AttachmentView } from "@drimvox/shared";
 import { ZoomableImage } from "../Lightbox";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";

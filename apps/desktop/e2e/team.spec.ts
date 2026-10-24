@@ -20,7 +20,7 @@ let app: ElectronApplication | undefined;
 let fake: FakeProvider | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
   repo = makeRepo({ "package.json": '{ "type": "module" }\n', "README.md": "# Demo\n" });
 });
 
@@ -66,7 +66,7 @@ function team(): (body: any) => FakeTurn {
 
 async function launch(): Promise<Page> {
   fake = await startFakeProvider({ key: KEY, models, respond: team() });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PICK_FOLDER: repo } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
 
@@ -82,7 +82,7 @@ async function launch(): Promise<Page> {
 test("a team: plan review with a removed subtask, the board, a subtask sheet, one review", async () => {
   const page = await launch();
   await page.getByRole("button", { name: "+ Проект" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/artel-repo-/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/drimvox-repo-/);
   await startTask(page, {
     task: "Добавь модули sub и mul",
     model: "lead",
@@ -110,5 +110,5 @@ test("a team: plan review with a removed subtask, the board, a subtask sheet, on
   await page.getByRole("button", { name: "Принять", exact: true }).click();
   await expect(page.getByText(/Принято: коммит/)).toBeVisible();
   expect(readFileSync(join(repo, "mul.js"), "utf8")).toBe("export const mul = true;\n");
-  expect(git(repo, "branch", "--list", "artel/*")).toBe("");
+  expect(git(repo, "branch", "--list", "drimvox/*")).toBe("");
 });

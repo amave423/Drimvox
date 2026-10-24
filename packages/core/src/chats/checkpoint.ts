@@ -2,20 +2,20 @@ import { randomUUID } from "node:crypto";
 import { existsSync, rmSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { DiffFile } from "@artel/shared";
+import type { DiffFile } from "@drimvox/shared";
 import { parseDiff } from "../agent/diff";
 import { isRepoRoot, runGit, withoutDependencies } from "../agent/git";
 
 /**
  * Snapshots of a chat's folder before each answer, so one button undoes what the model did (docs/specs/chat-folder.md).
- * A snapshot is a commit built in a temporary index and kept under refs/artel/chat/…: the user's branches, history,
+ * A snapshot is a commit built in a temporary index and kept under refs/drimvox/chat/…: the user's branches, history,
  * index and files stay as they are. Ignored files and dependency folders are not part of it and are never touched.
  */
-const ARTEL = { GIT_AUTHOR_NAME: "Drimvox", GIT_AUTHOR_EMAIL: "artel@localhost", GIT_COMMITTER_NAME: "Drimvox", GIT_COMMITTER_EMAIL: "artel@localhost" };
+const DRIMVOX = { GIT_AUTHOR_NAME: "Drimvox", GIT_AUTHOR_EMAIL: "drimvox@localhost", GIT_COMMITTER_NAME: "Drimvox", GIT_COMMITTER_EMAIL: "drimvox@localhost" };
 
 /** The folder's files as a tree, read through a temporary index. */
 async function treeOf(folder: string): Promise<string> {
-  const index = join(tmpdir(), `artel-index-${randomUUID()}`);
+  const index = join(tmpdir(), `drimvox-index-${randomUUID()}`);
   const env = { GIT_INDEX_FILE: index };
   try {
     await runGit(folder, ["add", "-A", "--", ".", ...withoutDependencies()], false, env);
@@ -29,7 +29,7 @@ async function treeOf(folder: string): Promise<string> {
 export async function checkpoint(folder: string, ref: string): Promise<string | null> {
   if (!(await isRepoRoot(folder))) return null;
   const tree = await treeOf(folder);
-  const commit = (await runGit(folder, ["commit-tree", tree, "-m", "Drimvox chat checkpoint"], false, ARTEL)).stdout.trim();
+  const commit = (await runGit(folder, ["commit-tree", tree, "-m", "Drimvox chat checkpoint"], false, DRIMVOX)).stdout.trim();
   await runGit(folder, ["update-ref", ref, commit]);
   return commit;
 }
@@ -53,7 +53,7 @@ export async function restore(folder: string, commit: string): Promise<void> {
     } else back.push(path);
   }
   if (back.length === 0) return;
-  const index = join(tmpdir(), `artel-index-${randomUUID()}`);
+  const index = join(tmpdir(), `drimvox-index-${randomUUID()}`);
   try {
     await runGit(folder, ["read-tree", commit], false, { GIT_INDEX_FILE: index });
     await runGit(folder, ["checkout-index", "-f", "--", ...back], false, { GIT_INDEX_FILE: index });

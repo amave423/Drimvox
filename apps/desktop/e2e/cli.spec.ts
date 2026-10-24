@@ -18,8 +18,8 @@ let app: ElectronApplication | undefined;
 let catalog: FakeProvider | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
-  cliDir = mkdtempSync(join(tmpdir(), "artel-e2e-cli-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
+  cliDir = mkdtempSync(join(tmpdir(), "drimvox-e2e-cli-"));
 });
 
 test.afterEach(async () => {
@@ -41,9 +41,9 @@ async function launch(): Promise<Page> {
     args: [mainJs],
     env: {
       ...process.env,
-      ARTEL_USER_DATA: userData,
-      ARTEL_TEST_CLI: JSON.stringify(commands),
-      ARTEL_TEST_OPENROUTER_URL: catalog.baseUrl,
+      DRIMVOX_USER_DATA: userData,
+      DRIMVOX_TEST_CLI: JSON.stringify(commands),
+      DRIMVOX_TEST_OPENROUTER_URL: catalog.baseUrl,
       FAKE_CLI_DIR: cliDir,
     },
   });

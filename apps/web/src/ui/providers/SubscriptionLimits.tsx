@@ -1,4 +1,4 @@
-import type { SubscriptionLimit } from "@artel/shared";
+import type { SubscriptionLimit } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";

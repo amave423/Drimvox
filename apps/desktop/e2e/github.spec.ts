@@ -15,8 +15,8 @@ let app: ElectronApplication | undefined;
 let hub: any;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
-  repo = mkdtempSync(join(tmpdir(), "artel-repo-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
+  repo = mkdtempSync(join(tmpdir(), "drimvox-repo-"));
   writeFileSync(join(repo, "index.html"), "<h1>Hi</h1>\n");
   const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, stdio: "pipe" });
   git("init", "-q", "-b", "main");
@@ -42,9 +42,9 @@ test("publishes a project on GitHub: the code to enter, the name, private by def
     args: [mainJs],
     env: {
       ...process.env,
-      ARTEL_USER_DATA: userData,
-      ARTEL_TEST_PICK_FOLDER: repo,
-      ARTEL_TEST_GITHUB: JSON.stringify({ webUrl: hub.origin, apiUrl: hub.origin, pollMs: 50 }),
+      DRIMVOX_USER_DATA: userData,
+      DRIMVOX_TEST_PICK_FOLDER: repo,
+      DRIMVOX_TEST_GITHUB: JSON.stringify({ webUrl: hub.origin, apiUrl: hub.origin, pollMs: 50 }),
     },
   });
   const page = await app.firstWindow();

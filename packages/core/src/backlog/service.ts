@@ -1,4 +1,4 @@
-import type { WorkChanges } from "@artel/shared";
+import type { WorkChanges } from "@drimvox/shared";
 import type { ProjectRepo } from "../agent/repo";
 import { runGit } from "../agent/git";
 import { changesSince, diffSince, dropCheckpoint, restore } from "../chats/checkpoint";
@@ -12,7 +12,7 @@ export class BacklogRefused extends Error {
   }
 }
 
-const ref = (itemId: string) => `refs/artel/item/${itemId}`;
+const ref = (itemId: string) => `refs/drimvox/item/${itemId}`;
 
 /**
  * The old task list (docs/specs/backlog-loop.md), replaced by one long run (docs/specs/project-work.md): tasks started

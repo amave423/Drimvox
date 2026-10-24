@@ -1,4 +1,4 @@
-import { presets } from "@artel/shared";
+import { presets } from "@drimvox/shared";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider } from "./fake-provider";

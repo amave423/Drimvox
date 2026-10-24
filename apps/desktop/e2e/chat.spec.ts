@@ -15,7 +15,7 @@ let app: ElectronApplication | undefined;
 let fake: FakeProvider | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
 });
 
 test.afterEach(async () => {
@@ -27,7 +27,7 @@ test.afterEach(async () => {
 });
 
 async function launch(env: Record<string, string> = {}): Promise<Page> {
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_USD_RUB: "80", ...env } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_USD_RUB: "80", ...env } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   return page;
@@ -289,7 +289,7 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
 
 // docs/specs/chat-folder.md: a chat with a folder works right in it, and one button undoes an answer.
 test("works in a connected folder and undoes an answer", async () => {
-  const folder = mkdtempSync(join(tmpdir(), "artel-e2e-folder-"));
+  const folder = mkdtempSync(join(tmpdir(), "drimvox-e2e-folder-"));
   execFileSync("git", ["init", "-q", "-b", "main"], { cwd: folder });
   writeFileSync(join(folder, "README.md"), "# Демо\n");
   fake = await startFakeProvider({
@@ -297,13 +297,13 @@ test("works in a connected folder and undoes an answer", async () => {
     models,
     script: [{ toolCalls: [{ name: "write_file", args: { path: "hello.txt", content: "привет\n" } }] }, { text: "Создал hello.txt." }],
   });
-  const page = await launch({ ARTEL_TEST_PICK_FOLDER: folder });
+  const page = await launch({ DRIMVOX_TEST_PICK_FOLDER: folder });
   await connect(page);
   await startChat(page);
   await page.getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByRole("button", { name: "Папка" }).click();
   // A connected folder is never hidden: the options button names it.
-  await expect(page.getByRole("button", { name: /^Параметры: Папка: artel-e2e-folder-/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Параметры: Папка: drimvox-e2e-folder-/ })).toBeVisible();
 
   await say(page, "Создай hello.txt");
   await expect(page.getByText("Создал hello.txt.")).toBeVisible();

@@ -1,5 +1,5 @@
 // Media part of the live check (`--media`, `--video`): a real picture and, if asked, a real clip on the cheapest models.
-import { estimateCost, isRoughEstimate, type MediaModel, type MediaOptions, type MessageView, type StreamEvent } from "@artel/shared";
+import { estimateCost, isRoughEstimate, type MediaModel, type MediaOptions, type MessageView, type StreamEvent } from "@drimvox/shared";
 
 type Api = (method: string, path: string, body?: unknown) => Promise<{ status: number; body: any }>;
 type Send = (chatId: string, body: unknown) => Promise<StreamEvent[]>;

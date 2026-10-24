@@ -1,4 +1,4 @@
-import type { GithubProject, GithubStatus, ProjectView } from "@artel/shared";
+import type { GithubProject, GithubStatus, ProjectView } from "@drimvox/shared";
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";

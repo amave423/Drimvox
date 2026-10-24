@@ -1,4 +1,4 @@
-import { defaultSettings, settingsSchema, type Settings, type SettingsPatch } from "@artel/shared";
+import { defaultSettings, settingsSchema, type Settings, type SettingsPatch } from "@drimvox/shared";
 import type { Database } from "./db";
 
 const shape = settingsSchema.shape;

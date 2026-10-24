@@ -1,5 +1,5 @@
 import { withOllamaDetails } from "./ollama-details";
-import { presets, type ModelInfo, type PresetId } from "@artel/shared";
+import { presets, type ModelInfo, type PresetId } from "@drimvox/shared";
 import { fetchJson } from "./http";
 import { usdPer } from "../rates";
 import { NATIVE, nativeModels } from "./native";

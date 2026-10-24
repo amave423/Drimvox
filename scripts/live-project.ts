@@ -1,6 +1,6 @@
 // Project part of the live check (docs/specs/project-work.md): a real model interviews, writes the plan, and after "Go"
 // works alone in a temporary project until it calls finish_work, with its own checklist.
-import type { ChatWithMessages, ProjectWorkView, TaskView } from "@artel/shared";
+import type { ChatWithMessages, ProjectWorkView, TaskView } from "@drimvox/shared";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,7 +15,7 @@ const TASK =
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
 
 function makeProject(): string {
-  const dir = mkdtempSync(join(tmpdir(), "artel-live-project-"));
+  const dir = mkdtempSync(join(tmpdir(), "drimvox-live-project-"));
   writeFileSync(join(dir, "package.json"), '{ "type": "module", "scripts": { "test": "node --test" } }\n');
   git(dir, "init", "-q", "-b", "main");
   git(dir, "config", "user.name", "Live Check");

@@ -1,4 +1,4 @@
-import type { MediaItem } from "@artel/shared";
+import type { MediaItem } from "@drimvox/shared";
 import { useApp } from "../../context";
 import { fileName, mediaUrl, useAuthorizedUrl } from "../../lib/media";
 import { ZoomableImage } from "../Lightbox";

@@ -1,4 +1,4 @@
-import type { ProviderError, ProviderErrorCode } from "@artel/shared";
+import type { ProviderError, ProviderErrorCode } from "@drimvox/shared";
 import { APICallError, RetryError } from "ai";
 
 /** A provider problem already translated into a code the UI understands. */

@@ -201,7 +201,7 @@ export const presets: Record<PresetId, Preset> = {
   sdcpp: {
     id: "sdcpp",
     name: "stable-diffusion.cpp",
-    baseUrl: "artel://sdcpp",
+    baseUrl: "drimvox://sdcpp",
     keyRequired: false,
     editableUrl: false,
     billing: "free",

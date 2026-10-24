@@ -1,4 +1,4 @@
-import type { BacklogItem, BacklogItemInput, BacklogStatus, ProjectPlan } from "@artel/shared";
+import type { BacklogItem, BacklogItemInput, BacklogStatus, ProjectPlan } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
 

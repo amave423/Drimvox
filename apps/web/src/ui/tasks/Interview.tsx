@@ -1,4 +1,4 @@
-import { referenceImageTypes, type StyleReference, type TaskView } from "@artel/shared";
+import { referenceImageTypes, type StyleReference, type TaskView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { LookSample } from "./Design";

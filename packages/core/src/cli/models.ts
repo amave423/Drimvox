@@ -1,4 +1,4 @@
-import { installCommand, type ModelInfo } from "@artel/shared";
+import { installCommand, type ModelInfo } from "@drimvox/shared";
 import { ProviderFailure } from "../providers/errors";
 import { catalogItems } from "../providers/native";
 import type { Connection } from "../providers/repo";

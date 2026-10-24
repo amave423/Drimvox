@@ -1,4 +1,4 @@
-import type { ModelInfo, ProviderError } from "@artel/shared";
+import type { ModelInfo, ProviderError } from "@drimvox/shared";
 import { hasToolCall, isStepCount, streamText, type ModelMessage, type StopCondition, type ToolSet } from "ai";
 import { describeError } from "../providers/errors";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";

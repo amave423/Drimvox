@@ -1,6 +1,6 @@
 import { rememberLimit } from "./limits";
 import { REGION } from "../providers/errors";
-import type { ProviderError } from "@artel/shared";
+import type { ProviderError } from "@drimvox/shared";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { killTree } from "../agent/commands";

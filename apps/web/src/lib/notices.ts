@@ -1,4 +1,4 @@
-import type { TaskView } from "@artel/shared";
+import type { TaskView } from "@drimvox/shared";
 
 export type NoticeKind = "review" | "answered" | "waiting" | "stuck" | "failed";
 

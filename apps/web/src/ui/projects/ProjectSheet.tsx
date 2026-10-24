@@ -1,4 +1,4 @@
-import type { ModelInfo, ProjectView } from "@artel/shared";
+import type { ModelInfo, ProjectView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";

@@ -2,7 +2,7 @@ import { HF_FILE_BASES } from "./hf-download";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OLLAMA_LINUX_COMMAND, OLLAMA_SETUP_URL, OllamaInstaller, runSetup } from "./install";
-import { presets, type HfRepo, type HfVariant, type LocalHardware, type LocalPick, type LocalPull, type LocalStatus } from "@artel/shared";
+import { presets, type HfRepo, type HfVariant, type LocalHardware, type LocalPick, type LocalPull, type LocalStatus } from "@drimvox/shared";
 import type { ProviderRepo } from "../providers/repo";
 import { LocalCatalog } from "./catalog";
 import { detectHardware } from "./hardware";
@@ -56,13 +56,13 @@ export class LocalModels {
       idleMs: o.idleMs ?? 10 * 60_000,
       hardware: this.hardware,
       onPulled: () => this.afterPull(),
-      hf: { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "artel-downloads"), proxy: o.proxy ?? (() => null) },
+      hf: { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "drimvox-downloads"), proxy: o.proxy ?? (() => null) },
     });
     const test = o.install;
     this.canInstall = test?.can ?? process.platform === "win32";
     this.installer = new OllamaInstaller({
       url: test?.url ?? OLLAMA_SETUP_URL,
-      dir: join(tmpdir(), "artel-ollama-setup"),
+      dir: join(tmpdir(), "drimvox-ollama-setup"),
       run: test?.skipRun ? async () => {} : runSetup,
       found: () => {
         const command = test?.command ?? findOllama();
@@ -70,10 +70,10 @@ export class LocalModels {
         return !!command;
       },
     });
-    const hf = { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "artel-downloads"), proxy: o.proxy ?? (() => null) };
+    const hf = { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "drimvox-downloads"), proxy: o.proxy ?? (() => null) };
     this.images = new LocalImages(
       {
-        dir: o.imagesDir ?? join(tmpdir(), "artel-images"),
+        dir: o.imagesDir ?? join(tmpdir(), "drimvox-images"),
         hardware: this.hardware,
         hf,
         providerId: () => this.providers.list().find((p) => p.preset === "sdcpp")?.id ?? null,

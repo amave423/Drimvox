@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Installs Drimvox on Ubuntu as a systemd service and opens it in your tailnet over HTTPS.
 # Run from the Drimvox folder: npm run server:install. Safe to run again after `git pull` to update.
-#   ARTEL_PORT      port on 127.0.0.1 (4317)
-#   ARTEL_DATA_DIR  data folder (~/.local/share/artel)
-#   ARTEL_CHROMIUM  1 = install Chromium for visual checks without asking, 0 = skip
+#   DRIMVOX_PORT      port on 127.0.0.1 (4317)
+#   DRIMVOX_DATA_DIR  data folder (~/.local/share/drimvox)
+#   DRIMVOX_CHROMIUM  1 = install Chromium for visual checks without asking, 0 = skip
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
-PORT="${ARTEL_PORT:-4317}"
-DATA="${ARTEL_DATA_DIR:-$HOME/.local/share/artel}"
+PORT="${DRIMVOX_PORT:-4317}"
+DATA="${DRIMVOX_DATA_DIR:-$HOME/.local/share/drimvox}"
 RUN_AS="$(id -un)"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
@@ -27,8 +27,8 @@ fi
 
 say "Installing packages and building Drimvox"
 npm install --no-audit --no-fund
-npm run build -w @artel/web
-npm run build -w @artel/server
+npm run build -w @drimvox/web
+npm run build -w @drimvox/server
 
 NAME=""
 if command -v tailscale >/dev/null 2>&1; then
@@ -44,7 +44,7 @@ fi
 
 say "Writing the systemd service"
 # The agents run git, npm, Claude Code and the like: the service gets the PATH of this shell.
-sudo tee /etc/systemd/system/artel.service >/dev/null <<UNIT
+sudo tee /etc/systemd/system/drimvox.service >/dev/null <<UNIT
 [Unit]
 Description=Drimvox: AI agents that write code under your review
 After=network-online.target tailscaled.service
@@ -55,9 +55,9 @@ Type=simple
 User=$RUN_AS
 WorkingDirectory=$ROOT
 Environment="PATH=$PATH"
-Environment="ARTEL_PORT=$PORT"
-Environment="ARTEL_DATA_DIR=$DATA"
-Environment="ARTEL_HOSTS=$NAME"
+Environment="DRIMVOX_PORT=$PORT"
+Environment="DRIMVOX_DATA_DIR=$DATA"
+Environment="DRIMVOX_HOSTS=$NAME"
 ExecStart=$NODE $ROOT/apps/server/dist/server.mjs
 Restart=on-failure
 RestartSec=3
@@ -66,15 +66,15 @@ RestartSec=3
 WantedBy=multi-user.target
 UNIT
 sudo systemctl daemon-reload
-sudo systemctl enable artel >/dev/null
-sudo systemctl restart artel
+sudo systemctl enable drimvox >/dev/null
+sudo systemctl restart drimvox
 
 if [ -n "$NAME" ]; then
   say "Opening Drimvox in the tailnet over HTTPS"
   sudo tailscale serve --bg --https=443 "http://127.0.0.1:$PORT"
 fi
 
-CHROMIUM="${ARTEL_CHROMIUM:-}"
+CHROMIUM="${DRIMVOX_CHROMIUM:-}"
 if [ -z "$CHROMIUM" ] && [ -t 0 ]; then
   read -r -p "Install Chromium so agents can look at the pages they build (about 300 MB)? [y/N] " answer
   [[ "$answer" =~ ^[YyДд] ]] && CHROMIUM=1 || CHROMIUM=0
@@ -88,17 +88,17 @@ say "Waiting for Drimvox to start"
 CODE=""
 for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
-    CODE="$(sudo journalctl -u artel -n 200 --no-pager 2>/dev/null | grep -o 'browser: [0-9]\{6\}' | tail -n 1 | grep -o '[0-9]\{6\}' || true)"
+    CODE="$(sudo journalctl -u drimvox -n 200 --no-pager 2>/dev/null | grep -o 'browser: [0-9]\{6\}' | tail -n 1 | grep -o '[0-9]\{6\}' || true)"
     break
   fi
   sleep 1
 done
 if ! curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
-  echo "Drimvox did not start. See: sudo journalctl -u artel -n 50"
+  echo "Drimvox did not start. See: sudo journalctl -u drimvox -n 50"
   exit 1
 fi
 
 say "Drimvox is running"
 if [ -n "$NAME" ]; then echo "Open: https://$NAME"; else echo "Open: http://127.0.0.1:$PORT (on this machine)"; fi
 if [ -n "$CODE" ]; then echo "Setup code for the first password: $CODE"; fi
-echo "Logs: sudo journalctl -u artel -f    Stop: sudo systemctl stop artel"
+echo "Logs: sudo journalctl -u drimvox -f    Stop: sudo systemctl stop drimvox"

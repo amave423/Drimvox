@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@artel/shared";
+import type { ModelInfo } from "@drimvox/shared";
 import { generateText, type ModelMessage } from "ai";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

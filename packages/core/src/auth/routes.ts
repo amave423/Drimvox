@@ -1,11 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
-import { authLoginSchema, authPasswordSchema, authSetupSchema, type AuthState } from "@artel/shared";
+import { authLoginSchema, authPasswordSchema, authSetupSchema, type AuthState } from "@drimvox/shared";
 import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { SESSION_DAYS, type AuthStore } from "./store";
 
-export const SESSION_COOKIE = "artel_session";
+export const SESSION_COOKIE = "drimvox_session";
 const MAX_FAILURES = 5;
 const LOCK_MS = 60_000;
 

@@ -1,4 +1,4 @@
-import type { DesignBrief, Milestone, Question, Requirement, TaskPhase, VisualCheck } from "@artel/shared";
+import type { DesignBrief, Milestone, Question, Requirement, TaskPhase, VisualCheck } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { briefInput, lookInput, toBrief, toLook } from "./design";

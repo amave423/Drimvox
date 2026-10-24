@@ -152,7 +152,7 @@ describe("the team at work", { timeout: 30_000 }, () => {
     expect(accepted.status).toBe(200);
     expect(git(repo, "log", "--format=%s", "-1")).toBe("Add sub and mul");
     expect(readFileSync(join(repo, "mul.js"), "utf8")).toBe("export const mul = true;\n");
-    expect(git(repo, "branch", "--list", "artel/*")).toBe("");
+    expect(git(repo, "branch", "--list", "drimvox/*")).toBe("");
   });
 
   it("starts a subtask only after the ones it depends on are merged", async () => {
@@ -407,7 +407,7 @@ describe("the end of a goal", () => {
     await approve(id);
     await waitFor(id, goalIs("review"));
     expect((await env.call("POST", `/api/tasks/${id}/discard`)).status).toBe(200);
-    expect(git(repo, "branch", "--list", "artel/*")).toBe("");
+    expect(git(repo, "branch", "--list", "drimvox/*")).toBe("");
     expect(git(repo, "worktree", "list").split("\n")).toHaveLength(1);
   });
 

@@ -1,4 +1,4 @@
-import type { ChatKind } from "@artel/shared";
+import type { ChatKind } from "@drimvox/shared";
 
 /** The model picked last, so a new chat starts with it. A per-device convenience, not settings. */
 export interface ModelChoice {
@@ -8,9 +8,9 @@ export interface ModelChoice {
   kind?: ChatKind;
 }
 
-const KEY = "artel.lastModel";
+const KEY = "drimvox.lastModel";
 /** The model a team's worker agents used last. */
-export const TEAM_MODEL_KEY = "artel.teamModel";
+export const TEAM_MODEL_KEY = "drimvox.teamModel";
 
 export function readLastModel(key = KEY): ModelChoice | null {
   try {

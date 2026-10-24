@@ -1,4 +1,4 @@
-import type { PlannedSubtask, TaskView } from "@artel/shared";
+import type { PlannedSubtask, TaskView } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import { Markdown } from "../chat/Markdown";

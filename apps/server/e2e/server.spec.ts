@@ -26,9 +26,9 @@ const freePort = () =>
   });
 
 /** Starts the built server and waits for the setup code it writes to its log. */
-async function startArtel(port: number): Promise<string> {
+async function startDrimvox(port: number): Promise<string> {
   server = spawn(process.execPath, [serverJs], {
-    env: { ...process.env, ARTEL_DATA_DIR: dataDir, ARTEL_PORT: String(port), ARTEL_TEST_USD_RUB: "80" },
+    env: { ...process.env, DRIMVOX_DATA_DIR: dataDir, DRIMVOX_PORT: String(port), DRIMVOX_TEST_USD_RUB: "80" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let log = "";
@@ -48,7 +48,7 @@ async function startArtel(port: number): Promise<string> {
 }
 
 test.beforeEach(async () => {
-  dataDir = mkdtempSync(join(tmpdir(), "artel-server-e2e-"));
+  dataDir = mkdtempSync(join(tmpdir(), "drimvox-server-e2e-"));
   fake = await startFakeProvider({
     key: KEY,
     models: [{ id: "fake-model", name: "Fake Model", pricing: { prompt: "0.000001", completion: "0.000002" } }],
@@ -69,7 +69,7 @@ test.afterEach(async () => {
 
 test("a browser sets the password with the setup code, chats, signs out and back in", async () => {
   const port = await freePort();
-  const code = await startArtel(port);
+  const code = await startDrimvox(port);
   const base = `http://127.0.0.1:${port}`;
 
   // The API is closed without a session.

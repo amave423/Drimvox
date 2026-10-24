@@ -1,4 +1,4 @@
-import type { SettingsPatch } from "@artel/shared";
+import type { SettingsPatch } from "@drimvox/shared";
 import type { ReactNode } from "react";
 import { useApp } from "../context";
 import type { MessageKey } from "../i18n";

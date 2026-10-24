@@ -1,4 +1,4 @@
-import type { HfRepo, HfVariant, LocalFit, LocalPick, LocalPull, LocalStatus } from "@artel/shared";
+import type { HfRepo, HfVariant, LocalFit, LocalPick, LocalPull, LocalStatus } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";

@@ -1,4 +1,4 @@
-import type { MediaModel, MediaOptions } from "@artel/shared";
+import type { MediaModel, MediaOptions } from "@drimvox/shared";
 import { codeForStatus, describeError, detailFromBody, ProviderFailure } from "../providers/errors";
 import type { Connection } from "../providers/repo";
 import { usdPer } from "../rates";

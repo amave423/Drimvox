@@ -6,8 +6,8 @@
 // needs the internet. `--tools` gives an agent a skill, an MCP tool and a page to look at. `--only=routerai`
 // checks one provider. `--cli` checks Claude Code, Codex and Gemini CLI instead of the keys. `--project` runs the
 // project's work instead of a task: interview, plan, "Go" and one long run with its checklist.
-import { startServer } from "@artel/core";
-import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@artel/shared";
+import { startServer } from "@drimvox/core";
+import type { ChatView, MessageView, ModelInfo, PresetId, ProviderView, StreamEvent } from "@drimvox/shared";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -60,7 +60,7 @@ const secrets = targets.map((t) => env[t.envKey]).filter((v): v is string => !!v
 const redact = (text: string) => secrets.reduce((s, key) => s.split(key).join("***"), text);
 const log = (...parts: unknown[]) => console.log(redact(parts.map((p) => (typeof p === "string" ? p : JSON.stringify(p))).join(" ")));
 
-const dataDir = mkdtempSync(join(tmpdir(), "artel-live-"));
+const dataDir = mkdtempSync(join(tmpdir(), "drimvox-live-"));
 const token = randomBytes(16).toString("hex");
 const server = await startServer({ token, secretKey: randomBytes(32), dataDir, version: "live-check", screenshot: () => weatherCard() });
 const base = `http://127.0.0.1:${server.port}/api`;

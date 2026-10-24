@@ -15,7 +15,7 @@ let app: ElectronApplication | undefined;
 let hub: Awaited<ReturnType<typeof startFakeHub>> | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
 });
 
 test.afterEach(async () => {
@@ -39,7 +39,7 @@ test("downloads a picture model on the local models' sheet and draws with it in 
   // Never this computer's own Ollama: an address where nothing answers.
   app = await electron.launch({
     args: [mainJs],
-    env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) },
+    env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) },
   });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
@@ -81,11 +81,11 @@ test("downloads the picture engine on the first start when the installer was ask
     hfFiles: [hub.url],
     images: { engineUrl: `${hub.url}/engine.zip`, serverCommand: [process.execPath, FAKE_SD] },
   };
-  const program = mkdtempSync(join(tmpdir(), "artel-e2e-program-"));
+  const program = mkdtempSync(join(tmpdir(), "drimvox-e2e-program-"));
   writeFileSync(join(program, "install-images"), "");
   app = await electron.launch({
     args: [mainJs],
-    env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_PROGRAM_DIR: program, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) },
+    env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PROGRAM_DIR: program, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) },
   });
   const page = await app.firstWindow();
   await expect(page.getByRole("heading", { name: "Локальные модели" })).toBeVisible();
@@ -106,7 +106,7 @@ test("offers the picture engine on its own on the sheet", async () => {
     hfFiles: [hub.url],
     images: { engineUrl: `${hub.url}/engine.zip`, serverCommand: [process.execPath, FAKE_SD] },
   };
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Локальные модели" }).click();
@@ -126,7 +126,7 @@ test("downloads a video model in the video part and films a free clip in a chat"
     hfFiles: [hub.url],
     images: { engineUrl: `${hub.url}/engine.zip`, serverCommand: [process.execPath, FAKE_SD] },
   };
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
   await page.getByRole("button", { name: "Локальные модели" }).click();
   await page.getByRole("radio", { name: "Видео" }).click();
@@ -157,7 +157,7 @@ test("finds a picture model on Hugging Face, greys out an unknown family and dow
     hfFiles: [hub.url],
     images: { engineUrl: `${hub.url}/engine.zip`, serverCommand: [process.execPath, FAKE_SD] },
   };
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", ARTEL_TEST_LOCAL: JSON.stringify(local) } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
   await page.getByRole("button", { name: "Локальные модели" }).click();
   await page.getByRole("radio", { name: "Картинки" }).click();

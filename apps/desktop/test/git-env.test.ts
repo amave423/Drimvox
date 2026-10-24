@@ -9,17 +9,17 @@ const gitDir = resolve(__dirname, "../../../node_modules/dugite/git");
 
 describe("the git the app carries", () => {
   it("puts the bundled git first and points git to its own parts", () => {
-    const vars = bundledGitEnv("/opt/artel/git", "linux", { PATH: "/usr/bin" });
-    expect(vars.PATH!.startsWith(join("/opt/artel/git", "bin"))).toBe(true);
+    const vars = bundledGitEnv("/opt/drimvox/git", "linux", { PATH: "/usr/bin" });
+    expect(vars.PATH!.startsWith(join("/opt/drimvox/git", "bin"))).toBe(true);
     expect(vars.PATH!.endsWith("/usr/bin")).toBe(true);
-    expect(vars).toMatchObject({ PREFIX: "/opt/artel/git", GIT_EXEC_PATH: join("/opt/artel/git", "libexec", "git-core") });
+    expect(vars).toMatchObject({ PREFIX: "/opt/drimvox/git", GIT_EXEC_PATH: join("/opt/drimvox/git", "libexec", "git-core") });
   });
 
   // The real thing: the copy dugite downloaded works with nothing installed, in a clean environment.
   it.runIf(process.platform === "win32" && existsSync(gitDir))("runs on Windows from its own folder", () => {
     const vars = bundledGitEnv(gitDir, "win32", { Path: "C:\\Windows\\System32" });
     const env = { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", ...vars };
-    const dir = mkdtempSync(join(tmpdir(), "artel-git-"));
+    const dir = mkdtempSync(join(tmpdir(), "drimvox-git-"));
     try {
       execFileSync("git", ["init", "-q"], { cwd: dir, env });
       expect(existsSync(join(dir, ".git"))).toBe(true);

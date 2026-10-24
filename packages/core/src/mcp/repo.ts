@@ -1,4 +1,4 @@
-import type { McpServerView } from "@artel/shared";
+import type { McpServerView } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
 import type { Cipher } from "../secrets";

@@ -20,7 +20,7 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "Artel ${GITHUB_REF_NAME#v}" --generate-notes
+        run: gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "Drimvox ${GITHUB_REF_NAME#v}" --generate-notes
 
   build:
     needs: release
@@ -38,7 +38,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run build -w @artel/web && npm run build -w @artel/desktop
+      - run: npm run build -w @drimvox/web && npm run build -w @drimvox/desktop
       - name: Build and upload the installers
         working-directory: apps/desktop
         env:

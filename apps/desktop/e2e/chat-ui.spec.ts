@@ -14,7 +14,7 @@ let app: ElectronApplication | undefined;
 let fake: FakeProvider | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
 });
 test.afterEach(async () => {
   await app?.close();
@@ -26,7 +26,7 @@ test.afterEach(async () => {
 
 async function launch(chunks: FakeChunk[], delayMs = 0): Promise<Page> {
   fake = await startFakeProvider({ key: KEY, models, chunks, delayMs });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Ключи и модели" }).click();
@@ -54,7 +54,7 @@ async function ask(page: Page, text: string) {
 /** Chats made through the API, as many as a long-used app has. */
 async function manyChats(page: Page, n: number) {
   await page.evaluate(async (count) => {
-    const token = await (window as unknown as { artel: { getToken(): Promise<string> } }).artel.getToken();
+    const token = await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken();
     const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
     const providers = (await (await fetch("/api/providers", { headers: h })).json()) as { id: string }[];
     for (let i = 0; i < count; i++) {

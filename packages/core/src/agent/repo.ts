@@ -1,4 +1,4 @@
-import type { AcceptanceReport, DesignBrief, DesignReview, Milestone, Requirement } from "@artel/shared";
+import type { AcceptanceReport, DesignBrief, DesignReview, Milestone, Requirement } from "@drimvox/shared";
 import { MAX_INTERVIEW_ROUNDS } from "./phases";
 import type {
   ModelRef,
@@ -14,7 +14,7 @@ import type {
   TaskStages,
   TaskView,
   VisualCheck,
-} from "@artel/shared";
+} from "@drimvox/shared";
 import type { ModelMessage } from "ai";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";

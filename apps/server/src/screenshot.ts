@@ -1,4 +1,4 @@
-import { PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, type PageAction } from "@artel/shared";
+import { PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, type PageAction } from "@drimvox/shared";
 import type { Browser, Page } from "playwright-core";
 
 /** As tall as the desktop app photographs. */

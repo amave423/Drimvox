@@ -48,7 +48,7 @@ describe("SKILL.md", () => {
 
 describe("files", () => {
   it("copies and removes folders, Cyrillic paths included", () => {
-    const base = mkdtempSync(join(tmpdir(), "artel-фс-"));
+    const base = mkdtempSync(join(tmpdir(), "drimvox-фс-"));
     const from = join(base, "исходник");
     mkdirSync(join(from, "вложенная"), { recursive: true });
     writeFileSync(join(from, "вложенная", "файл.txt"), "привет");
@@ -74,7 +74,7 @@ describe("skills in Drimvox", () => {
   });
 
   it("imports a skill folder with its files", async () => {
-    const folder = mkdtempSync(join(tmpdir(), "artel-skill-"));
+    const folder = mkdtempSync(join(tmpdir(), "drimvox-skill-"));
     writeFileSync(join(folder, "SKILL.md"), "---\nname: brand\ndescription: Фирменный стиль\n---\nСмотри palette.md.\n");
     writeFileSync(join(folder, "palette.md"), "синий #2b4c7e\n");
     const res = await env.call("POST", "/api/skills/import", { path: folder });
@@ -109,7 +109,7 @@ describe("skills for agents", () => {
   }
 
   function makeSharedSkill(): string {
-    const folder = mkdtempSync(join(tmpdir(), "artel-skill-"));
+    const folder = mkdtempSync(join(tmpdir(), "drimvox-skill-"));
     writeFileSync(join(folder, "SKILL.md"), "---\nname: reports\ndescription: Как оформлять отчёты\n---\nПиши вывод первой строкой. Шаблон: template.md\n");
     writeFileSync(join(folder, "template.md"), "# Вывод\n");
     return folder;

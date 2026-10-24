@@ -1,4 +1,4 @@
-import type { LocalStatus } from "@artel/shared";
+import type { LocalStatus } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { useSize } from "./size";

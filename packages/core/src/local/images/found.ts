@@ -1,4 +1,4 @@
-import type { HfMediaFile, HfMediaRepo, LocalHardware } from "@artel/shared";
+import type { HfMediaFile, HfMediaRepo, LocalHardware } from "@drimvox/shared";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fitOf, recommend } from "../fit";

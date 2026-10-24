@@ -1,4 +1,4 @@
-import type { ModelInfo, PresetId } from "@artel/shared";
+import type { ModelInfo, PresetId } from "@drimvox/shared";
 import { normalizeModels } from "./catalog";
 import { fetchJson } from "./http";
 import type { Connection } from "./repo";

@@ -1,4 +1,4 @@
-import type { ProxyCheck } from "@artel/shared";
+import type { ProxyCheck } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../context";
 import { ErrorNote } from "./ErrorNote";

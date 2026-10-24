@@ -10,7 +10,7 @@ let userData: string;
 let app: ElectronApplication | undefined;
 
 test.beforeEach(() => {
-  userData = mkdtempSync(join(tmpdir(), "artel-e2e-"));
+  userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
 });
 
 test.afterEach(async () => {
@@ -20,7 +20,7 @@ test.afterEach(async () => {
 });
 
 function launch() {
-  return electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData } });
+  return electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData } });
 }
 
 test("opens with a working core and remembers theme and language", async () => {
@@ -63,7 +63,7 @@ test("opens with a working core and remembers theme and language", async () => {
 // Seen: notifications went straight to the action centre without a sound, all of them: Focus Assist was on ("alarms
 // only"). The settings say so next to the notifications.
 test("says when Windows hides notifications by Focus Assist", async () => {
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, ARTEL_USER_DATA: userData, ARTEL_TEST_FOCUS_ASSIST: "2" } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_FOCUS_ASSIST: "2" } });
   const page = await app.firstWindow();
   await page.getByRole("button", { name: "Настройки" }).first().click();
   await expect(page.getByText(/Фокусировка внимания/)).toBeVisible();
@@ -87,7 +87,7 @@ test("the page has no access to Node", async () => {
   const exposed = await page.evaluate(() => ({
     require: typeof (window as unknown as { require?: unknown }).require,
     process: typeof (window as unknown as { process?: unknown }).process,
-    bridge: Object.keys((window as unknown as { artel?: object }).artel ?? {}).sort(),
+    bridge: Object.keys((window as unknown as { drimvox?: object }).drimvox ?? {}).sort(),
   }));
   expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "getToken", "installUpdate", "notify", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "setTitleBar", "testNotify", "updateState"] });
 });

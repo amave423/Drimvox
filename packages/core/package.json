@@ -1,5 +1,5 @@
 {
-  "name": "@artel/core",
+  "name": "@drimvox/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "@ai-sdk/google": "^4.0.93",
     "@ai-sdk/openai": "^4.0.91",
     "@ai-sdk/openai-compatible": "^3.0.67",
-    "@artel/shared": "^0.1.0",
+    "@drimvox/shared": "^0.1.0",
     "@hono/node-server": "^2.1.4",
     "@hono/zod-validator": "^0.9.1",
     "@modelcontextprotocol/sdk": "^1.32.1",

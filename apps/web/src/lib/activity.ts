@@ -1,4 +1,4 @@
-import type { TaskEvent } from "@artel/shared";
+import type { TaskEvent } from "@drimvox/shared";
 
 export type FeedItem =
   | { kind: "user"; seq: number; text: string }

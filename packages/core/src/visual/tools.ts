@@ -1,4 +1,4 @@
-import type { PageAction, TaskEvent, VisualCheck } from "@artel/shared";
+import type { PageAction, TaskEvent, VisualCheck } from "@drimvox/shared";
 import { pageStepsInput } from "./steps";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";

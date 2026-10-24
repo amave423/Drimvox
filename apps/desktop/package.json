@@ -1,9 +1,9 @@
 {
-  "name": "@artel/desktop",
+  "name": "@drimvox/desktop",
   "version": "0.11.0",
   "private": true,
   "type": "module",
-  "description": "Artel desktop app",
+  "description": "Drimvox desktop app",
   "main": "dist/main.cjs",
   "scripts": {
     "build": "node build.mjs",
@@ -12,7 +12,7 @@
     "dist": "electron-builder --publish never"
   },
   "devDependencies": {
-    "@artel/core": "^0.1.0",
+    "@drimvox/core": "^0.1.0",
     "dugite": "3.2.3",
     "electron": "44.7.0",
     "electron-builder": "26.15.3",
@@ -20,5 +20,5 @@
     "esbuild": "^0.28.2"
   },
   "author": "amave423 <artem123antropov@mail.ru>",
-  "homepage": "https://github.com/amave423/artel"
+  "homepage": "https://github.com/amave423/Drimvox"
 }

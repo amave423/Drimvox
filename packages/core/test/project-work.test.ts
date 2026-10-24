@@ -213,7 +213,7 @@ describe("work on a project", () => {
   });
 
   it("refuses to plan in a folder without git", async () => {
-    const plain = mkdtempSync(join(tmpdir(), "artel-plain-"));
+    const plain = mkdtempSync(join(tmpdir(), "drimvox-plain-"));
     const s = await setup({});
     const project = await (await env.call("POST", "/api/projects", { path: plain })).json();
     const res = await env.call("POST", `/api/projects/${project.id}/work/plan`, {
@@ -226,8 +226,8 @@ describe("work on a project", () => {
   });
 
   it("offers the project's skills in the run, and the agent can open one", async () => {
-    mkdirSync(join(folder, ".artel", "skills", "style"), { recursive: true });
-    writeFileSync(join(folder, ".artel", "skills", "style", "SKILL.md"), ["---", "name: style", "description: When making pages for this site", "---", "Use the brand green.", ""].join("\n"));
+    mkdirSync(join(folder, ".drimvox", "skills", "style"), { recursive: true });
+    writeFileSync(join(folder, ".drimvox", "skills", "style", "SKILL.md"), ["---", "name: style", "description: When making pages for this site", "---", "Use the brand green.", ""].join("\n"));
     const s = await setup({
       coder: [noQuestions, writePlan, call("use_skill", { name: "style" }), call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Готово." })],
     });
@@ -240,7 +240,7 @@ describe("work on a project", () => {
   });
 
   it("is done by Claude Code itself in the project's folder when the working model is on a subscription", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "artel-fake-cli-"));
+    const dir = mkdtempSync(join(tmpdir(), "drimvox-fake-cli-"));
     process.env.FAKE_CLI_DIR = dir;
     writeFileSync(join(dir, "script.json"), JSON.stringify([{ text: "Сделал калькулятор.", files: { "calculator.html": "<form></form>\n" } }]));
     env.setCliCommand("claude-code", [process.execPath, fileURLToPath(new URL("./fake-cli.mjs", import.meta.url)), "claude"]);

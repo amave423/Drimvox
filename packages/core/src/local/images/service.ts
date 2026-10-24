@@ -1,4 +1,4 @@
-import type { HfMediaFile, HfMediaRepo, LocalHardware, LocalImageModelId, LocalImagesStatus, LocalPull } from "@artel/shared";
+import type { HfMediaFile, HfMediaRepo, LocalHardware, LocalImageModelId, LocalImagesStatus, LocalPull } from "@drimvox/shared";
 import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fetchVia } from "../../proxy";

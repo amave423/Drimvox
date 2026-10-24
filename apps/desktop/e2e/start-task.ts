@@ -16,7 +16,7 @@ const DIRECT = { interview: false, spec: false, approveSpec: false, testsFirst: 
 export async function startTask(page: Page, s: Start): Promise<void> {
   const title = s.task.split("\n")[0]!;
   await page.evaluate(async ({ task, model, stages, team }) => {
-    const token = await (window as unknown as { artel: { getToken(): Promise<string> } }).artel.getToken();
+    const token = await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken();
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
     // Adding a folder starts git in it first: the project appears a moment after the click.
     let projects: { id: string }[] = [];

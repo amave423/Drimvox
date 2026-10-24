@@ -1,4 +1,4 @@
-import type { AcceptanceReport, Milestone, Requirement, TaskStages, VisualCheck } from "@artel/shared";
+import type { AcceptanceReport, Milestone, Requirement, TaskStages, VisualCheck } from "@drimvox/shared";
 import { findModel } from "../providers/catalog";
 import { runVisualChecks, visualTools, type LookLimit, type VisualDeps } from "../visual/tools";
 import { accepted, MAX_ACCEPTANCE_ROUNDS, problems, reworkMessage, runAcceptance } from "./acceptance";

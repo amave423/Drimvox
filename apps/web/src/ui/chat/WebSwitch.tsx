@@ -1,8 +1,8 @@
-import type { WebMode } from "@artel/shared";
+import type { WebMode } from "@drimvox/shared";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
 
-const KEY = "artel.web";
+const KEY = "drimvox.web";
 
 /** The internet setting of the last chat message on this device; free search by default. */
 export function readWebMode(): WebMode {

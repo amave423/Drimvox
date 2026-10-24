@@ -1,4 +1,4 @@
-import type { ProjectWorkView } from "@artel/shared";
+import type { ProjectWorkView } from "@drimvox/shared";
 import { useCallback, useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";

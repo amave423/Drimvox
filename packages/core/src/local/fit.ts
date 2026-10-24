@@ -1,4 +1,4 @@
-import type { LocalFit, LocalHardware } from "@artel/shared";
+import type { LocalFit, LocalHardware } from "@drimvox/shared";
 
 export const GB = 2 ** 30;
 

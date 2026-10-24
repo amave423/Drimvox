@@ -1,4 +1,4 @@
-import type { McpServerView, McpStatus } from "@artel/shared";
+import type { McpServerView, McpStatus } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";

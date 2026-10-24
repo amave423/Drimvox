@@ -1,5 +1,5 @@
-import type { Availability, ModelInfo, ProviderErrorCode } from "@artel/shared";
-import { presets } from "@artel/shared";
+import type { Availability, ModelInfo, ProviderErrorCode } from "@drimvox/shared";
+import { presets } from "@drimvox/shared";
 import { isCli } from "../cli/kinds";
 import { NATIVE } from "./native";
 import type { Connection } from "./repo";

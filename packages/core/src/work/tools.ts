@@ -1,4 +1,4 @@
-import type { ChecklistItem } from "@artel/shared";
+import type { ChecklistItem } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 

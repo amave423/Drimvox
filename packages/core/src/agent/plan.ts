@@ -1,4 +1,4 @@
-import type { Milestone, Requirement } from "@artel/shared";
+import type { Milestone, Requirement } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { briefInput, briefInstructions, teamDesignNote, toBrief } from "./design";

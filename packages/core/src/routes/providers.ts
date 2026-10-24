@@ -1,7 +1,7 @@
 import { limitsOf } from "../cli/limits";
 import { isCli } from "../cli/kinds";
 import { zValidator } from "@hono/zod-validator";
-import { presets, providerCreateSchema, providerUpdateSchema } from "@artel/shared";
+import { presets, providerCreateSchema, providerUpdateSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { listMediaModels, mediaModel } from "../media/catalog";

@@ -1,4 +1,4 @@
-import type { ProxyCheck, ProxyView } from "@artel/shared";
+import type { ProxyCheck, ProxyView } from "@drimvox/shared";
 import { ProxyAgent, fetch as proxiedFetch } from "undici";
 import type { Database } from "./db";
 import { describeError, ProviderFailure } from "./providers/errors";

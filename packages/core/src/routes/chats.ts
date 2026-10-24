@@ -11,7 +11,7 @@ import {
   presets,
   type FollowEvent,
   type StreamEvent,
-} from "@artel/shared";
+} from "@drimvox/shared";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
@@ -29,7 +29,7 @@ import type { WebAccess } from "../internet/web";
 import type { McpHub } from "../mcp/hub";
 import type { Studio } from "../media/studio";
 import type { ProviderRepo } from "../providers/repo";
-import type { ProjectPlan } from "@artel/shared";
+import type { ProjectPlan } from "@drimvox/shared";
 import type { BacklogService } from "../backlog/service";
 import { resolveVision } from "../visual/look";
 import { visualTools, type VisualKit } from "../visual/tools";
@@ -56,7 +56,7 @@ export interface WorkDeps {
   plan(projectId: string): ProjectPlan | null;
   visualKit: VisualKit;
   visionModel(): { providerId: string; model: string } | null;
-  /** Drimvox's shared skills; a folder's own (.artel/skills, .claude/skills) come first. */
+  /** Drimvox's shared skills; a folder's own (.drimvox/skills, .claude/skills) come first. */
   skillsDir: string;
 }
 

@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { proxySetSchema } from "@artel/shared";
+import { proxySetSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { checkProxy, type ProxyStore } from "../proxy";
 

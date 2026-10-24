@@ -55,7 +55,7 @@ function runOnce(cwd: string, args: string[], env?: Record<string, string>): Pro
 const out = async (cwd: string, args: string[]) => (await runGit(cwd, args)).stdout.trim();
 
 /** Commits that only exist inside Drimvox's copies carry Drimvox's name; accepted work carries the user's. */
-const artelIdentity = ["-c", "user.name=Drimvox", "-c", "user.email=artel@localhost"];
+const drimvoxIdentity = ["-c", "user.name=Drimvox", "-c", "user.email=drimvox@localhost"];
 
 /**
  * True when `dir` is the top of a git repository. A folder nested inside another repository is not:
@@ -131,7 +131,7 @@ export async function commitAll(worktree: string, message: string): Promise<bool
   await runGit(worktree, ["add", "-A", "--", ".", ...skipped.map((name) => `:(exclude,glob)**/${name}/**`)]);
   const staged = await runGit(worktree, ["diff", "--cached", "--quiet"], true);
   if (staged.code === 0) return false;
-  await runGit(worktree, [...artelIdentity, "commit", "-q", "--no-verify", "-m", message]);
+  await runGit(worktree, [...drimvoxIdentity, "commit", "-q", "--no-verify", "-m", message]);
   return true;
 }
 
@@ -186,7 +186,7 @@ function lines(text: string): string[] {
  * aborting the merge, so the goal's branch stays exactly as it was.
  */
 export async function mergeBranch(worktree: string, branch: string, message: string): Promise<string[] | null> {
-  const res = await runGit(worktree, [...artelIdentity, "merge", "--no-ff", "--no-edit", "-m", message, branch], true);
+  const res = await runGit(worktree, [...drimvoxIdentity, "merge", "--no-ff", "--no-edit", "-m", message, branch], true);
   if (res.code === 0) return null;
   const conflicts = lines((await runGit(worktree, ["diff", "--name-only", "--diff-filter=U"], true)).stdout);
   await runGit(worktree, ["merge", "--abort"], true);

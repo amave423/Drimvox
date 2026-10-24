@@ -1,4 +1,4 @@
-import type { TaskEvent } from "@artel/shared";
+import type { TaskEvent } from "@drimvox/shared";
 import { describe, expect, it } from "vitest";
 import { buildFeed, exitCodeOf } from "./activity";
 

@@ -1,4 +1,4 @@
-import type { ChecklistItem, ProjectPlan, ProviderError, StreamEvent } from "@artel/shared";
+import type { ChecklistItem, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
 import type { ToolHooks } from "../agent/tools";

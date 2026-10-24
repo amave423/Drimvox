@@ -1,4 +1,4 @@
-import type { SkillView } from "@artel/shared";
+import type { SkillView } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
@@ -18,7 +18,8 @@ export interface Skill {
 }
 
 /** Folders of a project that hold its skills, relative to the project. */
-export const PROJECT_SKILL_DIRS = [".artel/skills", ".claude/skills"];
+/** A project's own skills; .artel/skills is where they lived before the app was renamed to Drimvox. */
+export const PROJECT_SKILL_DIRS = [".drimvox/skills", ".artel/skills", ".claude/skills"];
 
 export function parseSkill(text: string, folderName: string): { name: string; description: string; body: string } {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);

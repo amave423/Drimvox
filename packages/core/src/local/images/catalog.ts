@@ -1,4 +1,4 @@
-import type { CheckedImageModelId, LocalFit, LocalHardware } from "@artel/shared";
+import type { CheckedImageModelId, LocalFit, LocalHardware } from "@drimvox/shared";
 import { fitOf } from "../fit";
 
 const MB = 2 ** 20;

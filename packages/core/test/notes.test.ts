@@ -6,7 +6,7 @@ import { NOTES_LIMIT, notesBlock, writeNotes } from "../src/agent/notes";
 
 let dir: string;
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "artel-notes-"));
+  dir = mkdtempSync(join(tmpdir(), "drimvox-notes-"));
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -14,7 +14,7 @@ describe("AGENTS.md, the notes every request starts with", () => {
   it("starts the file with the agent's section when there is none", () => {
     writeNotes(dir, "Сайт-таймер. Проверки: node --test.");
     const text = readFileSync(join(dir, "AGENTS.md"), "utf8");
-    expect(text).toContain("<!-- artel -->\nСайт-таймер. Проверки: node --test.\n<!-- /artel -->");
+    expect(text).toContain("<!-- drimvox -->\nСайт-таймер. Проверки: node --test.\n<!-- /drimvox -->");
     expect(notesBlock(dir)).toContain("Сайт-таймер");
   });
 
@@ -27,6 +27,14 @@ describe("AGENTS.md, the notes every request starts with", () => {
     expect(text).toContain("вторая версия");
     expect(text).not.toContain("первая версия");
     expect(notesBlock(dir)).toContain("Коммиты по-английски.");
+  });
+
+  // Projects worked on before the rename keep the agent's section between Artel's markers.
+  it("replaces a section written before the rename instead of adding a second one", () => {
+    writeFileSync(join(dir, "AGENTS.md"), "# Правила\n\n<!-- artel -->\nстарые заметки\n<!-- /artel -->\n");
+    writeNotes(dir, "новые заметки");
+    const text = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    expect(text).toBe("# Правила\n\n<!-- drimvox -->\nновые заметки\n<!-- /drimvox -->\n");
   });
 
   it("refuses notes too long to keep in every request", () => {

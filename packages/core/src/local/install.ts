@@ -1,4 +1,4 @@
-import type { OllamaInstall } from "@artel/shared";
+import type { OllamaInstall } from "@drimvox/shared";
 import { spawn } from "node:child_process";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { join } from "node:path";

@@ -1,4 +1,4 @@
-import type { TaskEvent, TaskUpdate, TaskView } from "@artel/shared";
+import type { TaskEvent, TaskUpdate, TaskView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { getStream } from "../../lib/sse";

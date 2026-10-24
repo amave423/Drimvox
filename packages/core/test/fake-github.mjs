@@ -10,7 +10,7 @@ export const FAKE_TOKEN = "gho_fake_token_for_tests";
 
 /** `pending`: how many polls answer "authorization_pending" first; `deny`: the user refuses. */
 export async function startFakeGithub({ pending = 1, deny = false } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "artel-fake-github-"));
+  const dir = mkdtempSync(join(tmpdir(), "drimvox-fake-github-"));
   const repos = new Map();
   const requests = [];
   let polls = 0;

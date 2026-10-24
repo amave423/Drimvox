@@ -1,4 +1,4 @@
-import type { ModelInfo, PresetId } from "@artel/shared";
+import type { ModelInfo, PresetId } from "@drimvox/shared";
 
 export interface TokenUsage {
   /** Every input token, the cached ones included. */
@@ -38,6 +38,6 @@ export function usageOf(u: { inputTokens?: number; outputTokens?: number; inputT
 
 /** The provider's own bill for a step in dollars, when it sent one (see `billed` in model.ts); null otherwise. */
 export function billedUsd(providerMetadata: unknown, usdPerUnit: number): number | null {
-  const billed = (providerMetadata as { artel?: { billed?: unknown } } | undefined)?.artel?.billed;
+  const billed = (providerMetadata as { drimvox?: { billed?: unknown } } | undefined)?.drimvox?.billed;
   return typeof billed === "number" ? billed * usdPerUnit : null;
 }

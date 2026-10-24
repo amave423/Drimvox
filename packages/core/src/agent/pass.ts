@@ -3,7 +3,7 @@ import { itemInstructions } from "../backlog/plan";
 import type { ProjectWorkRepo } from "../work/repo";
 import { PLAN_NOW, planInstructions as projectPlanInstructions, planTools as projectPlanTools, savePlan, toPlanStep } from "../work/plan";
 import type { Memory } from "./memory";
-import type { DesignBrief, ProjectPlan, TaskEvent, TaskPhase, TaskStages } from "@artel/shared";
+import type { DesignBrief, ProjectPlan, TaskEvent, TaskPhase, TaskStages } from "@drimvox/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { findModel } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";

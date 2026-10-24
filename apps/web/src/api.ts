@@ -1,4 +1,4 @@
-import type { AppType } from "@artel/core";
+import type { AppType } from "@drimvox/core";
 import { hc } from "hono/client";
 
 /** The desktop window sends its token; a browser on the server is signed in by its session cookie instead. */

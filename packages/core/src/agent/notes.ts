@@ -9,8 +9,11 @@ import { join } from "node:path";
 export const NOTES_LIMIT = 4000;
 /** More of a user's own file than this is not sent. */
 const FILE_LIMIT = 12_000;
-const START = "<!-- artel -->";
-const END = "<!-- /artel -->";
+const START = "<!-- drimvox -->";
+const END = "<!-- /drimvox -->";
+/** The markers of notes written before the app was renamed from Artel. */
+const OLD_START = "<!-- artel -->";
+const OLD_END = "<!-- /artel -->";
 
 function notesFile(root: string): string | null {
   for (const name of ["AGENTS.md", "CLAUDE.md"]) if (existsSync(join(root, name))) return join(root, name);
@@ -36,11 +39,13 @@ export function writeNotes(root: string, notes: string): void {
   const file = join(root, "AGENTS.md");
   const section = `${START}\n${body}\n${END}`;
   const old = existsSync(file) ? readFileSync(file, "utf8") : "";
-  const at = old.indexOf(START);
-  const end = old.indexOf(END);
+  // The section written before the rename (Artel) is the same section: it is replaced, not doubled.
+  const [open, close] = old.includes(START) ? [START, END] : [OLD_START, OLD_END];
+  const at = old.indexOf(open);
+  const end = old.indexOf(close);
   const next =
     at >= 0 && end > at
-      ? `${old.slice(0, at)}${section}${old.slice(end + END.length)}`
+      ? `${old.slice(0, at)}${section}${old.slice(end + close.length)}`
       : old.trim()
         ? `${old.replace(/\s*$/, "\n")}\n${section}\n`
         : `# Notes for agents\n\n${section}\n`;

@@ -1,4 +1,4 @@
-import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@artel/shared";
+import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@drimvox/shared";
 import { createContext, useContext } from "react";
 import type { Api } from "./api";
 import type { MessageKey } from "./i18n";

@@ -1,4 +1,4 @@
-import { CONFIRM_ABOVE_USD } from "@artel/shared";
+import { CONFIRM_ABOVE_USD } from "@drimvox/shared";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { formatUsd } from "../../lib/format";

@@ -1,4 +1,4 @@
-import type { AttachmentView } from "@artel/shared";
+import type { AttachmentView } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

@@ -18,7 +18,7 @@ export interface UpdateState {
   checkedAt?: number;
 }
 
-const RELEASES = "https://github.com/amave423/artel/releases";
+const RELEASES = "https://github.com/amave423/Drimvox/releases";
 /** First look a little after the start, then every few hours: nobody restarts an app they leave open. */
 const FIRST_CHECK_MS = 15_000;
 const CHECK_EVERY_MS = 6 * 3600_000;
@@ -29,11 +29,11 @@ const CHECK_EVERY_MS = 6 * 3600_000;
  */
 export function startUpdates(window: () => BrowserWindow | null, trusted: (event: IpcMainEvent) => boolean): void {
   let last: UpdateState = { state: "off", version: app.getVersion() };
-  ipcMain.handle("artel:update-state", () => last);
-  if (!app.isPackaged || process.env.ARTEL_NO_UPDATES === "1") return;
+  ipcMain.handle("drimvox:update-state", () => last);
+  if (!app.isPackaged || process.env.DRIMVOX_NO_UPDATES === "1") return;
   // Tests point the updater at a fake feed of their own.
   last = { state: "idle", version: app.getVersion() };
-  if (process.env.ARTEL_TEST_UPDATE_URL) autoUpdater.setFeedURL({ provider: "generic", url: process.env.ARTEL_TEST_UPDATE_URL });
+  if (process.env.DRIMVOX_TEST_UPDATE_URL) autoUpdater.setFeedURL({ provider: "generic", url: process.env.DRIMVOX_TEST_UPDATE_URL });
 
   // Every check and failure goes to logs/updates.log in the data folder (seen: an update never came and nothing said why).
   const logFile = join(app.getPath("userData"), "logs", "updates.log");
@@ -54,7 +54,7 @@ export function startUpdates(window: () => BrowserWindow | null, trusted: (event
   autoUpdater.autoInstallOnAppQuit = true;
   const tell = (state: UpdateState) => {
     last = state;
-    window()?.webContents.send("artel:update", state);
+    window()?.webContents.send("drimvox:update", state);
   };
   autoUpdater.on("update-available", (info) =>
     tell(manual ? { state: "manual", version: info.version, url: `${RELEASES}/tag/v${info.version}` } : { state: "downloading", version: info.version, percent: 0 }),
@@ -75,11 +75,11 @@ export function startUpdates(window: () => BrowserWindow | null, trusted: (event
     tell({ state: "checking", version: app.getVersion() });
     void autoUpdater.checkForUpdates().catch(() => {});
   };
-  ipcMain.on("artel:update-check", (event) => trusted(event) && check());
+  ipcMain.on("drimvox:update-check", (event) => trusted(event) && check());
   setTimeout(check, FIRST_CHECK_MS).unref();
   setInterval(check, CHECK_EVERY_MS).unref();
 
-  ipcMain.on("artel:update-install", (event) => {
+  ipcMain.on("drimvox:update-install", (event) => {
     if (!trusted(event) || last.state !== "ready") return;
     // The core still gets to stop what it started (see before-quit in main.ts); the installer runs on quit.
     autoUpdater.quitAndInstall(true, true);
