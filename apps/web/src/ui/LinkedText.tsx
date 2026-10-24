@@ -22,9 +22,16 @@ export function LinkedText({ text }: { text: string }) {
     <>
       {parts.map((part, n) =>
         n % 3 === 1 ? (
-          <button key={n} type="button" className="link" onClick={() => go(parts[n + 1] as Target)}>
+          <a
+            key={n}
+            href={`#${parts[n + 1]}`}
+            onClick={(e) => {
+              e.preventDefault();
+              go(parts[n + 1] as Target);
+            }}
+          >
             {part}
-          </button>
+          </a>
         ) : n % 3 === 2 ? null : (
           <Fragment key={n}>{part}</Fragment>
         ),

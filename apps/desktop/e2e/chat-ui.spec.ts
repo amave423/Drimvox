@@ -184,6 +184,16 @@ test("a code block has a copy button", async () => {
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("const total = 1;");
 });
 
+// Seen: links in answers were hard to tell from the text; popular sites now carry their mark, drawn without the network.
+test("links in an answer stand out, and a popular site's carries its mark", async () => {
+  const page = await launch([{ text: "Код на [GitHub](https://github.com/amave423/Drimvox), пример на [сайте](https://example.com/)." }]);
+  await ask(page, "Где код?");
+  const github = page.getByRole("link", { name: "GitHub" });
+  await expect(github).toHaveAttribute("href", "https://github.com/amave423/Drimvox");
+  await expect(github.locator("svg.md-link-icon")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "сайте" }).locator("svg")).toHaveCount(0);
+});
+
 // Seen: a 4.5 MB photo came back as "too heavy" from the provider.
 test("a big photo is made smaller before it goes", async () => {
   const page = await launch([{ text: "Вижу фото." }]);

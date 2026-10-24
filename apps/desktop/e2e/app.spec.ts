@@ -37,7 +37,7 @@ test("opens with a working core and remembers theme and language", async () => {
   for (const part of ["Модели", "Чат", "Проект", "Разрешения и расходы"]) await expect(page.getByRole("region", { name: part })).toBeVisible();
   await expect(page.getByText(/«Папка» подключает папку/)).toBeVisible();
   // The names in the guide open what they name.
-  await page.getByRole("region", { name: "Модели" }).getByRole("button", { name: "Локальные модели" }).click();
+  await page.getByRole("region", { name: "Модели" }).getByRole("link", { name: "Локальные модели" }).click();
   await expect(page.getByRole("heading", { name: "Локальные модели", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Drimvox" }).first().click();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();

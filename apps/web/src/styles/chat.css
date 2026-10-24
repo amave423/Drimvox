@@ -231,3 +231,8 @@
 .msg-shots { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 10px; }
 .msg-shot { display: block; width: 220px; max-width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .msg-shot.is-empty { display: inline-block; }
+
+/* Links in answers stand out from the words around them; a popular site's link carries its mark. */
+.md a.md-link { color: var(--ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--ink) 35%, transparent); padding: 0 1px; border-radius: 3px; overflow-wrap: anywhere; }
+.md a.md-link:hover { background: var(--ink-soft); border-bottom-color: var(--ink); }
+.md-link-icon { display: inline-block; width: 0.9em; height: 0.9em; margin-right: 0.3em; vertical-align: -0.1em; fill: currentColor; }

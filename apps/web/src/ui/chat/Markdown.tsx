@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { useApp } from "../../context";
 import { normalizeMath } from "../../lib/markdown";
+import { siteIcon } from "../../lib/siteIcons";
 import { Diagram } from "./Diagram";
 
 interface Props {
@@ -25,7 +26,7 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: Prop
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }], [rehypeHighlight, { detect: false }]]}
         components={{
-          a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+          a: ({ node: _node, children, ...props }) => <SiteLink props={props}>{children}</SiteLink>,
           pre: ({ node: _node, children, ...props }) => {
             const code = mermaidCode(children);
             if (code !== null && !streaming) return <Diagram code={code} />;
@@ -38,6 +39,24 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: Prop
     </div>
   );
 });
+
+/**
+ * A link stands out from the text, and a popular site's link carries its mark (seen: links in answers were hard to tell
+ * from the words around them). Opens in the system browser.
+ */
+function SiteLink({ props, children }: { props: ComponentProps<"a">; children: ReactNode }) {
+  const icon = siteIcon(props.href);
+  return (
+    <a {...props} className="md-link" target="_blank" rel="noreferrer" title={props.href}>
+      {icon && (
+        <svg className="md-link-icon" viewBox="0 0 24 24" aria-hidden>
+          <path d={icon.path} />
+        </svg>
+      )}
+      {children}
+    </a>
+  );
+}
 
 /** A code block with its language and a button that copies the code. */
 function CodeBlock({ props, children }: { props: ComponentProps<"pre">; children: ReactNode }) {
