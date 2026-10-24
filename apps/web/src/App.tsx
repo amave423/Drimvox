@@ -15,6 +15,7 @@ import { LocalModelsSheet } from "./ui/local/LocalModelsSheet";
 import { TaskSheet } from "./ui/tasks/TaskSheet";
 import { GallerySheet } from "./ui/GallerySheet";
 import { SettingsSheet } from "./ui/SettingsSheet";
+import { DownloadNote } from "./ui/DownloadNote";
 import { UpdateNote } from "./ui/UpdateNote";
 import { Sidebar } from "./ui/Sidebar";
 import { TopBar } from "./ui/TopBar";
@@ -227,6 +228,7 @@ export function App({ api, token, initialSettings, status }: Props) {
         <footer className="bottombar">
           {today && <span>{value.t("bottom.today", { cost: formatUsd(today.costUsd) })}</span>}
           <span className="spacer" />
+          <DownloadNote />
           <UpdateNote />
           <span>{value.t("bottom.version", { version: status.version })}</span>
         </footer>

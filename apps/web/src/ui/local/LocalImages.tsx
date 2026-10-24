@@ -1,6 +1,7 @@
 import type { LocalImageModelId, LocalImagesStatus } from "@drimvox/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
+import { downloadsChanged } from "../DownloadNote";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { LocalMediaSearch } from "./LocalMediaSearch";
@@ -44,7 +45,7 @@ export function LocalImagesSection({ kind }: { kind: "image" | "video" }) {
   const act = (run: (model: LocalImageModelId) => Promise<unknown>) => (model: string) =>
     void run(id(model))
       .catch(() => null)
-      .then(() => load());
+      .then(() => (downloadsChanged(), load()));
   const actions: PullActions = {
     pull: act((model) => api.local.images.pulls.$post({ json: { model } })),
     pause: act((model) => api.local.images.pulls.pause.$post({ json: { model } })),

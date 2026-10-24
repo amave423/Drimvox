@@ -162,3 +162,8 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .step-mark { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: 14px; color: var(--sheet); background: var(--ink); }
 .is-done .step-mark { background: var(--ok); }
 .start-ways { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; line-height: 1.5; }
+
+/* A local model downloading, wherever the user is; a click opens the local models. */
+.download-note { display: inline-flex; align-items: center; gap: 8px; color: inherit; font: inherit; }
+.download-note:hover { color: var(--fg); }
+.download-note progress { width: 80px; height: 6px; }

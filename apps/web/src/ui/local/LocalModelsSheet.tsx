@@ -1,6 +1,7 @@
 import type { LocalPull, LocalStatus } from "@drimvox/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
+import { downloadsChanged } from "../DownloadNote";
 import { useApp } from "../../context";
 import { InstallOllama } from "./InstallOllama";
 import { forgetModels } from "../../lib/models";
@@ -58,6 +59,7 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
   };
   const pull = async (model: string) => {
     await api.local.pulls.$post({ json: { model } }).catch(() => null);
+    downloadsChanged();
     await load();
   };
   const cancel = async (model: string) => {

@@ -88,6 +88,8 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   await cards.nth(0).getByRole("button", { name: /Скачать · 1,3 ГБ/ }).click();
   // The progress, pause and going on are at the model itself, not only in the list at the top.
   await expect(cards.nth(0).getByRole("progressbar", { name: "Скачивание qwen3:1.7b" })).toBeVisible();
+  // The bottom bar shows the download wherever the user is.
+  await expect(page.locator(".bottombar")).toContainText(/Скачивается qwen3:1\.7b: \d+%/);
   await cards.nth(0).getByRole("button", { name: "Пауза" }).click();
   await expect(cards.nth(0)).toContainText("на паузе");
   await cards.nth(0).getByRole("button", { name: "Продолжить" }).click();
