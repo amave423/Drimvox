@@ -121,6 +121,19 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await expect(cards.filter({ hasText: "GitHub" }).getByRole("switch")).not.toBeChecked();
 });
 
+// Seen: closing the window stopped the agents and the started site; Drimvox now stays in the tray until "Quit".
+test("closing the window keeps Drimvox working in the tray, and it shows the window again", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
+  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([false]);
+  // The core still answers: the app did not quit.
+  expect(await page.evaluate(async () => (await fetch("/api/health")).ok)).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show());
+  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isVisible())).toBe(true);
+});
+
 test("creates and deletes a shared skill in the settings", async () => {
   app = await launch();
   const page = await app.firstWindow();

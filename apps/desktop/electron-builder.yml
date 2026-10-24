@@ -17,6 +17,9 @@ extraResources:
   # Git for users without one (src/git-env.ts): dugite's build for this system.
   - from: ../../node_modules/dugite/git
     to: git
+  # The tray's icon (src/tray.ts).
+  - from: build/icon.png
+    to: icon.png
 asar: true
 npmRebuild: false
 nodeGypRebuild: false

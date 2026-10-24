@@ -10,6 +10,7 @@ import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, ty
 import { dataFolder } from "./data-folder";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
+import { keepInTray } from "./tray";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
@@ -58,6 +59,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on("second-instance", () => {
     if (!win) return;
     if (win.isMinimized()) win.restore();
+    // From the tray too: starting Drimvox again shows the window it keeps.
+    win.show();
     win.focus();
   });
   app.whenReady().then(() => {
@@ -435,6 +438,14 @@ async function createWindow(view?: "local" | "local-images") {
   });
 
   attachContextMenu(win.webContents);
+  const ru = app.getLocale().startsWith("ru");
+  keepInTray(
+    () => win,
+    () => quitting,
+    ru
+      ? { open: "Открыть Drimvox", quit: "Выйти", hidden: "Drimvox работает в фоне", hiddenBody: "Агенты и запущенные проекты продолжают работать. Открыть или выйти — значок в трее." }
+      : { open: "Open Drimvox", quit: "Quit", hidden: "Drimvox runs in the background", hiddenBody: "Agents and started projects go on. Open or quit from the tray icon." },
+  )(win);
   win.once("ready-to-show", () => win?.show());
   win.on("closed", () => (win = null));
   win.on("focus", () => win?.flashFrame(false));
@@ -451,12 +462,15 @@ async function createWindow(view?: "local" | "local-images") {
 
 app.on("window-all-closed", () => app.quit());
 let quitting = false;
+let stopping = false;
 app.on("before-quit", (event) => {
+  // The window closes for good now, not into the tray.
+  quitting = true;
   const child = core;
-  if (!child || quitting) return;
+  if (!child || stopping) return;
   // The core stops what it started, such as Ollama, before it goes; a hung core is stopped hard.
   event.preventDefault();
-  quitting = true;
+  stopping = true;
   child.once("exit", () => {
     core = null;
     app.quit();
