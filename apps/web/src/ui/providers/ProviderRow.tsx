@@ -3,7 +3,7 @@ import type { Balance, ProviderView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
-import { forgetModels, loadModels, type ModelsResult } from "../../lib/models";
+import { dropStoredModels, forgetModels, loadModels, type ModelsResult } from "../../lib/models";
 import { ErrorNote } from "../ErrorNote";
 import { Toggle } from "../Toggle";
 import { presetName } from "./presetName";
@@ -68,7 +68,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
   async function remove() {
     setBusy(true);
     await api.providers[":id"].$delete({ param: { id: provider.id } }).catch(() => null);
-    forgetModels(provider.id);
+    dropStoredModels(provider.id);
     await Promise.all([reloadProviders(), reloadChats()]);
   }
 

@@ -95,6 +95,30 @@ test("free models come first in the list, under their own heading", async () => 
   expect(order.map((s) => s.replace(/(free|paid)-model(:free)?$/, ""))).toEqual(["Бесплатные · 1", "Free Model", "Платные", "Paid Model"]);
 });
 
+// Asked for: a tab of starred models across providers, kept in the settings.
+test("a starred model is in the favourites tab, and choosing it there picks it", async () => {
+  fake = await startFakeProvider({
+    key: KEY,
+    models: [
+      { id: "alpha-model", name: "Alpha Model", pricing: { prompt: "0.000001", completion: "0.000002" } },
+      { id: "beta-model", name: "Beta Model", pricing: { prompt: "0.000001", completion: "0.000002" } },
+    ],
+  });
+  const page = await launch();
+  await connect(page);
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("button", { name: "В избранное: Beta Model" }).click();
+  await expect(page.getByRole("button", { name: "Убрать из избранного: Beta Model" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "★ Избранное" }).click();
+  const list = page.getByRole("listbox");
+  await expect(list.locator(".picker-name")).toHaveCount(1);
+  await expect(list.locator(".picker-name")).toContainText("Beta Model");
+  await expect(list.locator(".picker-name")).toContainText("Тестовый");
+  await list.getByRole("option").getByRole("button").first().click();
+  await expect(page.getByRole("button", { name: "Тестовый / beta-model" })).toBeVisible();
+});
+
 // Seen live: free models that a provider lists but no longer serves, or that answer "busy", failed every chat; and
 // OpenRouter's free models past the first two hundred names were cut off the list.
 test("asks the free models a word, hides those that are gone and marks the busy ones", async () => {

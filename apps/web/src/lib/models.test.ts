@@ -1,21 +1,29 @@
-import { describe, expect, it } from "vitest";
-import { freeFirst, isFree } from "./models";
+import type { ModelInfo } from "@drimvox/shared";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Api } from "../api";
+import { dropStoredModels, loadModels, storedModels } from "./models";
 
-const m = (id: string, priceIn: number | null, priceOut: number | null) => ({ id, priceIn, priceOut });
+const model: ModelInfo = { id: "m1", name: "Model 1", contextLength: null, priceIn: 1, priceOut: 2, tools: true, vision: false };
 
-describe("freeFirst", () => {
-  it("puts free models first when the list has both", () => {
-    const list = [m("gpt", 1, 2), m("qwen:free", 0, 0), m("claude", 3, 15), m("llama:free", 0, 0)];
-    expect(freeFirst(list, isFree)).toEqual({ free: [list[1], list[3]], paid: [list[0], list[2]] });
+beforeEach(() => {
+  const data = new Map<string, string>();
+  vi.stubGlobal("localStorage", { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, v), removeItem: (k: string) => data.delete(k) });
+});
+afterEach(() => vi.unstubAllGlobals());
+
+// Seen: the picker waited for the list every time it opened; a list kept from the last time shows at once.
+describe("a provider's model list kept between starts", () => {
+  it("is kept once loaded, and goes with the provider", async () => {
+    const api = { providers: { ":id": { models: { $get: async () => new Response(JSON.stringify([model]), { status: 200 }) } } } } as unknown as Api;
+    expect(storedModels("p1")).toBeNull();
+    await loadModels(api, "p1", true);
+    expect(storedModels("p1")).toEqual([model]);
+    dropStoredModels("p1");
+    expect(storedModels("p1")).toBeNull();
   });
 
-  it("does not split a list where everything or nothing is free", () => {
-    expect(freeFirst([m("a", 0, 0), m("b", 0, 0)], isFree)).toBeNull();
-    expect(freeFirst([m("a", 1, 1), m("b", null, null)], isFree)).toBeNull();
-  });
-
-  it("does not take an unknown price for free", () => {
-    expect(isFree(m("x", null, null))).toBe(false);
-    expect(isFree(m("x", 0, 1))).toBe(false);
+  it("is not shown when it is old", () => {
+    localStorage.setItem("drimvox.models.p2", JSON.stringify({ at: Date.now() - 8 * 24 * 60 * 60_000, models: [model] }));
+    expect(storedModels("p2")).toBeNull();
   });
 });

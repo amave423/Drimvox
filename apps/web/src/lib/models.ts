@@ -5,6 +5,35 @@ export type ModelsResult = { models: ModelInfo[] } | { error: ProviderError };
 
 const cache = new Map<string, Promise<ModelsResult>>();
 
+/** Lists kept between starts, so the picker shows them at once (seen: waiting for the list each time the picker opened). */
+const STORED = "drimvox.models.";
+/** A kept list older than this is not shown: models and prices change. */
+const STORED_MAX_MS = 7 * 24 * 60 * 60_000;
+
+/** The list kept from the last time, if there is a recent one; it is shown while the fresh one comes. */
+export function storedModels(providerId: string): ModelInfo[] | null {
+  try {
+    const kept = JSON.parse(localStorage.getItem(STORED + providerId) ?? "null") as { at: number; models: ModelInfo[] } | null;
+    return kept && Date.now() - kept.at < STORED_MAX_MS && Array.isArray(kept.models) ? kept.models : null;
+  } catch {
+    return null;
+  }
+}
+
+function store(providerId: string, models: ModelInfo[]): void {
+  try {
+    localStorage.setItem(STORED + providerId, JSON.stringify({ at: Date.now(), models }));
+  } catch {
+    // Too big or no storage: the list is asked for again next time.
+  }
+}
+
+/** Every provider's list asked for in the background at start, so the picker has it when opened. */
+export function preloadModels(api: Api, providers: { id: string; billing: string }[]): void {
+  // Programs on a subscription build their list each time from their last run.
+  for (const p of providers) if (p.billing !== "subscription") void loadModels(api, p.id);
+}
+
 /** Model list of a provider, shared by the picker and the providers screen. Never rejects. */
 export function loadModels(api: Api, providerId: string, fresh = false): Promise<ModelsResult> {
   const hit = cache.get(providerId);
@@ -13,7 +42,10 @@ export function loadModels(api: Api, providerId: string, fresh = false): Promise
     .$get({ param: { id: providerId }, query: fresh ? { fresh: "1" } : {} })
     .then(async (res): Promise<ModelsResult> => {
       const body = (await res.json()) as unknown;
-      if (res.ok) return { models: body as ModelInfo[] };
+      if (res.ok) {
+        store(providerId, body as ModelInfo[]);
+        return { models: body as ModelInfo[] };
+      }
       return { error: (body as { error?: ProviderError }).error ?? { code: "unknown" } };
     })
     .catch((): ModelsResult => ({ error: { code: "unknown" } }));
@@ -42,6 +74,7 @@ export function checkFree(api: Api, providerId: string, result: ModelsResult): P
       const states = (await res.json()) as Record<string, ModelInfo["available"]>;
       const checked = { models: result.models.map((m) => (states[m.id] ? { ...m, available: states[m.id] } : m)) };
       cache.set(providerId, Promise.resolve(checked));
+      store(providerId, checked.models);
       return checked;
     })
     .catch(() => result)
@@ -52,6 +85,16 @@ export function checkFree(api: Api, providerId: string, result: ModelsResult): P
 
 export function forgetModels(providerId: string): void {
   cache.delete(providerId);
+}
+
+/** A provider removed: its kept list goes too. */
+export function dropStoredModels(providerId: string): void {
+  forgetModels(providerId);
+  try {
+    localStorage.removeItem(STORED + providerId);
+  } catch {
+    // Nothing kept.
+  }
 }
 
 /** A model that costs nothing per token on a provider that charges for others. */

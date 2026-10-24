@@ -15,6 +15,7 @@ import { LocalModelsSheet } from "./ui/local/LocalModelsSheet";
 import { TaskSheet } from "./ui/tasks/TaskSheet";
 import { GallerySheet } from "./ui/GallerySheet";
 import { SettingsSheet } from "./ui/SettingsSheet";
+import { preloadModels } from "./lib/models";
 import { DownloadNote } from "./ui/DownloadNote";
 import { UpdateNote } from "./ui/UpdateNote";
 import { Sidebar } from "./ui/Sidebar";
@@ -72,6 +73,8 @@ export function App({ api, token, initialSettings, status }: Props) {
   const reloadProviders = useCallback(async () => {
     setProviders(await api.providers.$get().then((r) => ok<ProviderView[]>(r)).catch(() => []));
   }, [api]);
+  // Every provider's model list is asked for once it is known, so the picker opens with it at once.
+  useEffect(() => preloadModels(api, providers), [api, providers]);
   const reloadChats = useCallback(async () => {
     setChats(await api.chats.$get().then((r) => ok<ChatView[]>(r)).catch(() => []));
   }, [api]);

@@ -236,3 +236,10 @@
 .md a.md-link { color: var(--ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--ink) 35%, transparent); padding: 0 1px; border-radius: 3px; overflow-wrap: anywhere; }
 .md a.md-link:hover { background: var(--ink-soft); border-bottom-color: var(--ink); }
 .md-link-icon { display: inline-block; width: 0.9em; height: 0.9em; margin-right: 0.3em; vertical-align: -0.1em; fill: currentColor; }
+
+/* A star beside each model: the favourites tab gathers them across providers. */
+.picker-item { display: flex; align-items: center; gap: 2px; }
+.picker-item > button:first-child { flex: 1; min-width: 0; }
+.picker-list button.picker-star { width: 30px; flex: none; justify-content: center; padding: 6px 0; color: var(--muted); font-size: 15px; line-height: 1; }
+.picker-list button.picker-star:hover { color: var(--ink); background: var(--paper); }
+.picker-list button.picker-star.is-on { color: var(--wait); }
