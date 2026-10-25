@@ -56,6 +56,7 @@ export interface Generated {
 export async function generateImage(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal, photos: Photo[] = []): Promise<Generated> {
   if (conn.preset === "sdcpp") return drawLocally(model.id, prompt, o.aspectRatio, signal);
   if (model.viaChat) return drawInChat(conn, model, prompt, o, signal, photos);
+  if (model.openaiImages) return drawOpenAiStyle(conn, model, prompt, signal);
   const body = await postJson(
     conn,
     "/images",
@@ -77,6 +78,19 @@ export async function generateImage(conn: Connection, model: MediaModel, prompt:
     mime: typeof first.media_type === "string" ? first.media_type : sniff(first.b64_json),
     costUsd: await costOf(conn, body),
   };
+}
+
+/** OpenAI's images API, which most custom servers follow: the picture comes back as base64. */
+async function drawOpenAiStyle(conn: Connection, model: MediaModel, prompt: string, signal?: AbortSignal): Promise<Generated> {
+  const body = await postJson(conn, "/images/generations", { model: model.id, prompt, n: 1, response_format: "b64_json" }, 5 * 60_000, signal);
+  const first = Array.isArray(body?.data) ? body.data[0] : undefined;
+  if (first && typeof first.b64_json === "string") return { bytes: Buffer.from(first.b64_json, "base64"), mime: sniff(first.b64_json), costUsd: await costOf(conn, body) };
+  // Some servers give an address instead.
+  if (first && typeof first.url === "string") {
+    const res = await (conn.fetch ?? fetch)(first.url, { signal });
+    if (res.ok) return { bytes: Buffer.from(await res.arrayBuffer()), mime: res.headers.get("content-type") ?? "image/png", costUsd: await costOf(conn, body) };
+  }
+  throw new ProviderFailure({ code: "provider_error", detail: "No picture in the answer" });
 }
 
 /** Gemini-style models answer a chat request with text and pictures as data: URLs. */

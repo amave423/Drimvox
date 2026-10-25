@@ -17,6 +17,8 @@ export interface Connection {
   /** The provider asked for the proxy; `proxy` is its address, null when none is set. */
   useProxy: boolean;
   proxy: string | null;
+  /** Paid by a flat fee, not by tokens: its models cost nothing per answer. */
+  flat: boolean;
   /** Every request to the provider goes through this: straight, or through the proxy. */
   fetch: typeof fetch;
 }
@@ -33,6 +35,7 @@ interface Row {
   created_at: number;
   updated_at: number;
   use_proxy: number;
+  flat: number;
 }
 
 /** A custom address that is really a known service gets that service's preset: prices, currency, media. */
@@ -94,11 +97,12 @@ export class ProviderRepo {
       created_at: now,
       updated_at: now,
       use_proxy: 0,
+      flat: 0,
     };
     this.db.sql
       .prepare(
-        `insert into providers (id, preset, name, base_url, secret, created_at, updated_at, use_proxy)
-         values (:id, :preset, :name, :base_url, :secret, :created_at, :updated_at, :use_proxy)`,
+        `insert into providers (id, preset, name, base_url, secret, created_at, updated_at, use_proxy, flat)
+         values (:id, :preset, :name, :base_url, :secret, :created_at, :updated_at, :use_proxy, :flat)`,
       )
       .run({ ...row });
     return toView(row);
@@ -114,13 +118,14 @@ export class ProviderRepo {
       base_url: patch.baseUrl ?? row.base_url,
       secret: patch.apiKey ? this.cipher.encrypt(patch.apiKey) : row.secret,
       use_proxy: patch.useProxy === undefined ? row.use_proxy : patch.useProxy ? 1 : 0,
+      flat: patch.flat === undefined ? row.flat : patch.flat ? 1 : 0,
       updated_at: Date.now(),
     };
     this.db.sql
       .prepare(
-        "update providers set name = :name, base_url = :base_url, secret = :secret, use_proxy = :use_proxy, updated_at = :updated_at where id = :id",
+        "update providers set name = :name, base_url = :base_url, secret = :secret, use_proxy = :use_proxy, flat = :flat, updated_at = :updated_at where id = :id",
       )
-      .run({ id, name: next.name, base_url: next.base_url, secret: next.secret, use_proxy: next.use_proxy, updated_at: next.updated_at });
+      .run({ id, name: next.name, base_url: next.base_url, secret: next.secret, use_proxy: next.use_proxy, flat: next.flat, updated_at: next.updated_at });
     return toView(next);
   }
 
@@ -154,6 +159,7 @@ export class ProviderRepo {
       cacheKey: `${id}:${row.updated_at}:${proxy ?? ""}`,
       useProxy,
       proxy,
+      flat: row.flat === 1,
       fetch: this.wake(row.preset, baseUrl, !useProxy ? globalThis.fetch : proxy ? fetchVia(proxy) : noProxyFetch),
     };
   }
@@ -199,6 +205,7 @@ function toView(row: Row): ProviderView {
     billing: presets[row.preset].billing,
     currency: presets[row.preset].currency,
     useProxy: row.use_proxy === 1,
+    flat: row.flat === 1,
     createdAt: row.created_at,
   };
 }

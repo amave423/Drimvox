@@ -65,7 +65,8 @@ export function ConnectForm({ kind }: { kind: "key" | "subscription" }) {
         {presetIds
           // Gemini CLI no longer serves personal Google accounts (Google, 2026-06-18): Antigravity CLI replaces it.
           // stable-diffusion.cpp is made by Drimvox itself when a picture model is downloaded.
-          .filter((id) => id !== "gemini-cli" && id !== "sdcpp" && (presets[id].billing === "subscription") === (kind === "subscription"))
+          // Ollama is installed and run from "Local models".
+          .filter((id) => id !== "gemini-cli" && id !== "sdcpp" && id !== "ollama" && (presets[id].billing === "subscription") === (kind === "subscription"))
           .map((id) => (
             <button key={id} role="radio" aria-checked={preset === id} className={`preset${preset === id ? " is-on" : ""}`} onClick={() => choose(id)}>
               <span className="preset-name">{presetName(t, id)}</span>

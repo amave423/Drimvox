@@ -21,6 +21,7 @@ import { loadMediaModel } from "../../lib/media";
 import { postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
+import { DirectorControl, useDirector } from "./DirectorControl";
 import { AssistantMessage, UserMessage, type AnswerAction, type ChatApproval } from "./Messages";
 import { ModelPicker } from "./ModelPicker";
 import { isPhoto, photoProblem } from "./photos";
@@ -183,7 +184,12 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     return () => clearInterval(timer);
   }, [running, chat?.id]);
 
-  const estimateUsd = mediaModel ? estimateCost(mediaModel, options) : null;
+  // A director makes up to its attempts, each paid: the price on the button is for all of them (a clip: one).
+  const [director, setDirector] = useDirector();
+  const directing = kind !== "text" && director.on && !!director.providerId && !!director.model;
+  const tries = directing && kind === "image" ? director.attempts : 1;
+  const one = mediaModel ? estimateCost(mediaModel, options) : null;
+  const estimateUsd = one === null ? null : one * tries;
   const preset = providers.find((p) => p.id === choice?.providerId)?.preset;
   const providerSearch = preset === "openrouter" || preset === "routerai";
   const searchProvider = providerSearch && preset ? presets[preset].name : null;
@@ -198,7 +204,11 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     ...(folder ? [t("folder.connected", { name: folder.split(/[\\/]/).filter(Boolean).at(-1) ?? folder })] : []),
   ];
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
-  const mediaRows = useMediaOptionRows({ model: mediaModel, value: options, onChange: setOptions });
+  const optionRows = useMediaOptionRows({ model: mediaModel, value: options, onChange: setOptions });
+  const mediaRows = {
+    changed: [...optionRows.changed, ...(directing ? [t("director.short", { n: tries })] : [])],
+    rows: [...optionRows.rows, { label: t("director.label"), control: <DirectorControl value={director} video={kind === "video"} onChange={setDirector} /> }],
+  };
 
   async function saveFolder(id: string, next: string | null): Promise<boolean> {
     const res = await api.chats[":id"].folder.$patch({ param: { id }, json: { folder: next } }).catch(() => null);
@@ -307,7 +317,13 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         // The price was on the button the user pressed; that is the confirmation.
         kind === "text"
           ? { content, web: webMode, thinking: thinks ? thinking : "auto", attachments: attached.map((a) => a.id), ...(editOf ? { editOf } : {}) }
-          : { content, options, confirm, attachments: attached.map((a) => a.id) },
+          : {
+              content,
+              options,
+              confirm,
+              attachments: attached.map((a) => a.id),
+              ...(directing ? { director: { providerId: director.providerId!, model: director.model!, attempts: director.attempts } } : {}),
+            },
         (e) => {
           // The core named the chat after the question: the list shows the name before the answer is done.
           if (e.type === "start") void reloadChats();

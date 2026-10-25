@@ -56,9 +56,10 @@ async function launch(): Promise<Page> {
 test("connects Claude Code without a key, names its models and chats through it", async () => {
   writeFileSync(join(cliDir, "script.json"), JSON.stringify([{ text: "Привет из Claude Code", session: "s1", initModel: "claude-fable-5-1", limits: [{ status: "allowed_warning", resetsAt: 1_900_000_000, rateLimitType: "seven_day", utilization: 0.35 }] }]));
   const page = await launch();
-  // Subscriptions have their own place, apart from the keys.
-  const subscriptions = page.getByRole("region", { name: "По подписке" });
+  // Subscriptions have their own tab, apart from the keys.
+  const subscriptions = page.locator(".sheet-body");
   await expect(page.getByRole("radiogroup", { name: "Подключить провайдера" }).getByRole("radio", { name: /Claude Code/ })).toHaveCount(0);
+  await page.getByRole("tab", { name: /По подписке/ }).click();
   await subscriptions.getByRole("radio", { name: /Claude Code/ }).click();
   await expect(page.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
   await expect(page.getByLabel(/Ключ API/)).toHaveCount(0);
@@ -91,6 +92,7 @@ test("connects Claude Code without a key, names its models and chats through it"
 
 test("says how to install a CLI that is missing", async () => {
   const page = await launch();
+  await page.getByRole("tab", { name: /По подписке/ }).click();
   await page.getByRole("radio", { name: /Codex/ }).click();
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
   await expect(page.getByText("Программа не установлена или не найдена. Установи её командой ниже и проверь снова.")).toBeVisible();
@@ -99,7 +101,8 @@ test("says how to install a CLI that is missing", async () => {
 
 test("offers Antigravity CLI with Google's own install command for this computer", async () => {
   const page = await launch();
-  await page.getByRole("region", { name: "По подписке" }).getByRole("radio", { name: /Antigravity/ }).click();
+  await page.getByRole("tab", { name: /По подписке/ }).click();
+  await page.getByRole("radio", { name: /Antigravity/ }).click();
   const command = process.platform === "win32" ? "irm https://antigravity.google/cli/install.ps1 | iex" : "curl -fsSL https://antigravity.google/cli/install.sh | bash";
   await expect(page.locator("code.cli-install", { hasText: command })).toBeVisible();
 });

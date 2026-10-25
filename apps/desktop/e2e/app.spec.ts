@@ -101,14 +101,14 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Настройки" }).first().click();
-  await page.getByRole("tab", { name: "Инструменты" }).click();
-
+  // Skills and servers each on their own tab.
+  await page.getByRole("tab", { name: "Скиллы" }).click();
   const cards = page.locator(".catalog-card");
-  await expect(cards).toHaveCount(29);
-  for (const name of ["Playwright", "Chrome DevTools", "Context7", "GitHub", "Figma", "Дизайн интерфейсов", "Сначала тест", "Документы Word"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  await expect(cards).toHaveCount(16);
+  for (const name of ["Дизайн интерфейсов", "Сначала тест", "Документы Word"]) await expect(page.locator(".catalog-grid")).toContainText(name);
   // A filter by what the card is about.
   await page.getByRole("button", { name: "Документы", exact: true }).click();
-  await expect(cards).toHaveCount(5);
+  await expect(cards).toHaveCount(4);
 
   const word = cards.filter({ hasText: "Документы Word" });
   await word.getByRole("switch").click({ force: true });
@@ -119,7 +119,9 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await expect(page.getByText("Общих скиллов пока нет.")).toBeVisible();
 
   // The details show what using it looks like.
-  await page.getByRole("button", { name: "Все", exact: true }).click();
+  await page.getByRole("tab", { name: "Серверы MCP" }).click();
+  await expect(cards).toHaveCount(13);
+  for (const name of ["Playwright", "Chrome DevTools", "Context7", "GitHub", "Figma"]) await expect(page.locator(".catalog-grid")).toContainText(name);
   await cards.first().getByRole("button", { name: "Подробнее" }).click();
   const playwright = page.getByRole("dialog", { name: "Playwright" });
   await expect(playwright.getByRole("figure", { name: "Как это выглядит" })).toContainText("проверь, что форма входа работает");
@@ -154,7 +156,7 @@ test("creates and deletes a shared skill in the settings", async () => {
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Настройки" }).first().click();
-  await page.getByRole("tab", { name: "Инструменты" }).click();
+  await page.getByRole("tab", { name: "Скиллы" }).click();
 
   await page.getByRole("button", { name: "Создать скилл" }).click();
   await page.getByLabel("Название").fill("Отчёты");

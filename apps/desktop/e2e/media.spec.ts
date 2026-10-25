@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { startFakeProvider, type FakeProvider } from "../../../packages/core/test/fake-provider";
+import { startFakeProvider, type FakeProvider, type FakeTurn } from "../../../packages/core/test/fake-provider";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -26,10 +26,11 @@ test.afterEach(async () => {
   rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 
-async function launch(): Promise<Page> {
+async function launch(script?: FakeTurn[]): Promise<Page> {
   fake = await startFakeProvider({
     key: KEY,
     models: [{ id: "chatty", name: "Chatty" }],
+    ...(script ? { script } : {}),
     handle: (method, path) => {
       if (method === "GET" && path === "/v1/images/models") {
         return {
@@ -107,6 +108,32 @@ test("a picture in a chat: the price before, the picture after, the gallery", as
   await expect(page.getByRole("img", { name: "Лиса в шарфе" })).toBeVisible();
   await page.getByRole("button", { name: "Открыть чат" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Лиса в шарфе" })).toBeVisible();
+});
+
+// Asked for: a text model that knows the picture model, writes the prompt, looks at the picture and redoes it.
+test("a director writes the prompt, looks at the picture and says what it made", async () => {
+  const page = await launch([
+    { toolCalls: [{ name: "make_picture", args: { prompt: "A red fox in a knitted scarf, autumn forest, soft light" } }] },
+    { text: "Рыжая лиса в вязаном шарфе в осеннем лесу." },
+    { text: "Готово: лиса в шарфе, с первой попытки." },
+  ]);
+  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("tab", { name: "Картинки" }).click();
+  await page.getByRole("option", { name: /Cheap Painter/ }).click();
+  await page.getByRole("button", { name: /^Параметры/ }).click();
+  await page.locator(".director label.toggle").click();
+  await page.locator(".director").getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("option", { name: /Chatty/ }).click();
+  await page.locator(".director").getByRole("combobox", { name: "Попыток" }).selectOption("1");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: /Параметры: .*режиссёр · 1/ })).toBeVisible();
+  await page.getByLabel(/Опиши картинку/).fill("Лиса в шарфе");
+  await page.getByRole("button", { name: "Создать" }).click();
+
+  await expect(page.locator(".msg-assistant").last()).toContainText("Готово: лиса в шарфе, с первой попытки.");
+  await expect(page.locator(".msg-assistant").last().locator("img")).toHaveCount(1);
+  expect(fake!.requests.find((r) => r.path === "/v1/images")!.body).toMatchObject({ model: "img/cheap", prompt: "A red fox in a knitted scarf, autumn forest, soft light" });
 });
 
 // docs/specs/media.md: a photo only for a model that takes one; the others say they do not.

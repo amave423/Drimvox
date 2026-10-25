@@ -11,9 +11,6 @@ export const NOTES_LIMIT = 4000;
 const FILE_LIMIT = 12_000;
 const START = "<!-- drimvox -->";
 const END = "<!-- /drimvox -->";
-/** The markers of notes written before the app was renamed from Artel. */
-const OLD_START = "<!-- artel -->";
-const OLD_END = "<!-- /artel -->";
 
 function notesFile(root: string): string | null {
   for (const name of ["AGENTS.md", "CLAUDE.md"]) if (existsSync(join(root, name))) return join(root, name);
@@ -39,8 +36,7 @@ export function writeNotes(root: string, notes: string): void {
   const file = join(root, "AGENTS.md");
   const section = `${START}\n${body}\n${END}`;
   const old = existsSync(file) ? readFileSync(file, "utf8") : "";
-  // The section written before the rename (Artel) is the same section: it is replaced, not doubled.
-  const [open, close] = old.includes(START) ? [START, END] : [OLD_START, OLD_END];
+  const [open, close] = [START, END];
   const at = old.indexOf(open);
   const end = old.indexOf(close);
   const next =

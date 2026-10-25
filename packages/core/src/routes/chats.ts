@@ -195,7 +195,7 @@ export function chatRoutes(
       const conn = chat.providerId ? providers.connection(chat.providerId) : null;
       if (!conn || !chat.model) return c.json({ error: { code: "invalid", detail: "Choose a model first" } }, 400);
       if (!conn.apiKey && presets[conn.preset].keyRequired) return c.json({ error: { code: "no_key" } }, 400);
-      const { content, options, confirm, web: webMode, attachments, thinking, editOf } = c.req.valid("json");
+      const { content, options, confirm, web: webMode, attachments, thinking, editOf, director } = c.req.valid("json");
       // An edit: a text chat's own message, while nothing is being answered; a program on a subscription keeps its own
       // session and cannot go back in it.
       const edited = editOf ? chats.userMessage(chat.id, editOf) : null;
@@ -214,8 +214,36 @@ export function chatRoutes(
         if (photos.length > 0 && !model.photos) return c.json({ error: { code: "no_photo_input" as const } }, 409);
         if (model.photos && photos.length < model.photos.min) return c.json({ error: { code: "photo_required" as const } }, 409);
         if (model.photos && photos.length > model.photos.max) return c.json({ error: { code: "too_many_photos" as const, max: model.photos.max } }, 409);
-        const estimateUsd = estimateCost(model, options);
+        // With a director every attempt is paid: the price asked about is all of them (a clip is one per message).
+        const tries = director ? (model.kind === "video" ? 1 : director.attempts) : 1;
+        const one = estimateCost(model, options);
+        const estimateUsd = one === null ? null : one * tries;
         if (needsConfirmation(model, estimateUsd) && !confirm) return c.json({ error: { code: "confirm", estimateUsd } }, 409);
+        const photoFiles = { ids: photos.map((f) => f!.id), files: photos.map((f) => ({ mime: f!.type, data: chats.attachments.file(f!.id) })) };
+        if (director) {
+          const dconn = providers.connection(director.providerId);
+          if (!dconn) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
+          const info = await findModel(dconn, director.model);
+          // Seen: a director without eyes cannot tell what it made, and keeps redrawing blindly.
+          if (info?.vision === false) return c.json({ error: { code: "no_vision" as const } }, 409);
+          return streamSSE(c, async (stream) => {
+            const controller = new AbortController();
+            stream.onAbort(() => controller.abort());
+            await studio.direct({
+              chatId: chat.id,
+              director: { conn: dconn, model: director.model, price: info },
+              painter: { conn, model },
+              attempts: director.attempts,
+              content,
+              options,
+              photos: photoFiles,
+              signal: controller.signal,
+              emit: async (event) => {
+                if (!controller.signal.aborted) await stream.writeSSE({ data: JSON.stringify(event) });
+              },
+            });
+          });
+        }
         return streamSSE(c, async (stream) => {
           await studio.reply({
             chatId: chat.id,

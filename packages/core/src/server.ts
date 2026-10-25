@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { join } from "node:path";
 import { createCore, type AppOptions } from "./app";
-import { DB_FILE, moveLegacyData } from "./legacy";
+import { DB_FILE } from "./db-file";
 import { openDatabase } from "./db";
 
 export interface ServerOptions extends Omit<AppOptions, "db"> {
@@ -18,8 +18,6 @@ export interface RunningServer {
 }
 
 export function startServer(o: ServerOptions): Promise<RunningServer> {
-  // Data from before the rename (Artel) comes along first.
-  moveLegacyData(o.dataDir);
   const db = openDatabase(join(o.dataDir, DB_FILE));
   const { app, shutdown, needsPassword } = createCore({ ...o, db });
 

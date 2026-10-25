@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { InitMessage } from "./core-process";
 import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, type PageAction } from "@drimvox/shared";
-import { dataFolder } from "./data-folder";
+import { INSTALLER_ID } from "./installer-id";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
 import { keepInTray } from "./tray";
@@ -21,15 +21,11 @@ const token = randomBytes(32).toString("hex");
 
 // Unpackaged Electron would otherwise store data under %APPDATA%\Electron. Dev keeps its own folder;
 // DRIMVOX_USER_DATA lets tests isolate theirs.
-// The folder of the app's old name (Artel) becomes Drimvox's on the first start, with everything in it.
 app.setName(devServerUrl ? "Drimvox Dev" : "Drimvox");
-app.setPath(
-  "userData",
-  process.env.DRIMVOX_USER_DATA ?? dataFolder(join(app.getPath("appData"), app.getName()), join(app.getPath("appData"), devServerUrl ? "Artel Dev" : "Artel")),
-);
+app.setPath("userData", process.env.DRIMVOX_USER_DATA ?? join(app.getPath("appData"), app.getName()));
 // Windows shows toasts only for apps with an identity. The installed app has the installer's (electron-builder.yml),
 // a run from the sources its own, so their Start menu shortcuts do not overwrite each other.
-const appId = app.isPackaged ? "com.artel.app" : devServerUrl ? "Drimvox Dev" : "Drimvox";
+const appId = app.isPackaged ? INSTALLER_ID : devServerUrl ? "Drimvox Dev" : "Drimvox";
 app.setAppUserModelId(appId);
 
 /**

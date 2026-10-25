@@ -124,8 +124,9 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
         : (media ?? []).map((m) => ({ id: m.id, name: m.name, info: null, photoInput: m.photos }));
     const q = query.trim().toLowerCase();
     const found = q ? all.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : all;
-    // Models that do not answer are left out: a chat with them only fails. Checking screenshots needs eyes.
-    const usable = found.filter((m) => m.info?.available !== "gone" && (!vision || m.info?.vision === true));
+    // Models that do not answer are left out: a chat with them only fails. Checking screenshots needs eyes: those known to
+    // have none are left out (a custom server often does not say; seen: all its models hidden).
+    const usable = found.filter((m) => m.info?.available !== "gone" && (!vision || m.info?.vision !== false));
     // With a photo attached, the models that take one first (docs/specs/media.md).
     const list = photos && kind !== "text" ? [...usable.filter((m) => m.photoInput), ...usable.filter((m) => !m.photoInput)] : usable;
     // Free models first, under their own heading, inside the kind they belong to; the limit cuts the paid ones, so a
@@ -205,11 +206,14 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
       </button>
       {open && (
         <div className={`picker-panel${placement === "above" ? " is-above" : ""}`}>
-          {(providers.length > 1 || favorites.length > 0) && kinds.includes("text") && (
+          {/* Every provider stays in the row whichever is chosen (seen: choosing the picture engine hid the others). */}
+          {(providers.length > 1 || favorites.length > 0) && (
             <div className="picker-providers">
-              <button type="button" className={onFavorites ? "is-on" : undefined} onClick={() => setProviderId(FAVORITES)}>
-                {t("model.favorites")}
-              </button>
+              {wanted.includes("text") && (
+                <button type="button" className={onFavorites ? "is-on" : undefined} onClick={() => setProviderId(FAVORITES)}>
+                  {t("model.favorites")}
+                </button>
+              )}
               {providers.map((p) => (
                 <button type="button" key={p.id} className={p.id === providerId ? "is-on" : undefined} onClick={() => setProviderId(p.id)}>
                   {p.name}
@@ -267,7 +271,7 @@ function ModelFacts({ model, billing }: { model: ModelInfo; billing: ProviderVie
   const { t, settings } = useApp();
   const price =
     model.priceIn === null || model.priceOut === null
-      ? "—"
+      ? t("model.priceNone")
       : model.priceIn === 0 && model.priceOut === 0
         ? t(billing === "subscription" ? "model.subscription" : billing === "credits" ? "model.freeCredits" : "model.free")
         : `${model.priceEstimated ? "≈" : ""}${formatPrice(model.priceIn)} / ${formatPrice(model.priceOut)}`;
@@ -293,7 +297,7 @@ function MediaPrice({ providerId, kind, model }: { providerId: string; kind: Exc
     };
   }, [api, providerId, kind, model]);
   if (cost === undefined) return <span className="picker-facts mono muted">…</span>;
-  return <span className="picker-facts mono">{cost === null ? "—" : t(kind === "image" ? "model.perImage" : "model.perClip", { cost: formatUsd(cost) })}</span>;
+  return <span className="picker-facts mono">{cost === null ? t("model.priceNone") : t(kind === "image" ? "model.perImage" : "model.perClip", { cost: formatUsd(cost) })}</span>;
 }
 
 /** What a model does with a photo, on its line in the list: a reference, a first frame; "needs a photo" where it must. */

@@ -128,10 +128,11 @@
 .web-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--muted); }
 .web-dot.is-free { background: var(--ink); }
 .web-dot.is-provider { background: var(--wait); }
-.web-panel { width: min(340px, 80vw); grid-template-rows: none; gap: 2px; list-style: none; margin: 0; }
+.web-panel { width: max-content; min-width: 180px; max-width: min(300px, 80vw); grid-template-rows: none; gap: 2px; list-style: none; margin: 0; }
 .web-panel button { width: 100%; display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; text-align: left; }
 .web-panel button:hover, .web-panel button.is-on { background: var(--paper); }
-.web-option-name { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.web-option-name { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.web-option-name .hint { margin-left: auto; }
 .web-panel small { padding-left: 15px; font-size: 12px; line-height: 1.4; }
 .msg-activity li { overflow-wrap: anywhere; }
 .msg-activity { list-style: none; margin: 4px 0 8px; padding: 0 0 0 12px; border-left: 2px solid var(--line); font-size: 13px; display: grid; gap: 2px; }
@@ -244,13 +245,21 @@
 .picker-list button.picker-star:hover { color: var(--ink); background: var(--paper); }
 .picker-list button.picker-star.is-on { color: var(--wait); }
 
-/* One's own message: edit it in place, and switch between its versions. */
-.msg-user-tools { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
-.msg-user-tools button { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 6px; color: var(--muted); }
-.msg-user-tools button:hover:not(:disabled) { color: var(--fg); background: var(--paper); }
-.msg-user-tools button:disabled { opacity: 0.4; cursor: default; }
-.msg-versions { display: inline-flex; align-items: center; gap: 2px; }
-.msg-edit { opacity: 0; transition: opacity 120ms; }
-.msg-user:hover .msg-edit, .msg-edit:focus-visible { opacity: 1; }
-.msg-editing { display: grid; gap: 8px; width: min(100%, 640px); }
-.msg-editing textarea { resize: vertical; font: inherit; }
+/* One's own message: edit it in place, and switch between its versions, with the tools under it. */
+.msg-user-wrap { justify-self: end; max-width: 80%; display: grid; justify-items: end; gap: 2px; }
+.msg-user-wrap > .msg-user { max-width: 100%; justify-self: end; }
+.msg-user-tools { display: flex; align-items: center; gap: 2px; color: var(--muted); opacity: 0; transition: opacity 120ms; }
+.msg-user-wrap:hover .msg-user-tools, .msg-user-tools:focus-within, .msg-user-tools:has(.msg-versions) { opacity: 1; }
+.msg-tool { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: var(--muted); }
+.msg-tool:hover:not(:disabled) { color: var(--fg); background: var(--paper); }
+.msg-tool:disabled { opacity: 0.35; cursor: default; }
+.msg-versions { display: inline-flex; align-items: center; gap: 0; }
+.msg-versions-count { min-width: 40px; text-align: center; font-size: 13px; line-height: 30px; font-variant-numeric: tabular-nums; }
+.msg-editing { justify-self: stretch; display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.msg-editing textarea { height: 140px; resize: none; overflow-y: auto; border: none; outline: none; padding: 0; background: transparent; color: var(--fg); font: inherit; line-height: 1.5; }
+.msg-editing-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* The director in a picture or video chat's options. */
+.director { display: grid; gap: 8px; justify-items: start; }
+.director-row { display: inline-flex; align-items: center; gap: 8px; }
+.director-attempts { width: 64px; height: 32px; padding: 0 8px; }

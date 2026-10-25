@@ -88,7 +88,7 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(plan).toContainText("Сайт лесопилки с каталогом досок.", { timeout: 30_000 });
   await expect(plan.getByRole("listitem")).toHaveText(["Каталог досок", "Проверить страницу"]);
   await expect(plan.getByLabel("Время, часов")).toHaveValue("2");
-  await plan.getByRole("button", { name: "Поехали" }).click();
+  await plan.getByRole("button", { name: "Начать работу" }).click();
 
   // The project's conversation: the plan as its first message, the panel on the right with the checklist.
   await expect(page.locator(".msg-user").first()).toContainText("Каталог досок");

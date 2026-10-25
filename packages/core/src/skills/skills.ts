@@ -18,8 +18,8 @@ export interface Skill {
 }
 
 /** Folders of a project that hold its skills, relative to the project. */
-/** A project's own skills; .artel/skills is where they lived before the app was renamed to Drimvox. */
-export const PROJECT_SKILL_DIRS = [".drimvox/skills", ".artel/skills", ".claude/skills"];
+/** A project's own skills: Drimvox's folder, and Claude Code's, which many projects already have. */
+export const PROJECT_SKILL_DIRS = [".drimvox/skills", ".claude/skills"];
 
 export function parseSkill(text: string, folderName: string): { name: string; description: string; body: string } {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);

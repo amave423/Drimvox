@@ -1,6 +1,7 @@
 import type { MediaItem } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
+import { CheckIcon, CrossIcon } from "./SideChats";
 import { useApp } from "../context";
 import { formatUsd } from "../lib/format";
 import { MediaView } from "./chat/MediaView";
@@ -61,9 +62,15 @@ export function GallerySheet() {
                   </button>
                 )}
                 {removing === item.id ? (
-                  <button className="link is-pencil" onClick={() => void remove(item.id)}>
-                    {t("gallery.removeConfirm")}
-                  </button>
+                  // Delete it? A check mark and a cross, as for chats (asked for: not "really delete" in words).
+                  <span className="gallery-confirm">
+                    <button className="icon-button is-pencil" aria-label={t("gallery.removeConfirm")} title={t("gallery.removeConfirm")} onClick={() => void remove(item.id)}>
+                      <CheckIcon />
+                    </button>
+                    <button className="icon-button" aria-label={t("side.deleteNo")} title={t("side.deleteNo")} onClick={() => setRemoving(null)}>
+                      <CrossIcon />
+                    </button>
+                  </span>
                 ) : (
                   <button className="link is-pencil" onClick={() => setRemoving(item.id)}>
                     {t("gallery.remove")}

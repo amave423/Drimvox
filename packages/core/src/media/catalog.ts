@@ -1,4 +1,5 @@
 import type { MediaKind, MediaModel, PriceLine } from "@drimvox/shared";
+import { mediaKindByName } from "../providers/catalog";
 import { fetchJson } from "../providers/http";
 import type { Connection } from "../providers/repo";
 import { usdPer } from "../rates";
@@ -32,14 +33,18 @@ export async function listMediaModels(conn: Connection, kind: MediaKind): Promis
     const body = (await fetchJson(url, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
     items = (Array.isArray(body?.data) ? body.data : []).filter((i): i is Raw => !!i && typeof i === "object");
   } catch {
-    return [];
+    // No media catalog at this address: a custom server may still list picture models among its chat models (below).
+    if (conn.preset !== "custom") return [];
   }
   if (how === "combined") items = items.filter((i) => outputs(i).includes(kind));
   const factor = await usdPer(conn.currency);
-  const models = items
+  let models = items
     .map((item) => normalize(kind, item, how === "combined" ? factor : null))
     .filter((m) => m.id)
     .sort((a, b) => a.name.localeCompare(b.name));
+  // A custom server without a media catalog: its picture models are among its chat models (seen live). They draw through
+  // OpenAI's images API, Gemini-style ones through the chat; clips have no common API, so none are offered.
+  if (models.length === 0 && conn.preset === "custom" && kind === "image") models = await namedImageModels(conn);
   lists.set(key, { at: Date.now(), models });
   return models;
 }
@@ -74,6 +79,37 @@ async function imagePrices(conn: Connection, id: string): Promise<PriceLine[]> {
   }
   prices.set(key, { at: Date.now(), lines });
   return lines;
+}
+
+/** Picture models of a custom server's one list of models, told by their names. */
+async function namedImageModels(conn: Connection): Promise<MediaModel[]> {
+  let items: Raw[] = [];
+  try {
+    const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
+    items = (Array.isArray(body?.data) ? body.data : []).filter((i): i is Raw => !!i && typeof i === "object");
+  } catch {
+    return [];
+  }
+  return items
+    .filter((i) => typeof i.id === "string" && mediaKindByName(i.id) === "image")
+    .map((i): MediaModel => {
+      const id = i.id as string;
+      const chat = /gemini|nano-banana/i.test(id);
+      return {
+        id,
+        name: typeof i.name === "string" && i.name ? i.name : id,
+        kind: "image",
+        aspectRatios: [],
+        resolutions: [],
+        durations: [],
+        audio: false,
+        viaChat: chat,
+        openaiImages: !chat,
+        photos: null,
+        pricing: { lines: [], skus: {} },
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function outputs(raw: Raw): string[] {

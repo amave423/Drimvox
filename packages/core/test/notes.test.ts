@@ -29,14 +29,6 @@ describe("AGENTS.md, the notes every request starts with", () => {
     expect(notesBlock(dir)).toContain("Коммиты по-английски.");
   });
 
-  // Projects worked on before the rename keep the agent's section between Artel's markers.
-  it("replaces a section written before the rename instead of adding a second one", () => {
-    writeFileSync(join(dir, "AGENTS.md"), "# Правила\n\n<!-- artel -->\nстарые заметки\n<!-- /artel -->\n");
-    writeNotes(dir, "новые заметки");
-    const text = readFileSync(join(dir, "AGENTS.md"), "utf8");
-    expect(text).toBe("# Правила\n\n<!-- drimvox -->\nновые заметки\n<!-- /drimvox -->\n");
-  });
-
   it("refuses notes too long to keep in every request", () => {
     expect(() => writeNotes(dir, "x".repeat(NOTES_LIMIT + 1))).toThrow(/shorter/);
   });

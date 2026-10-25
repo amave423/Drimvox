@@ -251,6 +251,8 @@ const migrations: string[] = [
        and (p.created_at < messages.created_at or (p.created_at = messages.created_at and p.rowid < messages.rowid))
      order by p.created_at desc, p.rowid desc limit 1);
    update chats set head_id = (select m.id from messages m where m.chat_id = chats.id order by m.created_at desc, m.rowid desc limit 1);`,
+  // A provider paid by a flat fee, not by tokens (a reseller's subscription): its models are free to Drimvox.
+  `alter table providers add column flat integer not null default 0;`,
 ];
 
 export interface Database {
@@ -271,8 +273,6 @@ export function openDatabase(file: string): Database {
   sql.exec(
     "update tasks set status = 'stopped', status_reason = 'restart' where status = 'running' or (status = 'waiting' and status_reason = 'approval')",
   );
-  // The local picture engine had an address under the app's old name (Artel).
-  sql.exec("update providers set base_url = 'drimvox://sdcpp' where base_url = 'artel://sdcpp'");
   // A project's run lives in memory too: after a restart it continues by hand.
   sql.exec("update project_work set status = 'stopped', reason = 'restart' where status = 'running'");
   return {

@@ -14,7 +14,7 @@ const CATEGORIES: ("all" | CatalogCategory)[] = ["all", "web", "code", "design",
  * Ready MCP servers and skills as cards (docs/specs/catalog.md): switched on in one click, a key asked only where one is
  * needed, the details with an example in a window. Skills come from their authors' repositories.
  */
-export function Catalog({ onChanged }: { onChanged(): void }) {
+export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(): void }) {
   const { api, t } = useApp();
   const text = useEntryText();
   const [servers, setServers] = useState<McpServerView[]>([]);
@@ -69,16 +69,19 @@ export function Catalog({ onChanged }: { onChanged(): void }) {
     return !!have && (entry.kind === "skill" || (have as McpServerView).enabled);
   };
   const needsSecret = (entry: CatalogEntry) => entry.kind === "mcp" && !!entry.secret && !installed(entry, servers, skills);
-  const shown = CATALOG.filter((e) => category === "all" || e.category === category);
+  const own = CATALOG.filter((e) => e.kind === kind);
+  // Only the categories that have cards of this kind.
+  const categories = CATEGORIES.filter((c) => c === "all" || own.some((e) => e.category === c));
+  const shown = own.filter((e) => category === "all" || e.category === category);
 
   return (
     <section className="catalog" aria-labelledby="catalog-h">
       <h2 className="sheet-h" id="catalog-h">
-        {t("catalog.title")}
-        <Hint text={t("catalog.hint")} />
+        {t(kind === "mcp" ? "catalog.titleMcp" : "catalog.titleSkills")}
+        <Hint text={t(kind === "mcp" ? "catalog.hintMcp" : "catalog.hintSkills")} />
       </h2>
       <div className="catalog-filter" role="group" aria-label={t("catalog.title")}>
-        {CATEGORIES.map((c) => (
+        {categories.map((c) => (
           <button key={c} type="button" className={c === category ? "chip is-on" : "chip"} aria-pressed={c === category} onClick={() => setCategory(c)}>
             {t(`catalog.cat.${c}`)}
           </button>
@@ -91,9 +94,7 @@ export function Catalog({ onChanged }: { onChanged(): void }) {
               <CatalogLogo logo={entry.logo} />
               <div className="catalog-card-title">
                 <strong>{text(entry, "name")}</strong>
-                <span className="muted">
-                  {t(entry.kind === "mcp" ? "catalog.kind.mcp" : "catalog.kind.skill")} · {entry.vendor}
-                </span>
+                <span className="muted">{entry.vendor}</span>
               </div>
             </div>
             <p className="muted">{text(entry, "about")}</p>

@@ -2,6 +2,10 @@ import type { catalogRu } from "./catalog.ru";
 
 /** The catalog's cards in English (docs/specs/catalog.md). */
 export const catalogEn: Record<keyof typeof catalogRu, string> = {
+  "catalog.titleMcp": "MCP server catalog",
+  "catalog.titleSkills": "Skill catalog",
+  "catalog.hintMcp": "MCP servers give models new tools: a browser, search, GitHub, databases. Those switched on appear below in “MCP servers” and are available in chats and projects.",
+  "catalog.hintSkills": "Skills are ready instructions a model opens by itself when the task fits. Those switched on appear below in “Skills”.",
   "catalog.title": "Catalog",
   "catalog.hint": "Ready MCP servers and skills, switched on with one switch. What is on appears below in its list and is available to models in chats and projects.",
   "catalog.kind.mcp": "MCP server",

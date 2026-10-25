@@ -32,6 +32,8 @@ export interface MediaModel {
   audio: boolean;
   /** Draws through chat completions (Gemini-style models that answer with text and pictures). */
   viaChat: boolean;
+  /** Draws through OpenAI's /images/generations (a custom server that lists pictures among its chat models). */
+  openaiImages?: boolean;
   /** Null: the model takes no photos, and none is sent to it. */
   photos: PhotoInput | null;
   /** Null until loaded: image prices live on a separate endpoint per model. */

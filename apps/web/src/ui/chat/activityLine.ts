@@ -20,6 +20,8 @@ const OWN_LINES = [
   "use_skill",
   "browse_page",
   "open_for_user",
+  "make_picture",
+  "make_clip",
   "look_at_image",
 ];
 

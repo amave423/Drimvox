@@ -50,3 +50,4 @@
 .player-seek::-webkit-slider-thumb { appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--on-overlay); }
 .player:fullscreen { width: 100%; border-radius: 0; display: grid; place-items: center; }
 .player:fullscreen video { max-height: 100vh; }
+.gallery-confirm { display: inline-flex; gap: 4px; }

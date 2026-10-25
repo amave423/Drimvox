@@ -177,5 +177,10 @@ describe("a provider that gives no prices", () => {
     expect(by("ag/claude-sonnet-4.5")).toMatchObject({ priceIn: 3, priceOut: 15, priceEstimated: true, contextLength: 200000 });
     expect(by("gemini-2.5-flash")).toMatchObject({ priceIn: 0.3, priceOut: 2.5, priceEstimated: true });
     expect(by("house-model-1")).toMatchObject({ priceIn: null, priceOut: null, priceEstimated: false });
+
+    // A reseller paid by a flat fee: the user says so, and its models cost nothing per answer.
+    expect((await (await env.call("PATCH", `/api/providers/${id}`, { flat: true })).json()).flat).toBe(true);
+    const flat = (await (await env.call("GET", `/api/providers/${id}/models`)).json()) as { priceIn: number | null; priceOut: number | null }[];
+    expect(flat.every((m) => m.priceIn === 0 && m.priceOut === 0)).toBe(true);
   });
 });

@@ -241,6 +241,8 @@ export const providerUpdateSchema = z
     apiKey: z.string().trim().min(1).max(500).optional(),
     /** Send this provider's requests through the proxy from the settings. */
     useProxy: z.boolean().optional(),
+    /** Paid by a flat fee, not by tokens (a custom server's subscription): its models count as free. */
+    flat: z.boolean().optional(),
   })
   .strict();
 
@@ -258,6 +260,7 @@ export interface ProviderView {
   currency: Preset["currency"];
   /** Requests go through the proxy from the settings. */
   useProxy: boolean;
+  flat: boolean;
   createdAt: number;
 }
 

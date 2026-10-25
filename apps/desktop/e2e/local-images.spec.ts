@@ -55,9 +55,9 @@ test("downloads a picture model on the local models' sheet and draws with it in 
   await expect(card.getByText(/^Скачана · /)).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Скачанные модели — во вкладке «Картинки»/)).toBeVisible();
 
-  // The provider appears by itself; there is nothing to check or proxy on it.
+  // The engine lives in "Local models", not among the keys (asked for: Ollama and the picture engine are not providers to manage).
   await page.getByRole("button", { name: "Ключи и модели" }).click();
-  await expect(page.getByText(/Картинки на этом компьютере, бесплатно/)).toBeVisible();
+  await expect(page.getByText(/Картинки на этом компьютере, бесплатно/)).toHaveCount(0);
 
   await page.getByRole("button", { name: "+ Новый чат" }).click();
   await page.getByRole("button", { name: "Выбери модель" }).click();

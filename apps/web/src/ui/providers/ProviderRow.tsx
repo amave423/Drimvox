@@ -5,6 +5,7 @@ import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
 import { dropStoredModels, forgetModels, loadModels, type ModelsResult } from "../../lib/models";
 import { ErrorNote } from "../ErrorNote";
+import { Hint } from "../Hint";
 import { Toggle } from "../Toggle";
 import { presetName } from "./presetName";
 
@@ -65,6 +66,15 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
     void runCheck(true);
   }
 
+  /** A reseller paid by a flat fee: its models count as free, no estimate from the catalog. */
+  async function switchFlat(flat: boolean) {
+    const res = await api.providers[":id"].$patch({ param: { id: provider.id }, json: { flat } }).catch(() => null);
+    if (!res?.ok) return;
+    forgetModels(provider.id);
+    await reloadProviders();
+    void runCheck(true);
+  }
+
   async function remove() {
     setBusy(true);
     await api.providers[":id"].$delete({ param: { id: provider.id } }).catch(() => null);
@@ -110,6 +120,14 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
             {t("providers.useProxy")}
           </Toggle>
           {!proxySet && <span className="muted">{t("providers.proxyNotSet")}</span>}
+        </div>
+      )}
+      {provider.preset === "custom" && (
+        <div className="provider-proxy">
+          <Toggle checked={provider.flat} onChange={(on) => void switchFlat(on)}>
+            {t("providers.flat")}
+          </Toggle>
+          <Hint text={t("providers.flatHint")} />
         </div>
       )}
 

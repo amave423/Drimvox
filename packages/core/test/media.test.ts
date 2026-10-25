@@ -365,3 +365,84 @@ describe("photos", () => {
     expect(sent.frame_images).toEqual([{ type: "image_url", image_url: { url: `data:image/png;base64,${PNG.toString("base64")}` }, frame_type: "first_frame" }]);
   });
 });
+
+// Seen live: custom providers listed picture and video models among the chat models; their media tabs were empty.
+describe("a custom provider with one list of models", () => {
+  const listed = {
+    data: [
+      { id: "gpt-5-mini", name: "GPT-5 mini" },
+      { id: "flux-1.1-pro", name: "FLUX 1.1 Pro" },
+      { id: "gemini-2.5-flash-image", name: "Nano Banana" },
+      { id: "veo-3.1", name: "Veo 3.1" },
+    ],
+  };
+
+  it("keeps picture and video models out of the chat models and offers the pictures in their own tab", async () => {
+    let asked: any = null;
+    fake = await startFakeProvider({
+      key: KEY,
+      handle: (method, path, body) => {
+        if (method === "GET" && path === "/v1/models") return { json: listed };
+        if (method === "POST" && path === "/v1/images/generations") {
+          asked = body;
+          return { json: { data: [{ b64_json: PNG.toString("base64") }] } };
+        }
+        return undefined;
+      },
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const chatModels = await (await env.call("GET", `/api/providers/${provider.id}/models`)).json();
+    expect(chatModels.map((m: { id: string }) => m.id)).toEqual(["gpt-5-mini"]);
+    const images = await (await env.call("GET", `/api/providers/${provider.id}/media-models?kind=image`)).json();
+    expect(images.map((m: { id: string }) => m.id)).toEqual(["flux-1.1-pro", "gemini-2.5-flash-image"]);
+
+    const chat = await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "flux-1.1-pro", kind: "image" })).json();
+    const res = await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Кот", confirm: true });
+    const done = (await readEvents(res)).find((e) => e.type === "done").message;
+    expect(done.media).toHaveLength(1);
+    expect(asked).toMatchObject({ model: "flux-1.1-pro", prompt: "Кот", response_format: "b64_json" });
+  });
+});
+
+// Asked for: a text model that knows the picture model, writes the prompt itself, looks at the result and redoes it, as
+// many times as the user allows.
+describe("a director for pictures", () => {
+  it("writes the prompt, looks at each picture and redraws within the attempts the user gave", async () => {
+    const prompts: string[] = [];
+    const providerId = await start({
+      image: (body) => {
+        prompts.push(body.prompt);
+        return { json: { data: [{ b64_json: PNG.toString("base64"), media_type: "image/png" }], usage: { cost: 0.039 } } };
+      },
+      script: [
+        { toolCalls: [{ name: "make_picture", args: { prompt: "A ginger cat on a windowsill, soft morning light" } }] },
+        // The director's own look at the picture.
+        { text: "Рыжий кот на подоконнике, но без очков." },
+        { toolCalls: [{ name: "make_picture", args: { prompt: "A ginger cat wearing round glasses on a windowsill, soft morning light" } }] },
+        { text: "Рыжий кот в круглых очках на подоконнике." },
+        // A third try would go past the two the user allowed.
+        { toolCalls: [{ name: "make_picture", args: { prompt: "One more" } }] },
+        { text: "Готово: кот в очках, вторая попытка." },
+      ],
+    });
+    const chatId = await chatWith(providerId, "img/cheap", "image");
+    const res = await send(chatId, { content: "Кот в очках", director: { providerId, model: "coder", attempts: 2 }, confirm: true });
+    expect(res.status).toBe(200);
+    const done = (await readEvents(res)).find((e) => e.type === "done").message;
+    expect(prompts).toEqual(["A ginger cat on a windowsill, soft morning light", "A ginger cat wearing round glasses on a windowsill, soft morning light"]);
+    expect(done).toMatchObject({ status: "done", content: "Готово: кот в очках, вторая попытка." });
+    expect(done.media).toHaveLength(2);
+    // The director was told about the picture model it works with.
+    const first = fake!.requests.find((r) => r.path === "/v1/chat/completions")!;
+    expect(JSON.stringify(first.body.messages)).toMatch(/Cheap Image/);
+  });
+
+  it("asks before spending more than the confirmation limit across all its attempts", async () => {
+    const providerId = await start();
+    const chatId = await chatWith(providerId, "img/cheap", "image");
+    // Three attempts of $0.04 are more than $0.10.
+    const res = await send(chatId, { content: "Кот", director: { providerId, model: "coder", attempts: 3 } });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: { code: "confirm" } });
+  });
+});

@@ -25,15 +25,8 @@ import { createApi, ok } from "./api";
 import { guessLocale } from "./i18n";
 import type { Settings } from "@drimvox/shared";
 import type { CoreStatus } from "./context";
-import { moveLegacyStorage } from "./lib/legacyStorage";
 
 async function boot() {
-  // What the window remembered under the app's old name (Artel) comes along.
-  try {
-    moveLegacyStorage(localStorage);
-  } catch {
-    // No storage here: nothing to bring along.
-  }
   const root = createRoot(document.getElementById("root")!);
   const locale = guessLocale(navigator.languages);
 

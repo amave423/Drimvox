@@ -15,17 +15,6 @@ describe("server settings", () => {
     expect(() => readConfig({ DRIMVOX_PORT: "abc" }, "/home/artem")).toThrow(/DRIMVOX_PORT/);
   });
 
-  // A server installed before the rename has ARTEL_* in its service and its data in ~/.local/share/artel.
-  it("keeps working with the settings and the data folder from before the rename", () => {
-    expect(readConfig({ ARTEL_DATA_DIR: "/srv/artel", ARTEL_PORT: "5001", ARTEL_HOSTS: "box" }, "/home/artem")).toEqual({ dataDir: "/srv/artel", port: 5001, hosts: ["box"] });
-    const home = mkdtempSync(join(tmpdir(), "drimvox-home-"));
-    mkdirSync(join(home, ".local", "share", "artel"), { recursive: true });
-    expect(readConfig({}, home).dataDir).toBe(join(home, ".local", "share", "artel"));
-    mkdirSync(join(home, ".local", "share", "drimvox"), { recursive: true });
-    expect(readConfig({}, home).dataDir).toBe(join(home, ".local", "share", "drimvox"));
-    rmSync(home, { recursive: true, force: true });
-  });
-
   it("learns the machine's Tailscale name from `tailscale status --json`", () => {
     const status = JSON.stringify({ BackendState: "Running", Self: { DNSName: "drimvox-box.tail1234.ts.net.", HostName: "drimvox-box" } });
     expect(tailscaleName(status)).toBe("drimvox-box.tail1234.ts.net");

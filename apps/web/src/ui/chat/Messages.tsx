@@ -33,9 +33,10 @@ export function UserMessage({
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(content);
   if (editing && onEdit) {
+    // As in other chats: the message becomes a box with the text and the buttons inside, the same width every time.
     return (
       <form
-        className="msg msg-user msg-editing"
+        className="msg-editing"
         onSubmit={(e) => {
           e.preventDefault();
           if (!text.trim()) return;
@@ -45,10 +46,8 @@ export function UserMessage({
       >
         {files}
         <textarea
-          className="field-input"
           aria-label={t("msg.editLabel")}
           value={text}
-          rows={Math.min(10, Math.max(2, text.split("\n").length))}
           autoFocus
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -59,7 +58,7 @@ export function UserMessage({
             }
           }}
         />
-        <div className="actions">
+        <div className="msg-editing-actions">
           <button type="button" className="btn" onClick={() => setEditing(false)}>
             {t("providers.cancel")}
           </button>
@@ -71,29 +70,19 @@ export function UserMessage({
     );
   }
   return (
-    <div className="msg msg-user">
-      <span className="visually-hidden">{t("chat.you")}</span>
-      {files}
-      <p>{content}</p>
+    <div className="msg-user-wrap">
+      <div className="msg msg-user">
+        <span className="visually-hidden">{t("chat.you")}</span>
+        {files}
+        <p>{content}</p>
+      </div>
+      {/* Under the message, as in other chats: edit it, and the versions it has. */}
       {(onEdit || (versions && onVersion)) && (
         <div className="msg-user-tools">
-          {versions && onVersion && (
-            <span className="msg-versions">
-              <button type="button" aria-label={t("msg.versionPrev")} disabled={versions.index === 0} onClick={() => onVersion(versions.ids[versions.index - 1]!)}>
-                ‹
-              </button>
-              <span className="mono">
-                {versions.index + 1}/{versions.count}
-              </span>
-              <button type="button" aria-label={t("msg.versionNext")} disabled={versions.index === versions.count - 1} onClick={() => onVersion(versions.ids[versions.index + 1]!)}>
-                ›
-              </button>
-            </span>
-          )}
           {onEdit && (
             <button
               type="button"
-              className="msg-edit"
+              className="msg-tool"
               aria-label={t("msg.edit")}
               title={t("msg.edit")}
               onClick={() => {
@@ -104,9 +93,30 @@ export function UserMessage({
               <PencilIcon />
             </button>
           )}
+          {versions && onVersion && (
+            <span className="msg-versions">
+              <button type="button" className="msg-tool" aria-label={t("msg.versionPrev")} disabled={versions.index === 0} onClick={() => onVersion(versions.ids[versions.index - 1]!)}>
+                <Chevron left />
+              </button>
+              <span className="msg-versions-count">
+                {versions.index + 1} / {versions.count}
+              </span>
+              <button type="button" className="msg-tool" aria-label={t("msg.versionNext")} disabled={versions.index === versions.count - 1} onClick={() => onVersion(versions.ids[versions.index + 1]!)}>
+                <Chevron />
+              </button>
+            </span>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function Chevron({ left = false }: { left?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={left ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} />
+    </svg>
   );
 }
 

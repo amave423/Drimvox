@@ -72,7 +72,7 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean): string
 
 /** The first message of a project's run: the plan the user said "Go" to. */
 export function planMessage(plan: ProjectPlan): string {
-  return ["Поехали. План:", "", plan.context, "", ...(plan.steps ?? []).map((s, n) => `${n + 1}. ${s}`)].join("\n");
+  return ["Начинай работу по плану:", "", plan.context, "", ...(plan.steps ?? []).map((s, n) => `${n + 1}. ${s}`)].join("\n");
 }
 
 /** Said when the model stops without finish_work (docs/specs/project-work.md: "stuck"). */

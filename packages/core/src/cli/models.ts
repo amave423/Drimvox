@@ -46,9 +46,20 @@ export function parseModelList(output: string): { id: string; name: string }[] {
   return found;
 }
 
+/** A CLI's own list, asked for rarely (seen: running it on every visit to the providers flashed a console window). */
+const LISTED_MS = 6 * 60 * 60_000;
+const listed = new Map<string, { at: number; models: { id: string; name: string }[] }>();
+
 function listByCli(argv: string[]): Promise<{ id: string; name: string }[]> {
+  const key = argv.join("|");
+  const hit = listed.get(key);
+  if (hit && Date.now() - hit.at < LISTED_MS) return Promise.resolve(hit.models);
   return new Promise((resolve) => {
-    execFile(argv[0]!, [...argv.slice(1), "models"], { timeout: 20_000, windowsHide: true }, (err, stdout) => resolve(err ? [] : parseModelList(String(stdout))));
+    execFile(argv[0]!, [...argv.slice(1), "models"], { timeout: 20_000, windowsHide: true }, (err, stdout) => {
+      const models = err ? [] : parseModelList(String(stdout));
+      if (models.length) listed.set(key, { at: Date.now(), models });
+      resolve(models);
+    });
   });
 }
 

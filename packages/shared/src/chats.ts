@@ -42,6 +42,8 @@ export const messageSendSchema = z
     thinking: z.enum(thinkingLevels).default("auto"),
     /** Files uploaded to the chat for this message (docs/specs/chat-attachments.md). */
     attachments: z.array(z.string().min(1)).max(10).default([]),
+    /** Pictures and clips through a director: a text model that sees pictures writes the prompts and checks the results. */
+    director: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200), attempts: z.number().int().min(1).max(5) }).optional(),
     /** The user's message this one replaces: the answer goes on a branch of its own, the old one stays (docs/specs/chats.md). */
     editOf: z.string().min(1).optional(),
   })

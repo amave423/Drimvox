@@ -19,7 +19,7 @@ const localeNames = { ru: "Русский", en: "English" } as const;
 type SaveState = "idle" | "saved" | "failed";
 
 /** The settings' sections (seen: one long page of everything was hard to find one's way in). */
-const PARTS = ["general", "models", "internet", "tools"] as const;
+const PARTS = ["general", "models", "internet", "mcp", "skills"] as const;
 type SettingsPart = (typeof PARTS)[number];
 const PART_KEY = "drimvox.settingsPart";
 
@@ -168,11 +168,16 @@ export function SettingsSheet() {
         <ProxySection />
       </>
     ),
-    tools: (
+    // Servers and skills apart (seen: one catalog of both was hard to find one's way in); each list shows what a card switched.
+    mcp: (
       <>
-        {/* The sections below show what a card switched on or off. */}
-        <Catalog onChanged={() => setToolsVersion((v) => v + 1)} />
+        <Catalog key="mcp" kind="mcp" onChanged={() => setToolsVersion((v) => v + 1)} />
         <McpSection key={`mcp-${toolsVersion}`} />
+      </>
+    ),
+    skills: (
+      <>
+        <Catalog key="skill" kind="skill" onChanged={() => setToolsVersion((v) => v + 1)} />
         <SkillsSection key={`skills-${toolsVersion}`} />
       </>
     ),

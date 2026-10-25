@@ -192,18 +192,18 @@ test("an edited message gets a new answer, and the arrows switch back to the fir
   const page = await launch([], 0, [{ text: "Ответ про кошек" }, { text: "Ответ про собак" }]);
   await ask(page, "Расскажи про кошек");
   await expect(page.locator(".msg-assistant").last()).toContainText("Ответ про кошек");
-  const mine = page.locator(".msg-user").first();
+  const mine = page.locator(".msg-user-wrap").first();
   await mine.hover();
   await mine.getByRole("button", { name: "Изменить сообщение" }).click();
   await page.getByLabel("Новый текст сообщения").fill("Расскажи про собак");
   await page.locator(".msg-editing").getByRole("button", { name: "Отправить", exact: true }).click();
   await expect(page.locator(".msg-assistant .md").last()).toHaveText("Ответ про собак");
   await expect(page.locator(".msg-user")).toHaveCount(1);
-  await expect(page.locator(".msg-versions")).toContainText("2/2");
+  await expect(page.locator(".msg-versions")).toContainText("2 / 2");
   await page.getByRole("button", { name: "Предыдущая версия" }).click();
   await expect(page.locator(".msg-user").first()).toContainText("Расскажи про кошек");
   await expect(page.locator(".msg-assistant .md").last()).toHaveText("Ответ про кошек");
-  await expect(page.locator(".msg-versions")).toContainText("1/2");
+  await expect(page.locator(".msg-versions")).toContainText("1 / 2");
 });
 
 // Seen: links in answers were hard to tell from the text; popular sites now carry their mark, drawn without the network.

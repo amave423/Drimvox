@@ -3,6 +3,7 @@ import type { ChatRepo, PendingJob } from "../chats/repo";
 import { describeError } from "../providers/errors";
 import type { Connection, ProviderRepo } from "../providers/repo";
 import { downloadVideo, generateImage, pollVideo, submitVideo, type Photo } from "./generate";
+import { directReply, type DirectorInput } from "./director";
 import { filmLocally } from "./local";
 import type { MediaRepo } from "./repo";
 
@@ -88,6 +89,11 @@ export class Studio {
       this.fail(answer.id, describeError(err));
     }
     await i.emit({ type: "done", message: chats.message(answer.id)! });
+  }
+
+  /** A picture or a clip through a director (docs/specs/media-director.md). */
+  direct(i: Omit<DirectorInput, "chats" | "media" | "pollMs" | "signal"> & { signal: AbortSignal }): Promise<void> {
+    return directReply({ ...i, chats: this.o.chats, media: this.o.media, pollMs: this.o.pollMs, signal: AbortSignal.any([i.signal, this.stop.signal]) });
   }
 
   shutdown(): void {

@@ -396,7 +396,7 @@ test("an MCP server from the settings gives the chat a tool that asks first", as
 
   const server = fileURLToPath(new URL("../../../packages/core/test/mcp-server.mjs", import.meta.url));
   await page.getByRole("button", { name: "Настройки" }).first().click();
-  await page.getByRole("tab", { name: "Инструменты" }).click();
+  await page.getByRole("tab", { name: "Серверы MCP" }).click();
   await page.getByRole("button", { name: "Добавить сервер" }).click();
   await page.getByLabel("Название").fill("demo");
   await page.getByLabel("Команда", { exact: true }).fill(`node "${server}"`);

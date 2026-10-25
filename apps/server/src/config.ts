@@ -12,14 +12,13 @@ export interface ServerConfig {
 }
 
 export function readConfig(env: Record<string, string | undefined>, home: string): ServerConfig {
-  // A server installed before the rename (Artel) has ARTEL_* in its service and its data under the old name.
-  const get = (name: string) => env[`DRIMVOX_${name}`] ?? env[`ARTEL_${name}`];
+  const get = (name: string) => env[`DRIMVOX_${name}`];
   const portText = get("PORT");
   const port = portText ? Number(portText) : 4317;
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`DRIMVOX_PORT must be a port number, got "${portText}"`);
   const share = join(home, ".local", "share");
   return {
-    dataDir: get("DATA_DIR") || (!existsSync(join(share, "drimvox")) && existsSync(join(share, "artel")) ? join(share, "artel") : join(share, "drimvox")),
+    dataDir: get("DATA_DIR") || join(share, "drimvox"),
     port,
     hosts: (get("HOSTS") ?? "")
       .split(",")

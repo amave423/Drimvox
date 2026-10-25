@@ -1,5 +1,9 @@
 /** The catalog's cards in Russian (docs/specs/catalog.md): kept apart, the main file is long enough. */
 export const catalogRu = {
+  "catalog.titleMcp": "Каталог серверов MCP",
+  "catalog.titleSkills": "Каталог скиллов",
+  "catalog.hintMcp": "Серверы MCP дают моделям новые инструменты: браузер, поиск, GitHub, базы данных. Включённые появляются ниже в «Серверах MCP» и доступны в чатах и проектах.",
+  "catalog.hintSkills": "Скиллы — готовые инструкции, которые модель открывает сама, когда задача подходит. Включённые появляются ниже в «Скиллах».",
   "catalog.title": "Каталог",
   "catalog.hint": "Готовые серверы MCP и скиллы: включаются одним переключателем. Включённое появляется ниже, в своих списках, и доступно моделям в чатах и проектах.",
   "catalog.kind.mcp": "сервер MCP",
