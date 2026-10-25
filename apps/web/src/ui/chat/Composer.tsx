@@ -3,6 +3,7 @@ import { useApp } from "../../context";
 import { PendingFiles, type PendingFile } from "./Attachments";
 import { ChatOptions, type OptionRow } from "./ChatOptions";
 import { splitLinks } from "../../lib/links";
+import { DictateButton } from "./Voice";
 
 /** Below this width the model and the paperclip move into Options, so the bar stays one tidy row. */
 const NARROW = 480;
@@ -163,6 +164,7 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
       <div className="composer-bar">
         <div className="composer-tools">
           {attach && !narrow && attachButton}
+          {!attach?.photos && <DictateButton disabled={disabled || streaming} onText={(said) => setText((now) => (now.trim() ? `${now.trimEnd()} ${said}` : said))} />}
           {!narrow && picker}
           {(narrow || options.rows.length > 0) && (
             <ChatOptions

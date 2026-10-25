@@ -14,6 +14,7 @@ import { Catalog } from "./Catalog";
 import { Hint } from "./Hint";
 import { SearchSection } from "./SearchSection";
 import { SpendingSection } from "./SpendingSection";
+import { ModelPicker } from "./chat/ModelPicker";
 import { Tabs } from "./Tabs";
 
 const localeNames = { ru: "Русский", en: "English" } as const;
@@ -184,6 +185,19 @@ export function SettingsSheet() {
           />
           <button className="btn">{t("settings.save")}</button>
         </form>
+
+        <h2 className="sheet-h">
+          {t("voice.title")}
+          <Hint text={t("voice.modelHint")} />
+        </h2>
+        <div className="actions">
+          <ModelPicker value={settings.voiceModel} onChange={({ providerId, model }) => void save({ voiceModel: { providerId, model } })} />
+          {settings.voiceModel && (
+            <button className="link" onClick={() => void save({ voiceModel: null })}>
+              {t("settings.clear")}
+            </button>
+          )}
+        </div>
 
         <SpendingSection />
 

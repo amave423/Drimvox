@@ -3,6 +3,7 @@ import type { ChatKind, MessageView } from "@drimvox/shared";
 import { useState, type ReactNode } from "react";
 import { PencilIcon } from "../SideChats";
 import { MessageText } from "./LinkedText";
+import { SpeakButton } from "./Voice";
 import { useApp } from "../../context";
 import { useSmoothText } from "../../lib/smooth";
 import { formatTokens, formatUsd } from "../../lib/format";
@@ -239,7 +240,12 @@ export function AssistantMessage({
       {streaming && !making && !content && !reasoning && <span className="caret" aria-hidden />}
       {message?.status === "stopped" && <p className="msg-flag">{t("chat.stopped")}</p>}
       {message?.error && <ErrorNote error={message.error} />}
-      {meta && <p className="msg-meta mono">{meta}</p>}
+      {(meta || (!streaming && content)) && (
+        <div className="msg-foot">
+          {meta && <p className="msg-meta mono">{meta}</p>}
+          {!streaming && content && <SpeakButton text={content} />}
+        </div>
+      )}
       {message?.canUndo && onUndo && (
         <div className="actions">
           <button className="btn" onClick={onUndo} title={t("folder.undoHint")}>

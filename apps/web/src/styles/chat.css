@@ -286,3 +286,12 @@
 .work-stats-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13.5px; }
 .work-stats-list li { display: flex; gap: 12px; justify-content: space-between; }
 .work-stats-list li > :first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Voice: dictation in the message box, an answer read aloud under it. */
+.dictate { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.attach-button.is-recording { color: var(--sheet); background: var(--pencil); border-color: var(--pencil); animation: recording 1.2s ease-in-out infinite; }
+@keyframes recording { 50% { opacity: 0.6; } }
+.dictate-problem { font-size: 12.5px; color: var(--pencil); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg-foot { display: flex; align-items: center; gap: 6px; }
+.msg-foot .msg-meta { margin: 0; }
+.msg-speak { width: 26px; height: 26px; }

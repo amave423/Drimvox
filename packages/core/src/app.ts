@@ -37,6 +37,9 @@ import { localRoutes } from "./routes/local";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
 import { monthUsage } from "./budget";
+import { transcribe } from "./voice";
+import { z } from "zod";
+import { describeError } from "./providers/errors";
 import { spendingByModel } from "./savings";
 import { SKILL_SOURCES, type SkillSources } from "./skills/install";
 import { SEARCH_URLS, SearchStore, withSearchService, type SearchUrls } from "./internet/search-service";
@@ -209,6 +212,18 @@ export function createCore(o: AppOptions) {
     .route("/local", localRoutes(local))
     .route("/proxy", proxyRoutes(proxies, o.proxyCheckUrl ?? "https://www.google.com/generate_204"))
     .route("/search", searchRoutes(searchStore, searchUrls))
+    // Dictation (asked for): the recording to the voice model from the settings, its text back.
+    .post("/voice/transcribe", zValidator("json", z.object({ audio: z.string().min(1).max(30_000_000), mimeType: z.string().regex(/^audio\/[\w.+-]+$/) })), async (c) => {
+      const choice = readSettings(o.db).voiceModel;
+      const conn = choice ? providers.connection(choice.providerId) : null;
+      if (!choice || !conn) return c.json({ error: { code: "no_voice_model" as const } }, 409);
+      const { audio, mimeType } = c.req.valid("json");
+      try {
+        return c.json({ text: await transcribe(conn, choice.model, Buffer.from(audio, "base64"), mimeType) }, 200);
+      } catch (err) {
+        return c.json({ error: describeError(err) }, 502);
+      }
+    })
     .route(
       "/chats",
       chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs, join(o.dataDir, "cli-chats"), {

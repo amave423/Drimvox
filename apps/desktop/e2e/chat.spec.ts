@@ -276,7 +276,7 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
       };
     });
   const wide = await bar();
-  expect(wide.count).toBe(4);
+  expect(wide.count).toBe(5);
   expect(wide.model).toBe(true);
   expect(Math.max(...wide.tops) - Math.min(...wide.tops)).toBeLessThanOrEqual(1);
   expect(Math.max(...wide.heights) - Math.min(...wide.heights)).toBeLessThanOrEqual(1);
