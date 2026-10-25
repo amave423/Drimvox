@@ -1,5 +1,5 @@
 import type { DesignBrief, DesignReview, StyleReference, VisualCheck } from "@drimvox/shared";
-import { askAboutPictures, mayLookAt, type Picture } from "../visual/look";
+import { askAboutPictures, mayLookAt, pngOf, type Picture } from "../visual/look";
 import { reachable, type VisualDeps } from "../visual/tools";
 import { parseReview, polishMessage, reviewQuestion, STYLE_QUESTION } from "./design";
 import { pagesUpTo } from "./landing";
@@ -53,7 +53,7 @@ export async function designRound(ctx: PassContext, id: string, visual: VisualDe
         if (!(await reachable(page.url, ctx.signal))) continue;
       }
       for (const size of [DESKTOP, PHONE]) {
-        const png = await visual.kit.screenshot(page.url, size);
+        const png = pngOf(await visual.kit.screenshot(page.url, size));
         const shot = visual.kit.shots.save(png);
         ctx.event("screenshot", { id: shot, url: page.url, width: size.width });
         shots.push(shot);
@@ -103,7 +103,7 @@ export async function describeReference(ctx: PassContext, id: string, ref: Style
   else if (!picture && ref.url && !mayLookAt(ref.url)) why = "only public addresses can be opened";
   else {
     try {
-      picture ??= { data: await kit.screenshot!(ref.url!, DESKTOP), mediaType: "image/png" };
+      picture ??= { data: pngOf(await kit.screenshot!(ref.url!, DESKTOP)), mediaType: "image/png" };
       const answer = await askAboutPictures(vision, [picture], STYLE_QUESTION, ctx.signal);
       spend(ctx, id, answer.costUsd);
       description = answer.text || null;

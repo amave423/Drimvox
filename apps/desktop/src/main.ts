@@ -165,7 +165,7 @@ function startCore(): Promise<number> {
         return;
       }
       photograph(msg.url, msg.width ?? 1280, msg.height ?? 800, steps).then(
-        (png) => child.postMessage({ type: "screenshot-done", id, png: png.toString("base64") }),
+        (shot) => child.postMessage({ type: "screenshot-done", id, png: shot.png.toString("base64"), console: shot.console }),
         (err: unknown) => child.postMessage({ type: "screenshot-done", id, error: err instanceof Error ? err.message : String(err) }),
       );
     });
@@ -184,15 +184,15 @@ function startCore(): Promise<number> {
 /** Very long pages are cut here; a picture taller than this tells a model little more. */
 const MAX_SHOT_HEIGHT = 8000;
 
-async function photograph(url: string, width: number, height: number, actions: PageAction[] = []): Promise<Buffer> {
-  return withPage(url, width, height, actions, async (shot) => {
+async function photograph(url: string, width: number, height: number, actions: PageAction[] = []): Promise<{ png: Buffer; console: string[] }> {
+  return withPage(url, width, height, actions, async (shot, errors) => {
     // The whole page, not only its first screen: a check of a long page needs what is further down too.
     const full = Number(await shot.webContents.executeJavaScript(PAGE_HEIGHT_SCRIPT));
     if (full > height) {
       shot.setContentSize(width, Math.min(full, MAX_SHOT_HEIGHT));
       await new Promise((r) => setTimeout(r, 500));
     }
-    return (await shot.webContents.capturePage()).toPNG();
+    return { png: (await shot.webContents.capturePage()).toPNG(), console: errors };
   });
 }
 
@@ -298,9 +298,11 @@ function settled(shot: BrowserWindow): Promise<void> {
 }
 
 /** Opens a page in a hidden window of its own session, goes through the steps, and hands the window to `read`. */
-async function withPage<T>(url: string, width: number, height: number, actions: PageAction[], read: (shot: BrowserWindow) => Promise<T>): Promise<T> {
+async function withPage<T>(url: string, width: number, height: number, actions: PageAction[], read: (shot: BrowserWindow, errors: string[]) => Promise<T>): Promise<T> {
   if (!/^https?:\/\//.test(url)) throw new Error("Only http and https pages");
   const preview = session.fromPartition("drimvox-preview");
+  // Each look loads the page afresh (seen live: an agent added ?v=1, ?v=2… to every address to get past the cache).
+  await preview.clearCache().catch(() => {});
   preview.removeAllListeners("will-download");
   preview.on("will-download", (_event, item) => item.cancel());
   const shot = new BrowserWindow({
@@ -314,6 +316,13 @@ async function withPage<T>(url: string, width: number, height: number, actions: 
   shot.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   shot.webContents.on("will-navigate", (event, next) => {
     if (!/^https?:\/\//.test(next)) event.preventDefault();
+  });
+  // The page's own errors go with the picture (seen live: an agent wrote three diagnostic pages to see why its page
+  // stayed empty, as the picture could not show a failed script).
+  const errors: string[] = [];
+  shot.webContents.on("console-message", (event) => {
+    const e = event as unknown as { level?: string | number; message?: string; lineNumber?: number; sourceId?: string };
+    if ((e.level === "error" || e.level === 3) && e.message && errors.length < 20) errors.push(`${e.message}${e.sourceId ? ` (${e.sourceId.split("/").pop()}:${e.lineNumber ?? ""})` : ""}`);
   });
   try {
     await Promise.race([
@@ -340,7 +349,7 @@ async function withPage<T>(url: string, width: number, height: number, actions: 
       }
       await new Promise((r) => setTimeout(r, 700));
     }
-    return await read(shot);
+    return await read(shot, errors);
   } finally {
     shot.destroy();
   }

@@ -92,6 +92,16 @@ describe("look_at_page", () => {
     expect(file.headers.get("content-type")).toBe("image/png");
   });
 
+  // Seen live: an agent wrote three diagnostic pages to learn why its page stayed empty; a failed script does not show.
+  it("hands the page's console errors to the agent with what the vision model sees", async () => {
+    env.setScreenshot(async () => ({ png: PNG, console: ["Uncaught SyntaxError: Unexpected token '}' (ui.js:120)"] }));
+    const id = await start([call("look_at_page", { url: "http://localhost:5173/", question: "Видно небо?" }), finish], ["Страница пустая."]);
+    await waitTask(id, (t) => t.status === "done_empty");
+    const result = (await events(id)).find((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
+    expect(result.data.output).toContain("Страница пустая.");
+    expect(result.data.output).toContain("Errors in the page's console:\n- Uncaught SyntaxError: Unexpected token '}' (ui.js:120)");
+  });
+
   // docs/specs/project-work.md: the agent goes through a scenario as a person would, then looks at the result.
   it("goes through the steps of a scenario before the screenshot, and says which step failed", async () => {
     const scenario = [

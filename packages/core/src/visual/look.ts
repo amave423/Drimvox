@@ -10,7 +10,11 @@ import type { Connection } from "../providers/repo";
 
 /** Photographs a page: the desktop app does it with a hidden Electron window. */
 /** Photographs a page; with actions, it first goes through them in order (a scenario, docs/specs/project-work.md). */
-export type Screenshotter = (url: string, size: { width: number; height: number }, actions?: PageAction[]) => Promise<Buffer>;
+/** A picture of the page, or a picture with the errors its console showed while it loaded. */
+export type Screenshotter = (url: string, size: { width: number; height: number }, actions?: PageAction[]) => Promise<Buffer | { png: Buffer; console: string[] }>;
+
+/** The picture of a screenshot, with or without the console's errors. */
+export const pngOf = (taken: Buffer | { png: Buffer }): Buffer => (Buffer.isBuffer(taken) ? taken : taken.png);
 
 export interface Vision {
   conn: Connection;

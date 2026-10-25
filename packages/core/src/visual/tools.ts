@@ -53,12 +53,15 @@ const sleep = (ms: number, signal?: AbortSignal) =>
 /** Takes a screenshot, keeps it and asks the vision model; the answer is what the agent or the gate gets. */
 async function look(d: VisualDeps, url: string, question: string, signal?: AbortSignal, width?: number, steps?: PageAction[]): Promise<{ shot: string; answer: string }> {
   if (!d.kit.screenshot || !d.vision) throw new Error("No way to look at pages here");
-  const png = await d.kit.screenshot(url, sizeOf(width), steps?.length ? steps : undefined);
+  const taken = await d.kit.screenshot(url, sizeOf(width), steps?.length ? steps : undefined);
+  const png = Buffer.isBuffer(taken) ? taken : taken.png;
+  const errors = Buffer.isBuffer(taken) ? [] : taken.console;
   const shot = d.kit.shots.save(png);
   d.event("screenshot", { id: shot, url });
   const { text, costUsd } = await askAboutPicture(d.vision, png, question, signal);
   d.onSpend(costUsd);
-  return { shot, answer: text };
+  // What the picture cannot show: a script that failed, a file that did not load.
+  return { shot, answer: errors.length ? `${text}\n\nErrors in the page's console:\n${errors.map((e) => `- ${e}`).join("\n")}` : text };
 }
 
 export function visualTools(d: VisualDeps, limit: LookLimit = { looks: MAX_LOOKS, then: CODER_LIMIT }): ToolSet {

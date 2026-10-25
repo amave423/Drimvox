@@ -17,7 +17,7 @@ export interface InitMessage {
 const pending = new Map<number, { resolve(data: { png?: string; page?: unknown }): void; reject(err: Error): void }>();
 let nextRequest = 1;
 let running: RunningServer | null = null;
-process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number; png?: string; page?: unknown; error?: string } }) => {
+process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number; png?: string; page?: unknown; error?: string; console?: string[] } }) => {
   // The app is closing: stop what the core started (agents, the Ollama it runs), then go.
   if (data?.type === "quit") {
     setTimeout(() => process.exit(0), 2_500).unref();
@@ -32,7 +32,7 @@ process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number
 });
 
 /** Asks the main process's browser and waits; a scenario of a few steps takes its time on top of loading the page. */
-function askBrowser(message: Record<string, unknown>, timeoutMs: number): Promise<{ png?: string; page?: unknown }> {
+function askBrowser(message: Record<string, unknown>, timeoutMs: number): Promise<{ png?: string; page?: unknown; console?: string[] }> {
   return new Promise((resolve, reject) => {
     const id = nextRequest++;
     const timer = setTimeout(() => {
@@ -47,9 +47,9 @@ function askBrowser(message: Record<string, unknown>, timeoutMs: number): Promis
   });
 }
 
-async function screenshot(url: string, size: { width: number; height: number }, actions?: PageAction[]): Promise<Buffer> {
+async function screenshot(url: string, size: { width: number; height: number }, actions?: PageAction[]): Promise<{ png: Buffer; console: string[] }> {
   const data = await askBrowser({ type: "screenshot", url, ...size, ...(actions ? { actions } : {}) }, actions?.length ? 180_000 : 60_000);
-  return Buffer.from(data.png!, "base64");
+  return { png: Buffer.from(data.png!, "base64"), console: data.console ?? [] };
 }
 
 async function readPage(url: string, actions?: PageAction[]): Promise<{ url: string; title: string; text: string }> {

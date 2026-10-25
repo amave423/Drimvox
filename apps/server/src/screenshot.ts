@@ -10,8 +10,8 @@ let browser: Promise<Browser> | null = null;
  * Screenshots of pages for the agents' visual checks: headless Chromium through Playwright, started on the first
  * shot and kept open. The desktop app uses a hidden Electron window instead.
  */
-export function screenshot(url: string, size: { width: number; height: number }, actions: PageAction[] = []): Promise<Buffer> {
-  return withPage(url, size, actions, async (page) => {
+export function screenshot(url: string, size: { width: number; height: number }, actions: PageAction[] = []): Promise<{ png: Buffer; console: string[] }> {
+  return withPage(url, size, actions, async (page, errors) => {
     // The whole page, as on the desktop: a check of a long page needs what is further down too. A page that scrolls
     // inside its own full-screen container shows all of it only in a window that tall.
     const height = Math.min(Number(await page.evaluate(PAGE_HEIGHT_SCRIPT)), MAX_SHOT_HEIGHT);
@@ -19,7 +19,7 @@ export function screenshot(url: string, size: { width: number; height: number },
       await page.setViewportSize({ width: size.width, height });
       await page.waitForTimeout(300);
     }
-    return await page.screenshot({ type: "png", fullPage: true });
+    return { png: await page.screenshot({ type: "png", fullPage: true }), console: errors };
   });
 }
 
@@ -29,7 +29,7 @@ export function readPage(url: string, actions: PageAction[] = []): Promise<{ url
 }
 
 /** Opens a page, goes through the steps as a person would, and hands it to `read`. */
-async function withPage<T>(url: string, size: { width: number; height: number }, actions: PageAction[], read: (page: Page) => Promise<T>): Promise<T> {
+async function withPage<T>(url: string, size: { width: number; height: number }, actions: PageAction[], read: (page: Page, errors: string[]) => Promise<T>): Promise<T> {
   browser ??= import("playwright-core")
     .then(({ chromium }) => chromium.launch({ headless: true }))
     .catch((err: unknown) => {
@@ -39,6 +39,14 @@ async function withPage<T>(url: string, size: { width: number; height: number },
       );
     });
   const page = await (await browser).newPage({ viewport: size });
+  // The page's own errors go with the picture, as on the desktop: a failed script does not show in a screenshot.
+  const errors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error" && errors.length < 20) errors.push(msg.text());
+  });
+  page.on("pageerror", (err) => {
+    if (errors.length < 20) errors.push(err.message);
+  });
   try {
     await page.goto(url, { waitUntil: "load", timeout: 60_000 });
     // Let fonts and the first animation frame settle; scripts of single-page apps draw after the load event.
@@ -69,7 +77,7 @@ async function withPage<T>(url: string, size: { width: number; height: number },
       }
       await page.waitForTimeout(700);
     }
-    return await read(page);
+    return await read(page, errors);
   } finally {
     await page.close();
   }
