@@ -1,6 +1,6 @@
 import type { AttachmentView } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Database } from "../db";
 import type { AttachmentKind } from "./attachments";
@@ -53,6 +53,18 @@ export class AttachmentRepo {
   attach(chatId: string, messageId: string, ids: string[]): void {
     const set = this.db.sql.prepare("update attachments set message_id = ? where id = ? and chat_id = ? and message_id is null");
     for (const id of ids) set.run(messageId, id, chatId);
+  }
+
+  /** An edited message keeps the files of the one it replaces: copies, so each version has its own. */
+  copy(fromMessageId: string, toMessageId: string): void {
+    const rows = this.db.sql.prepare("select * from attachments where message_id = ? order by created_at, rowid").all(fromMessageId) as unknown as Row[];
+    for (const r of rows) {
+      const id = randomUUID();
+      copyFileSync(join(this.dir, r.id), join(this.dir, id));
+      this.db.sql
+        .prepare("insert into attachments (id, chat_id, message_id, name, type, size, kind, text, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(id, r.chat_id, toMessageId, r.name, r.type, r.size, r.kind, r.text, Date.now());
+    }
   }
 
   forMessages(messageIds: string[]): Map<string, (AttachmentView & { text: string | null })[]> {

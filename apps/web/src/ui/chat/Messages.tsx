@@ -1,6 +1,7 @@
 import type { MessageKey } from "../../i18n";
 import type { ChatKind, MessageView } from "@drimvox/shared";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { PencilIcon } from "../SideChats";
 import { useApp } from "../../context";
 import { useSmoothText } from "../../lib/smooth";
 import { formatTokens, formatUsd } from "../../lib/format";
@@ -11,13 +12,100 @@ import { ZoomableImage } from "../Lightbox";
 import { useAuthorizedUrl } from "../../lib/media";
 import { Reasoning } from "./Reasoning";
 
-export function UserMessage({ content, files }: { content: string; files?: ReactNode }) {
+/**
+ * The user's message. It can be edited in place: the answer is written again on a branch of its own, and the arrows
+ * switch between the versions (asked for: like in other chats).
+ */
+export function UserMessage({
+  content,
+  files,
+  versions,
+  onEdit,
+  onVersion,
+}: {
+  content: string;
+  files?: ReactNode;
+  versions?: MessageView["versions"];
+  onEdit?(text: string): void;
+  onVersion?(id: string): void;
+}) {
   const { t } = useApp();
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(content);
+  if (editing && onEdit) {
+    return (
+      <form
+        className="msg msg-user msg-editing"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!text.trim()) return;
+          setEditing(false);
+          onEdit(text.trim());
+        }}
+      >
+        {files}
+        <textarea
+          className="field-input"
+          aria-label={t("msg.editLabel")}
+          value={text}
+          rows={Math.min(10, Math.max(2, text.split("\n").length))}
+          autoFocus
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setEditing(false);
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
+        />
+        <div className="actions">
+          <button type="button" className="btn" onClick={() => setEditing(false)}>
+            {t("providers.cancel")}
+          </button>
+          <button className="btn is-primary" disabled={!text.trim()}>
+            {t("msg.editSend")}
+          </button>
+        </div>
+      </form>
+    );
+  }
   return (
     <div className="msg msg-user">
       <span className="visually-hidden">{t("chat.you")}</span>
       {files}
       <p>{content}</p>
+      {(onEdit || (versions && onVersion)) && (
+        <div className="msg-user-tools">
+          {versions && onVersion && (
+            <span className="msg-versions">
+              <button type="button" aria-label={t("msg.versionPrev")} disabled={versions.index === 0} onClick={() => onVersion(versions.ids[versions.index - 1]!)}>
+                ‹
+              </button>
+              <span className="mono">
+                {versions.index + 1}/{versions.count}
+              </span>
+              <button type="button" aria-label={t("msg.versionNext")} disabled={versions.index === versions.count - 1} onClick={() => onVersion(versions.ids[versions.index + 1]!)}>
+                ›
+              </button>
+            </span>
+          )}
+          {onEdit && (
+            <button
+              type="button"
+              className="msg-edit"
+              aria-label={t("msg.edit")}
+              title={t("msg.edit")}
+              onClick={() => {
+                setText(content);
+                setEditing(true);
+              }}
+            >
+              <PencilIcon />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

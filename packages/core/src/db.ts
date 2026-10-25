@@ -243,6 +243,14 @@ const migrations: string[] = [
   `alter table project_work add column report text;
    alter table project_work add column site_command text;
    alter table project_work add column site_url text;`,
+  // An edited message starts a branch (docs/specs/chats.md): each message knows the one before it, the chat its branch.
+  `alter table messages add column parent_id text;
+   alter table chats add column head_id text;
+   update messages set parent_id = (
+     select p.id from messages p where p.chat_id = messages.chat_id
+       and (p.created_at < messages.created_at or (p.created_at = messages.created_at and p.rowid < messages.rowid))
+     order by p.created_at desc, p.rowid desc limit 1);
+   update chats set head_id = (select m.id from messages m where m.chat_id = chats.id order by m.created_at desc, m.rowid desc limit 1);`,
 ];
 
 export interface Database {

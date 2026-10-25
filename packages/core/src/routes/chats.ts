@@ -6,7 +6,7 @@ import {
   chatFolderSchema,
   chatUpdateSchema,
   estimateCost,
-  messageSendSchema,
+  messageBranchSchema, messageSendSchema,
   needsConfirmation,
   presets,
   type ActivityEntry,
@@ -171,6 +171,13 @@ export function chatRoutes(
       }),
     )
     .post("/:id/seen", (c) => (chats.markSeen(c.req.param("id")) ? c.json({ ok: true as const }, 200) : c.json(notFound, 404)))
+    // Another version of an edited message: the chat shows that branch and goes on from it.
+    .post("/:id/branch", zValidator("json", messageBranchSchema), (c) => {
+      const id = c.req.param("id");
+      if (!chats.get(id)) return c.json(notFound, 404);
+      if (running.has(id)) return c.json({ error: { code: "busy" } }, 409);
+      return chats.branch(id, c.req.valid("json").messageId) ? c.json(chats.get(id)!, 200) : c.json(notFound, 404);
+    })
     .post("/:id/stop", (c) => {
       const answer = running.get(c.req.param("id"));
       if (!answer) return c.json(notFound, 404);
@@ -188,7 +195,12 @@ export function chatRoutes(
       const conn = chat.providerId ? providers.connection(chat.providerId) : null;
       if (!conn || !chat.model) return c.json({ error: { code: "invalid", detail: "Choose a model first" } }, 400);
       if (!conn.apiKey && presets[conn.preset].keyRequired) return c.json({ error: { code: "no_key" } }, 400);
-      const { content, options, confirm, web: webMode, attachments, thinking } = c.req.valid("json");
+      const { content, options, confirm, web: webMode, attachments, thinking, editOf } = c.req.valid("json");
+      // An edit: a text chat's own message, while nothing is being answered; a program on a subscription keeps its own
+      // session and cannot go back in it.
+      const edited = editOf ? chats.userMessage(chat.id, editOf) : null;
+      if (editOf && (!edited || chat.kind !== "text" || isCli(conn.preset))) return c.json({ error: { code: "invalid", detail: "Only your own message in a text chat can be edited" } }, 400);
+      if (edited && running.has(chat.id)) return c.json({ error: { code: "busy" } }, 409);
       const files = attachments.map((id) => chats.attachments.get(id));
       if (files.some((f) => !f || f.chatId !== chat.id)) return c.json(notFound, 404);
 
@@ -293,6 +305,7 @@ export function chatRoutes(
           conn,
           model: chat.model!,
           content,
+          ...(edited ? { edit: { parentId: edited.parentId, from: edited.id } } : {}),
           signal: controller.signal,
           idleTimeoutMs,
           web: !toolsOk && webMode === "free" ? "off" : webMode,

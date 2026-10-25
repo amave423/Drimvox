@@ -170,6 +170,11 @@ export const ru = {
   "chat.totalsUnpriced": "Часть ответов без цены: провайдер её не публикует.",
   "chat.sendFailed": "Сообщение не ушло: ядро не отвечает.",
 
+  "msg.edit": "Изменить сообщение",
+  "msg.editLabel": "Новый текст сообщения",
+  "msg.editSend": "Отправить",
+  "msg.versionPrev": "Предыдущая версия",
+  "msg.versionNext": "Следующая версия",
   "msg.actionsLatest": "Действия: {n} · {latest}",
   "msg.screenshot": "Скриншот страницы",
   "msg.actions": "Действия: {n}",

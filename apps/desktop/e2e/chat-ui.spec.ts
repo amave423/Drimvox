@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { startFakeProvider, type FakeProvider, type FakeChunk } from "../../../packages/core/test/fake-provider";
+import { startFakeProvider, type FakeProvider, type FakeChunk, type FakeTurn } from "../../../packages/core/test/fake-provider";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -24,8 +24,8 @@ test.afterEach(async () => {
   rmSync(userData, { recursive: true, force: true });
 });
 
-async function launch(chunks: FakeChunk[], delayMs = 0): Promise<Page> {
-  fake = await startFakeProvider({ key: KEY, models, chunks, delayMs });
+async function launch(chunks: FakeChunk[], delayMs = 0, script?: FakeTurn[]): Promise<Page> {
+  fake = await startFakeProvider({ key: KEY, models, chunks, delayMs, ...(script ? { script } : {}) });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
@@ -166,9 +166,12 @@ test("an answer still being written shows how far it got after coming back, and 
   await expect(page.locator(".msg-assistant .md")).toContainText("часть 0", { timeout: 10_000 });
   await page.getByRole("button", { name: "Настройки" }).first().click();
   await page.locator(".side-chat", { hasText: "Пиши долго" }).click();
-  await expect(page.getByText("Модель отвечает…")).toBeVisible({ timeout: 5_000 });
+  // Under way: "answering" shows only until the window follows the answer live, then the words go on with a caret.
+  await expect(page.getByRole("button", { name: "Стоп" })).toBeVisible({ timeout: 5_000 });
   await expect(page.getByText(/Ролик/)).toHaveCount(0);
   await expect(page.locator(".msg-assistant .md")).toContainText("часть 0");
+  const before = (await page.locator(".msg-assistant .md").textContent())?.length ?? 0;
+  await expect.poll(async () => (await page.locator(".msg-assistant .md").textContent())?.length ?? 0, { timeout: 5_000 }).toBeGreaterThan(before);
   await page.getByRole("button", { name: "Стоп" }).click();
   await expect(page.getByText("Модель отвечает…")).toHaveCount(0, { timeout: 5_000 });
   await expect(page.getByRole("button", { name: "Отправить" })).toBeVisible();
@@ -182,6 +185,25 @@ test("a code block has a copy button", async () => {
   await block.getByRole("button", { name: "Копировать" }).click();
   await expect(block.getByRole("button", { name: "Скопировано" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("const total = 1;");
+});
+
+// Asked for: edit one's own message, get a new answer, and switch between the versions.
+test("an edited message gets a new answer, and the arrows switch back to the first version", async () => {
+  const page = await launch([], 0, [{ text: "Ответ про кошек" }, { text: "Ответ про собак" }]);
+  await ask(page, "Расскажи про кошек");
+  await expect(page.locator(".msg-assistant").last()).toContainText("Ответ про кошек");
+  const mine = page.locator(".msg-user").first();
+  await mine.hover();
+  await mine.getByRole("button", { name: "Изменить сообщение" }).click();
+  await page.getByLabel("Новый текст сообщения").fill("Расскажи про собак");
+  await page.locator(".msg-editing").getByRole("button", { name: "Отправить", exact: true }).click();
+  await expect(page.locator(".msg-assistant .md").last()).toHaveText("Ответ про собак");
+  await expect(page.locator(".msg-user")).toHaveCount(1);
+  await expect(page.locator(".msg-versions")).toContainText("2/2");
+  await page.getByRole("button", { name: "Предыдущая версия" }).click();
+  await expect(page.locator(".msg-user").first()).toContainText("Расскажи про кошек");
+  await expect(page.locator(".msg-assistant .md").last()).toHaveText("Ответ про кошек");
+  await expect(page.locator(".msg-versions")).toContainText("1/2");
 });
 
 // Seen: links in answers were hard to tell from the text; popular sites now carry their mark, drawn without the network.

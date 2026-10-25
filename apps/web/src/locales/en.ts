@@ -170,6 +170,11 @@ export const en: Record<keyof typeof ru, string> = {
   "chat.totalsUnpriced": "Some answers have no price: the provider does not publish it.",
   "chat.sendFailed": "The message was not sent: the core is not responding.",
 
+  "msg.edit": "Edit the message",
+  "msg.editLabel": "The message's new text",
+  "msg.editSend": "Send",
+  "msg.versionPrev": "Previous version",
+  "msg.versionNext": "Next version",
   "msg.actionsLatest": "Actions: {n} · {latest}",
   "msg.screenshot": "Screenshot of the page",
   "msg.actions": "Actions: {n}",

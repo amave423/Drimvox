@@ -39,6 +39,7 @@ interface MessageRow {
   media_job: string | null;
   checkpoint: string | null;
   activity: string | null;
+  parent_id: string | null;
 }
 
 /** A clip the provider is still rendering for an answer. */
@@ -66,6 +67,8 @@ export interface NewMessage {
   status: MessageStatus;
   providerId?: string | null;
   model?: string | null;
+  /** The message it follows: by default the end of the chat's current branch; an edit follows what the edited one did. */
+  parentId?: string | null;
 }
 
 export interface FinishedAnswer {
@@ -109,12 +112,45 @@ export class ChatRepo {
   get(id: string): Omit<ChatWithMessages, "approvals"> | null {
     const row = this.chatRow(id);
     if (!row) return null;
-    const messages = this.db.sql
-      .prepare("select * from messages where chat_id = ? order by created_at, rowid")
-      .all(id) as unknown as MessageRow[];
+    const all = this.rows(id);
+    const messages = branchOf(all, this.head(id));
     const media = this.media.forMessages(messages.map((m) => m.id));
     const files = this.attachments.forMessages(messages.map((m) => m.id));
-    return { ...toChat(row), messages: messages.map((m) => toMessage(m, media.get(m.id) ?? [], files.get(m.id) ?? [])) };
+    return {
+      ...toChat(row),
+      messages: messages.map((m) => ({ ...toMessage(m, media.get(m.id) ?? [], files.get(m.id) ?? []), versions: m.role === "user" ? versionsOf(all, m) : null })),
+    };
+  }
+
+  private rows(chatId: string): MessageRow[] {
+    return this.db.sql.prepare("select * from messages where chat_id = ? order by created_at, rowid").all(chatId) as unknown as MessageRow[];
+  }
+
+  private head(chatId: string): string | null {
+    return (this.db.sql.prepare("select head_id from chats where id = ?").get(chatId) as { head_id: string | null } | undefined)?.head_id ?? null;
+  }
+
+  /** The message an edit starts from, if it is a message of this chat the user wrote. */
+  userMessage(chatId: string, messageId: string): { id: string; parentId: string | null } | null {
+    const row = this.db.sql.prepare("select id, parent_id from messages where id = ? and chat_id = ? and role = 'user'").get(messageId, chatId) as { id: string; parent_id: string | null } | undefined;
+    return row ? { id: row.id, parentId: row.parent_id } : null;
+  }
+
+  /**
+   * Shows the branch of a message (a version of an edited one): the chat goes on from the newest end of that branch.
+   * False when the message is not in the chat.
+   */
+  branch(chatId: string, messageId: string): boolean {
+    const all = this.rows(chatId);
+    let end = all.find((m) => m.id === messageId);
+    if (!end) return false;
+    for (;;) {
+      const child = all.filter((m) => m.parent_id === end!.id).at(-1);
+      if (!child) break;
+      end = child;
+    }
+    this.db.sql.prepare("update chats set head_id = ? where id = ?").run(end.id, chatId);
+    return true;
   }
 
   /** A new chat; `work` makes it a project task's conversation in the project's folder. */
@@ -206,12 +242,13 @@ export class ChatRepo {
       media_job: null,
       checkpoint: null,
       activity: null,
+      parent_id: m.parentId !== undefined ? m.parentId : this.head(m.chatId),
     };
     const cols = Object.keys(row);
     this.db.sql
       .prepare(`insert into messages (${cols.join(", ")}) values (${cols.map((c) => `:${c}`).join(", ")})`)
       .run({ ...row });
-    this.db.sql.prepare("update chats set updated_at = ? where id = ?").run(row.created_at, m.chatId);
+    this.db.sql.prepare("update chats set updated_at = ?, head_id = ? where id = ?").run(row.created_at, row.id, m.chatId);
     return toMessage(row, [], []);
   }
 
@@ -295,13 +332,8 @@ export class ChatRepo {
 
   /** What the model sees: finished turns only, with the user's attachments. Failed and empty answers are left out. */
   history(chatId: string): HistoryTurn[] {
-    const rows = this.db.sql
-      .prepare(
-        `select id, role, content from messages where chat_id = ?
-         and (role = 'user' or (status in ('done', 'stopped') and content <> ''))
-         order by created_at, rowid`,
-      )
-      .all(chatId) as { id: string; role: "user" | "assistant"; content: string }[];
+    // The current branch only: an edited message's older versions and what followed them are not said again.
+    const rows = branchOf(this.rows(chatId), this.head(chatId)).filter((r) => r.role === "user" || ((r.status === "done" || r.status === "stopped") && r.content !== ""));
     const files = this.attachments.forMessages(rows.filter((r) => r.role === "user").map((r) => r.id));
     return rows.map(({ id, role, content }) => (files.has(id) ? { role, content, attachments: files.get(id)! } : { role, content }));
   }
@@ -345,6 +377,21 @@ function toChat(r: ChatRow): ChatView {
   };
 }
 
+/** The messages from the first to `head`, following each one's parent; the whole chat for one made before branches. */
+function branchOf(all: MessageRow[], head: string | null): MessageRow[] {
+  if (!head) return all;
+  const byId = new Map(all.map((m) => [m.id, m]));
+  const path: MessageRow[] = [];
+  for (let m = byId.get(head); m; m = m.parent_id ? byId.get(m.parent_id) : undefined) path.push(m);
+  return path.reverse();
+}
+
+/** An edited message's versions: the messages the user wrote at the same place, oldest first. */
+function versionsOf(all: MessageRow[], m: MessageRow): MessageView["versions"] {
+  const same = all.filter((o) => o.role === "user" && o.parent_id === m.parent_id);
+  return same.length > 1 ? { index: same.findIndex((o) => o.id === m.id), count: same.length, ids: same.map((o) => o.id) } : null;
+}
+
 function toMessage(r: MessageRow, media: MessageView["media"], attachments: MessageView["attachments"]): MessageView {
   return {
     id: r.id,
@@ -362,6 +409,7 @@ function toMessage(r: MessageRow, media: MessageView["media"], attachments: Mess
     canUndo: !!r.checkpoint,
     attachments: attachments.map(({ id, name, type, size, kind }) => ({ id, name, type, size, kind })),
     activity: r.activity ? (JSON.parse(r.activity) as MessageView["activity"]) : [],
+    versions: null,
     createdAt: r.created_at,
   };
 }

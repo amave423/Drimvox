@@ -61,6 +61,8 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  /** While an edited message is answered: how many messages before it stay on screen. */
+  const [cutAt, setCutAt] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [mediaModel, setMediaModel] = useState<MediaModel | null>(null);
   const [options, setOptions] = useState<Options>({});
@@ -251,7 +253,14 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     if (chat) await load(chat.id);
   }
 
-  async function send(content: string) {
+  /** Shows another version of an edited message, and the branch that goes on from it. */
+  async function showVersion(messageId: string) {
+    if (!chat) return;
+    await api.chats[":id"].branch.$post({ param: { id: chat.id }, json: { messageId } }).catch(() => null);
+    await load(chat.id);
+  }
+
+  async function send(content: string, editOf?: string) {
     if (projectId) return sendToWork(projectId, content);
     if (!choice) return;
     setFailed(false);
@@ -286,14 +295,18 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
 
     const controller = new AbortController();
     abort.current = controller;
-    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text", activity: [], approvals: [], attachments: attached });
+    // An edit: the chat shows what came before the edited message, then the new version and its answer.
+    const cut = editOf ? (chat?.messages.findIndex((m) => m.id === editOf) ?? -1) : -1;
+    setCutAt(cut >= 0 ? cut : null);
+    const kept = cut >= 0 && !attached.length ? (chat?.messages[cut]?.attachments ?? []) : attached;
+    setDraft({ user: content, text: "", reasoning: "", model: choice.model, media: kind !== "text", activity: [], approvals: [], attachments: kept });
     try {
       await postStream<StreamEvent>(
         `/api/chats/${id}/messages`,
         token,
         // The price was on the button the user pressed; that is the confirmation.
         kind === "text"
-          ? { content, web: webMode, thinking: thinks ? thinking : "auto", attachments: attached.map((a) => a.id) }
+          ? { content, web: webMode, thinking: thinks ? thinking : "auto", attachments: attached.map((a) => a.id), ...(editOf ? { editOf } : {}) }
           : { content, options, confirm, attachments: attached.map((a) => a.id) },
         (e) => {
           // The core named the chat after the question: the list shows the name before the answer is done.
@@ -322,6 +335,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     if (controller.signal.aborted) await new Promise((r) => setTimeout(r, 200));
     await load(id);
     setDraft(null);
+    setCutAt(null);
     void reloadChats();
     void reloadToday();
   }
@@ -356,6 +370,8 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   const messages = chat?.messages ?? [];
   const answers = messages.filter((m) => m.role === "assistant");
   const empty = messages.length === 0 && !draft;
+  // One's own message is edited in a text chat; a project's run and a program on a subscription keep their own course.
+  const editable = kind === "text" && !projectId && !chat?.itemId && providers.find((p) => p.id === chat?.providerId)?.billing !== "subscription";
 
   return (
     <article className="sheet chat">
@@ -372,9 +388,16 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         {empty && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
 
         <div className="messages" ref={list} hidden={!!projectId && tab !== "work"}>
-          {messages.map((m) =>
+          {(cutAt !== null ? messages.slice(0, cutAt) : messages).map((m) =>
             m.role === "user" ? (
-              <UserMessage key={m.id} content={m.content} files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null} />
+              <UserMessage
+                key={m.id}
+                content={m.content}
+                files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null}
+                versions={m.versions}
+                onVersion={draft ? undefined : (id) => void showVersion(id)}
+                onEdit={editable && !draft ? (text) => void send(text, m.id) : undefined}
+              />
             ) : (
               <AssistantMessage
                 key={m.id}

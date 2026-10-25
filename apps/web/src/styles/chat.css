@@ -243,3 +243,14 @@
 .picker-list button.picker-star { width: 30px; flex: none; justify-content: center; padding: 6px 0; color: var(--muted); font-size: 15px; line-height: 1; }
 .picker-list button.picker-star:hover { color: var(--ink); background: var(--paper); }
 .picker-list button.picker-star.is-on { color: var(--wait); }
+
+/* One's own message: edit it in place, and switch between its versions. */
+.msg-user-tools { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
+.msg-user-tools button { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 6px; color: var(--muted); }
+.msg-user-tools button:hover:not(:disabled) { color: var(--fg); background: var(--paper); }
+.msg-user-tools button:disabled { opacity: 0.4; cursor: default; }
+.msg-versions { display: inline-flex; align-items: center; gap: 2px; }
+.msg-edit { opacity: 0; transition: opacity 120ms; }
+.msg-user:hover .msg-edit, .msg-edit:focus-visible { opacity: 1; }
+.msg-editing { display: grid; gap: 8px; width: min(100%, 640px); }
+.msg-editing textarea { resize: vertical; font: inherit; }

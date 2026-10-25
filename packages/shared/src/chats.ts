@@ -42,8 +42,13 @@ export const messageSendSchema = z
     thinking: z.enum(thinkingLevels).default("auto"),
     /** Files uploaded to the chat for this message (docs/specs/chat-attachments.md). */
     attachments: z.array(z.string().min(1)).max(10).default([]),
+    /** The user's message this one replaces: the answer goes on a branch of its own, the old one stays (docs/specs/chats.md). */
+    editOf: z.string().min(1).optional(),
   })
   .strict();
+
+/** Which version of an edited message to show: the chat goes on from the end of its branch. */
+export const messageBranchSchema = z.object({ messageId: z.string().min(1) }).strict();
 
 /** A file to attach, as the window reads it. */
 export const attachmentUploadSchema = z.object({ name: z.string().trim().min(1).max(260), type: z.string().max(200).default(""), data: z.string().min(1) }).strict();
@@ -118,6 +123,8 @@ export interface MessageView {
   attachments: AttachmentView[];
   /** The tools the model called while answering, in order: the name and what it was called on. */
   activity: ActivityEntry[];
+  /** A message the user edited: which of its versions this is, of how many, and their ids to switch to. */
+  versions: { index: number; count: number; ids: string[] } | null;
   createdAt: number;
 }
 

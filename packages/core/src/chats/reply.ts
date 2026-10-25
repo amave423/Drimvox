@@ -64,6 +64,8 @@ export interface ReplyInput {
   thinking?: ThinkingLevel;
   /** Files uploaded for this message. */
   attachments?: string[];
+  /** An edit of an earlier message: the new one follows what that one did, and keeps its files unless others are sent. */
+  edit?: { parentId: string | null; from: string };
   /** The model sees pictures: attached ones go to it as pictures, not as a note. */
   vision?: boolean;
   /** The chat's folder: the model works in it, and it is snapshotted before the answer so the answer can be undone. */
@@ -81,8 +83,9 @@ export interface ReplyInput {
  */
 export async function reply(i: ReplyInput): Promise<void> {
   if (isCli(i.conn.preset) && i.cliDir) return cliReply(i, i.cliDir, FORMAT_HINT);
-  const added = i.chats.addMessage({ chatId: i.chatId, role: "user", content: i.content, status: "done" });
+  const added = i.chats.addMessage({ chatId: i.chatId, role: "user", content: i.content, status: "done", ...(i.edit ? { parentId: i.edit.parentId } : {}) });
   if (i.attachments?.length) i.chats.attachments.attach(i.chatId, added.id, i.attachments);
+  else if (i.edit) i.chats.attachments.copy(i.edit.from, added.id);
   const userMessage = i.chats.message(added.id)!;
   i.chats.nameIfUntitled(i.chatId, i.content);
   const history = toModelMessages(i.chats.history(i.chatId), i.chats.attachments, i.vision !== false);
