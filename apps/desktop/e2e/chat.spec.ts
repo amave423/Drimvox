@@ -217,7 +217,7 @@ test("keeps keys and chats after a restart", async () => {
   await app!.close();
 
   page = await launch();
-  await page.getByRole("button", { name: /^Первый/ }).click();
+  await page.locator(".side").getByRole("button", { name: /^Первый/ }).click();
   await say(page, "Второй");
   await expect(page.getByText("Ответ", { exact: true })).toHaveCount(2);
   expect(fake.requests.at(-1)?.auth).toBe(`Bearer ${KEY}`);

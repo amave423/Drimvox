@@ -8,6 +8,7 @@ import { ErrorNote } from "../ErrorNote";
 import { Hint } from "../Hint";
 import { Toggle } from "../Toggle";
 import { presetName } from "./presetName";
+import { ProviderLogo } from "./ProviderLogo";
 
 type Mode = "idle" | "replaceKey" | "confirmRemove";
 
@@ -27,6 +28,9 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
   const [mode, setMode] = useState<Mode>("idle");
   const [newKey, setNewKey] = useState("");
   const [busy, setBusy] = useState(false);
+  // A connected provider is one line with its state; its switches and actions open on request (seen: a heavy grey card
+  // outweighed the way to connect above it). A provider that fails opens by itself: its key may need replacing.
+  const [open, setOpen] = useState(false);
   // Pictures on this computer: its models are downloaded on the local models' sheet, nothing to check or proxy here.
   const local = provider.preset === "sdcpp";
 
@@ -82,11 +86,18 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
     await Promise.all([reloadProviders(), reloadChats()]);
   }
 
+  const shown = open || mode !== "idle" || (!!check && "error" in check);
   return (
-    <li className="provider">
+    <li className={`provider${shown ? " is-open" : ""}`}>
       <div className="provider-head">
-        <h3>{provider.name}</h3>
-        <span className="muted">{presetName(t, provider.preset)}</span>
+        <ProviderLogo preset={provider.preset} name={provider.name} />
+        <div className="provider-title">
+          <h3>{provider.name}</h3>
+          <span className="muted">{presetName(t, provider.preset)}</span>
+        </div>
+        <button type="button" className="link provider-more" aria-expanded={shown} onClick={() => setOpen(!open)}>
+          {t(shown ? "providers.less" : "providers.more")}
+        </button>
       </div>
 
       <div className="provider-status" aria-live="polite">
@@ -104,7 +115,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
         {check && "error" in check && <ErrorNote error={check.error} />}
       </div>
       {provider.billing === "subscription" && check && "models" in check && <SubscriptionLimits providerId={provider.id} />}
-      {provider.preset === "google" && (
+      {shown && provider.preset === "google" && (
         <p className="muted provider-note">
           {t("providers.googleFree")}{" "}
           {/* Google does not tell the API what is left of the free limit; its own page does. */}
@@ -114,7 +125,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
         </p>
       )}
 
-      {!local && (
+      {shown && !local && (
         <div className="provider-proxy">
           <Toggle checked={provider.useProxy} disabled={!proxySet && !provider.useProxy} onChange={(on) => void switchProxy(on)}>
             {t("providers.useProxy")}
@@ -122,7 +133,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
           {!proxySet && <span className="muted">{t("providers.proxyNotSet")}</span>}
         </div>
       )}
-      {provider.preset === "custom" && (
+      {shown && provider.preset === "custom" && (
         <div className="provider-proxy">
           <Toggle checked={provider.flat} onChange={(on) => void switchFlat(on)}>
             {t("providers.flat")}
@@ -172,7 +183,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
         </div>
       )}
 
-      {mode === "idle" && (
+      {shown && mode === "idle" && (
         <div className="provider-actions">
           {!local && (
             <button className="link" onClick={() => void runCheck(true)}>

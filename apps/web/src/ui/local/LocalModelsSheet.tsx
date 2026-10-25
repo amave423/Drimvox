@@ -8,7 +8,7 @@ import { forgetModels } from "../../lib/models";
 import { LocalCatalogView } from "./LocalCatalog";
 import { LocalImagesSection } from "./LocalImages";
 import { LocalAudioSection } from "./LocalAudio";
-import { Segmented } from "../Segmented";
+import { Tabs } from "../Tabs";
 import type { LocalPart } from "../../context";
 import { PullControl, type PullActions } from "./PullControl";
 import { useSize } from "./size";
@@ -94,12 +94,10 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
                 : t("local.hwCpu", { ram: size(hw.ramBytes) })}
           </p>
         )}
-        <span id="local-part" className="visually-hidden">
-          {t("local.part")}
-        </span>
-        <Segmented<LocalPart>
+        {/* The sheet's parts are tabs, as everywhere else: the pill switch is for choosing a value (seen: it read as a setting). */}
+        <Tabs<LocalPart>
           value={part}
-          labelledBy="local-part"
+          label={t("local.part")}
           onChange={setPart}
           options={[
             { value: "text", label: t("local.part.text") },

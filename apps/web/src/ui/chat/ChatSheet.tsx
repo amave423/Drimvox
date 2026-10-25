@@ -145,10 +145,12 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
     if (chatId && chatId !== chat?.id) void load(chatId);
   }, [chatId]);
 
-  // A project task's conversation starts with the task itself, sent once the chat and its model are loaded.
+  // A project task's conversation starts with the task itself, sent once the chat and its model are loaded; a question
+  // asked on the start page opens a new chat that sends it once its model is known.
   const autoSent = useRef(false);
   useEffect(() => {
-    if (!autoSend || autoSent.current || !chat || chat.id !== chatId || chat.messages.length > 0 || !choice || draft) return;
+    if (!autoSend || autoSent.current || !choice || draft) return;
+    if (chatId && (!chat || chat.id !== chatId || chat.messages.length > 0)) return;
     autoSent.current = true;
     void send(autoSend);
   }, [autoSend, chat, choice]);

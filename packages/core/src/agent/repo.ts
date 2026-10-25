@@ -108,6 +108,11 @@ export class ProjectRepo {
     return toProject(row);
   }
 
+  rename(id: string, name: string): Omit<ProjectView, "gitState"> | null {
+    this.db.sql.prepare("update projects set name = ? where id = ?").run(name, id);
+    return this.get(id);
+  }
+
   remove(id: string): boolean {
     return Number(this.db.sql.prepare("delete from projects where id = ?").run(id).changes) > 0;
   }

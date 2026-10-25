@@ -13,7 +13,10 @@ a { color: var(--ink); }
 .btn:hover { border-color: var(--muted); }
 .btn.is-primary { background: var(--fg); border-color: var(--fg); color: var(--sheet); font-weight: 500; }
 .btn.is-pencil { background: transparent; border-color: var(--pencil); color: var(--pencil); }
-.btn:disabled { opacity: 0.45; cursor: default; }
+/* A button that cannot be pressed yet keeps its outline and only its words go quiet (seen: a faded blot that read as
+   neither a button nor a caption, and a grey filled one that melted into the dark sheet). */
+.btn:disabled, .btn.is-primary:disabled { cursor: default; background: transparent; border-color: var(--line); color: var(--muted); font-weight: 400; }
+.btn:disabled:hover { border-color: var(--line); }
 
 .link { color: var(--muted); font-size: 14px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
 .link:hover { color: var(--fg); }
@@ -80,16 +83,17 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 .toggle-track {
   flex: none; position: relative; width: 34px; height: 20px; margin-top: 1px;
-  border-radius: 999px; background: var(--line); transition: background-color 120ms;
+  border-radius: 999px; background: var(--paper); box-shadow: inset 0 0 0 1.5px var(--muted); transition: background-color 120ms, box-shadow 120ms;
 }
+/* Off: a muted knob in an outlined track, seen in both themes (seen: grey on grey, nearly gone in the dark one). */
 .toggle-track::after {
-  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
-  border-radius: 50%; background: var(--sheet); transition: transform 120ms;
+  content: ""; position: absolute; top: 4px; left: 4px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--muted); transition: transform 120ms, background-color 120ms, width 120ms, height 120ms, top 120ms, left 120ms;
 }
-.toggle input:checked + .toggle-track { background: var(--ink); }
-.toggle input:checked + .toggle-track::after { transform: translateX(14px); }
+.toggle input:checked + .toggle-track { background: var(--ink); box-shadow: none; }
+.toggle input:checked + .toggle-track::after { top: 2px; left: 2px; width: 16px; height: 16px; background: var(--sheet); transform: translateX(14px); }
 .toggle input:focus-visible + .toggle-track { outline: 2px solid var(--ink); outline-offset: 2px; }
-.toggle:hover input:not(:checked):not(:disabled) + .toggle-track { background: var(--muted); }
+.toggle:hover input:not(:checked):not(:disabled) + .toggle-track::after { background: var(--fg); }
 .toggle.is-disabled { cursor: default; color: var(--muted); }
 .toggle.is-disabled .toggle-track { opacity: 0.5; }
 
@@ -105,6 +109,10 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .side-chat .side-item { padding-right: 60px; }
 .side-chat-actions { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; align-items: center; }
 .side-chat:hover .side-chat-actions, .side-chat:focus-within .side-chat-actions, .side-chat-actions.is-shown { display: inline-flex; }
+/* A project in the list: a pencil on hover, as on chats. */
+.side-project-row { position: relative; }
+.side-project-row .side-item { padding-right: 36px; }
+.side-project-row:hover .side-chat-actions, .side-project-row:focus-within .side-chat-actions { display: inline-flex; }
 /* While asking "delete?" the row stays lit like on hover, so the two icons sit on its own background. */
 .side-chat:has(.side-chat-actions.is-shown) .side-item { background: var(--sheet); }
 .icon-button.is-pencil { color: var(--pencil); }
@@ -113,10 +121,6 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .icon-button:hover { color: var(--fg); background: var(--paper); }
 .side-pick { display: flex !important; align-items: center; gap: 8px; cursor: pointer; }
 .side-rename .field-input { width: 100%; padding: 5px 8px; font-size: 14px; }
-.setting-hint { margin: 6px 0 0; }
-.model-setting { display: grid; gap: 4px; margin-top: 14px; }
-.model-setting h3 { margin: 0; font: 600 15px/1.4 var(--font-ui); }
-.model-setting p { margin: 0; }
 .more-settings { margin-top: 16px; }
 .more-settings summary { cursor: pointer; color: var(--ink); font-size: 14px; }
 
@@ -137,7 +141,7 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .catalog-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .catalog-filter .chip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13.5px; color: var(--muted); background: var(--sheet); }
 .catalog-filter .chip:hover { color: var(--fg); border-color: var(--fg); }
-.catalog-filter .chip.is-on { color: var(--sheet); background: var(--fg); border-color: var(--fg); }
+.catalog-filter .chip.is-on { color: var(--on-choice); background: var(--choice); border-color: var(--choice); }
 .catalog-grid { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .catalog-card { display: grid; gap: 8px; align-content: start; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 .catalog-card p { margin: 0; font-size: 13.5px; line-height: 1.45; }
@@ -176,3 +180,13 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .spending-row { display: flex; align-items: baseline; gap: 12px; }
 .spending-model { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .spending-cheaper { margin: 2px 0 0; padding-left: 12px; border-left: 2px solid var(--ok); color: var(--ok); font-size: 13px; }
+
+/* A setting inside a group: name, a quiet line about it, the control. */
+.setting { display: grid; gap: 6px; justify-items: start; margin-top: 18px; }
+.setting-h { margin: 0; font: 600 14.5px/1.4 var(--font-ui); }
+.setting-about { margin: 0 0 4px; max-width: 62ch; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.sheet-h + .setting-about { margin-top: -4px; }
+/* An amount: a narrow field with the currency inside it, saved by Enter or on leaving it. */
+.amount-field { position: relative; display: inline-flex; align-items: center; }
+.amount-field .field-input { width: 190px; padding-right: 30px; }
+.amount-field > span { position: absolute; right: 12px; color: var(--muted); font-size: 14px; pointer-events: none; }

@@ -69,7 +69,8 @@ async function manyChats(page: Page, n: number) {
 test("many chats scroll inside their own list, without running over the rest of the sidebar", async () => {
   const page = await launch([{ text: "Привет" }]);
   await manyChats(page, 40);
-  await expect(page.getByText("Чат номер 39")).toBeVisible();
+  // The start page lists recent chats too: the sidebar's list is the one measured.
+  await expect(page.locator(".side").getByText("Чат номер 39")).toBeVisible();
   const box = async (selector: string) => (await page.locator(selector).boundingBox())!;
   const chats = await box(".side-chats-group");
   const nav = await box(".side-nav");

@@ -15,6 +15,10 @@
   --ok-soft: #dcebe0;
   --wait: #9a6200;
   --wait-soft: #f3e5c8;
+  /* The chosen option of a pill switch or a filter: ink on paper in the light theme, soft ink in the dark one
+     (seen: a near-white pill was the brightest thing on a dark screen). */
+  --choice: var(--fg);
+  --on-choice: var(--sheet);
   --sheet-shadow: 0 18px 40px -30px rgba(40, 35, 20, 0.5);
   /* Buttons, pickers and one-line fields share this height, so a row of them lines up. */
   --control-h: 38px;
@@ -47,6 +51,8 @@
   --ok-soft: #1f3326;
   --wait: #e3a948;
   --wait-soft: #3a2e18;
+  --choice: var(--ink-soft);
+  --on-choice: var(--ink);
   --sheet-shadow: 0 18px 40px -30px rgba(0, 0, 0, 0.8);
 }
 

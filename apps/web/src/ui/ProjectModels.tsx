@@ -2,18 +2,14 @@ import type { SettingsPatch } from "@drimvox/shared";
 import { useApp } from "../context";
 import type { MessageKey } from "../i18n";
 import { ModelPicker } from "./chat/ModelPicker";
-import { Hint } from "./Hint";
+import { Setting } from "./Setting";
 
 type Ref = { providerId: string; model: string } | null;
 
 function ModelSetting(p: { title: MessageKey; hint: string; value: Ref; image?: boolean; vision?: boolean; onChange(v: Ref): void }) {
   const { t } = useApp();
   return (
-    <div className="model-setting">
-      <h3>
-        {t(p.title)}
-        <Hint text={p.hint} />
-      </h3>
+    <Setting id={`${p.title.replace(".", "-")}-label`} title={t(p.title)} about={p.hint}>
       <div className="actions">
         <ModelPicker
           value={p.value && (p.image ? { ...p.value, kind: "image" } : p.value)}
@@ -27,7 +23,7 @@ function ModelSetting(p: { title: MessageKey; hint: string; value: Ref; image?: 
           </button>
         )}
       </div>
-    </div>
+    </Setting>
   );
 }
 

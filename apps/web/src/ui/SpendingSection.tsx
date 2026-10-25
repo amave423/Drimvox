@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";
 import { formatUsd } from "../lib/format";
-import { Hint } from "./Hint";
 
 const DAYS = 30;
 
@@ -27,8 +26,8 @@ export function SpendingSection() {
     <section className="spending" aria-labelledby="spending-h">
       <h2 className="sheet-h" id="spending-h">
         {t("spending.title", { n: DAYS })}
-        <Hint text={t("spending.hint")} />
       </h2>
+      <p className="setting-about">{t("spending.hint")}</p>
       {rows === null ? null : rows.length === 0 ? (
         <p className="muted">{t("spending.empty")}</p>
       ) : (

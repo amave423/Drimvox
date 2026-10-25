@@ -1,7 +1,6 @@
 import type { SearchCheck, SearchView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../context";
-import { Hint } from "./Hint";
 import { Segmented } from "./Segmented";
 
 type Service = "tavily" | "brave";
@@ -59,8 +58,8 @@ export function SearchSection() {
     <>
       <h2 className="sheet-h">
         {t("settings.search")}
-        <Hint text={t("settings.searchHint")} />
       </h2>
+      <p className="setting-about">{t("settings.searchHint")}</p>
       {keyed && !editing ? (
         <div className="actions">
           <span>{t("settings.searchUses", { name: t(`settings.search.${view.service}`) })}</span>

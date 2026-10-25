@@ -1,26 +1,33 @@
 /* Keys and models screen. */
 /* Each connected provider is a card: no rules between them, so nothing stray sits above the list of presets. */
 .provider-list { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 10px; }
-.provider { padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.provider { padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); }
+.provider.is-open { background: var(--paper); }
 .provider-confirm { display: grid; gap: 10px; margin-top: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--pencil); font-size: 14px; }
 .provider-confirm p { margin: 0; }
 .provider-confirm-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.provider-head { display: flex; gap: 12px; align-items: baseline; }
-.provider-head h3 { margin: 0; font: 600 18px var(--font-serif); }
+.provider-head { display: flex; gap: 12px; align-items: center; }
+.provider-title { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
+.provider-head h3 { margin: 0; font: 600 15.5px var(--font-ui); }
 .provider-head .muted { font-size: 13px; }
-.provider-status { margin-top: 4px; font-size: 14px; min-height: 22px; }
+.provider-more { flex: none; }
+/* The state under the name, in line with it past the logo. */
+.provider-status { margin: 2px 0 0 44px; font-size: 14px; min-height: 22px; }
+.provider > :not(.provider-head):not(.provider-status) { margin-left: 44px; }
 .provider-proxy { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-top: 8px; font-size: 14px; }
 .provider-actions { display: flex; gap: 16px; margin-top: 6px; }
 
 .preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .preset {
-  display: grid; gap: 2px; align-content: start; text-align: left;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; text-align: left;
   padding: 10px 12px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--sheet);
 }
 .preset:hover { border-color: var(--muted); }
 .preset.is-on { border-color: var(--ink); background: var(--ink-soft); }
+.preset-text { display: grid; gap: 2px; min-width: 0; }
 .preset-name { font-weight: 500; font-size: 14.5px; }
+.provider-initial { font: 600 15px var(--font-ui); color: var(--ink); }
 .preset-hint { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
 
 .connect { display: grid; gap: 16px; }

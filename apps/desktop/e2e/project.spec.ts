@@ -73,13 +73,16 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(page.getByRole("checkbox")).toHaveCount(0);
   await page.getByLabel("Что сделать?").fill("Сайт лесопилки");
   const models = page.getByRole("group", { name: "Модели" });
-  await expect(models).toContainText("Опрос");
-  await expect(models).toContainText("План");
-  await expect(models).toContainText("Работа");
+  await expect(models).toContainText("Модель для опроса, плана и работы");
   await expect(models).toContainText("Сильная модель");
   await models.getByRole("button", { name: "Выбери модель" }).first().click();
   await page.getByRole("option", { name: /Coder/ }).click();
-  // One pick fills all three roles.
+  // One pick is the model of all three stages; each can be told apart on request.
+  await page.getByRole("button", { name: "Разные модели для этапов" }).click();
+  await expect(models).toContainText("Опрос");
+  await expect(models).toContainText("План");
+  await expect(models).toContainText("Работа");
+  await expect(models.getByRole("button", { name: /Coder/ })).toHaveCount(3);
   await expect(models.getByRole("button", { name: "Выбери модель" })).toHaveCount(0);
   await page.getByRole("button", { name: "Начать опрос" }).click();
 

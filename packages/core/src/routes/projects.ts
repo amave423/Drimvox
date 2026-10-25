@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { findSkills, projectSkillRoots, toSkillView } from "../skills/skills";
-import { projectCreateSchema, taskCreateSchema, type ProjectView } from "@drimvox/shared";
+import { projectCreateSchema, projectRenameSchema, taskCreateSchema, type ProjectView } from "@drimvox/shared";
 import { Hono } from "hono";
 import { existsSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
@@ -36,6 +36,11 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
       } catch (err) {
         return c.json(gitFailure(err), 409);
       }
+    })
+    .patch("/:id", zValidator("json", projectRenameSchema), async (c) => {
+      const project = projects.rename(c.req.param("id"), c.req.valid("json").name);
+      if (!project) return c.json(notFound, 404);
+      return c.json(await withGit(project), 200);
     })
     .post("/:id/init-git", async (c) => {
       const project = projects.get(c.req.param("id"));

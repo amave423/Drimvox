@@ -169,8 +169,9 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   // A CLI's "default" is whatever the program itself is set to.
   const isCliDefault = (pid: string | undefined, model: string) =>
     model === "default" && providers.find((p) => p.id === pid)?.billing === "subscription";
-  const label =
-    value && providerName ? `${providerName} / ${isCliDefault(value.providerId, value.model) ? t("model.cliDefault") : value.model}` : t("model.pick");
+  const modelName = useModelName(value);
+  const cliDefault = !!value && isCliDefault(value.providerId, value.model);
+  const chosen = value && providerName ? { name: cliDefault ? t("model.cliDefault") : (modelName ?? value.model), id: cliDefault ? t("model.cliDefault") : value.model } : null;
 
   // A model that takes no photo cannot be chosen while one waits: it would be refused anyway.
   const refused = (m: Listed) => photos && kind !== "text" && !m.photoInput;
@@ -227,8 +228,24 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   return (
     <div className="picker" ref={root}>
       {/* Not a submit button: the picker sits in the message form (seen: with a file attached, opening it sent the message). */}
-      <button type="button" className="picker-button" aria-expanded={open} aria-haspopup="listbox" onClick={() => setOpen(!open)}>
-        <span className={`picker-label${value && providerName ? " mono" : ""}`}>{label}</span>
+      {/* The model's own name and its provider, the id only in the hint (seen: "OpenRouter / anthropic/c…" cut where it mattered). */}
+      <button
+        type="button"
+        className="picker-button"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={chosen ? `${providerName} / ${chosen.id}${chosen.name !== chosen.id ? ` — ${chosen.name}` : ""}` : undefined}
+        title={chosen ? `${providerName} / ${chosen.id}` : undefined}
+        onClick={() => setOpen(!open)}
+      >
+        {chosen ? (
+          <span className="picker-label">
+            {chosen.name}
+            <span className="picker-label-provider">{providerName}</span>
+          </span>
+        ) : (
+          <span className="picker-label">{t("model.pick")}</span>
+        )}
         <span aria-hidden>▾</span>
       </button>
       {open && (
@@ -296,6 +313,30 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
       )}
     </div>
   );
+}
+
+/** The chosen model's name as its provider lists it: from the kept list at once, then the fresh one. */
+function useModelName(value: ModelChoice | null): string | null {
+  const { api } = useApp();
+  const [name, setName] = useState<string | null>(null);
+  const providerId = value?.providerId;
+  const model = value?.model;
+  const kind = value?.kind ?? "text";
+  useEffect(() => {
+    if (!providerId || !model) return setName(null);
+    let live = true;
+    if (kind !== "text") {
+      setName(null);
+      void loadMediaModel(api, providerId, kind, model).then((m) => live && setName(m?.name ?? null));
+    } else {
+      setName(storedModels(providerId)?.find((m) => m.id === model)?.name ?? null);
+      void loadModels(api, providerId).then((r) => live && "models" in r && setName(r.models.find((m) => m.id === model)?.name ?? null));
+    }
+    return () => {
+      live = false;
+    };
+  }, [api, providerId, model, kind]);
+  return name;
 }
 
 function ModelFacts({ model, billing }: { model: ModelInfo; billing: ProviderView["billing"] | undefined }) {

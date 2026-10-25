@@ -34,7 +34,6 @@
 .task-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-row .mono { text-align: right; font-size: 12.5px; }
 .project-remove { margin-top: 28px; }
-.budget-input { width: 110px; }
 
 /* Task */
 .task-head { display: grid; gap: 8px; margin-bottom: 14px; }
@@ -282,6 +281,11 @@
 .local-fit { font-size: 12px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
 .local-fit.is-fast { background: var(--ok-soft); color: var(--ok); }
 .local-fit.is-slow { background: var(--wait-soft); color: var(--wait); }
+.local-fit.is-quiet { background: var(--paper); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+/* Three speech models in one row, so none is left alone on a second one. */
+.local-audio-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+/* Narrow cards: the mark goes under the name instead of squeezing it onto two lines. */
+.local-audio-cards .local-card-head { flex-direction: column; align-items: flex-start; gap: 4px; }
 .local-search { display: flex; gap: 8px; margin: 8px 0 12px; }
 .local-search .field-input { flex: 1 1 auto; min-width: 0; }
 .local-repo { border-bottom: 1px solid var(--line); }
@@ -303,6 +307,8 @@
 .project-models { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; margin: 12px 0 4px; }
 .project-model { display: grid; gap: 4px; align-content: start; justify-items: start; }
 .project-model-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* "+ Add" stands where a picker would, on its line (seen: it sat higher than the pickers beside it). */
+.project-model > .link { min-height: var(--control-h); display: inline-flex; align-items: center; }
 .project-strong-hint { margin: 0 0 8px; font-size: 13px; }
 .project-plan { display: grid; gap: 10px; margin: 8px 0 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
 .project-plan .sheet-h { margin: 0; }

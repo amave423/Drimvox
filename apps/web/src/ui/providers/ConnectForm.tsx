@@ -4,6 +4,7 @@ import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { ErrorNote } from "../ErrorNote";
 import { presetName } from "./presetName";
+import { ProviderLogo } from "./ProviderLogo";
 
 interface Problem {
   code: string;
@@ -69,8 +70,11 @@ export function ConnectForm({ kind }: { kind: "key" | "subscription" }) {
           .filter((id) => id !== "gemini-cli" && id !== "sdcpp" && id !== "whispercpp" && id !== "ollama" && (presets[id].billing === "subscription") === (kind === "subscription"))
           .map((id) => (
             <button key={id} role="radio" aria-checked={preset === id} className={`preset${preset === id ? " is-on" : ""}`} onClick={() => choose(id)}>
-              <span className="preset-name">{presetName(t, id)}</span>
-              <span className="preset-hint">{t(`providers.hint.${id}` as MessageKey)}</span>
+              <ProviderLogo preset={id} name={presetName(t, id)} size={30} />
+              <span className="preset-text">
+                <span className="preset-name">{presetName(t, id)}</span>
+                <span className="preset-hint">{t(`providers.hint.${id}` as MessageKey)}</span>
+              </span>
             </button>
           ))}
       </div>

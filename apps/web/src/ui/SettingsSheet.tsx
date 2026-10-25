@@ -11,7 +11,7 @@ import { Toggle } from "./Toggle";
 import { SkillsSection } from "./SkillsSection";
 import { UpdatesSection } from "./UpdatesSection";
 import { Catalog } from "./Catalog";
-import { Hint } from "./Hint";
+import { Setting } from "./Setting";
 import { SearchSection } from "./SearchSection";
 import { SpendingSection } from "./SpendingSection";
 import { ModelPicker } from "./chat/ModelPicker";
@@ -38,7 +38,7 @@ function initialPart(): SettingsPart {
 }
 
 export function SettingsSheet() {
-  const { t, settings, updateSettings, usdRub } = useApp();
+  const { t, settings, updateSettings, usdRub, status } = useApp();
   // Windows' Focus Assist hides every app's notifications: said here, where notifications are switched on.
   const [focusAssist, setFocusAssist] = useState(false);
   useEffect(() => {
@@ -69,58 +69,50 @@ export function SettingsSheet() {
   const sections: Record<SettingsPart, ReactNode> = {
     general: (
       <>
-        <h2 className="sheet-h" id="theme-label">
-          {t("settings.theme")}
-        </h2>
-        <Segmented
-          labelledBy="theme-label"
-          value={settings.theme}
-          options={themes.map((v) => ({ value: v, label: t(`settings.theme.${v}`) }))}
-          onChange={(theme) => save({ theme })}
-        />
+        <h2 className="sheet-h">{t("settings.group.look")}</h2>
+        <Setting id="theme-label" title={t("settings.theme")}>
+          <Segmented
+            labelledBy="theme-label"
+            value={settings.theme}
+            options={themes.map((v) => ({ value: v, label: t(`settings.theme.${v}`) }))}
+            onChange={(theme) => save({ theme })}
+          />
+        </Setting>
+        <Setting id="locale-label" title={t("settings.locale")}>
+          <Segmented
+            labelledBy="locale-label"
+            value={settings.locale}
+            options={locales.map((v) => ({ value: v, label: localeNames[v] }))}
+            onChange={(locale) => save({ locale })}
+          />
+        </Setting>
 
-        <h2 className="sheet-h" id="locale-label">
-          {t("settings.locale")}
-        </h2>
-        <Segmented
-          labelledBy="locale-label"
-          value={settings.locale}
-          options={locales.map((v) => ({ value: v, label: localeNames[v] }))}
-          onChange={(locale) => save({ locale })}
-        />
-
-        <h2 className="sheet-h">
-          {t("settings.notifications")}
-          <Hint text={t(window.drimvox ? "settings.notificationsAbout" : "settings.notificationsAboutBrowser")} />
-        </h2>
-        <Toggle
-          checked={settings.notifications}
-          onChange={(notifications) => {
-            // A browser asks the user once before it shows anything.
-            if (notifications && !window.drimvox && typeof Notification !== "undefined" && Notification.permission === "default") {
-              void Notification.requestPermission();
-            }
-            void save({ notifications });
-          }}
-        >
-          {window.drimvox ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
-        </Toggle>
-        {window.drimvox && (
-          <p>
+        <h2 className="sheet-h">{t("settings.group.work")}</h2>
+        <Setting id="notifications-label" title={t("settings.notifications")} about={t(window.drimvox ? "settings.notificationsAbout" : "settings.notificationsAboutBrowser")}>
+          <Toggle
+            checked={settings.notifications}
+            onChange={(notifications) => {
+              // A browser asks the user once before it shows anything.
+              if (notifications && !window.drimvox && typeof Notification !== "undefined" && Notification.permission === "default") {
+                void Notification.requestPermission();
+              }
+              void save({ notifications });
+            }}
+          >
+            {window.drimvox ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
+          </Toggle>
+          {window.drimvox && (
             <button type="button" className="link" onClick={() => window.drimvox?.testNotify({ title: t("notice.test"), body: t("notice.testBody") })}>
               {t("settings.notificationsTest")}
             </button>
-          </p>
-        )}
-        {focusAssist && <p className="note is-pencil">{t("settings.focusAssist")}</p>}
-
-        <h2 className="sheet-h">
-          {t("settings.developerTitle")}
-          <Hint text={t("settings.developerHint")} />
-        </h2>
-        <Toggle checked={settings.developer} onChange={(developer) => void save({ developer })}>
-          {t("settings.developer")}
-        </Toggle>
+          )}
+          {focusAssist && <p className="note is-pencil">{t("settings.focusAssist")}</p>}
+        </Setting>
+        <Setting id="developer-label" title={t("settings.developerTitle")} about={t("settings.developerHint")}>
+          <Toggle checked={settings.developer} onChange={(developer) => void save({ developer })}>
+            {t("settings.developer")}
+          </Toggle>
+        </Setting>
 
         <UpdatesSection />
         {!window.drimvox && <AccountSection />}
@@ -128,76 +120,53 @@ export function SettingsSheet() {
     ),
     models: (
       <>
-        <h2 className="sheet-h" id="currency-label">
-          {t("settings.currency")}
-          {usdRub > 0 && <Hint text={t("settings.currencyHint", { rate: usdRub.toFixed(2).replace(".", ",") })} />}
-        </h2>
-        <Segmented
-          labelledBy="currency-label"
-          value={settings.currency}
-          options={currencies.map((v) => ({ value: v, label: t(`settings.currency.${v}`) }))}
-          onChange={(currency) => save({ currency })}
-        />
-
-        <h2 className="sheet-h">
-          {t(perUsd === 1 ? "settings.agentBudget" : "settings.agentBudgetRub")}
-          <Hint text={t("settings.agentBudgetHint")} />
-        </h2>
-        <form
-          className="inline-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const value = Number(budget.replace(",", ".")) / perUsd;
-            if (value >= 0.01) void save({ agentBudgetUsd: Number(value.toFixed(4)) });
-          }}
-        >
-          <input
-            className="field-input mono budget-input"
-            inputMode="decimal"
-            aria-label={t("settings.agentBudget")}
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
+        <h2 className="sheet-h">{t("settings.group.money")}</h2>
+        <Setting id="currency-label" title={t("settings.currency")}>
+          <Segmented
+            labelledBy="currency-label"
+            value={settings.currency}
+            options={currencies.map((v) => ({ value: v, label: t(`settings.currency.${v}`) }))}
+            onChange={(currency) => save({ currency })}
           />
-          <button className="btn" disabled={!(Number(budget.replace(",", ".")) / perUsd >= 0.01)}>
-            {t("settings.save")}
-          </button>
-        </form>
-
-        <h2 className="sheet-h">
-          {t("settings.monthlyBudget", { currency: shownSign() })}
-          <Hint text={t("settings.monthlyBudgetHint")} />
-        </h2>
-        <form
-          className="inline-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const value = Number(monthly.replace(",", ".")) / perUsd;
-            void save({ monthlyBudgetUsd: monthly.trim() && value > 0 ? Number(value.toFixed(4)) : null });
-          }}
-        >
-          <input
-            className="field-input mono budget-input"
-            inputMode="decimal"
-            aria-label={t("settings.monthlyBudget", { currency: shownSign() })}
+        </Setting>
+        <Setting id="agent-budget-label" title={t("settings.agentBudgetLabel")} about={t("settings.agentBudgetHint")}>
+          <AmountField
+            label={t(perUsd === 1 ? "settings.agentBudget" : "settings.agentBudgetRub")}
+            sign={shownSign()}
+            value={budget}
+            onChange={setBudget}
+            onSave={() => {
+              const value = Number(budget.replace(",", ".")) / perUsd;
+              if (value >= 0.01) void save({ agentBudgetUsd: Number(value.toFixed(4)) });
+              else setBudget(shown(settings.agentBudgetUsd));
+            }}
+          />
+        </Setting>
+        <Setting id="monthly-budget-label" title={t("settings.monthlyBudgetLabel")} about={t("settings.monthlyBudgetHint")}>
+          <AmountField
+            label={t("settings.monthlyBudget", { currency: shownSign() })}
+            sign={shownSign()}
             placeholder={t("settings.monthlyBudgetNone")}
             value={monthly}
-            onChange={(e) => setMonthly(e.target.value)}
+            onChange={setMonthly}
+            onSave={() => {
+              const value = Number(monthly.replace(",", ".")) / perUsd;
+              void save({ monthlyBudgetUsd: monthly.trim() && value > 0 ? Number(value.toFixed(4)) : null });
+            }}
           />
-          <button className="btn">{t("settings.save")}</button>
-        </form>
+        </Setting>
 
-        <h2 className="sheet-h">
-          {t("voice.title")}
-          <Hint text={t("voice.modelHint")} />
-        </h2>
-        <div className="actions">
-          <ModelPicker audio value={settings.voiceModel} onChange={({ providerId, model }) => void save({ voiceModel: { providerId, model } })} />
-          {settings.voiceModel && (
-            <button className="link" onClick={() => void save({ voiceModel: null })}>
-              {t("settings.clear")}
-            </button>
-          )}
-        </div>
+        <h2 className="sheet-h">{t("voice.title")}</h2>
+        <Setting id="voice-label" title={t("voice.modelTitle")} about={t("voice.modelHint")}>
+          <div className="actions">
+            <ModelPicker audio value={settings.voiceModel} onChange={({ providerId, model }) => void save({ voiceModel: { providerId, model } })} />
+            {settings.voiceModel && (
+              <button className="link" onClick={() => void save({ voiceModel: null })}>
+                {t("settings.clear")}
+              </button>
+            )}
+          </div>
+        </Setting>
 
         <SpendingSection />
 
@@ -240,10 +209,50 @@ export function SettingsSheet() {
         />
         {sections[part]}
       </div>
-      <aside className="margin" aria-live="polite">
-        {state === "saved" && <p className="note is-ok">{t("settings.saved")}</p>}
-        {state === "failed" && <p className="note is-pencil">{t("settings.saveFailed")}</p>}
+      {/* The margin says what was saved, and what stays true of the section (seen: the right half of the sheet stood empty). */}
+      <aside className="margin">
+        <div aria-live="polite">
+          {state === "saved" && <p className="note is-ok">{t("settings.saved")}</p>}
+          {state === "failed" && <p className="note is-pencil">{t("settings.saveFailed")}</p>}
+        </div>
+        {part === "general" && (
+          <>
+            <p className="note">{t("home.noteCore", { version: status.version, node: status.node })}</p>
+            <p className="note">
+              {t("home.noteData")}
+              <br />
+              <span className="mono">{status.dataDir}</span>
+            </p>
+          </>
+        )}
+        {part === "models" && usdRub > 0 && settings.currency === "RUB" && <p className="note">{t("settings.currencyHint", { rate: usdRub.toFixed(2).replace(".", ",") })}</p>}
+        {part === "mcp" && <p className="note">{t("settings.marginMcp")}</p>}
+        {part === "skills" && <p className="note">{t("settings.marginSkills")}</p>}
       </aside>
     </article>
+  );
+}
+
+/** An amount of money: a narrow field with its currency inside, saved by Enter or on leaving it. */
+function AmountField(p: { label: string; sign: string; value: string; placeholder?: string; onChange(v: string): void; onSave(): void }) {
+  return (
+    <form
+      className="amount-field"
+      onSubmit={(e) => {
+        e.preventDefault();
+        p.onSave();
+      }}
+    >
+      <input
+        className="field-input mono"
+        inputMode="decimal"
+        aria-label={p.label}
+        placeholder={p.placeholder}
+        value={p.value}
+        onChange={(e) => p.onChange(e.target.value)}
+        onBlur={p.onSave}
+      />
+      <span aria-hidden>{p.sign}</span>
+    </form>
   );
 }

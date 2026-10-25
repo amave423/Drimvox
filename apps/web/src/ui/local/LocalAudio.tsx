@@ -52,14 +52,15 @@ export function LocalAudioSection() {
       <p className="muted">{t("localAudio.hint")}</p>
       {!status.supported && <p className="note">{t("localAudio.unsupported")}</p>}
       {status.supported && (
-        <ul className="local-cards local-image-cards">
+        <ul className="local-cards local-audio-cards">
           {status.models.map((m) => {
             const chosen = settings.voiceModel?.providerId === status.providerId && settings.voiceModel?.model === m.id;
             return (
               <li key={m.id} className="local-card">
                 <div className="local-card-head">
                   <span className="local-card-name">{m.name}</span>
-                  <span className="local-fit is-fast">{t(`localAudio.note.${m.note}` as MessageKey)}</span>
+                  {/* Speed and accuracy are not good or bad: only the recommended one is green (seen: three greens said nothing). */}
+                  <span className={m.note === "balanced" ? "local-fit is-fast" : "local-fit is-quiet"}>{t(`localAudio.note.${m.note}` as MessageKey)}</span>
                 </div>
                 <p>{t(`localAudio.model.${m.id}` as MessageKey)}</p>
                 <PullControl model={m.id} sizeBytes={m.sizeBytes} installed={m.installed} pull={m.pull ?? undefined} actions={actions} />

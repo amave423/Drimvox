@@ -69,12 +69,15 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .side-h { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
 .side-empty { margin: 0; font-size: 14px; color: var(--muted); }
 .side-nav { margin-top: auto; display: grid; gap: 2px; border-top: 1px solid var(--line); padding-top: 10px; }
-.side-link { margin: 0 -8px; display: flex; justify-content: space-between; align-items: baseline; padding: 7px 8px; border-radius: 8px; font-size: 14px; text-align: left; }
+.side-link { margin: 0 -8px; display: flex; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 8px; font-size: 14px; text-align: left; }
+.side-icon { flex: none; color: var(--muted); }
+.side-link.is-on .side-icon, .side-link:hover .side-icon { color: var(--fg); }
 .side-link:hover { background: var(--sheet); }
 .side-link small { color: var(--muted); font-size: 12px; }
 
 /* Positioned: hidden labels inside it stay within the scroller instead of stretching the window. */
-.desk { position: relative; overflow: auto; padding: 28px 40px; display: flex; justify-content: center; align-items: flex-start; }
+/* The scrollbar's room is kept always, so a long section does not shift the sheet sideways (seen: the sheet jumped between sections). */
+.desk { position: relative; overflow: auto; scrollbar-gutter: stable; padding: 28px 40px; display: flex; justify-content: center; align-items: flex-start; }
 .desk.is-alone { height: 100%; }
 
 .bottombar {
@@ -91,10 +94,11 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 }
 
 /* ---------- Sheet ---------- */
-/* A card on the desk, with room around it; wider on a big screen, so a 31-inch one is not mostly empty (seen). */
+/* A card on the desk, with room around it; wider on a big screen, so a 31-inch one is not mostly empty (seen).
+   One width for every section, the chat included: the sheet stood at a different place in each (seen). */
 .sheet {
   width: 100%;
-  max-width: max(900px, min(1400px, 66vw));
+  max-width: max(900px, min(1400px, 72vw));
   min-height: 100%;
   background: var(--sheet);
   border: 1px solid var(--line);
@@ -126,7 +130,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .segmented { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 .segmented button { padding: 7px 16px; border-radius: 999px; font-size: 14px; color: var(--muted); }
 .segmented button:hover { color: var(--fg); }
-.segmented button.is-on { background: var(--fg); color: var(--sheet); }
+.segmented button.is-on { background: var(--choice); color: var(--on-choice); }
 
 .error-detail { margin: 0; padding: 12px 14px; background: var(--pencil-soft); color: var(--pencil); white-space: pre-wrap; }
 
@@ -194,3 +198,17 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
   .sheet { box-shadow: none !important; border: 0 !important; border-radius: 0 !important; margin: 0 !important; max-width: none !important; animation: none !important; }
   * { animation: none !important; }
 }
+
+/* The start page: a question for a model first, the recent chats, the guide folded under its heading. */
+.home-ask { display: grid; gap: 10px; margin: 0 0 8px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); }
+.home-ask textarea { resize: vertical; min-height: 76px; background: var(--sheet); }
+.home-ask-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.home-ask-bar .picker { min-width: 0; max-width: min(100%, 360px); }
+.home-recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.home-recent button { width: calc(100% + 20px); display: flex; justify-content: space-between; gap: 16px; padding: 8px 10px; margin: 0 -10px; border-radius: 8px; text-align: left; font-size: 14.5px; }
+.home-recent button:hover { background: var(--paper); }
+.home-recent-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-guide > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
+.home-guide > summary::-webkit-details-marker { display: none; }
+.home-guide > summary::after { content: "▾"; font: 400 13px var(--font-ui); color: var(--muted); transition: transform 120ms; }
+.home-guide:not([open]) > summary::after { transform: rotate(-90deg); }

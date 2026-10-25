@@ -52,3 +52,9 @@
 .player:fullscreen { width: 100%; border-radius: 0; display: grid; place-items: center; }
 .player:fullscreen video { max-height: 100vh; }
 .gallery-confirm { display: inline-flex; gap: 4px; }
+
+/* The gallery has no margin notes: its pictures take the whole sheet. */
+.gallery-sheet > .sheet-body { grid-column: 1 / -1; }
+.gallery-empty { display: grid; gap: 14px; justify-items: start; margin-top: 4px; }
+.gallery-empty-frames { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: min(100%, 480px); }
+.gallery-empty-frames span { aspect-ratio: 4 / 3; border: 1.5px dashed var(--line); border-radius: 12px; background: var(--paper); }

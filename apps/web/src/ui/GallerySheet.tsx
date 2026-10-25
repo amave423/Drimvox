@@ -8,7 +8,7 @@ import { MediaView } from "./chat/MediaView";
 
 /** Every picture and clip, newest first: what it was asked for, where it came from, what it cost. */
 export function GallerySheet() {
-  const { api, t, settings, navigate } = useApp();
+  const { api, t, settings, navigate, openNewChat } = useApp();
   const [items, setItems] = useState<MediaItem[] | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
 
@@ -33,7 +33,20 @@ export function GallerySheet() {
       <div className="sheet-body">
         <h1>{t("gallery.title")}</h1>
         <p className="lede">{t("gallery.lede")}</p>
-        {items?.length === 0 && <p className="muted">{t("gallery.empty")}</p>}
+        {/* Empty: where the pictures will stand and how to make the first (seen: one grey line on a big empty sheet). */}
+        {items?.length === 0 && (
+          <div className="gallery-empty">
+            <div className="gallery-empty-frames" aria-hidden>
+              <span />
+              <span />
+              <span />
+            </div>
+            <p className="muted">{t("gallery.empty")}</p>
+            <button className="btn is-primary" onClick={openNewChat}>
+              {t("gallery.makeFirst")}
+            </button>
+          </div>
+        )}
         <ul className="gallery">
           {items?.map((item) => (
             <li key={item.id} className="gallery-card">

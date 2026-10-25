@@ -107,6 +107,17 @@ describe("projects", () => {
     }
   });
 
+  // Seen: a project was called by its folder's name with no way to change it; chats could be renamed.
+  it("renames a project without touching its folder", async () => {
+    const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
+    const res = await env.call("PATCH", `/api/projects/${project.id}`, { name: "  Сайт кофейни  " });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ name: "Сайт кофейни", path: repo });
+    expect((await (await env.call("GET", "/api/projects")).json())[0].name).toBe("Сайт кофейни");
+    expect((await env.call("PATCH", `/api/projects/${project.id}`, { name: " " })).status).toBe(400);
+    expect((await env.call("PATCH", "/api/projects/nope", { name: "X" })).status).toBe(404);
+  });
+
   it("refuses a folder that does not exist", async () => {
     const res = await env.call("POST", "/api/projects", { path: join(repo, "nope") });
     expect(res.status).toBe(400);

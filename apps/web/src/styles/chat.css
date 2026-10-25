@@ -1,9 +1,11 @@
 /* Chat sheet: messages read like a manuscript, the composer stays at the bottom of the desk. */
 /* Grows with the window: on a big screen the answers get the room, not the desk around them. */
-.sheet.chat { padding-bottom: 0; grid-template-rows: 1fr; align-content: stretch; max-width: max(900px, 72vw); }
+.sheet.chat { padding-bottom: 0; grid-template-rows: 1fr; align-content: stretch; }
 .chat-body { display: flex; flex-direction: column; min-height: 100%; min-width: 0; }
 .chat-head { display: grid; gap: 12px; margin-bottom: 18px; }
-.chat-head h1 { overflow-wrap: anywhere; }
+/* A chat's name is smaller than a section's: the conversation under it is what is read (seen: the name repeated the
+   first message, as the largest words on the screen). */
+.chat-head h1 { overflow-wrap: anywhere; font-size: 22px; }
 /* The hint under a new chat sits as close to the title as on every other sheet. */
 .chat-head + .lede { margin-top: -10px; }
 
@@ -108,6 +110,8 @@
   font-size: 13px; max-width: 100%;
 }
 .picker-button .mono, .picker-button .picker-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.picker-label { font-size: 13.5px; }
+.picker-label-provider { margin-left: 6px; color: var(--muted); font-size: 12.5px; }
 .picker-panel {
   position: absolute; z-index: 10; top: calc(100% + 6px); left: 0;
   width: min(560px, 80vw); max-height: 420px;
@@ -118,7 +122,7 @@
 .picker-panel > .muted, .picker-panel > .error-note { margin: 4px 6px; }
 .picker-providers { display: flex; flex-wrap: wrap; gap: 4px; }
 .picker-providers button { padding: 4px 10px; border-radius: 999px; font-size: 13px; color: var(--muted); }
-.picker-providers button.is-on { background: var(--fg); color: var(--sheet); }
+.picker-providers button.is-on { background: var(--choice); color: var(--on-choice); }
 .picker-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
 .picker-list button { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 7px 8px; border-radius: 8px; text-align: left; }
 /* What a model does with a photo; one that takes none is greyed while a photo waits (docs/specs/media.md). */
@@ -164,7 +168,8 @@
 .md .hljs-comment, .md .hljs-quote, .md .hljs-meta { color: var(--muted); font-style: italic; }
 
 .web-note { padding: 6px 10px 4px; font-size: 12.5px; max-width: 280px; }
-.picker-group { padding: 8px 10px 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+/* Plain case, as everywhere else in the app (seen: the only capitals were here). */
+.picker-group { padding: 8px 10px 4px; font-size: 12.5px; color: var(--muted); }
 
 /* Attachments (docs/specs/chat-attachments.md) */
 .attachments { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
@@ -188,7 +193,8 @@
 .chat-options .picker-button { gap: 8px; max-width: clamp(110px, 26cqw, 260px); }
 .chat-options .picker-button.is-on { border-color: var(--ink); color: var(--ink); background: var(--ink-soft); }
 .chat-options .options-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.options-panel { width: min(380px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }
+/* As wide as its rows, no wider (seen: a strip of empty panel to the right of the buttons). */
+.options-panel { width: max-content; min-width: 260px; max-width: min(380px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }
 .options-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; font-size: 13px; min-height: 32px; }
 .options-row .picker { justify-self: start; }
 /* An option's own list opens over the panel, from its bottom right corner up and to the left (seen: to the right it ran
@@ -211,7 +217,7 @@
 .msg-done summary { cursor: pointer; }
 .msg-done .msg-activity { margin-top: 4px; }
 /* Narrow: the model's list and the other menus open above the panel at full width instead of beside it. */
-.options-panel.is-narrow { width: min(380px, calc(100vw - 32px)); }
+.options-panel.is-narrow { width: max-content; max-width: min(380px, calc(100vw - 32px)); }
 .options-panel.is-narrow .picker-panel.is-above { width: min(520px, calc(100vw - 32px)); }
 .options-panel.is-narrow .options-row .picker-button { max-width: 230px; }
 
@@ -295,3 +301,7 @@
 .msg-foot { display: flex; align-items: center; gap: 6px; }
 .msg-foot .msg-meta { margin: 0; }
 .msg-speak { width: 26px; height: 26px; }
+
+/* On the switch itself the blue fill already says search is on; the coloured dots stay in its list, where they tell the
+   ways apart (seen: a dot on the button read as a status light). */
+.web-switch > .picker-button .web-dot { display: none; }

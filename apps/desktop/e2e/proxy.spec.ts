@@ -50,12 +50,11 @@ test("notifications are a switch, the proxy is set once and each provider opts i
   await notify.click({ force: true });
   await expect(notify).not.toBeChecked();
 
-  // The settings are in sections; the internet's has the search service and the proxy, explained by a "?".
+  // The settings are in sections; the internet's has the search service and the proxy, each explained in a line under it.
   await page.getByRole("tab", { name: "Интернет" }).click();
   await expect(page.getByRole("heading", { name: /Поиск в интернете/ })).toBeVisible();
   await expect(page.getByText("Сейчас — бесплатный поиск", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: /Бесплатный поиск \(DuckDuckGo\) часто блокирует/ }).hover();
-  await expect(page.getByRole("tooltip")).toContainText("Tavily или Brave");
+  await expect(page.getByText(/Бесплатный поиск \(DuckDuckGo\) часто блокирует.*Tavily или Brave/)).toBeVisible();
   await page.getByLabel("Адрес прокси").fill(proxy.url);
   await page.getByRole("button", { name: "Сохранить" }).last().click();
   await expect(page.getByText(`http://artem:•••@127.0.0.1:${proxy.port}`)).toBeVisible();
@@ -70,6 +69,8 @@ test("notifications are a switch, the proxy is set once and each provider opts i
   await expect(page.getByText("Моделей: 1")).toBeVisible();
   const before = proxy.hits.length;
 
+  // A connected provider's switches open with its settings.
+  await page.getByRole("button", { name: "Настроить" }).click();
   const viaProxy = page.getByRole("switch", { name: "Через прокси" });
   await expect(viaProxy).not.toBeChecked();
   await viaProxy.click({ force: true });

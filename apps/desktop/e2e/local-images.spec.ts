@@ -46,7 +46,7 @@ test("downloads a picture model on the local models' sheet and draws with it in 
 
   await page.getByRole("button", { name: "Локальные модели" }).click();
   // Text, pictures and video are parts of the sheet.
-  await page.getByRole("radio", { name: "Картинки" }).click();
+  await page.getByRole("tab", { name: "Картинки" }).click();
   await expect(page.getByRole("heading", { name: "Картинки на этом компьютере" })).toBeVisible();
   const card = page.locator(".local-card", { hasText: "Z-Image Turbo" });
   await expect(card.getByText("быстро")).toBeVisible();
@@ -110,7 +110,7 @@ test("offers the picture engine on its own on the sheet", async () => {
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Локальные модели" }).click();
-  await page.getByRole("radio", { name: "Картинки" }).click();
+  await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByRole("button", { name: "Скачать движок · 30 МБ" }).click();
   await expect(page.getByRole("button", { name: /Скачать движок/ })).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByText(/Движок stable-diffusion\.cpp/)).toHaveCount(0);
@@ -129,7 +129,7 @@ test("downloads a video model in the video part and films a free clip in a chat"
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
   await page.getByRole("button", { name: "Локальные модели" }).click();
-  await page.getByRole("radio", { name: "Видео" }).click();
+  await page.getByRole("tab", { name: "Видео" }).click();
   await expect(page.getByRole("heading", { name: "Видео на этом компьютере" })).toBeVisible();
   // Only video models here.
   await expect(page.locator(".local-card", { hasText: "Z-Image Turbo" })).toHaveCount(0);
@@ -160,7 +160,7 @@ test("finds a picture model on Hugging Face, greys out an unknown family and dow
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
   await page.getByRole("button", { name: "Локальные модели" }).click();
-  await page.getByRole("radio", { name: "Картинки" }).click();
+  await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByPlaceholder(/z-image или qwen-image/).fill("turbo");
   await page.getByRole("button", { name: "Найти" }).click();
   await expect(page.locator(".local-repo.is-unsupported", { hasText: "someone/flux-mystery-GGUF" })).toContainText("пока не знает");

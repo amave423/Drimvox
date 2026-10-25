@@ -3,6 +3,8 @@ import { requirementSchema, type AcceptanceReport, type Milestone, type Requirem
 import { z } from "zod";
 
 export const projectCreateSchema = z.object({ path: z.string().trim().min(1).max(1000) }).strict();
+/** A project's own name instead of its folder's. */
+export const projectRenameSchema = z.object({ name: z.string().trim().min(1).max(120) }).strict();
 
 export interface ProjectView {
   id: string;

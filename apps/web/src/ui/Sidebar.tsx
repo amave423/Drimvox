@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { useApp } from "../context";
+import { ComputerIcon, GalleryIcon, GearIcon, KeyIcon } from "./NavIcons";
+import { PencilIcon } from "./SideChats";
 import { AddProject } from "./projects/AddProject";
 import { SideChats } from "./SideChats";
 import { StatusDot } from "./tasks/StatusDot";
@@ -6,7 +9,17 @@ import { StatusDot } from "./tasks/StatusDot";
 const FINISHED = new Set(["accepted", "discarded"]);
 
 export function Sidebar() {
-  const { t, view, navigate, providers, projects, tasks, chats } = useApp();
+  const { api, t, view, navigate, projects, tasks, chats, reloadProjects } = useApp();
+  // A project is called by its folder until the user names it (asked for: renaming like chats).
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  async function rename(id: string) {
+    const next = name.trim();
+    setRenaming(null);
+    if (!next) return;
+    await api.projects[":id"].$patch({ param: { id }, json: { name: next } }).catch(() => null);
+    await reloadProjects();
+  }
   const currentChat = view.kind === "chat" ? view.chatId : undefined;
   const currentProject = view.kind === "project" ? view.projectId : undefined;
   const currentTask = view.kind === "task" ? view.taskId : undefined;
@@ -28,12 +41,47 @@ export function Sidebar() {
               const work = chats.filter((c) => c.projectId === project.id).slice(0, 6);
               return (
                 <li key={project.id}>
-                  <button
-                    className={`side-item${project.id === currentProject ? " is-on" : ""}`}
-                    onClick={() => navigate({ kind: "project", projectId: project.id })}
-                  >
-                    <span className="side-item-title">{project.name}</span>
-                  </button>
+                  {renaming === project.id ? (
+                    <form
+                      className="side-rename"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void rename(project.id);
+                      }}
+                    >
+                      <input
+                        className="field-input"
+                        aria-label={t("side.renameProjectLabel")}
+                        value={name}
+                        autoFocus
+                        onChange={(e) => setName(e.target.value)}
+                        onBlur={() => void rename(project.id)}
+                        onKeyDown={(e) => e.key === "Escape" && setRenaming(null)}
+                      />
+                    </form>
+                  ) : (
+                    <div className="side-project-row">
+                      <button
+                        className={`side-item${project.id === currentProject ? " is-on" : ""}`}
+                        onClick={() => navigate({ kind: "project", projectId: project.id })}
+                      >
+                        <span className="side-item-title">{project.name}</span>
+                      </button>
+                      <span className="side-chat-actions">
+                        <button
+                          className="icon-button"
+                          aria-label={t("side.renameProject", { name: project.name })}
+                          title={t("side.renameProjectLabel")}
+                          onClick={() => {
+                            setName(project.name);
+                            setRenaming(project.id);
+                          }}
+                        >
+                          <PencilIcon />
+                        </button>
+                      </span>
+                    </div>
+                  )}
                   {(open.length > 0 || work.length > 0) && (
                     <ul className="side-sublist">
                       {work.map((chat) => (
@@ -72,22 +120,19 @@ export function Sidebar() {
 
       <nav className="side-nav">
         <button className={`side-link${view.kind === "gallery" ? " is-on" : ""}`} onClick={() => navigate({ kind: "gallery" })}>
+          <GalleryIcon />
           {t("side.gallery")}
         </button>
-        <button
-          className={`side-link${view.kind === "providers" ? " is-on" : ""}`}
-          onClick={() => navigate({ kind: "providers" })}
-        >
+        <button className={`side-link${view.kind === "providers" ? " is-on" : ""}`} onClick={() => navigate({ kind: "providers" })}>
+          <KeyIcon />
           {t("side.keys")}
-          <small>{providers.length}</small>
         </button>
         <button className={`side-link${view.kind === "local" ? " is-on" : ""}`} onClick={() => navigate({ kind: "local" })}>
+          <ComputerIcon />
           {t("side.local")}
         </button>
-        <button
-          className={`side-link${view.kind === "settings" ? " is-on" : ""}`}
-          onClick={() => navigate({ kind: "settings" })}
-        >
+        <button className={`side-link${view.kind === "settings" ? " is-on" : ""}`} onClick={() => navigate({ kind: "settings" })}>
+          <GearIcon />
           {t("top.settings")}
         </button>
       </nav>

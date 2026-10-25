@@ -158,11 +158,12 @@ test("a model list near the bottom of the window opens upwards and stays inside 
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Настройки" }).first().click();
   await page.getByRole("tab", { name: "Модели и деньги" }).click();
-  const button = page.locator(".model-setting").getByRole("button", { name: "Выбери модель" });
+  const setting = page.getByRole("region", { name: "Проверка по скриншотам" });
+  const button = setting.getByRole("button", { name: "Выбери модель" });
   await button.scrollIntoViewIfNeeded();
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await button.click();
-  const panel = page.locator(".model-setting .picker-panel");
+  const panel = setting.locator(".picker-panel");
   await expect(panel).toBeVisible();
   const box = await panel.boundingBox();
   const height = await page.evaluate(() => window.innerHeight);

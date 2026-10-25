@@ -23,6 +23,8 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
   const [models, setModels] = useState<Record<Role, ModelChoice | null>>({ interview: initial, plan: initial, work: initial });
   const [strong, setStrong] = useState<ModelChoice | null>(null);
   const [addingStrong, setAddingStrong] = useState(false);
+  // One model for the three stages unless asked otherwise (seen: three identical buttons in a row said one thing thrice).
+  const [split, setSplit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const ready = ROLES.every((r) => models[r]) && !!text.trim();
@@ -77,12 +79,19 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
           onChange={(e) => setText(e.target.value)}
         />
         <div className="project-models" role="group" aria-label={t("projectWork.models")}>
-          {ROLES.map((role) => (
-            <div key={role} className="project-model">
-              <span className="field-label">{t(`projectWork.model.${role}` as MessageKey)}</span>
-              <ModelPicker value={models[role]} onChange={(c) => choose(role, c)} />
+          {split ? (
+            ROLES.map((role) => (
+              <div key={role} className="project-model">
+                <span className="field-label">{t(`projectWork.model.${role}` as MessageKey)}</span>
+                <ModelPicker value={models[role]} onChange={(c) => choose(role, c)} />
+              </div>
+            ))
+          ) : (
+            <div className="project-model">
+              <span className="field-label">{t("projectWork.model.all")}</span>
+              <ModelPicker value={models.work} onChange={(c) => setModels({ interview: c, plan: c, work: c })} />
             </div>
-          ))}
+          )}
           <div className="project-model">
             <span className="field-label" title={t("projectWork.strongHint")}>
               {t("projectWork.model.strong")}
@@ -108,7 +117,20 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
             )}
           </div>
         </div>
-        <p className="muted project-strong-hint">{t("projectWork.strongHint")}</p>
+        <p className="muted project-strong-hint">
+          {t("projectWork.strongHint")}{" "}
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              // Back to one model: the working one stands for all three.
+              if (split) setModels((m) => ({ interview: m.work, plan: m.work, work: m.work }));
+              setSplit(!split);
+            }}
+          >
+            {t(split ? "projectWork.joinModels" : "projectWork.splitModels")}
+          </button>
+        </p>
         <div className="actions">
           <button className="btn is-primary" disabled={busy || !ready}>
             {t("projectWork.start")}

@@ -1,6 +1,5 @@
 import type { ProxyCheck } from "@drimvox/shared";
 import { useEffect, useState } from "react";
-import { Hint } from "./Hint";
 import { useApp } from "../context";
 import { ErrorNote } from "./ErrorNote";
 
@@ -76,8 +75,8 @@ export function ProxySection() {
     <>
       <h2 className="sheet-h">
         {t("settings.proxy")}
-        <Hint text={t("settings.proxyHint")} />
       </h2>
+      <p className="setting-about">{t("settings.proxyHint")}</p>
       {current === undefined ? null : current && !editing ? (
         <div className="actions">
           <span className="mono proxy-address">{current}</span>
