@@ -1,6 +1,7 @@
 import { currencies, locales, themes, type SettingsPatch } from "@drimvox/shared";
 import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../context";
+import { shownSign } from "../lib/format";
 import { ProjectModels } from "./ProjectModels";
 import { Segmented } from "./Segmented";
 import { McpSection } from "./McpSection";
@@ -12,6 +13,7 @@ import { UpdatesSection } from "./UpdatesSection";
 import { Catalog } from "./Catalog";
 import { Hint } from "./Hint";
 import { SearchSection } from "./SearchSection";
+import { SpendingSection } from "./SpendingSection";
 import { Tabs } from "./Tabs";
 
 const localeNames = { ru: "Русский", en: "English" } as const;
@@ -56,6 +58,7 @@ export function SettingsSheet() {
   const perUsd = settings.currency === "RUB" && usdRub > 0 ? usdRub : 1;
   const shown = (usd: number) => String(Number((usd * perUsd).toFixed(perUsd === 1 ? 2 : 0)));
   const [budget, setBudget] = useState(shown(settings.agentBudgetUsd));
+  const [monthly, setMonthly] = useState(settings.monthlyBudgetUsd === null ? "" : shown(settings.monthlyBudgetUsd));
   useEffect(() => setBudget(shown(settings.agentBudgetUsd)), [perUsd]);
 
   async function save(patch: SettingsPatch) {
@@ -158,6 +161,31 @@ export function SettingsSheet() {
             {t("settings.save")}
           </button>
         </form>
+
+        <h2 className="sheet-h">
+          {t("settings.monthlyBudget", { currency: shownSign() })}
+          <Hint text={t("settings.monthlyBudgetHint")} />
+        </h2>
+        <form
+          className="inline-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const value = Number(monthly.replace(",", ".")) / perUsd;
+            void save({ monthlyBudgetUsd: monthly.trim() && value > 0 ? Number(value.toFixed(4)) : null });
+          }}
+        >
+          <input
+            className="field-input mono budget-input"
+            inputMode="decimal"
+            aria-label={t("settings.monthlyBudget", { currency: shownSign() })}
+            placeholder={t("settings.monthlyBudgetNone")}
+            value={monthly}
+            onChange={(e) => setMonthly(e.target.value)}
+          />
+          <button className="btn">{t("settings.save")}</button>
+        </form>
+
+        <SpendingSection />
 
         <ProjectModels save={(patch) => void save(patch)} />
       </>

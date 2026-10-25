@@ -18,7 +18,7 @@ import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
 import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/lastModel";
 import { loadMediaModel } from "../../lib/media";
-import { postStream } from "../../lib/sse";
+import { CoreRefusal, postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
 import { directorRows, useDirector } from "./DirectorControl";
@@ -65,6 +65,8 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   /** While an edited message is answered: how many messages before it stay on screen. */
   const [cutAt, setCutAt] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
+  /** The month's budget is used up: said with the numbers, not as a failed send. */
+  const [monthRefusal, setMonthRefusal] = useState<{ spent: number; budget: number } | null>(null);
   const [mediaModel, setMediaModel] = useState<MediaModel | null>(null);
   const [options, setOptions] = useState<Options>({});
   const [web, setWeb] = useState(readWebMode);
@@ -271,6 +273,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   }
 
   async function send(content: string, editOf?: string) {
+    setMonthRefusal(null);
     if (projectId) return sendToWork(projectId, content);
     if (!choice) return;
     setFailed(false);
@@ -343,8 +346,9 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         },
         controller.signal,
       );
-    } catch {
-      if (!controller.signal.aborted) setFailed(true);
+    } catch (err) {
+      if (err instanceof CoreRefusal && err.error?.code === "month_budget") setMonthRefusal({ spent: Number(err.error.spentUsd ?? 0), budget: Number(err.error.budgetUsd ?? 0) });
+      else if (!controller.signal.aborted) setFailed(true);
     }
     abort.current = null;
     // After Stop the core saves the partial answer a moment later.
@@ -452,6 +456,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         </div>
 
         {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
+        {monthRefusal && <p className="error-note">{t("chat.monthBudget", { spent: formatUsd(monthRefusal.spent), budget: formatUsd(monthRefusal.budget) })}</p>}
         {attachError && <p className="error-note">{t(`attach.${attachError}` as MessageKey, { max: MAX_FILES })}</p>}
         {folderError && <p className="error-note">{t(folderError === "no_tools" ? "folder.noTools" : folderError === "not_found" ? "folder.notFound" : "folder.failed")}</p>}
         {chat?.projectId && chat.itemId && (

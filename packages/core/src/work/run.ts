@@ -1,6 +1,7 @@
-import type { ActivityEntry, ChecklistItem, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
+import type { ActivityEntry, ChecklistItem, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
+import { isFreeToRun } from "../budget";
 import type { ToolHooks } from "../agent/tools";
 import type { ChatApprovals } from "../chats/approvals";
 import { describeCall, folderHint, folderTools } from "../chats/folder";
@@ -41,6 +42,8 @@ export interface RunDeps {
   skillsDir: string;
   idleTimeoutMs: number;
   plan(projectId: string): ProjectPlan | null;
+  /** This month's spending against the app's budget. */
+  month(): MonthUsage;
   vision(conn: Connection, model: string): Promise<Vision | null>;
   /** The run ended (done, paused or stopped): notifications, the sidebar. */
   ended(projectId: string): void;
@@ -104,7 +107,7 @@ export class WorkRun {
     let doneBefore = this.row().checklist.filter((i) => i.done).length;
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
 
-    const stopWith = (status: "paused" | "stopped" | "done", reason: "budget" | "time" | "stuck" | "error" | "user" | null, detail?: string) => {
+    const stopWith = (status: "paused" | "stopped" | "done", reason: "budget" | "time" | "stuck" | "error" | "user" | "month_budget" | null, detail?: string) => {
       this.d.repo.update(this.projectId, { status, reason, detail: detail ?? null, workedMs: worked() });
     };
 
@@ -119,6 +122,8 @@ export class WorkRun {
         const ref = escalated ? row.models!.strong! : (row.models?.work ?? { providerId: chat.providerId!, model: chat.model! });
         const conn = this.d.providers.connection(ref.providerId);
         if (!conn) return stopWith("paused", "error", "no_provider");
+        // The app's budget for the month is used up: the run waits until it is raised.
+        if (this.d.month().over && !isFreeToRun(conn)) return stopWith("paused", "month_budget");
 
         const outcome = await this.answer(messages, conn, ref.model, () => {
           const now = this.row();

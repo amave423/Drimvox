@@ -36,6 +36,8 @@ import { providerRoutes } from "./routes/providers";
 import { localRoutes } from "./routes/local";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
+import { monthUsage } from "./budget";
+import { spendingByModel } from "./savings";
 import { SKILL_SOURCES, type SkillSources } from "./skills/install";
 import { SEARCH_URLS, SearchStore, withSearchService, type SearchUrls } from "./internet/search-service";
 import { githubRoutes } from "./routes/github";
@@ -179,6 +181,7 @@ export function createCore(o: AppOptions) {
       skillsDir: join(o.dataDir, "skills"),
       idleTimeoutMs,
       plan: (projectId) => backlog.plan(projectId),
+      month: () => monthUsage(o.db, chats),
       vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel),
     },
   });
@@ -214,12 +217,13 @@ export function createCore(o: AppOptions) {
         visualKit,
         visionModel: () => readSettings(o.db).visionModel,
         skillsDir: join(o.dataDir, "skills"),
+        month: () => monthUsage(o.db, chats),
       }),
     )
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills"), o.skillSources ?? SKILL_SOURCES))
-    .route("/usage", usageRoutes(chats))
+    .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), (since) => spendingByModel(o.db, providers, since)))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
     .route("/projects", workRoutes(projects, providers, projectWork, shots))

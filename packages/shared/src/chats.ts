@@ -146,6 +146,27 @@ export interface ChatApprovalView {
   purpose?: string;
 }
 
+/** One model's spending over a time, and cheaper models of the same maker with what the same answers would have cost. */
+export interface ModelSpending {
+  providerId: string;
+  providerName: string;
+  model: string;
+  answers: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  cheaper: { model: string; name: string; priceIn: number; priceOut: number; wouldCostUsd: number }[];
+}
+
+/** This month's spending against the app's monthly budget. */
+export interface MonthUsage {
+  spentUsd: number;
+  budgetUsd: number | null;
+  /** The budget is used up: new answers, pictures and runs wait until it is raised or the month ends. */
+  over: boolean;
+  since: number;
+}
+
 export interface UsageSummary {
   inputTokens: number;
   outputTokens: number;

@@ -39,12 +39,26 @@ export function getStream<T>(url: string, token: string | null, onEvent: (event:
 
 async function readStream<T>(url: string, init: RequestInit, onEvent: (event: T) => void): Promise<void> {
   const res = await fetch(url, init);
-  if (!res.ok || !res.body) throw new Error(`Core answered ${res.status}`);
+  if (!res.ok || !res.body) {
+    // The core's reason, when it gives one (the month's budget, a confirmation), for the window to explain.
+    const body = (await res.json().catch(() => null)) as { error?: { code?: string } & Record<string, unknown> } | null;
+    throw new CoreRefusal(res.status, body?.error ?? null);
+  }
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
   const parse = createSseParser<T>();
   for (;;) {
     const { value, done } = await reader.read();
     if (done) return;
     for (const event of parse(value)) onEvent(event);
+  }
+}
+
+/** The core refused a request, with its reason. */
+export class CoreRefusal extends Error {
+  constructor(
+    readonly status: number,
+    readonly error: ({ code?: string } & Record<string, unknown>) | null,
+  ) {
+    super(`Core answered ${status}`);
   }
 }

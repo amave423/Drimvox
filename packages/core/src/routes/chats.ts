@@ -1,5 +1,6 @@
+import { isFreeToRun } from "../budget";
 import { zValidator } from "@hono/zod-validator";
-import {
+import { type MonthUsage, type ModelSpending,
   approvalDecisionSchema,
   chatCreateSchema,
   attachmentUploadSchema,
@@ -63,6 +64,8 @@ export interface WorkDeps {
   visionModel(): { providerId: string; model: string } | null;
   /** Drimvox's shared skills; a folder's own (.drimvox/skills, .claude/skills) come first. */
   skillsDir: string;
+  /** This month's spending against the app's budget. */
+  month(): MonthUsage;
 }
 
 /** Looks at pages per answer of a task: the desktop and the phone, then again after a fix. */
@@ -194,6 +197,9 @@ export function chatRoutes(
       if (!chat) return c.json(notFound, 404);
       const conn = chat.providerId ? providers.connection(chat.providerId) : null;
       if (!conn || !chat.model) return c.json({ error: { code: "invalid", detail: "Choose a model first" } }, 400);
+      // The month's budget is used up: nothing new is paid for until it is raised (free and local models still answer).
+      const month = work.month();
+      if (month.over && !isFreeToRun(conn)) return c.json({ error: { code: "month_budget" as const, spentUsd: month.spentUsd, budgetUsd: month.budgetUsd } }, 409);
       if (!conn.apiKey && presets[conn.preset].keyRequired) return c.json({ error: { code: "no_key" } }, 400);
       const { content, options, confirm, web: webMode, attachments, thinking, editOf, director } = c.req.valid("json");
       // An edit: a text chat's own message, while nothing is being answered; a program on a subscription keeps its own
@@ -378,8 +384,9 @@ export function chatRoutes(
     });
 }
 
-export function usageRoutes(chats: ChatRepo) {
-  return new Hono().get("/", zValidator("query", z.object({ since: z.coerce.number().int().min(0) })), (c) =>
-    c.json(chats.usageSince(c.req.valid("query").since)),
-  );
+export function usageRoutes(chats: ChatRepo, month: () => MonthUsage, byModel: (since: number) => Promise<ModelSpending[]>) {
+  return new Hono()
+    .get("/", zValidator("query", z.object({ since: z.coerce.number().int().min(0) })), (c) => c.json(chats.usageSince(c.req.valid("query").since)))
+    .get("/month", (c) => c.json(month()))
+    .get("/models", zValidator("query", z.object({ since: z.coerce.number().int().min(0) })), async (c) => c.json(await byModel(c.req.valid("query").since)));
 }

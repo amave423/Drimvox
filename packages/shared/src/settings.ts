@@ -23,6 +23,8 @@ export const settingsSchema = z.object({
   acceptanceModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
   /** Image model agents draw with; null means agents have no picture tool. */
   imageModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
+  /** The most the whole app may spend in a calendar month, in dollars; null: no limit. */
+  monthlyBudgetUsd: z.number().min(0.00001).max(100000).nullable(),
   /** Models the user starred: the picker's "Favourites" tab, across providers. */
   favoriteModels: z.array(z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) })).max(100),
 });
@@ -35,4 +37,4 @@ export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 export type Currency = Settings["currency"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, developer: false, favoriteModels: [] };
+export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, developer: false, favoriteModels: [], monthlyBudgetUsd: null };

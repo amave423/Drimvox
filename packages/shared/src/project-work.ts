@@ -17,7 +17,7 @@ export type ProjectModels = z.infer<typeof projectModelsSchema>;
 export type ProjectWorkStatus = "idle" | "planning" | "ready" | "running" | "paused" | "done" | "stopped";
 
 /** Why the run stopped and waits: the budget or the time ran out, the model got stuck, a provider error, a restart. */
-export type ProjectWorkReason = "budget" | "time" | "stuck" | "error" | "user" | "restart";
+export type ProjectWorkReason = "budget" | "time" | "stuck" | "error" | "user" | "restart" | "month_budget";
 
 export interface ChecklistItem {
   text: string;

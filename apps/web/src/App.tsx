@@ -1,4 +1,4 @@
-import type { ChatView, ProjectView, ProjectWorkView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@drimvox/shared";
+import type { MonthUsage, ChatView, ProjectView, ProjectWorkView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@drimvox/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ok, type Api } from "./api";
 import { AppContext, type AppContextValue, type CoreStatus, type View } from "./context";
@@ -38,6 +38,7 @@ export function App({ api, token, initialSettings, status }: Props) {
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [chats, setChats] = useState<ChatView[]>([]);
   const [today, setToday] = useState<UsageSummary | null>(null);
+  const [month, setMonth] = useState<MonthUsage | null>(null);
   const [projects, setProjects] = useState<ProjectView[]>([]);
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [usdRub, setUsdRub] = useState(0);
@@ -81,6 +82,7 @@ export function App({ api, token, initialSettings, status }: Props) {
   const reloadToday = useCallback(async () => {
     const since = String(startOfToday());
     setToday(await api.usage.$get({ query: { since } }).then((r) => ok<UsageSummary>(r)).catch(() => null));
+    setMonth(await api.usage.month.$get().then((r) => ok<MonthUsage>(r)).catch(() => null));
   }, [api]);
 
   const reloadProjects = useCallback(async () => {
@@ -230,6 +232,12 @@ export function App({ api, token, initialSettings, status }: Props) {
         </main>
         <footer className="bottombar">
           {today && <span>{value.t("bottom.today", { cost: formatUsd(today.costUsd) })}</span>}
+          {/* The month against its budget, once there is one: amber near it, red past it. */}
+          {month?.budgetUsd != null && (
+            <span className={`bottom-month${month.over ? " is-over" : month.spentUsd >= month.budgetUsd * 0.8 ? " is-near" : ""}`}>
+              {value.t("bottom.month", { spent: formatUsd(month.spentUsd), budget: formatUsd(month.budgetUsd) })}
+            </span>
+          )}
           <span className="spacer" />
           <DownloadNote />
           <UpdateNote />
