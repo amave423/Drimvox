@@ -325,7 +325,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
               options,
               confirm,
               attachments: attached.map((a) => a.id),
-              ...(directing ? { director: { providerId: director.providerId!, model: director.model!, attempts: director.attempts } } : {}),
+              ...(directing ? { director: { providerId: director.providerId!, model: director.model!, attempts: director.attempts, sketches: director.sketches } } : {}),
             },
         (e) => {
           // The core named the chat after the question: the list shows the name before the answer is done.

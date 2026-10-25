@@ -247,6 +247,7 @@ export function chatRoutes(
               director: { conn: dconn, model: director.model, price: info },
               painter: { conn, model },
               attempts: director.attempts,
+              sketches: director.sketches,
               content,
               options,
               photos: photoFiles,

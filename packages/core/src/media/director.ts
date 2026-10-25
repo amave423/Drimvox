@@ -26,6 +26,8 @@ export interface DirectorInput {
   /** The picture or video model it works with. */
   painter: { conn: Connection; model: MediaModel };
   attempts: number;
+  /** Sketches first: one 2x2 collage of four variants, the user picks one, it is then made in full quality. */
+  sketches?: boolean;
   content: string;
   options: MediaOptions;
   photos?: { ids: string[]; files: Photo[] };
@@ -118,7 +120,7 @@ export async function directReply(i: DirectorInput): Promise<void> {
   try {
     const result = streamText({
       model: languageModel(i.director.conn, i.director.model),
-      system: systemPrompt(i.painter.model, allowed),
+      system: systemPrompt(i.painter.model, allowed, i.sketches),
       messages,
       tools: { [video ? "make_clip" : "make_picture"]: make },
       stopWhen: isStepCount(allowed * 2 + 4),
@@ -157,7 +159,15 @@ export async function directReply(i: DirectorInput): Promise<void> {
   await i.emit({ type: "done", message: chats.message(answer.id)! });
 }
 
-function systemPrompt(model: MediaModel, attempts: number): string {
+/** The collage of variants: one cheap picture to choose from, before the dear full one. */
+const SKETCH_RULES = [
+  "Sketches are on: for a new idea, first make ONE picture that is a 2x2 grid of four clearly different variants of it (different compositions, angles or",
+  "styles), with thin plain borders between them and a small number 1-4 in the corner of each. Write the prompt for the grid that way. Then look at it, say",
+  "in one line what each variant is, and ask the user which one to develop. Make no other picture in that message.",
+  "When the user picks a variant (a number, or describes one), make that variant alone in full quality, as a normal picture, keeping what they liked.",
+].join("\n");
+
+function systemPrompt(model: MediaModel, attempts: number, sketches = false): string {
   const what = model.kind === "video" ? "clips" : "pictures";
   return [
     `You are a director for ${what}. You work with one model: ${model.name} (${model.id}).`,
@@ -168,7 +178,10 @@ function systemPrompt(model: MediaModel, attempts: number): string {
       ? "You cannot watch clips: after the clip is made, tell the user it is ready and ask what to change."
       : "After each picture you get what is in it: if it departs from the request, write a better prompt and try again; when it matches, stop.",
     "At the end say briefly what you made and, if anything is still off, what the user could ask for. Never paste long prompts into your answer.",
-  ].join("\n");
+    sketches && model.kind === "image" ? SKETCH_RULES : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** The last picture of the chat, for a request about it ("make the background darker"). */

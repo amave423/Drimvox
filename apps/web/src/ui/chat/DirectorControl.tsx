@@ -11,10 +11,12 @@ export interface Director {
   providerId: string | null;
   model: string | null;
   attempts: number;
+  /** One collage of four variants first, then the chosen one in full quality. */
+  sketches: boolean;
 }
 
 const KEY = "drimvox.director";
-const DEFAULT: Director = { on: false, providerId: null, model: null, attempts: 3 };
+const DEFAULT: Director = { on: false, providerId: null, model: null, attempts: 3, sketches: false };
 
 /** The director chosen last, kept in this window (docs/specs/media-director.md). */
 export function useDirector(): [Director, (next: Director) => void] {
@@ -68,6 +70,17 @@ export function directorRows(value: Director, video: boolean, onChange: (next: D
     ),
   });
   if (!video) {
+    rows.push({
+      label: t("director.sketches"),
+      control: (
+        <span className="director-row">
+          <Toggle checked={value.sketches} onChange={(sketches) => onChange({ ...value, sketches })}>
+            {t("director.sketchesOn")}
+          </Toggle>
+          <Hint text={t("director.sketchesHint")} />
+        </span>
+      ),
+    });
     rows.push({
       label: t("director.attempts"),
       control: <Pills label={t("director.attempts")} options={[1, 2, 3, 4, 5]} current={value.attempts} show={String} onPick={(n) => onChange({ ...value, attempts: Number(n) })} />,

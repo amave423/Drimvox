@@ -437,6 +437,14 @@ describe("a director for pictures", () => {
     expect(JSON.stringify(first.body.messages)).toMatch(/Cheap Image/);
   });
 
+  it("with sketches on, is told to make one 2x2 collage of variants first", async () => {
+    const providerId = await start({ script: [{ text: "О чём картинка?" }] });
+    const chatId = await chatWith(providerId, "img/cheap", "image");
+    await readEvents(await send(chatId, { content: "Кот", director: { providerId, model: "coder", attempts: 1, sketches: true }, confirm: true }));
+    const first = fake!.requests.find((r) => r.path === "/v1/chat/completions")!;
+    expect(JSON.stringify(first.body.messages)).toMatch(/2x2 grid of four clearly different variants/);
+  });
+
   it("asks before spending more than the confirmation limit across all its attempts", async () => {
     const providerId = await start();
     const chatId = await chatWith(providerId, "img/cheap", "image");
