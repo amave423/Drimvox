@@ -18,3 +18,21 @@ export const skillCreateSchema = z
 
 /** A folder with SKILL.md to copy into Drimvox's shared skills. */
 export const skillImportSchema = z.object({ path: z.string().min(1).max(1000) }).strict();
+
+/** Drimvox's own ready skills (docs/specs/catalog.md). */
+export const builtinSkills = ["docx", "xlsx", "pptx", "pdf"] as const;
+
+/** A ready skill: a folder of a GitHub repository with SKILL.md, or one of Drimvox's own. */
+export const skillInstallSchema = z
+  .object({
+    source: z.discriminatedUnion("kind", [
+      z.object({
+        kind: z.literal("github"),
+        repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
+        path: z.string().min(1).max(300),
+        ref: z.string().regex(/^[\w./-]+$/).max(100).default("main"),
+      }),
+      z.object({ kind: z.literal("builtin"), id: z.enum(builtinSkills) }),
+    ]),
+  })
+  .strict();

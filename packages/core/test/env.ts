@@ -6,6 +6,7 @@ import type { PresetId } from "@drimvox/shared";
 import { createCore, openDatabase, type Database } from "../src";
 import type { WebAccess } from "../src/internet/web";
 import type { SearchUrls } from "../src/internet/search-service";
+import type { SkillSources } from "../src/skills/install";
 import type { Screenshotter } from "../src/visual/look";
 import type { CliId } from "../src/cli/kinds";
 import type { LocalOptions } from "../src/local/service";
@@ -46,6 +47,8 @@ export interface TestEnv {
   setProxyCheckUrl(url: string): void;
   /** Where Tavily and Brave answer. */
   setSearchUrls(urls: SearchUrls): void;
+  /** Where GitHub answers for ready skills. */
+  setSkillSources(urls: SkillSources): void;
   /** Ollama and its catalogs: by default nothing is installed and no catalog answers. */
   setLocal(o: LocalOptions): void;
   /** GitHub: by default an address where nothing answers. */
@@ -69,6 +72,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
   let screenshot: Screenshotter | undefined;
   const cliCommands: Partial<Record<CliId, string[]>> = {};
   let proxyCheckUrl = "http://127.0.0.1:9/no-internet-in-tests";
+  let skillSources: SkillSources = { api: "http://127.0.0.1:9", raw: "http://127.0.0.1:9" };
   let searchUrls: SearchUrls = { tavily: "http://127.0.0.1:9/search", brave: "http://127.0.0.1:9/brave" };
   // Never the real Ollama, Hugging Face or this computer's hardware in tests.
   let local: LocalOptions = {
@@ -105,6 +109,7 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
       cliCommands,
       proxyCheckUrl,
       searchUrls,
+      skillSources,
       local,
       github,
       ...(o.setupCode ? { password: { setupCode: o.setupCode } } : {}),
@@ -153,6 +158,10 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
     },
     setSearchUrls(urls) {
       searchUrls = urls;
+      void dropCore();
+    },
+    setSkillSources(urls) {
+      skillSources = urls;
       void dropCore();
     },
     setLocal(next) {

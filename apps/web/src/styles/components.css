@@ -132,18 +132,40 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .hint-tip { position: fixed; z-index: 80; transform: translateY(-100%); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--sheet); color: var(--fg); box-shadow: var(--sheet-shadow); font-size: 13px; font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; pointer-events: none; }
 .hint-tip.is-below { transform: none; }
 
-/* Ready MCP servers and skills as cards, with their details in a window. */
-.catalog-grid { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
-.catalog-card { display: grid; gap: 6px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+/* Ready MCP servers and skills as cards, with their details and an example in a window. */
+.catalog-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.catalog-filter .chip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13.5px; color: var(--muted); background: var(--sheet); }
+.catalog-filter .chip:hover { color: var(--fg); border-color: var(--fg); }
+.catalog-filter .chip.is-on { color: var(--sheet); background: var(--fg); border-color: var(--fg); }
+.catalog-grid { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.catalog-card { display: grid; gap: 8px; align-content: start; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 .catalog-card p { margin: 0; font-size: 13.5px; line-height: 1.45; }
-.catalog-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.catalog-kind { font-size: 12px; }
-.catalog-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
-.catalog-dialog { width: min(520px, calc(100vw - 32px)); padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--sheet); color: var(--fg); box-shadow: var(--sheet-shadow); }
+.catalog-card-head { display: flex; align-items: center; gap: 10px; }
+.catalog-card-title { display: grid; min-width: 0; }
+.catalog-card-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-card-title .muted { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.catalog-logo { display: inline-grid; place-items: center; flex: none; border-radius: 10px; background: var(--sheet); border: 1px solid var(--line); color: var(--ink); }
+.catalog-dialog { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--sheet); color: var(--fg); box-shadow: var(--sheet-shadow); }
 .catalog-dialog::backdrop { background: var(--overlay-soft); }
-.catalog-dialog h2 { margin: 0 32px 10px 0; }
-.catalog-dialog p { line-height: 1.5; }
+.catalog-dialog-head { display: flex; align-items: center; gap: 14px; margin: 0 32px 12px 0; }
+.catalog-dialog-head h2 { margin: 0; }
+.catalog-dialog-head p { margin: 2px 0 0; font-size: 13px; }
+.catalog-dialog p { line-height: 1.55; }
+.catalog-dialog h3 { margin: 18px 0 6px; font-size: 15px; }
+.catalog-can { margin: 0; padding-left: 20px; display: grid; gap: 3px; }
 .catalog-close { position: absolute; top: 14px; right: 14px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--muted); }
 .catalog-close:hover { background: var(--paper); color: var(--fg); }
 .catalog-command { overflow-wrap: anywhere; font-size: 13px; }
 .catalog-secret { display: grid; gap: 8px; }
+/* The example: a small Drimvox chat window. */
+.catalog-example { margin: 14px 0 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg); }
+.catalog-example-bar { display: flex; gap: 6px; padding: 8px 12px; background: var(--paper); border-bottom: 1px solid var(--line); }
+.catalog-example-bar span { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.catalog-example-body { display: grid; gap: 10px; padding: 14px; }
+.catalog-example-you { justify-self: end; max-width: 80%; margin: 0; padding: 8px 12px; border-radius: 12px 12px 4px 12px; background: var(--ink-soft); font-size: 14px; }
+.catalog-example-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
+.catalog-example-steps li { display: flex; align-items: center; gap: 8px; }
+.catalog-example-steps .catalog-logo { border-radius: 5px; }
+.catalog-example-answer { margin: 0; padding: 8px 12px; border-left: 2px solid var(--ink); background: var(--sheet); border-radius: 0 8px 8px 0; font-size: 14px; }
+.catalog-example figcaption { padding: 6px 12px; font-size: 12px; border-top: 1px solid var(--line); background: var(--paper); }

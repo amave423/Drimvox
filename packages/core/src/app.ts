@@ -36,6 +36,7 @@ import { providerRoutes } from "./routes/providers";
 import { localRoutes } from "./routes/local";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
+import { SKILL_SOURCES, type SkillSources } from "./skills/install";
 import { SEARCH_URLS, SearchStore, withSearchService, type SearchUrls } from "./internet/search-service";
 import { githubRoutes } from "./routes/github";
 import { GitHub, type GithubOptions } from "./github/github";
@@ -91,6 +92,8 @@ export interface AppOptions {
   proxyCheckUrl?: string;
   /** Where Tavily and Brave answer: fakes in tests. */
   searchUrls?: SearchUrls;
+  /** Where GitHub answers for ready skills: a fake in tests. */
+  skillSources?: SkillSources;
   /** Ollama and its catalogs; tests give a fake program, fixed hardware and fake catalogs. */
   local?: LocalOptions;
   /** GitHub's addresses; tests give a fake. */
@@ -215,7 +218,7 @@ export function createCore(o: AppOptions) {
     )
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
     .route("/media", mediaRoutes(media))
-    .route("/skills", skillRoutes(join(o.dataDir, "skills")))
+    .route("/skills", skillRoutes(join(o.dataDir, "skills"), o.skillSources ?? SKILL_SOURCES))
     .route("/usage", usageRoutes(chats))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))

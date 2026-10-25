@@ -104,25 +104,36 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await page.getByRole("tab", { name: "Инструменты" }).click();
 
   const cards = page.locator(".catalog-card");
+  await expect(cards).toHaveCount(29);
+  for (const name of ["Playwright", "Chrome DevTools", "Context7", "GitHub", "Figma", "Дизайн интерфейсов", "Сначала тест", "Документы Word"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  // A filter by what the card is about.
+  await page.getByRole("button", { name: "Документы", exact: true }).click();
   await expect(cards).toHaveCount(5);
-  for (const name of ["Playwright", "Context7", "GitHub", "Документы", "Дизайн сайтов"]) await expect(page.locator(".catalog-grid")).toContainText(name);
 
-  const documents = cards.filter({ hasText: "Документы" });
-  await documents.getByRole("switch").click({ force: true });
-  await expect(documents.getByRole("switch")).toBeChecked();
-  await expect(page.locator(".skill-list li", { hasText: "documents" })).toContainText("Word, Excel, PowerPoint or PDF");
-  await documents.getByRole("switch").click({ force: true });
-  await expect(documents.getByRole("switch")).not.toBeChecked();
+  const word = cards.filter({ hasText: "Документы Word" });
+  await word.getByRole("switch").click({ force: true });
+  await expect(word.getByRole("switch")).toBeChecked();
+  await expect(page.locator(".skill-list li", { hasText: "docx" })).toContainText("Word document");
+  await word.getByRole("switch").click({ force: true });
+  await expect(word.getByRole("switch")).not.toBeChecked();
   await expect(page.getByText("Общих скиллов пока нет.")).toBeVisible();
 
+  // The details show what using it looks like.
+  await page.getByRole("button", { name: "Все", exact: true }).click();
+  await cards.first().getByRole("button", { name: "Подробнее" }).click();
+  const playwright = page.getByRole("dialog", { name: "Playwright" });
+  await expect(playwright.getByRole("figure", { name: "Как это выглядит" })).toContainText("проверь, что форма входа работает");
+  await expect(playwright).toContainText("Microsoft · лицензия Apache-2.0");
+  await page.keyboard.press("Escape");
+
   // GitHub needs a token: switching it on asks for one in its window; Escape closes the window, nothing is added.
-  await cards.filter({ hasText: "GitHub" }).getByRole("switch").click({ force: true });
+  await cards.filter({ has: page.locator("strong", { hasText: /^GitHub$/ }) }).locator("label.toggle").click();
   const dialog = page.getByRole("dialog", { name: "GitHub" });
   await expect(dialog).toContainText("api.githubcopilot.com/mcp");
-  await expect(dialog.getByLabel("Токен GitHub")).toBeVisible();
+  await expect(dialog.getByLabel("Ключ GitHub")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(cards.filter({ hasText: "GitHub" }).getByRole("switch")).not.toBeChecked();
+  await expect(cards.filter({ has: page.locator("strong", { hasText: /^GitHub$/ }) }).getByRole("switch")).not.toBeChecked();
 });
 
 // Seen: closing the window stopped the agents and the started site; Drimvox now stays in the tray until "Quit".

@@ -1,15 +1,16 @@
 import { zValidator } from "@hono/zod-validator";
-import { skillCreateSchema, skillImportSchema } from "@drimvox/shared";
+import { skillCreateSchema, skillImportSchema, skillInstallSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { copyTree, removeTree } from "../fsx";
+import { installSkill, SkillInstallError, type SkillSources } from "../skills/install";
 import { findSkills, parseSkill, skillSlug, toSkillView } from "../skills/skills";
 
 const notFound = { error: { code: "not_found" } } as const;
 
 /** Shared skills: in Drimvox's data folder, for every project. */
-export function skillRoutes(sharedDir: string) {
+export function skillRoutes(sharedDir: string, sources: SkillSources) {
   const shared = () => findSkills([{ dir: sharedDir, scope: "shared" }]);
   return new Hono()
     .get("/", (c) => c.json(shared().map((s) => toSkillView(s))))
@@ -33,6 +34,16 @@ export function skillRoutes(sharedDir: string) {
       if (existsSync(dir)) return c.json({ error: { code: "exists" } }, 409);
       copyTree(from, dir);
       return c.json(toSkillView({ name: parsed.name, description: parsed.description, scope: "shared", dir }), 201);
+    })
+    // A ready skill from the catalog (docs/specs/catalog.md): a GitHub repository's folder, or one of Drimvox's own.
+    .post("/install", zValidator("json", skillInstallSchema), async (c) => {
+      try {
+        const s = await installSkill(sharedDir, c.req.valid("json").source, sources);
+        return c.json(toSkillView({ name: s.name, description: s.description, scope: "shared", dir: s.dir }), 201);
+      } catch (err) {
+        if (!(err instanceof SkillInstallError)) throw err;
+        return c.json({ error: { code: err.code } }, err.code === "exists" ? 409 : err.code === "download" ? 502 : 400);
+      }
     })
     .delete("/:name", (c) => {
       const skill = shared().find((s) => s.name === c.req.param("name"));

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Api } from "../api";
 import { dropStoredModels, loadModels, storedModels } from "./models";
 
-const model: ModelInfo = { id: "m1", name: "Model 1", contextLength: null, priceIn: 1, priceOut: 2, tools: true, vision: false };
+const model: ModelInfo = { id: "m1", name: "Model 1", contextLength: null, priceIn: 1, priceOut: 2, priceEstimated: false, tools: true, vision: false };
 
 beforeEach(() => {
   const data = new Map<string, string>();
