@@ -209,8 +209,12 @@ test("an edited message gets a new answer, and the arrows switch back to the fir
 // Seen: links in answers were hard to tell from the text; popular sites now carry their mark, drawn without the network.
 test("links in an answer stand out, and a popular site's carries its mark", async () => {
   const page = await launch([{ text: "Код на [GitHub](https://github.com/amave423/Drimvox), пример на [сайте](https://example.com/)." }]);
-  await ask(page, "Где код?");
-  const github = page.getByRole("link", { name: "GitHub" });
+  await ask(page, "Где код? Я смотрел https://github.com/amave423 ещё");
+  // The user's own address is a link too, with the site's mark.
+  const mine = page.locator(".msg-user").getByRole("link", { name: "https://github.com/amave423" });
+  await expect(mine).toHaveAttribute("href", "https://github.com/amave423");
+  await expect(mine.locator("svg.text-link-icon")).toHaveCount(1);
+  const github = page.locator(".msg-assistant").getByRole("link", { name: "GitHub" });
   await expect(github).toHaveAttribute("href", "https://github.com/amave423/Drimvox");
   await expect(github.locator("svg.md-link-icon")).toHaveCount(1);
   await expect(page.getByRole("link", { name: "сайте" }).locator("svg")).toHaveCount(0);

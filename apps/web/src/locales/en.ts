@@ -436,6 +436,7 @@ export const en: Record<keyof typeof ru, string> = {
   "model.kind.video": "Video",
   "model.noMedia": "This provider has no such models. OpenRouter has pictures and video.",
   "director.label": "Director",
+  "director.model": "Model",
   "director.on": "Through a director",
   "director.short": "director · {n}",
   "director.attempts": "Attempts",

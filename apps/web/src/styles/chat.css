@@ -84,6 +84,21 @@
   border: 1px solid var(--line); background: var(--sheet); color: var(--fg);
   font: inherit; line-height: 1.5; overflow-y: hidden;
 }
+/* The field over a copy of its text with the links marked: the field is transparent, the copy shows through. */
+.composer-field { position: relative; display: grid; }
+.composer-field textarea { position: relative; z-index: 1; background: transparent; color: transparent; caret-color: var(--fg); }
+.composer-field textarea::placeholder { color: var(--muted); }
+.composer-field textarea::selection { color: var(--fg); background: var(--ink-soft); }
+.composer-backdrop {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+  padding: 11px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); color: var(--fg);
+  font: inherit; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word;
+}
+.composer-backdrop mark { color: var(--ink); background: var(--ink-soft); border-radius: 3px; }
+/* A link in the user's own message, as in answers. */
+.text-link { color: var(--ink); font-weight: 500; text-decoration: none; overflow-wrap: anywhere; }
+.text-link:hover { text-decoration: underline; }
+.text-link-icon { display: inline-block; width: 0.95em; height: 0.95em; margin-right: 0.3em; vertical-align: -0.12em; fill: currentColor; }
 
 /* Model picker */
 .picker { position: relative; }
@@ -173,13 +188,13 @@
 .chat-options .picker-button { gap: 8px; max-width: clamp(110px, 26cqw, 260px); }
 .chat-options .picker-button.is-on { border-color: var(--ink); color: var(--ink); background: var(--ink-soft); }
 .chat-options .options-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.options-panel { width: min(340px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }
-.options-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; font-size: 13px; }
+.options-panel { width: min(380px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }
+.options-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; font-size: 13px; min-height: 32px; }
 .options-row .picker { justify-self: start; }
-/* An option's own list opens above the whole panel, from its right edge to the left (seen: opening to the right of the
-   panel, the model list ran off the window and a sideways scrollbar appeared). */
+/* An option's own list opens over the panel, from its bottom right corner up and to the left (seen: to the right it ran
+   off the window; above the panel, a tall panel pushed it past the top of the window). */
 .options-panel .picker { position: static; }
-.options-panel .picker-panel.is-above { top: auto; bottom: calc(100% + 8px); left: auto; right: 0; max-width: calc(100vw - 32px); }
+.options-panel .picker-panel.is-above { top: auto; bottom: 0; left: auto; right: 0; z-index: 2; max-width: calc(100vw - 32px); max-height: min(560px, calc(100vh - 140px)); }
 /* Choices inside the options panel: pills, like the rest of the bar. */
 .pills { display: flex; flex-wrap: wrap; gap: 4px; }
 .pills button { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); font-size: 12.5px; color: var(--fg); }

@@ -436,6 +436,7 @@ export const ru = {
   "model.kind.video": "Видео",
   "model.noMedia": "У этого провайдера нет таких моделей. Картинки и видео есть у OpenRouter.",
   "director.label": "Режиссёр",
+  "director.model": "Модель",
   "director.on": "Через режиссёра",
   "director.short": "режиссёр · {n}",
   "director.attempts": "Попыток",

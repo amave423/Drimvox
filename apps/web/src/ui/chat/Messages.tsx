@@ -2,6 +2,7 @@ import type { MessageKey } from "../../i18n";
 import type { ChatKind, MessageView } from "@drimvox/shared";
 import { useState, type ReactNode } from "react";
 import { PencilIcon } from "../SideChats";
+import { MessageText } from "./LinkedText";
 import { useApp } from "../../context";
 import { useSmoothText } from "../../lib/smooth";
 import { formatTokens, formatUsd } from "../../lib/format";
@@ -74,7 +75,9 @@ export function UserMessage({
       <div className="msg msg-user">
         <span className="visually-hidden">{t("chat.you")}</span>
         {files}
-        <p>{content}</p>
+        <p>
+          <MessageText text={content} />
+        </p>
       </div>
       {/* Under the message, as in other chats: edit it, and the versions it has. */}
       {(onEdit || (versions && onVersion)) && (

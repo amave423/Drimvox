@@ -3,6 +3,29 @@ import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 let tray: Tray | null = null;
+let menuTexts: { open: string; quit: string } | null = null;
+let showWindow: (() => void) | null = null;
+let update: { label: string; install: () => void } | null = null;
+
+/** The tray's menu: open, restart into a downloaded update when there is one, quit. */
+function rebuildMenu(): void {
+  if (!tray || !menuTexts) return;
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: menuTexts.open, click: () => showWindow?.() },
+      ...(update ? [{ label: update.label, click: update.install }] : []),
+      { type: "separator" },
+      { label: menuTexts.quit, click: () => app.quit() },
+    ]),
+  );
+}
+
+/** A downloaded update: in the tray's menu, and said once with a notification (the window may be hidden). */
+export function offerUpdate(label: string, title: string, body: string, install: () => void): void {
+  update = { label, install };
+  rebuildMenu();
+  if (Notification.isSupported()) new Notification({ title, body }).show();
+}
 
 /** The app's icon: packed next to the app, or in the build folder while developing. */
 function icon() {
@@ -23,18 +46,14 @@ export function keepInTray(win: () => BrowserWindow | null, quitting: () => bool
     w.show();
     w.focus();
   };
+  showWindow = show;
+  menuTexts = { open: texts.open, quit: texts.quit };
   if (!tray) {
     tray = new Tray(icon());
     tray.setToolTip("Drimvox");
-    tray.setContextMenu(
-      Menu.buildFromTemplate([
-        { label: texts.open, click: show },
-        { type: "separator" },
-        { label: texts.quit, click: () => app.quit() },
-      ]),
-    );
     tray.on("click", show);
   }
+  rebuildMenu();
   const told = join(app.getPath("userData"), "tray-told");
   return (target) => {
     target.on("close", (event) => {

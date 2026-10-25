@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { useApp } from "../../context";
 import { PendingFiles, type PendingFile } from "./Attachments";
 import { ChatOptions, type OptionRow } from "./ChatOptions";
+import { splitLinks } from "../../lib/links";
 
 /** Below this width the model and the paperclip move into Options, so the bar stays one tidy row. */
 const NARROW = 480;
@@ -44,6 +45,7 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
   }, []);
   const [text, setText] = useState("");
   const area = useRef<HTMLTextAreaElement>(null);
+  const backdrop = useRef<HTMLDivElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
   const hasFiles = !!attach && attach.files.length > 0;
 
@@ -80,7 +82,17 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
       disabled={disabled || streaming || !!attach.blocked}
       onClick={() => filePicker.current?.click()}
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
         <path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8" />
       </svg>
     </button>
@@ -102,24 +114,36 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
       }}
     >
       {attach && <PendingFiles files={attach.files} onRemove={attach.onRemove} />}
-      <textarea
-        ref={area}
-        rows={2}
-        value={text}
-        placeholder={placeholder ?? t("chat.placeholder")}
-        aria-label={placeholder ?? t("chat.placeholder")}
-        onChange={(e) => {
-          setText(e.target.value);
-          grow();
-        }}
-        onKeyDown={onKeyDown}
-        onPaste={(e) => {
-          const files = [...e.clipboardData.files];
-          if (!attach || files.length === 0) return;
-          e.preventDefault();
-          attach.onAdd(files);
-        }}
-      />
+      {/* Links light up as they are typed: the text is drawn again under the field, with the addresses marked; the field's
+          own text is transparent above it (a field cannot colour part of its text). */}
+      <div className="composer-field">
+        <div ref={backdrop} className="composer-backdrop" aria-hidden>
+          {splitLinks(text).map((p, n) => (p.url ? <mark key={n}>{p.text}</mark> : <span key={n}>{p.text}</span>))}
+          {/* A last empty line, so a newline at the end takes its place as in the field. */}
+          {"\n"}
+        </div>
+        <textarea
+          ref={area}
+          onScroll={(e) => {
+            if (backdrop.current) backdrop.current.scrollTop = e.currentTarget.scrollTop;
+          }}
+          rows={2}
+          value={text}
+          placeholder={placeholder ?? t("chat.placeholder")}
+          aria-label={placeholder ?? t("chat.placeholder")}
+          onChange={(e) => {
+            setText(e.target.value);
+            grow();
+          }}
+          onKeyDown={onKeyDown}
+          onPaste={(e) => {
+            const files = [...e.clipboardData.files];
+            if (!attach || files.length === 0) return;
+            e.preventDefault();
+            attach.onAdd(files);
+          }}
+        />
+      </div>
       {extra}
       {attach && (
         <input

@@ -130,8 +130,8 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .hint { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; margin-left: 6px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: var(--sheet); vertical-align: middle; cursor: default; flex: none; }
 .hint svg { display: block; }
 .hint:hover, .hint:focus-visible { color: var(--ink); border-color: var(--ink); }
-.hint-tip { position: fixed; z-index: 80; transform: translateY(-100%); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--sheet); color: var(--fg); box-shadow: var(--sheet-shadow); font-size: 13px; font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; pointer-events: none; }
-.hint-tip.is-below { transform: none; }
+.hint-tip { position: fixed; z-index: 80; translate: 0 -100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--sheet); color: var(--fg); box-shadow: var(--sheet-shadow); font-size: 13px; font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; pointer-events: none; }
+.hint-tip.is-below { translate: none; }
 
 /* Ready MCP servers and skills as cards, with their details and an example in a window. */
 .catalog-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }

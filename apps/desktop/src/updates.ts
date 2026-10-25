@@ -19,15 +19,20 @@ export interface UpdateState {
 }
 
 const RELEASES = "https://github.com/amave423/Drimvox/releases";
-/** First look a little after the start, then every few hours: nobody restarts an app they leave open. */
+/** First look a little after the start, then every hour, in the tray too: nobody restarts an app they leave open. */
 const FIRST_CHECK_MS = 15_000;
-const CHECK_EVERY_MS = 6 * 3600_000;
+const CHECK_EVERY_MS = 3600_000;
 
 /**
  * Updates from the GitHub releases of the repository: the installed Windows app and the AppImage download the new
  * version by themselves and install it on restart; a .deb only says where to get it. Nothing runs unpackaged.
  */
-export function startUpdates(window: () => BrowserWindow | null, trusted: (event: IpcMainEvent) => boolean): void {
+export function startUpdates(
+  window: () => BrowserWindow | null,
+  trusted: (event: IpcMainEvent) => boolean,
+  /** A version is downloaded: said while the window is hidden too (the tray), with a way to restart into it. */
+  ready?: (version: string, install: () => void) => void,
+): void {
   let last: UpdateState = { state: "off", version: app.getVersion() };
   ipcMain.handle("drimvox:update-state", () => last);
   if (!app.isPackaged || process.env.DRIMVOX_NO_UPDATES === "1") return;
@@ -60,7 +65,10 @@ export function startUpdates(window: () => BrowserWindow | null, trusted: (event
     tell(manual ? { state: "manual", version: info.version, url: `${RELEASES}/tag/v${info.version}` } : { state: "downloading", version: info.version, percent: 0 }),
   );
   autoUpdater.on("download-progress", (p) => tell({ ...last, percent: Math.round(p.percent) }));
-  autoUpdater.on("update-downloaded", (info) => tell({ state: "ready", version: info.version }));
+  autoUpdater.on("update-downloaded", (info) => {
+    tell({ state: "ready", version: info.version });
+    ready?.(info.version, () => autoUpdater.quitAndInstall(true, true));
+  });
   autoUpdater.on("update-not-available", () => tell({ state: "latest", version: app.getVersion(), checkedAt: Date.now() }));
   // Offline or GitHub out of reach: said in the settings, and tried again at the next check.
   autoUpdater.on("error", (err) => {

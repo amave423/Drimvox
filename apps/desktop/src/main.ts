@@ -10,7 +10,7 @@ import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, ty
 import { INSTALLER_ID } from "./installer-id";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
-import { keepInTray } from "./tray";
+import { keepInTray, offerUpdate } from "./tray";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
@@ -61,7 +61,18 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(() => {
     ensureShortcut();
-    startUpdates(() => win, (event) => fromOurPage(event.senderFrame?.url));
+    const ru = app.getLocale().startsWith("ru");
+    startUpdates(
+      () => win,
+      (event) => fromOurPage(event.senderFrame?.url),
+      (version, install) =>
+        offerUpdate(
+          ru ? `Перезапустить и обновить до ${version}` : `Restart and update to ${version}`,
+          ru ? `Drimvox ${version} скачан` : `Drimvox ${version} is downloaded`,
+          ru ? "Установится при выходе, или перезапусти из значка в трее." : "It installs on quit, or restart from the tray icon.",
+          install,
+        ),
+    );
     return launch();
   });
 }

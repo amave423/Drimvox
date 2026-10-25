@@ -122,10 +122,11 @@ test("a director writes the prompt, looks at the picture and says what it made",
   await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByRole("option", { name: /Cheap Painter/ }).click();
   await page.getByRole("button", { name: /^Параметры/ }).click();
-  await page.locator(".director label.toggle").click();
-  await page.locator(".director").getByRole("button", { name: "Выбери модель" }).click();
+  const panel = page.getByRole("dialog", { name: "Параметры" });
+  await panel.locator("label.toggle").click();
+  await panel.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Chatty/ }).click();
-  await page.locator(".director").getByRole("radiogroup", { name: "Попыток" }).getByRole("radio", { name: "1" }).click();
+  await panel.getByRole("radiogroup", { name: "Попыток" }).getByRole("radio", { name: "1" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: /Параметры: .*режиссёр · 1/ })).toBeVisible();
   await page.getByLabel(/Опиши картинку/).fill("Лиса в шарфе");

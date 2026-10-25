@@ -8,9 +8,14 @@
   .sheet { animation: rise 220ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
   /* Each message, and each card of a list, fades in where it stands. */
   .msg-user, .msg-assistant, .local-card, .preset, .first-steps > ol > li { animation: fade-in 200ms ease-out backwards; }
-  /* Menus and option panels unfold from the button that opened them. */
-  .picker-panel { animation: pop 140ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards; transform-origin: top left; }
-  .picker-panel.is-above { transform-origin: bottom left; }
+  /* Menus and option panels drop out of the button that opened them, from its corner (asked for). */
+  .picker-panel { animation: drop-down 200ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; transform-origin: top left; }
+  .picker-panel.is-above { animation-name: drop-up; transform-origin: bottom left; }
+  .options-panel .picker-panel.is-above { transform-origin: bottom right; }
+  .picture-menu { animation: drop-down 160ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; transform-origin: top left; }
+  .hint-tip { animation: drop-up 140ms ease-out backwards; transform-origin: bottom center; }
+  .hint-tip.is-below { animation-name: drop-down; transform-origin: top center; }
+  .catalog-dialog[open] { animation: pop 200ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
   .lightbox { animation: fade-in 160ms ease-out backwards; }
   .lightbox img { animation: pop 200ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards; transform-origin: center; }
 
@@ -28,4 +33,6 @@
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
   @keyframes fade-in { from { opacity: 0; transform: translateY(3px); } }
   @keyframes pop { from { opacity: 0; transform: scale(0.96); } }
+  @keyframes drop-down { from { opacity: 0; transform: translateY(-6px) scale(0.92); } }
+  @keyframes drop-up { from { opacity: 0; transform: translateY(6px) scale(0.92); } }
 }

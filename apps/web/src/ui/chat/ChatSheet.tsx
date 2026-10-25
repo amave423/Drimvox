@@ -21,7 +21,7 @@ import { loadMediaModel } from "../../lib/media";
 import { postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
-import { DirectorControl, useDirector } from "./DirectorControl";
+import { directorRows, useDirector } from "./DirectorControl";
 import { AssistantMessage, UserMessage, type AnswerAction, type ChatApproval } from "./Messages";
 import { ModelPicker } from "./ModelPicker";
 import { isPhoto, photoProblem } from "./photos";
@@ -207,7 +207,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   const optionRows = useMediaOptionRows({ model: mediaModel, value: options, onChange: setOptions });
   const mediaRows = {
     changed: [...optionRows.changed, ...(directing ? [t("director.short", { n: tries })] : [])],
-    rows: [...optionRows.rows, { label: t("director.label"), control: <DirectorControl value={director} video={kind === "video"} onChange={setDirector} /> }],
+    rows: [...optionRows.rows, ...directorRows(director, kind === "video", setDirector, t)],
   };
 
   async function saveFolder(id: string, next: string | null): Promise<boolean> {
