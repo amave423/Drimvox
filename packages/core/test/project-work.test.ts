@@ -287,6 +287,10 @@ describe("work on a project", () => {
     await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
     const done = await until(s.project.id, (w) => w.status === "done" && w.site?.running);
     expect(done).toMatchObject({ report: "Сделал сайт. Запуск: node server.js.", site: { url: `http://localhost:${port}/`, running: true } });
+    // The report after the work: the actions it took and the checklist.
+    const report = await (await env.call("GET", `/api/projects/${s.project.id}/work/report`)).json();
+    expect(report).toMatchObject({ checklist: { done: PLAN.steps.length, total: PLAN.steps.length } });
+    expect(report.actions.map((a: { name: string }) => a.name)).toEqual(expect.arrayContaining(["update_checklist", "finish_work"]));
     // The process runs at once; the server listens a moment later.
     let answer = "";
     for (let i = 0; i < 50 && answer !== "ok"; i++) {

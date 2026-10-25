@@ -122,6 +122,20 @@ export class ProjectWorkRepo {
   }
 
   /** What the project's conversation cost and how many tools it called since the work started. */
+  /** The run's answers since it started: each one's model, price and actions, for the report after the work. */
+  answers(chatId: string, since: number): { model: string | null; costUsd: number; inputTokens: number; outputTokens: number; actions: string[] }[] {
+    const rows = this.db.sql
+      .prepare("select model, cost_usd, input_tokens, output_tokens, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?")
+      .all(chatId, since) as { model: string | null; cost_usd: number | null; input_tokens: number | null; output_tokens: number | null; activity: string | null }[];
+    return rows.map((r) => ({
+      model: r.model,
+      costUsd: r.cost_usd ?? 0,
+      inputTokens: r.input_tokens ?? 0,
+      outputTokens: r.output_tokens ?? 0,
+      actions: r.activity ? (JSON.parse(r.activity) as { name: string }[]).map((a) => a.name) : [],
+    }));
+  }
+
   spending(chatId: string, since: number): { spentUsd: number; actions: number } {
     const rows = this.db.sql
       .prepare("select cost_usd, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?")

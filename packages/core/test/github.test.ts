@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestEnv, type TestEnv } from "./env";
@@ -93,6 +93,38 @@ describe("publishing", () => {
     git(p.path, "commit", "-q", "-m", "Add about page");
     expect((await env.call("POST", `/api/github/projects/${p.id}/push`)).status).toBe(200);
     expect(git(made.bare, "rev-parse", "main")).toBe(git(p.path, "rev-parse", "HEAD"));
+  });
+
+  // Asked for: the finished site published in one click, with a link.
+  it("publishes the built site to GitHub Pages from a branch of its own, and says where it is", async () => {
+    await start();
+    await signIn();
+    const p = await project();
+    await env.call("POST", `/api/github/projects/${p.id}/publish`, { name: "site", private: false });
+    mkdirSync(join(p.path, "dist"), { recursive: true });
+    writeFileSync(join(p.path, "dist", "index.html"), "<h1>Сайт</h1>\n");
+
+    const res = await env.call("POST", `/api/github/projects/${p.id}/site`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ url: "https://octo.github.io/site/", folder: "dist" });
+    const made = hub.repos.get("site");
+    expect(made.pages).toEqual({ branch: "gh-pages", path: "/" });
+    // The branch holds the built site alone, with .nojekyll so folders starting with _ are served.
+    const files = git(made.bare, "ls-tree", "--name-only", "gh-pages").split("\n").sort();
+    expect(files).toEqual([".nojekyll", "index.html"]);
+    // Published again: the branch is replaced, Pages is already on.
+    expect((await env.call("POST", `/api/github/projects/${p.id}/site`)).status).toBe(200);
+  });
+
+  it("says when there is no built site to publish", async () => {
+    await start();
+    await signIn();
+    const p = await project();
+    await env.call("POST", `/api/github/projects/${p.id}/publish`, { name: "empty", private: false });
+    rmSync(join(p.path, "index.html"), { force: true });
+    const res = await env.call("POST", `/api/github/projects/${p.id}/site`);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: { code: "no_site" } });
   });
 
   it("says when the name is taken", async () => {

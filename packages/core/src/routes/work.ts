@@ -7,12 +7,14 @@ import { TaskBusy } from "../agent/runner";
 import type { ProviderRepo } from "../providers/repo";
 import type { Shots } from "../visual/look";
 import { folderChanges } from "../work/changes";
+import { workReport } from "../work/report";
+import type { ProjectWorkRepo } from "../work/repo";
 import { WorkRefused, type ProjectWork } from "../work/service";
 
 const notFound = { error: { code: "not_found" } } as const;
 
 /** A project's work (docs/specs/project-work.md): the interview and the plan, "Go", messages on the way, Stop, limits. */
-export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work: ProjectWork, shots: Shots) {
+export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work: ProjectWork, shots: Shots, repo: ProjectWorkRepo) {
   const refused = (err: unknown) => {
     if (err instanceof WorkRefused) return { error: { code: err.code } };
     if (err instanceof TaskBusy) return { error: { code: "busy" as const } };
@@ -85,6 +87,12 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
       const patch = c.req.valid("json");
       if (patch.strong && !providers.get(patch.strong.providerId)) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
       return c.json(work.update(id, patch), 200);
+    })
+    .get("/:id/work/report", async (c) => {
+      const project = projects.get(c.req.param("id"));
+      if (!project) return c.json(notFound, 404);
+      const report = await workReport(repo, project.id, project.path);
+      return report ? c.json(report, 200) : c.json(notFound, 404);
     })
     .get("/:id/work/changes", async (c) => {
       const project = projects.get(c.req.param("id"));

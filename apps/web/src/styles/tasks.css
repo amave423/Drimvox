@@ -326,3 +326,4 @@
 .work-summary { display: grid; gap: 6px; margin: 8px 0 16px; }
 .work-summary .actions { margin: 4px 0 0; }
 .field-label { color: var(--muted); font-size: 14px; }
+.project-templates { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }

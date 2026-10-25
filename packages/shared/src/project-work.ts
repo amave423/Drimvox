@@ -17,6 +17,19 @@ export type ProjectModels = z.infer<typeof projectModelsSchema>;
 export type ProjectWorkStatus = "idle" | "planning" | "ready" | "running" | "paused" | "done" | "stopped";
 
 /** Why the run stopped and waits: the budget or the time ran out, the model got stuck, a provider error, a restart. */
+/** What a run did, for the report after the work: time, money by model, actions by kind, files, checklist. */
+export interface WorkReport {
+  workedMs: number;
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  byModel: { model: string; answers: number; costUsd: number }[];
+  /** Actions by kind, the most frequent first. */
+  actions: { name: string; count: number }[];
+  files: { changed: number; added: number; removed: number };
+  checklist: { done: number; total: number };
+}
+
 export type ProjectWorkReason = "budget" | "time" | "stuck" | "error" | "user" | "restart" | "month_budget";
 
 export interface ChecklistItem {

@@ -2,6 +2,9 @@ import type { GithubProject, GithubStatus } from "@drimvox/shared";
 import type { Database } from "../db";
 import { currentBranch, GitError, runGit } from "../agent/git";
 import type { Cipher } from "../secrets";
+import { rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /** Drimvox's OAuth app on GitHub. Public by design: the device flow has no client secret. */
 export const CLIENT_ID = "Ov23liuac4Ai8HSL86BH";
@@ -198,6 +201,44 @@ export class GitHub {
     const account = this.signedIn();
     if (!(await this.project(dir)).remote) throw new GithubFailure("no_remote", "The project has no remote");
     await this.pushTo(dir, account, false);
+  }
+
+  /**
+   * Publishes a built site with GitHub Pages (asked for: the finished site in one click, with a link): the folder's files
+   * become the gh-pages branch alone, through a separate index, so the project's own branch and files stay as they are.
+   */
+  async publishSite(dir: string, folder: string): Promise<{ url: string }> {
+    const account = this.signedIn();
+    const remote = (await this.project(dir)).remote;
+    if (!remote) throw new GithubFailure("no_remote", "The project has no remote");
+    const repo = remote.replace(/\.git$/, "").split("/").at(-1)!;
+    const index = join(tmpdir(), `drimvox-site-${Date.now()}.index`);
+    try {
+      const env = { GIT_INDEX_FILE: index };
+      await runGit(dir, ["--work-tree", folder, "add", "-A", "-f", "--", "."], false, env);
+      const tree = (await runGit(dir, ["write-tree"], false, env)).stdout.trim();
+      const commit = (await runGit(dir, ["-c", "user.name=Drimvox", "-c", "user.email=drimvox@localhost", "commit-tree", tree, "-m", "Publish the site"])).stdout.trim();
+      await this.pushRef(dir, account, `${commit}:refs/heads/gh-pages`);
+    } finally {
+      rmSync(index, { force: true });
+    }
+    const res = await this.call(`/repos/${account.user}/${repo}/pages`, account.token, { source: { branch: "gh-pages", path: "/" } }).catch(() => null);
+    const body = (await res?.json().catch(() => ({}))) as { html_url?: string; message?: string };
+    // 409: Pages is already on, the new branch is served in a minute.
+    if (res && !res.ok && res.status !== 409) throw new GithubFailure("github_error", body.message ?? `GitHub answered ${res.status}`);
+    return { url: body.html_url ?? `https://${account.user}.github.io/${repo}/` };
+  }
+
+  /** Pushes one ref to `origin` with the token, as pushTo does for the branch. */
+  private async pushRef(dir: string, account: Account, refspec: string): Promise<void> {
+    const remote = (await this.project(dir)).remote ?? "";
+    const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0" };
+    if (/^https:\/\//i.test(remote)) {
+      const basic = Buffer.from(`x-access-token:${account.token}`).toString("base64");
+      Object.assign(env, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: `http.${new URL(remote).origin}/.extraheader`, GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}` });
+    }
+    const result = await runGit(dir, ["push", "--force", "origin", refspec], true, env);
+    if (result.code !== 0) throw new GithubFailure("push_failed", hide(result.stderr.trim() || result.stdout.trim(), account.token));
   }
 
   private async pushTo(dir: string, account: Account, first: boolean): Promise<void> {

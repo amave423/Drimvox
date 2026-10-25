@@ -14,6 +14,9 @@ const ref = (c: ModelChoice): ModelRef => ({ providerId: c.providerId, model: c.
  * The start of a project's work (docs/specs/project-work.md): what to make, and who does what — the interview, the plan,
  * the work, and the strong model that steps in when the working one is stuck.
  */
+/** Ready starts for common projects: their names and the task each puts in the box. */
+const TEMPLATES = ["landing", "shop", "bot", "api", "dashboard", "portfolio"] as const;
+
 export function ProjectStart({ projectId, initial, onStarted }: { projectId: string; initial: ModelChoice | null; onStarted(task: TaskView): void }) {
   const { api, t } = useApp();
   const [text, setText] = useState("");
@@ -57,6 +60,14 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
           void start();
         }}
       >
+        {/* Ready starts for common projects (asked for): a click puts a fuller task in the box, to change as needed. */}
+        <div className="project-templates" role="group" aria-label={t("projectWork.templates")}>
+          {TEMPLATES.map((id) => (
+            <button key={id} type="button" className="chip" onClick={() => setText(t(`projectWork.template.${id}.text` as MessageKey))}>
+              {t(`projectWork.template.${id}` as MessageKey)}
+            </button>
+          ))}
+        </div>
         <textarea
           className="field-input task-input"
           rows={5}

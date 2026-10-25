@@ -46,6 +46,15 @@ export async function startFakeGithub({ pending = 1, deny = false } = {}) {
       repos.set(body.name, { bare, private: body.private });
       return json(201, { full_name: `octo/${body.name}`, html_url: `${origin}/octo/${body.name}`, clone_url: pathToFileURL(bare).href, private: body.private });
     }
+    // GitHub Pages: switched on from a branch; asked again, it is already on.
+    const pages = path.match(/^\/repos\/([^/]+)\/([^/]+)\/pages$/);
+    if (req.method === "POST" && pages) {
+      const repo = repos.get(pages[2]);
+      if (!repo) return json(404, { message: "Not Found" });
+      if (repo.pages) return json(409, { message: "GitHub Pages is already enabled." });
+      repo.pages = body.source;
+      return json(201, { html_url: `https://${pages[1]}.github.io/${pages[2]}/`, source: body.source });
+    }
     return json(404, { message: "Not Found" });
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));

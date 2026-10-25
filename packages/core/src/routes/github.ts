@@ -1,9 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
 import { githubPublishSchema } from "@drimvox/shared";
 import { Hono } from "hono";
+import { join } from "node:path";
 import { existsSync } from "node:fs";
 import type { ProjectRepo } from "../agent/repo";
 import { GithubFailure, type GitHub } from "../github/github";
+import { builtSite, markNoJekyll } from "../github/site";
 
 const notFound = { error: { code: "not_found" } } as const;
 
@@ -38,6 +40,20 @@ export function githubRoutes(github: GitHub, projects: ProjectRepo) {
       const input = c.req.valid("json");
       try {
         return c.json(await github.publish(dir, input.name, input.private), 201);
+      } catch (err) {
+        const f = failure(err);
+        return c.json(f.body, f.status);
+      }
+    })
+    // The finished site, published with GitHub Pages (docs/specs/github-publish.md).
+    .post("/projects/:id/site", async (c) => {
+      const dir = folder(c.req.param("id"));
+      if (!dir) return c.json(notFound, 404);
+      const site = await builtSite(dir);
+      if (!site) return c.json({ error: { code: "no_site" as const } }, 409);
+      try {
+        markNoJekyll(join(dir, site));
+        return c.json({ ...(await github.publishSite(dir, join(dir, site))), folder: site }, 200);
       } catch (err) {
         const f = failure(err);
         return c.json(f.body, f.status);

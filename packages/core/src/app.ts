@@ -226,7 +226,7 @@ export function createCore(o: AppOptions) {
     .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), (since) => spendingByModel(o.db, providers, since)))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
-    .route("/projects", workRoutes(projects, providers, projectWork, shots))
+    .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo))
     .route("/tasks", taskRoutes(tasks, runner, shots, backlogService))
     .route("/github", githubRoutes(github, projects))
     // Every project's work at once: the window's notifications (docs/specs/project-work.md).
