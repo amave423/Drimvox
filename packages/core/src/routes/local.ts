@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { localAudioPullSchema, localAudioSearchSchema, hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@drimvox/shared";
+import { localAudioPullSchema, localAudioSearchSchema, localVoicePullSchema, hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { CatalogError } from "../local/catalog";
@@ -81,6 +81,19 @@ export function localRoutes(local: LocalModels) {
         throw err;
       }
     })
+    // Reading aloud (docs/specs/local-speech.md): Piper's voices, the engine with the first one.
+    .get("/speech", (c) => c.json(local.speech.status()))
+    .post("/speech/pulls", zValidator("json", localVoicePullSchema), (c) => {
+      try {
+        return c.json(local.speech.pull(c.req.valid("json").voice), 202);
+      } catch (err) {
+        return c.json({ error: { code: "unsupported", detail: err instanceof Error ? err.message : String(err) } }, 409);
+      }
+    })
+    .post("/speech/pulls/pause", zValidator("json", localVoicePullSchema), (c) => (local.speech.pause(c.req.valid("json").voice) ? c.json({ ok: true as const }, 200) : c.json({ error: { code: "not_found" } }, 404)))
+    .delete("/speech/pulls", zValidator("query", localVoicePullSchema), (c) => (local.speech.cancel(c.req.valid("query").voice) ? c.body(null, 204) : c.json({ error: { code: "not_found" } }, 404)))
+    .delete("/speech/voices", zValidator("query", localVoicePullSchema), (c) => (local.speech.remove(c.req.valid("query").voice) ? c.body(null, 204) : c.json({ error: { code: "not_found" } }, 404)))
+    .delete("/speech/engine", (c) => (local.speech.removeEngine() ? c.body(null, 204) : c.json({ error: { code: "busy" } }, 409)))
     .delete("/audio/engine", (c) => (local.audio.removeEngine() ? c.body(null, 204) : c.json({ error: { code: "busy" } }, 409)))
     .get("/images", async (c) => c.json(await local.images.status()))
     .delete("/images/engine", (c) => (local.images.removeEngine() ? c.body(null, 204) : c.json({ error: { code: "busy" } }, 409)))

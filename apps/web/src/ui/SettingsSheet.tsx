@@ -12,6 +12,7 @@ import { SkillsSection } from "./SkillsSection";
 import { UpdatesSection } from "./UpdatesSection";
 import { Catalog } from "./Catalog";
 import { Setting } from "./Setting";
+import { SpeechVoiceSetting } from "./SpeechVoiceSetting";
 import { SearchSection } from "./SearchSection";
 import { SpendingSection } from "./SpendingSection";
 import { ModelPicker } from "./chat/ModelPicker";
@@ -167,6 +168,8 @@ export function SettingsSheet() {
             )}
           </div>
         </Setting>
+
+        <SpeechVoiceSetting />
 
         <SpendingSection />
 

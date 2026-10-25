@@ -8,7 +8,7 @@ import { workRoutes } from "./routes/work";
 import { resolveVision } from "./visual/look";
 import { findModel } from "./providers/catalog";
 import { zValidator } from "@hono/zod-validator";
-import { settingsPatchSchema, type PresetId } from "@drimvox/shared";
+import { settingsPatchSchema, speakSchema, type PresetId } from "@drimvox/shared";
 import { Hono } from "hono";
 import { join } from "node:path";
 import { ProjectRepo, TaskRepo } from "./agent/repo";
@@ -122,7 +122,7 @@ export function createCore(o: AppOptions) {
   const searchStore = new SearchStore(o.db, cipher);
   const searchUrls = o.searchUrls ?? SEARCH_URLS;
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
-  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), audioDir: join(o.dataDir, "audio"), proxy: () => proxies.url(), ...o.local });
+  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
   useLocalImages(local.images);
   useLocalAudio(local.audio);
@@ -229,6 +229,17 @@ export function createCore(o: AppOptions) {
         return c.json({ text }, 200);
       } catch (err) {
         return c.json({ error: describeError(err) }, 502);
+      }
+    })
+    // An answer read aloud by the Piper voice from the settings (docs/specs/local-speech.md), as a WAV.
+    .post("/voice/speak", zValidator("json", speakSchema), async (c) => {
+      const voice = readSettings(o.db).speechVoice;
+      if (!voice) return c.json({ error: { code: "no_speech_voice" as const } }, 409);
+      try {
+        const wav = await local.speech.speak(voice, c.req.valid("json").text);
+        return c.body(new Uint8Array(wav), 200, { "Content-Type": "audio/wav" });
+      } catch (err) {
+        return c.json({ error: { code: "speech_failed" as const, detail: err instanceof Error ? err.message : String(err) } }, 502);
       }
     })
     .route(

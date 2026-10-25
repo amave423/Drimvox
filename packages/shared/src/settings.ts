@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { localVoiceIds } from "./local-speech";
 
 export const themes = ["system", "light", "dark"] as const;
 export const locales = ["ru", "en"] as const;
@@ -25,6 +26,8 @@ export const settingsSchema = z.object({
   imageModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
   /** The model that turns dictation into text: one that takes audio (Gemini, GPT-4o audio); null: no dictation. */
   voiceModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
+  /** The Piper voice that reads answers aloud (docs/specs/local-speech.md); null: the system's own voice. */
+  speechVoice: z.enum(localVoiceIds).nullable(),
   /** The most the whole app may spend in a calendar month, in dollars; null: no limit. */
   monthlyBudgetUsd: z.number().min(0.00001).max(100000).nullable(),
   /** Models the user starred: the picker's "Favourites" tab, across providers. */
@@ -39,4 +42,4 @@ export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 export type Currency = Settings["currency"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, developer: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null };
+export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, developer: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null };

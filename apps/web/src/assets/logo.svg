@@ -1,20 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="152 134 720 720">
-  <!-- Drimvox's mark: five petals around a spark cut out of the middle (docs/DESIGN.md). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 8 84 84">
+  <!-- Drimvox's mark: one ribbon folded into a D, the fold in shade (docs/DESIGN.md). -->
   <defs>
-    <linearGradient id="drimvox-petals" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="drimvox-ribbon" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#8b6fe0"/>
       <stop offset="1" stop-color="#3b7bd8"/>
     </linearGradient>
-    <mask id="drimvox-spark">
-      <rect x="0" y="0" width="1024" height="1024" fill="white"/>
-      <path d="M512 392 C 534 490 534 490 632 512 C 534 534 534 534 512 632 C 490 534 490 534 392 512 C 490 490 490 490 512 392 Z" fill="black"/>
-    </mask>
+    <linearGradient id="drimvox-fold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6a4fc4"/>
+      <stop offset="1" stop-color="#2a5fb0"/>
+    </linearGradient>
+    <linearGradient id="drimvox-light" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b19cf0"/>
+      <stop offset="1" stop-color="#6fa2ea"/>
+    </linearGradient>
   </defs>
-  <g fill="url(#drimvox-petals)" mask="url(#drimvox-spark)">
-    <circle cx="512.0" cy="322.0" r="150"/>
-    <circle cx="692.7" cy="453.3" r="150"/>
-    <circle cx="623.7" cy="665.7" r="150"/>
-    <circle cx="400.3" cy="665.7" r="150"/>
-    <circle cx="331.3" cy="453.3" r="150"/>
-  </g>
+  <path d="M22 14 H52 C74 14 88 30 88 50 C88 70 74 86 52 86 H38 L46 70 H52 C64 70 72 62 72 50 C72 38 64 30 52 30 H30 Z" fill="url(#drimvox-ribbon)"/>
+  <path d="M30 30 L22 14 L14 30 L26 86 L38 86 Z" fill="url(#drimvox-fold)"/>
+  <path d="M38 86 L46 70 L30 30 L26 86 Z" fill="url(#drimvox-light)" fill-opacity="0.55"/>
 </svg>

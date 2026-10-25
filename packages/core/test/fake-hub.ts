@@ -25,6 +25,11 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
       res.writeHead(200, { "content-type": "application/zip" });
       return res.end(Buffer.from(zipSync({ "Release/whisper-cli.exe": new Uint8Array([1, 2, 3]), "Release/whisper.dll": new Uint8Array([4]) })));
     }
+    // Piper for reading aloud (docs/specs/local-speech.md).
+    if (url.pathname === "/piper.zip") {
+      res.writeHead(200, { "content-type": "application/zip" });
+      return res.end(Buffer.from(zipSync({ "piper/piper.exe": new Uint8Array([1, 2, 3]), "piper/espeak-ng-data/phontab": new Uint8Array([4]) })));
+    }
     const tree = /^\/api\/models\/([^/]+\/[^/]+)\/tree\/main(\/.*)?$/.exec(url.pathname);
     if (tree) {
       const folder = tree[2] ? tree[2].slice(1) : "";
@@ -41,6 +46,7 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
         // Found by the search: one of a family Drimvox knows, one it does not.
         "someone/Z-Image-Turbo-Fun-GGUF": ["z_image_turbo_fun-Q5_K_M.gguf", "z_image_turbo_fun-Q8_0.gguf", "vae/ae.safetensors"],
         "someone/flux-mystery-GGUF": ["flux-mystery-Q4_K_S.gguf"],
+        "rhasspy/piper-voices": ["ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx"],
         "ggerganov/whisper.cpp": ["ggml-base.bin", "ggml-small-q5_1.bin", "ggml-large-v3-turbo-q5_0.bin"],
         // A speech model found by the search: whisper.cpp's file and a Core ML encoder beside it.
         "someone/whisper-ru-ggml": ["ggml-ru-q5_0.bin", "ggml-ru-encoder.mlmodelc.bin"],

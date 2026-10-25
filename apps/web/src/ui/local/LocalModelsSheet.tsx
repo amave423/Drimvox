@@ -8,6 +8,7 @@ import { forgetModels } from "../../lib/models";
 import { LocalCatalogView } from "./LocalCatalog";
 import { LocalImagesSection } from "./LocalImages";
 import { LocalAudioSection } from "./LocalAudio";
+import { LocalSpeechSection } from "./LocalSpeech";
 import { Tabs } from "../Tabs";
 import type { LocalPart } from "../../context";
 import { PullControl, type PullActions } from "./PullControl";
@@ -173,7 +174,12 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
           </>
         )}
         {(part === "image" || part === "video") && <LocalImagesSection key={part} kind={part} />}
-        {part === "audio" && <LocalAudioSection />}
+        {part === "audio" && (
+          <>
+            <LocalAudioSection />
+            <LocalSpeechSection />
+          </>
+        )}
       </div>
       <aside className="margin">
         <p className="note">{t("local.marginTip")}</p>

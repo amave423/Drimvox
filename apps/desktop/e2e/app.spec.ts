@@ -155,6 +155,19 @@ test("closing the window keeps Drimvox working in the tray, and it shows the win
   await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isVisible())).toBe(true);
 });
 
+// Asked for: reading answers aloud with Piper's voices instead of the system's.
+test("offers Piper's voices on the audio tab and in the settings", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await page.getByRole("button", { name: "Локальные модели" }).first().click();
+  await page.getByRole("tab", { name: "Аудио" }).click();
+  await expect(page.getByRole("heading", { name: "Озвучка ответов" })).toBeVisible();
+  await expect(page.locator(".local-card", { hasText: "Ирина" })).toContainText("русский, женский");
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await page.getByRole("tab", { name: "Модели и деньги" }).click();
+  await expect(page.getByRole("region", { name: "Голос для чтения ответов" })).toContainText("Скачать голоса Piper");
+});
+
 // Seen again and again: a model list fixed to open downwards ran off the window near the bottom of a page.
 test("a model list near the bottom of the window opens upwards and stays inside it", async () => {
   app = await launch();

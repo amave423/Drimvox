@@ -55,12 +55,51 @@ export async function startRecording(): Promise<() => Promise<string>> {
     });
 }
 
-/** Reads a text aloud with the system's voices, in the interface's language; Markdown marks are left out. */
-export function speak(text: string, locale: string, onEnd: () => void): () => void {
-  const plain = text
+/** The words of an answer to read aloud: no code blocks, no Markdown marks, links as their words. */
+export function plainText(text: string): string {
+  return text
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/[*_#>`~|]/g, "")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+}
+
+/**
+ * Plays a WAV that a voice on this computer read (Piper, docs/specs/local-speech.md); `wav` fetches it. Resolves to a
+ * way to stop; falls back to the system's voice when the recording does not come.
+ */
+export function speakWav(wav: () => Promise<Blob>, fallback: () => () => void, onEnd: () => void): () => void {
+  let stopped = false;
+  let audio: HTMLAudioElement | null = null;
+  let url: string | null = null;
+  let stopFallback: (() => void) | null = null;
+  const end = () => {
+    if (url) URL.revokeObjectURL(url);
+    url = null;
+    onEnd();
+  };
+  void wav()
+    .then((blob) => {
+      if (stopped) return;
+      url = URL.createObjectURL(blob);
+      audio = new Audio(url);
+      audio.onended = end;
+      audio.onerror = end;
+      return audio.play();
+    })
+    .catch(() => {
+      if (!stopped) stopFallback = fallback();
+    });
+  return () => {
+    stopped = true;
+    audio?.pause();
+    stopFallback?.();
+    end();
+  };
+}
+
+/** Reads a text aloud with the system's voices, in the interface's language; Markdown marks are left out. */
+export function speak(text: string, locale: string, onEnd: () => void): () => void {
+  const plain = plainText(text);
   const utterance = new SpeechSynthesisUtterance(plain);
   utterance.lang = locale === "ru" ? "ru-RU" : "en-US";
   // A natural (neural) voice where the system has one: the plain ones sound like a robot (seen: Windows' Irina).

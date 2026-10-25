@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
-import { speak, startRecording } from "../../lib/recorder";
+import { speak, startRecording, plainText, speakWav } from "../../lib/recorder";
 
 /**
  * Dictation in the message box (asked for): press, speak, press again; the voice model from the settings writes it down
@@ -64,11 +64,11 @@ export function DictateButton({ onText, disabled }: { onText(text: string): void
 
 /** An answer read aloud with the system's voices (asked for); pressed again, it stops. */
 export function SpeakButton({ text }: { text: string }) {
-  const { t, settings } = useApp();
+  const { api, t, settings } = useApp();
   const [on, setOn] = useState(false);
   const stop = useRef<(() => void) | null>(null);
   useEffect(() => () => stop.current?.(), []);
-  if (typeof speechSynthesis === "undefined") return null;
+  if (typeof speechSynthesis === "undefined" && !settings.speechVoice) return null;
   const label = t(on ? "voice.silence" : "voice.listen");
   return (
     <button
@@ -80,7 +80,20 @@ export function SpeakButton({ text }: { text: string }) {
       onClick={() => {
         if (on) return stop.current?.();
         setOn(true);
-        stop.current = speak(text, settings.locale, () => setOn(false));
+        const done = () => setOn(false);
+        const system = () => speak(text, settings.locale, done);
+        // A Piper voice from the settings reads it on this computer (asked for: the system's voice sounded like a robot).
+        stop.current = settings.speechVoice
+          ? speakWav(
+              async () => {
+                const res = await api.voice.speak.$post({ json: { text: plainText(text) } });
+                if (!res.ok) throw new Error(String(res.status));
+                return res.blob();
+              },
+              system,
+              done,
+            )
+          : system();
       }}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

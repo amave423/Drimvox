@@ -1,4 +1,5 @@
 import { LocalAudio, type LocalAudioOptions } from "./audio/service";
+import { LocalSpeech, type LocalSpeechOptions } from "./speech/service";
 import { HF_FILE_BASES } from "./hf-download";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -36,6 +37,10 @@ export interface LocalOptions {
   audioDir?: string;
   /** The speech engine (docs/specs/local-audio.md); tests give a fake one. */
   audio?: LocalAudioOptions;
+  /** Where Piper and its voices live; the data folder's "speech" by default. */
+  speechDir?: string;
+  /** Reading aloud (docs/specs/local-speech.md); tests give a fake engine. */
+  speech?: LocalSpeechOptions;
 }
 
 /** Local models: Ollama on this computer, the catalog sized for it, and the chat provider that uses it. */
@@ -46,6 +51,7 @@ export class LocalModels {
   readonly installer: OllamaInstaller;
   readonly images: LocalImages;
   readonly audio: LocalAudio;
+  readonly speech: LocalSpeech;
   private readonly canInstall: boolean;
 
   constructor(
@@ -96,6 +102,7 @@ export class LocalModels {
       },
       o.audio,
     );
+    this.speech = new LocalSpeech({ dir: o.speechDir ?? join(tmpdir(), "drimvox-speech"), hf }, o.speech);
     this.catalog = new LocalCatalog({ registryUrl: o.registryUrl ?? "https://registry.ollama.ai", hfUrl: o.hfUrl ?? "https://huggingface.co" });
   }
 
