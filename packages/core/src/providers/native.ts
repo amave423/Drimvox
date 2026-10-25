@@ -83,6 +83,7 @@ export async function withCatalogPrices(models: ModelInfo[], fetchFn: typeof fet
       contextLength: m.contextLength ?? known.contextLength,
       tools: m.tools ?? known.tools,
       vision: m.vision ?? known.vision,
+      ...(m.audio || known.audio ? { audio: true } : {}),
     };
   });
 }
@@ -152,6 +153,7 @@ export async function nativeModels(conn: Connection): Promise<ModelInfo[]> {
         ...(known?.priceCacheRead !== undefined ? { priceCacheRead: known.priceCacheRead } : {}),
         tools: known?.tools ?? null,
         vision: known?.vision ?? null,
+        ...(known?.audio ? { audio: true } : {}),
         ...(conn.preset === "google" ? { freeTier: googleFreeTier(m.id) } : {}),
       };
     })

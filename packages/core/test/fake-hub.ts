@@ -20,6 +20,11 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
       res.writeHead(200, { "content-type": "application/zip" });
       return res.end(Buffer.from(zipSync({ "sd-server.exe": new Uint8Array([1, 2, 3]), "stable-diffusion.dll": new Uint8Array([4]) })));
     }
+    // whisper.cpp for speech on this computer (docs/specs/local-audio.md).
+    if (url.pathname === "/whisper.zip") {
+      res.writeHead(200, { "content-type": "application/zip" });
+      return res.end(Buffer.from(zipSync({ "Release/whisper-cli.exe": new Uint8Array([1, 2, 3]), "Release/whisper.dll": new Uint8Array([4]) })));
+    }
     const tree = /^\/api\/models\/([^/]+\/[^/]+)\/tree\/main(\/.*)?$/.exec(url.pathname);
     if (tree) {
       const folder = tree[2] ? tree[2].slice(1) : "";
@@ -36,6 +41,7 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
         // Found by the search: one of a family Drimvox knows, one it does not.
         "someone/Z-Image-Turbo-Fun-GGUF": ["z_image_turbo_fun-Q5_K_M.gguf", "z_image_turbo_fun-Q8_0.gguf", "vae/ae.safetensors"],
         "someone/flux-mystery-GGUF": ["flux-mystery-Q4_K_S.gguf"],
+        "ggerganov/whisper.cpp": ["ggml-base.bin", "ggml-small-q5_1.bin", "ggml-large-v3-turbo-q5_0.bin"],
         "Comfy-Org/Wan_2.1_ComfyUI_repackaged": ["split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors", "split_files/vae/wan_2.1_vae.safetensors"],
       };
       const all = url.searchParams.get("recursive") === "true";

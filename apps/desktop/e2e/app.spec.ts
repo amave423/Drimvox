@@ -151,6 +151,25 @@ test("closing the window keeps Drimvox working in the tray, and it shows the win
   await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isVisible())).toBe(true);
 });
 
+// Seen again and again: a model list fixed to open downwards ran off the window near the bottom of a page.
+test("a model list near the bottom of the window opens upwards and stays inside it", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await page.getByRole("tab", { name: "Модели и деньги" }).click();
+  const button = page.locator(".model-setting").getByRole("button", { name: "Выбери модель" });
+  await button.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await button.click();
+  const panel = page.locator(".model-setting .picker-panel");
+  await expect(panel).toBeVisible();
+  const box = await panel.boundingBox();
+  const height = await page.evaluate(() => window.innerHeight);
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+});
+
 test("creates and deletes a shared skill in the settings", async () => {
   app = await launch();
   const page = await app.firstWindow();

@@ -38,6 +38,7 @@ import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
 import { monthUsage } from "./budget";
 import { transcribe } from "./voice";
+import { useLocalAudio } from "./local/audio/service";
 import { z } from "zod";
 import { describeError } from "./providers/errors";
 import { spendingByModel } from "./savings";
@@ -119,9 +120,10 @@ export function createCore(o: AppOptions) {
   const searchStore = new SearchStore(o.db, cipher);
   const searchUrls = o.searchUrls ?? SEARCH_URLS;
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
-  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), proxy: () => proxies.url(), ...o.local });
+  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), audioDir: join(o.dataDir, "audio"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
   useLocalImages(local.images);
+  useLocalAudio(local.audio);
   const github = new GitHub(o.db, cipher, o.github);
   const mcpRepo = new McpRepo(o.db, cipher);
   const mcp = new McpHub(mcpRepo);
@@ -219,7 +221,10 @@ export function createCore(o: AppOptions) {
       if (!choice || !conn) return c.json({ error: { code: "no_voice_model" as const } }, 409);
       const { audio, mimeType } = c.req.valid("json");
       try {
-        return c.json({ text: await transcribe(conn, choice.model, Buffer.from(audio, "base64"), mimeType) }, 200);
+        const bytes = Buffer.from(audio, "base64");
+        // A model on this computer writes it down itself, free and offline (docs/specs/local-audio.md).
+        const text = conn.preset === "whispercpp" ? await local.audio.transcribe(choice.model, bytes) : await transcribe(conn, choice.model, bytes, mimeType);
+        return c.json({ text }, 200);
       } catch (err) {
         return c.json({ error: describeError(err) }, 502);
       }

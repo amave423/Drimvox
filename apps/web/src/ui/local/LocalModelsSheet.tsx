@@ -7,6 +7,7 @@ import { InstallOllama } from "./InstallOllama";
 import { forgetModels } from "../../lib/models";
 import { LocalCatalogView } from "./LocalCatalog";
 import { LocalImagesSection } from "./LocalImages";
+import { LocalAudioSection } from "./LocalAudio";
 import { Segmented } from "../Segmented";
 import type { LocalPart } from "../../context";
 import { PullControl, type PullActions } from "./PullControl";
@@ -104,6 +105,7 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
             { value: "text", label: t("local.part.text") },
             { value: "image", label: t("local.part.image") },
             { value: "video", label: t("local.part.video") },
+            { value: "audio", label: t("local.part.audio") },
           ]}
         />
 
@@ -172,7 +174,8 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
             {status?.running && <LocalCatalogView status={status} actions={actions} />}
           </>
         )}
-        {part !== "text" && <LocalImagesSection key={part} kind={part} />}
+        {(part === "image" || part === "video") && <LocalImagesSection key={part} kind={part} />}
+        {part === "audio" && <LocalAudioSection />}
       </div>
       <aside className="margin">
         <p className="note">{t("local.marginTip")}</p>

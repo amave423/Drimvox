@@ -1,4 +1,4 @@
-import type { LocalImagesStatus, LocalPull, LocalStatus } from "@drimvox/shared";
+import type { LocalAudioStatus, LocalImagesStatus, LocalPull, LocalStatus } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";
@@ -18,12 +18,13 @@ interface Download {
 }
 
 /** The downloads going on now, from the local models' and pictures' states. */
-export function activeDownloads(local: LocalStatus | null, images: LocalImagesStatus | null): Download[] {
+export function activeDownloads(local: LocalStatus | null, images: LocalImagesStatus | null, audio: LocalAudioStatus | null = null): Download[] {
   const going = (p: LocalPull | null | undefined): p is LocalPull => !!p && !p.done && !p.paused && !p.error;
   return [
     ...(local?.pulls ?? []).filter(going).map((pull) => ({ name: pull.model, pull })),
     ...(images?.models ?? []).filter((m) => going(m.pull)).map((m) => ({ name: m.name, pull: m.pull! })),
     ...(going(images?.enginePull) ? [{ name: "stable-diffusion.cpp", pull: images!.enginePull! }] : []),
+    ...(audio?.models ?? []).filter((m) => going(m.pull)).map((m) => ({ name: m.name, pull: m.pull! })),
   ];
 }
 
@@ -40,12 +41,13 @@ export function DownloadNote() {
     let stop = false;
     let timer: ReturnType<typeof setTimeout>;
     const tick = async () => {
-      const [local, images] = await Promise.all([
+      const [local, images, audio] = await Promise.all([
         api.local.$get().then((r) => ok<LocalStatus>(r)).catch(() => null),
         api.local.images.$get().then((r) => ok<LocalImagesStatus>(r)).catch(() => null),
+        api.local.audio.$get().then((r) => ok<LocalAudioStatus>(r)).catch(() => null),
       ]);
       if (stop) return;
-      const now = activeDownloads(local, images);
+      const now = activeDownloads(local, images, audio);
       setDownloads(now);
       // One timer even when a tick was asked for while another was on its way.
       clearTimeout(timer);

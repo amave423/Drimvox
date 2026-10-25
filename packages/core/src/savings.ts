@@ -33,13 +33,15 @@ export async function spendingByModel(db: Database, providers: ProviderRepo, sin
       const models = await listModels(conn).catch(() => [] as ModelInfo[]);
       const used = models.find((m) => m.id === r.model);
       const family = maker(r.model);
-      cheaper = models
-        .filter((m) => m.id !== r.model && m.priceIn !== null && m.priceOut !== null && (m.priceIn > 0 || m.priceOut > 0))
+      // Only models that talk, compared with one that talks (seen: a picture model's answers "would cost 0" on chat models),
+      // and only with both prices known: no price is not the same as free.
+      cheaper = (used ? models : [])
+        .filter((m) => m.id !== r.model && m.priceIn !== null && m.priceOut !== null && m.priceIn > 0 && m.priceOut > 0)
         .filter((m) => family === null || maker(m.id) === family)
         .filter((m) => (used?.tools !== true || m.tools === true) && (used?.vision !== true || m.vision === true))
         .filter((m) => !used?.contextLength || !m.contextLength || m.contextLength >= Math.min(used.contextLength, 64_000))
         .map((m) => ({ model: m.id, name: m.name, priceIn: m.priceIn!, priceOut: m.priceOut!, wouldCostUsd: priceOf(m, r.input, r.output) }))
-        .filter((m) => m.wouldCostUsd <= r.cost * CHEAPER_BY)
+        .filter((m) => m.wouldCostUsd > 0 && m.wouldCostUsd <= r.cost * CHEAPER_BY)
         // The dearest of the cheaper ones first: the closest to what was used.
         .sort((a, b) => b.wouldCostUsd - a.wouldCostUsd)
         .slice(0, SUGGESTIONS);

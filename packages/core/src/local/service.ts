@@ -1,3 +1,4 @@
+import { LocalAudio, type LocalAudioOptions } from "./audio/service";
 import { HF_FILE_BASES } from "./hf-download";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,6 +32,10 @@ export interface LocalOptions {
   imagesDir?: string;
   /** The picture engine (docs/specs/local-images.md); tests give a fake one. */
   images?: LocalImagesOptions;
+  /** Where the speech engine and its models live; the data folder's "audio" by default. */
+  audioDir?: string;
+  /** The speech engine (docs/specs/local-audio.md); tests give a fake one. */
+  audio?: LocalAudioOptions;
 }
 
 /** Local models: Ollama on this computer, the catalog sized for it, and the chat provider that uses it. */
@@ -40,6 +45,7 @@ export class LocalModels {
   private readonly hardware: () => Promise<LocalHardware>;
   readonly installer: OllamaInstaller;
   readonly images: LocalImages;
+  readonly audio: LocalAudio;
   private readonly canInstall: boolean;
 
   constructor(
@@ -80,6 +86,15 @@ export class LocalModels {
         connect: () => this.providers.list().find((p) => p.preset === "sdcpp")?.id ?? this.providers.create({ preset: "sdcpp" }).id,
       },
       o.images,
+    );
+    this.audio = new LocalAudio(
+      {
+        dir: o.audioDir ?? join(tmpdir(), "drimvox-audio"),
+        hf,
+        providerId: () => this.providers.list().find((p) => p.preset === "whispercpp")?.id ?? null,
+        connect: () => this.providers.list().find((p) => p.preset === "whispercpp")?.id ?? this.providers.create({ preset: "whispercpp" }).id,
+      },
+      o.audio,
     );
     this.catalog = new LocalCatalog({ registryUrl: o.registryUrl ?? "https://registry.ollama.ai", hfUrl: o.hfUrl ?? "https://huggingface.co" });
   }

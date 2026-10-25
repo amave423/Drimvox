@@ -191,7 +191,7 @@ export function SettingsSheet() {
           <Hint text={t("voice.modelHint")} />
         </h2>
         <div className="actions">
-          <ModelPicker value={settings.voiceModel} onChange={({ providerId, model }) => void save({ voiceModel: { providerId, model } })} />
+          <ModelPicker audio value={settings.voiceModel} onChange={({ providerId, model }) => void save({ voiceModel: { providerId, model } })} />
           {settings.voiceModel && (
             <button className="link" onClick={() => void save({ voiceModel: null })}>
               {t("settings.clear")}

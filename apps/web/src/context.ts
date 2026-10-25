@@ -15,7 +15,7 @@ export interface CoreStatus {
  * `key` keeps a chat screen alive while a new chat gets its id, so a streaming answer
  * is not lost when the draft turns into a saved chat.
  */
-export type LocalPart = "text" | "image" | "video";
+export type LocalPart = "text" | "image" | "video" | "audio";
 
 export type View =
   | { kind: "home" }

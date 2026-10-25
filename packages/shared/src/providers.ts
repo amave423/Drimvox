@@ -16,6 +16,7 @@ export const presetIds = [
   "ollama",
   "lmstudio",
   "sdcpp",
+  "whispercpp",
   "custom",
 ] as const;
 export type PresetId = (typeof presetIds)[number];
@@ -207,6 +208,16 @@ export const presets: Record<PresetId, Preset> = {
     billing: "free",
     currency: "USD",
   },
+  // Speech on this computer (docs/specs/local-audio.md): made by Drimvox when a speech model is downloaded.
+  whispercpp: {
+    id: "whispercpp",
+    name: "whisper.cpp",
+    baseUrl: "drimvox://whisper",
+    keyRequired: false,
+    editableUrl: false,
+    billing: "free",
+    currency: "USD",
+  },
   custom: {
     id: "custom",
     name: "OpenAI-совместимый",
@@ -278,6 +289,8 @@ export interface ModelInfo {
   tools: boolean | null;
   /** Understands pictures in the prompt; null when the catalog does not say. */
   vision: boolean | null;
+  /** Takes sound: such a model can write dictation down (the catalog says so; absent when it does not). */
+  audio?: boolean;
   /** For a CLI's "default": the model it actually ran last time, when Drimvox has seen one. */
   resolved?: string | null;
   /** Whether a free model answers, when Drimvox has asked it or chatted with it lately. */

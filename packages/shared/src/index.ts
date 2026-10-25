@@ -12,6 +12,7 @@ export * from "./quality";
 export * from "./design";
 export * from "./local";
 export * from "./local-images";
+export * from "./local-audio";
 export * from "./page";
 export * from "./backlog";
 export * from "./project-work";

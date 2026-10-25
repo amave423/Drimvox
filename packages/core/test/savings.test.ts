@@ -39,4 +39,17 @@ describe("spending by model", () => {
     expect(rows[0].cheaper.map((c: { model: string }) => c.model)).toEqual(["vendor/small"]);
     expect(rows[0].cheaper[0].wouldCostUsd).toBeLessThan(rows[0].costUsd);
   });
+
+  it("offers nothing for a model that is not among the provider's chat models (a picture model)", async () => {
+    fake = await startFakeProvider({ key: KEY, models: [{ id: "vendor/chat", pricing: { prompt: "0.000001", completion: "0.000002" } }], chunks: [{ text: "Ответ" }] });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    env.db.sql
+      .prepare("insert into chats (id, title, provider_id, model, kind, created_at, updated_at) values ('c', 't', ?, 'vendor/painter', 'image', 1, 1)")
+      .run(provider.id);
+    env.db.sql
+      .prepare("insert into messages (id, chat_id, role, content, provider_id, model, input_tokens, output_tokens, cost_usd, status, created_at) values ('m', 'c', 'assistant', '', ?, 'vendor/painter', 10, 10, 0.3, 'done', ?)")
+      .run(provider.id, Date.now());
+    const rows = await (await env.call("GET", "/api/usage/models?since=0")).json();
+    expect(rows[0]).toMatchObject({ model: "vendor/painter", cheaper: [] });
+  });
 });

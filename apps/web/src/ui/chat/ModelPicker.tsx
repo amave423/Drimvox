@@ -1,6 +1,7 @@
 import { estimateCost, type ChatKind, type MediaModel, type ModelInfo, type PhotoInput, type ProviderView } from "@drimvox/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
+import { useFlip } from "../../lib/flip";
 import { formatPrice, formatTokens, formatUsd } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
 import { loadMediaModel, loadMediaModels } from "../../lib/media";
@@ -20,17 +21,37 @@ interface PickerProps {
   kinds?: ChatKind[];
   /** Only models that see pictures (for checking screenshots). */
   vision?: boolean;
+  /** Only models that hear sound (dictation), and only the providers that have one. */
+  audio?: boolean;
   /** A photo waits to be sent: picture and video models that take one come first, the others cannot be chosen. */
   photos?: boolean;
 }
 
 type Listed = { id: string; name: string; info: ModelInfo | null; photoInput?: PhotoInput | null; providerId?: string };
 
-export function ModelPicker({ value, onChange, placement = "below", kinds: wanted = ["text"], vision = false, photos = false }: PickerProps) {
-  const { api, t, providers, settings, updateSettings } = useApp();
+export function ModelPicker({ value, onChange, placement = "below", kinds: wanted = ["text"], vision = false, photos = false, audio = false }: PickerProps) {
+  const { api, t, providers: all, settings, updateSettings } = useApp();
+  // For dictation: only providers with a model that hears (seen: every provider and the picture tabs were offered).
+  const [hearing, setHearing] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (!audio) return;
+    let live = true;
+    const hears = (models: ModelInfo[] | null) => !!models?.some((m) => m.audio);
+    setHearing(new Set(all.filter((p) => hears(storedModels(p.id))).map((p) => p.id)));
+    void Promise.all(all.filter((p) => p.billing !== "subscription").map(async (p) => ({ id: p.id, r: await loadModels(api, p.id) }))).then(
+      (rows) => live && setHearing(new Set(rows.filter((x) => "models" in x.r && hears(x.r.models)).map((x) => x.id))),
+    );
+    return () => {
+      live = false;
+    };
+  }, [audio, all, api]);
+  // The speech engine on this computer only writes dictation down: it is offered for that alone.
+  const providers = audio ? all.filter((p) => hearing?.has(p.id)) : all.filter((p) => p.preset !== "whispercpp");
   const favorites = settings.favoriteModels;
   const [open, setOpen] = useState(false);
-  const [providerId, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
+  const [chosenProvider, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
+  // A provider that is not offered (no model that hears) gives way to the first that is.
+  const providerId = providers.some((p) => p.id === chosenProvider) || chosenProvider === FAVORITES ? chosenProvider : providers[0]?.id;
   // Local models and programs on a subscription only talk: no tabs for pictures and video there (seen: empty tabs).
   const preset = providers.find((p) => p.id === providerId)?.preset;
   const talkOnly = preset === "ollama" || preset === "lmstudio" || providers.find((p) => p.id === providerId)?.billing === "subscription";
@@ -46,6 +67,9 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const [media, setMedia] = useState<MediaModel[] | null>(null);
   const [checking, setChecking] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  // Where the list opens: where there is room. Inside the chat's options it opens over the panel instead (the CSS).
+  const nested = !!root.current?.closest(".options-panel");
+  const flip = useFlip(open, root, placement === "above");
 
   useEffect(() => {
     if (!open || !providerId || providerId === FAVORITES) return;
@@ -126,7 +150,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
     const found = q ? all.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : all;
     // Models that do not answer are left out: a chat with them only fails. Checking screenshots needs eyes: those known to
     // have none are left out (a custom server often does not say; seen: all its models hidden).
-    const usable = found.filter((m) => m.info?.available !== "gone" && (!vision || m.info?.vision !== false));
+    const usable = found.filter((m) => m.info?.available !== "gone" && (!vision || m.info?.vision !== false) && (!audio || m.info?.audio === true));
     // With a photo attached, the models that take one first (docs/specs/media.md).
     const list = photos && kind !== "text" ? [...usable.filter((m) => m.photoInput), ...usable.filter((m) => !m.photoInput)] : usable;
     // Free models first, under their own heading, inside the kind they belong to; the limit cuts the paid ones, so a
@@ -138,7 +162,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
       groups: split && { free: split.free, paid: split.paid.slice(0, Math.max(0, LIMIT - split.free.length)) },
       hidden: found.length - list.length,
     };
-  }, [result, media, kind, query, vision, photos, onFavorites, favoriteList]);
+  }, [result, media, kind, query, vision, photos, onFavorites, favoriteList, audio]);
   const loading = onFavorites ? favoriteList === null : kind === "text" ? result === null : media === null;
 
   const providerName = providers.find((p) => p.id === value?.providerId)?.name;
@@ -208,11 +232,15 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
         <span aria-hidden>▾</span>
       </button>
       {open && (
-        <div className={`picker-panel${placement === "above" ? " is-above" : ""}`}>
+        <div
+          className={`picker-panel${(nested ? true : flip.above) ? " is-above" : ""}`}
+          style={nested ? undefined : { maxHeight: flip.maxHeight ? Math.min(560, flip.maxHeight) : undefined }}
+        >
+          {audio && hearing !== null && providers.length === 0 && <p className="muted">{t("voice.noModels")}</p>}
           {/* Every provider stays in the row whichever is chosen (seen: choosing the picture engine hid the others). */}
           {(providers.length > 1 || favorites.length > 0) && (
             <div className="picker-providers">
-              {wanted.includes("text") && (
+              {wanted.includes("text") && !audio && (
                 <button type="button" className={onFavorites ? "is-on" : undefined} onClick={() => setProviderId(FAVORITES)}>
                   {t("model.favorites")}
                 </button>

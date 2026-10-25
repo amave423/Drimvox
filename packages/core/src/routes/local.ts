@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@drimvox/shared";
+import { localAudioPullSchema, hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { CatalogError } from "../local/catalog";
@@ -50,6 +50,20 @@ export function localRoutes(local: LocalModels) {
       (await local.remove(c.req.valid("query").name)) ? c.json({ ok: true }, 200) : c.json({ error: { code: "not_found" } }, 404),
     )
     // Pictures on this computer (docs/specs/local-images.md): the short list, downloads of the engine and the models.
+    // Speech on this computer (docs/specs/local-audio.md): the speech models, the engine with the first one.
+    .get("/audio", (c) => c.json(local.audio.status()))
+    .post("/audio/pulls", zValidator("json", localAudioPullSchema), (c) => {
+      try {
+        return c.json(local.audio.pull(c.req.valid("json").model), 202);
+      } catch (err) {
+        return c.json({ error: { code: "unsupported", detail: err instanceof Error ? err.message : String(err) } }, 409);
+      }
+    })
+    .post("/audio/pulls/pause", zValidator("json", localAudioPullSchema), (c) => (local.audio.pause(c.req.valid("json").model) ? c.json({ ok: true as const }, 200) : c.json({ error: { code: "not_found" } }, 404)))
+    .delete("/audio/pulls", zValidator("query", localAudioPullSchema), (c) => (local.audio.cancel(c.req.valid("query").model) ? c.body(null, 204) : c.json({ error: { code: "not_found" } }, 404)))
+    .delete("/audio/models/:id", (c) =>
+      local.audio.remove(c.req.param("id") as never) ? c.body(null, 204) : c.json({ error: { code: "not_found" } }, 404),
+    )
     .get("/images", async (c) => c.json(await local.images.status()))
     .post("/images/pulls", zValidator("json", localImagePullSchema), async (c) => {
       try {

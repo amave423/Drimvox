@@ -17,7 +17,7 @@ export function ProvidersSheet() {
   }, [api]);
   // Models on this computer live in "Local models": Ollama and the picture engine are run from there (seen: Ollama in the
   // keys' list looked out of place, and opening the list woke it).
-  const own = providers.filter((p) => p.preset !== "ollama" && p.preset !== "sdcpp");
+  const own = providers.filter((p) => p.preset !== "ollama" && p.preset !== "sdcpp" && p.preset !== "whispercpp");
   const bySubscription = own.filter((p) => p.billing === "subscription");
   const byKey = own.filter((p) => p.billing !== "subscription");
   // By key or by subscription, each on its own tab; the way to connect comes first (seen: with many providers it was

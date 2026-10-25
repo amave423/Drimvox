@@ -5,6 +5,7 @@ import { usdPer } from "../rates";
 import { NATIVE, nativeModels, withCatalogPrices } from "./native";
 import { isCli } from "../cli/kinds";
 import { cliModels } from "../cli/models";
+import { localAudio } from "../local/audio/service";
 import type { Connection } from "./repo";
 
 /**
@@ -95,6 +96,7 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
       ...(priceCacheRead !== null && priceIn !== null && priceCacheRead < priceIn ? { priceCacheRead } : {}),
       tools: Array.isArray(params) ? params.includes("tools") : null,
       vision: Array.isArray(inputs) ? inputs.includes("image") : null,
+      ...(Array.isArray(inputs) && inputs.includes("audio") ? { audio: true } : {}),
     });
   }
   return models.sort((a, b) => a.name.localeCompare(b.name));
@@ -119,6 +121,9 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
   if (isCli(conn.preset)) return cliModels({ ...conn, preset: conn.preset });
   // Pictures on this computer have no models to talk to (docs/specs/local-images.md).
   if (conn.preset === "sdcpp") return [];
+  // Speech on this computer (docs/specs/local-audio.md): the downloaded models, all of which hear.
+  if (conn.preset === "whispercpp")
+    return (localAudio()?.installed() ?? []).map((m) => ({ id: m.id, name: m.name, contextLength: null, priceIn: 0, priceOut: 0, priceEstimated: false, tools: false, vision: false, audio: true }));
   const hit = cache.get(conn.cacheKey);
   if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.models;
   let models: ModelInfo[];
