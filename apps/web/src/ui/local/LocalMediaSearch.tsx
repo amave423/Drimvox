@@ -2,6 +2,7 @@ import type { HfMediaFile, HfMediaRepo, LocalImagesStatus } from "@drimvox/share
 import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
+import { HfCard } from "./HfCard";
 import { PullControl, type PullActions } from "./PullControl";
 
 /**
@@ -55,22 +56,18 @@ export function LocalMediaSearch({ kind, status, actions }: { kind: "image" | "v
       </form>
       {error && <p className="note is-pencil">{t("local.hfFailed")}</p>}
       {repos && repos.length === 0 && <p className="muted">{t("local.hfNone")}</p>}
-      <ul className="local-list">
+      <ul className="hf-cards">
         {repos?.map((r) => (
-          <li key={r.repo} className={`local-repo${r.family ? "" : " is-unsupported"}`}>
-            <button
-              type="button"
-              className="local-repo-head"
-              disabled={!r.family}
-              aria-expanded={r.family ? open === r.repo : undefined}
-              onClick={() => setOpen(open === r.repo ? null : r.repo)}
-            >
-              <span className="mono">{r.repo}</span>
-              <span className="muted">{t("local.downloads", { n: compact.format(r.downloads) })}</span>
-              {!r.family && <span className="local-why">{t("localImages.unknownFamily")}</span>}
-            </button>
-            {open === r.repo && <Files repo={r.repo} status={status} actions={actions} />}
-          </li>
+          <HfCard
+            key={r.repo}
+            repo={r.repo}
+            facts={t("local.downloads", { n: compact.format(r.downloads) })}
+            why={r.family ? null : t("localImages.unknownFamily")}
+            open={open === r.repo}
+            onToggle={() => setOpen(open === r.repo ? null : r.repo)}
+          >
+            <Files repo={r.repo} status={status} actions={actions} />
+          </HfCard>
         ))}
       </ul>
     </>

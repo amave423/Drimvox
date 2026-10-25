@@ -1,4 +1,4 @@
-import type { LocalAudioModelId, LocalAudioStatus, LocalPull } from "@drimvox/shared";
+import type { HfAudioFile, HfAudioRepo, LocalAudioStatus, LocalPull } from "@drimvox/shared";
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fetchVia } from "../../proxy";
 import { downloadFile, fileByPath, type Route } from "../hf-download";
 import { AUDIO_MODELS, type AudioModelDef } from "./catalog";
+import { audioFiles, FoundAudio, foundAudio, parseFound, searchAudio } from "./found";
 import { findCli, installWhisper, whisperUrl } from "./engine";
 
 export interface LocalAudioOptions {
@@ -37,14 +38,31 @@ const TRANSCRIBE_MS = 5 * 60_000;
  * written down by running whisper-cli on the recording, free and without the internet.
  */
 export class LocalAudio {
-  private readonly pulls = new Map<LocalAudioModelId, Active>();
+  private readonly pulls = new Map<string, Active>();
   private readonly url: string | null;
+  private readonly found: FoundAudio;
 
   constructor(
     private readonly d: Deps,
     private readonly o: LocalAudioOptions = {},
   ) {
     this.url = o.engineUrl === undefined ? whisperUrl() : o.engineUrl;
+    this.found = new FoundAudio(d.dir);
+  }
+
+  /** Drimvox's own models and the ones downloaded from a search. */
+  private defs(): AudioModelDef[] {
+    return [...AUDIO_MODELS, ...this.found.list()];
+  }
+
+  /** Speech models on Hugging Face, the ones whisper.cpp runs first. */
+  search(query: string): Promise<HfAudioRepo[]> {
+    return searchAudio(this.d.hf.apiUrl, query);
+  }
+
+  /** A found repository's whisper.cpp files. */
+  files(repo: string): Promise<HfAudioFile[]> {
+    return audioFiles(this.d.hf.apiUrl, repo, (id) => this.installed().some((m) => m.id === id));
   }
 
   private get engineDir() {
@@ -52,7 +70,7 @@ export class LocalAudio {
   }
 
   private pathOf(m: AudioModelDef) {
-    return join(this.d.dir, "models", m.path);
+    return join(this.d.dir, "models", m.file);
   }
 
   status(): LocalAudioStatus {
@@ -60,18 +78,34 @@ export class LocalAudio {
       supported: this.url !== null,
       engine: !!findCli(this.engineDir),
       providerId: this.d.providerId(),
-      models: AUDIO_MODELS.map((m) => ({ id: m.id, name: m.name, note: m.note, sizeBytes: m.bytes, installed: existsSync(this.pathOf(m)), pull: this.pulls.get(m.id)?.pull ?? null })),
+      models: this.defs().map((m) => ({
+        id: m.id,
+        name: m.name,
+        note: m.note,
+        source: m.id.startsWith("hf:") ? ("hf" as const) : ("checked" as const),
+        sizeBytes: m.bytes,
+        installed: existsSync(this.pathOf(m)),
+        pull: this.pulls.get(m.id)?.pull ?? null,
+      })),
     };
   }
 
   /** The downloaded models: what the engine's provider lists. */
   installed(): AudioModelDef[] {
-    return AUDIO_MODELS.filter((m) => existsSync(this.pathOf(m)));
+    return this.defs().filter((m) => existsSync(this.pathOf(m)));
   }
 
-  pull(id: LocalAudioModelId): LocalPull {
+  /** Starts downloading a model (and the engine, the first time); a found one is looked up on Hugging Face first. */
+  async pull(id: string): Promise<LocalPull> {
     if (this.url === null) throw new Error("There is no build of the engine for this system");
-    const model = AUDIO_MODELS.find((m) => m.id === id)!;
+    let model = this.defs().find((m) => m.id === id);
+    const where = parseFound(id);
+    if (!model && where) {
+      const info = await fileByPath(this.d.hf.apiUrl, where.repo, where.path, AbortSignal.timeout(30_000));
+      model = foundAudio(where.repo, where.path, info.size);
+      this.found.add(model);
+    }
+    if (!model) throw new Error("Unknown speech model");
     const going = this.pulls.get(id);
     if (going && !going.pull.done && !going.pull.paused) return { ...going.pull };
     const a: Active = {
@@ -149,7 +183,7 @@ export class LocalAudio {
     }
   }
 
-  pause(id: LocalAudioModelId): boolean {
+  pause(id: string): boolean {
     const a = this.pulls.get(id);
     if (!a || a.pull.done) return false;
     a.abort.abort();
@@ -157,21 +191,33 @@ export class LocalAudio {
     return true;
   }
 
-  cancel(id: LocalAudioModelId): boolean {
+  cancel(id: string): boolean {
     const a = this.pulls.get(id);
     if (!a) return false;
     a.abort.abort();
     this.pulls.delete(id);
+    // A found model not downloaded after all leaves the list.
+    const def = this.defs().find((m) => m.id === id);
+    if (def && id.startsWith("hf:") && !existsSync(this.pathOf(def))) this.found.remove(id);
     const file = a.partial;
     if (file) setTimeout(() => rmSync(file, { force: true }), 500).unref();
     return true;
   }
 
-  remove(id: LocalAudioModelId): boolean {
-    const model = AUDIO_MODELS.find((m) => m.id === id);
+  remove(id: string): boolean {
+    const model = this.defs().find((m) => m.id === id);
     if (!model || !existsSync(this.pathOf(model))) return false;
     rmSync(this.pathOf(model), { force: true });
     this.pulls.delete(id);
+    if (id.startsWith("hf:")) this.found.remove(id);
+    return true;
+  }
+
+  /** Deletes the engine, the models staying; refused while something downloads. */
+  removeEngine(): boolean {
+    if ([...this.pulls.values()].some((a) => !a.pull.done && !a.pull.paused)) return false;
+    rmSync(this.engineDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    for (const [id, a] of this.pulls) if (a.pull.done) this.pulls.delete(id);
     return true;
   }
 

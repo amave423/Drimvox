@@ -55,6 +55,8 @@ export interface Generated {
 /** Draws one picture. Pictures take seconds to a minute; five minutes is the limit. */
 export async function generateImage(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal, photos: Photo[] = []): Promise<Generated> {
   if (conn.preset === "sdcpp") return drawLocally(model.id, prompt, o.aspectRatio, signal);
+  if (model.native === "gemini") return drawGemini(conn, model, prompt, o, signal, photos);
+  if (model.native === "nvidia") return drawNvidia(conn, model, prompt, o, signal);
   if (model.viaChat) return drawInChat(conn, model, prompt, o, signal, photos);
   if (model.openaiImages) return drawOpenAiStyle(conn, model, prompt, signal);
   const body = await postJson(
@@ -114,6 +116,54 @@ async function drawInChat(conn: Connection, model: MediaModel, prompt: string, o
   const match = typeof url === "string" ? url.match(/^data:([^;,]+);base64,(.*)$/s) : null;
   if (!match) throw new ProviderFailure({ code: "provider_error", detail: "No picture in the answer" });
   return { bytes: Buffer.from(match[2]!, "base64"), mime: match[1]!, costUsd: await costOf(conn, body) };
+}
+
+/** Gemini's own API: the picture comes back as inline data among the answer's parts. */
+async function drawGemini(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal, photos: Photo[] = []): Promise<Generated> {
+  const aspect = pick(model.aspectRatios, o.aspectRatio);
+  const res = await request(
+    conn,
+    `${conn.baseUrl}/models/${model.id}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", "x-goog-api-key": conn.apiKey ?? "" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, ...photos.map((p) => ({ inlineData: { mimeType: p.mime, data: p.data.toString("base64") } }))] }],
+        generationConfig: { responseModalities: ["TEXT", "IMAGE"], ...(aspect ? { imageConfig: { aspectRatio: aspect } } : {}) },
+      }),
+      signal,
+    },
+    5 * 60_000,
+  );
+  const body = (await res.json().catch(() => null)) as { candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[] } | null;
+  const picture = body?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
+  if (!picture?.data) throw new ProviderFailure({ code: "provider_error", detail: "No picture in the answer" });
+  return { bytes: Buffer.from(picture.data, "base64"), mime: picture.mimeType ?? sniff(picture.data), costUsd: null };
+}
+
+/** The size NVIDIA's FLUX draws at for an aspect ratio: about a megapixel, sides in steps of 64. */
+const NVIDIA_SIZES: Record<string, [number, number]> = { "1:1": [1024, 1024], "16:9": [1344, 768], "9:16": [768, 1344], "4:3": [1152, 896], "3:4": [896, 1152] };
+
+/** NVIDIA's genai endpoints, on their own host next to the chat API; drawn on free developer credits. */
+async function drawNvidia(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal): Promise<Generated> {
+  const [width, height] = NVIDIA_SIZES[o.aspectRatio ?? "1:1"] ?? NVIDIA_SIZES["1:1"]!;
+  const schnell = /schnell/i.test(model.id);
+  const url = `${conn.baseUrl.replace(/integrate\.api\.nvidia\.com\/v1\/?$/, "ai.api.nvidia.com/v1")}/genai/${model.id}`;
+  const res = await request(
+    conn,
+    url,
+    {
+      method: "POST",
+      headers: headers(conn),
+      body: JSON.stringify(schnell ? { prompt, width, height, seed: 0, steps: 4 } : { prompt, mode: "base", cfg_scale: 3.5, width, height, seed: 0, steps: 30 }),
+      signal,
+    },
+    5 * 60_000,
+  );
+  const body = (await res.json().catch(() => null)) as { artifacts?: { base64?: string; finishReason?: string }[] } | null;
+  const art = body?.artifacts?.[0];
+  if (!art?.base64) throw new ProviderFailure({ code: "provider_error", detail: art?.finishReason ? `NVIDIA: ${art.finishReason}` : "No picture in the answer" });
+  return { bytes: Buffer.from(art.base64, "base64"), mime: sniff(art.base64), costUsd: null };
 }
 
 /** PNG and JPEG are told apart by their first bytes when the answer does not say. */

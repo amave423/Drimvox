@@ -8,6 +8,7 @@ import { ErrorNote } from "../ErrorNote";
 import { Hint } from "../Hint";
 import { Toggle } from "../Toggle";
 import { presetName } from "./presetName";
+import { AllModels } from "./AllModels";
 import { ProviderLogo } from "./ProviderLogo";
 
 type Mode = "idle" | "replaceKey" | "confirmRemove";
@@ -31,6 +32,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
   // A connected provider is one line with its state; its switches and actions open on request (seen: a heavy grey card
   // outweighed the way to connect above it). A provider that fails opens by itself: its key may need replacing.
   const [open, setOpen] = useState(false);
+  const [listing, setListing] = useState(false);
   // Pictures on this computer: its models are downloaded on the local models' sheet, nothing to check or proxy here.
   const local = provider.preset === "sdcpp";
 
@@ -190,6 +192,11 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
               {t("providers.recheck")}
             </button>
           )}
+          {!local && (
+            <button className="link" onClick={() => setListing(true)}>
+              {t("allModels.open")}
+            </button>
+          )}
           {(provider.billing === "paid" || provider.billing === "credits") && (
             <button className="link" onClick={() => setMode("replaceKey")}>
               {t("providers.replaceKey")}
@@ -200,6 +207,7 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
           </button>
         </div>
       )}
+      {listing && <AllModels provider={provider} onClose={() => setListing(false)} />}
     </li>
   );
 }

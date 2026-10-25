@@ -17,6 +17,9 @@
   --wait-soft: #f3e5c8;
   /* The chosen option of a pill switch or a filter: ink on paper in the light theme, soft ink in the dark one
      (seen: a near-white pill was the brightest thing on a dark screen). */
+  /* The colours of Drimvox's mark, the same in both themes: also the marks of providers, servers and skills. */
+  --brand-from: #8b6fe0;
+  --brand-to: #3b7bd8;
   --choice: var(--fg);
   --on-choice: var(--sheet);
   --sheet-shadow: 0 18px 40px -30px rgba(40, 35, 20, 0.5);

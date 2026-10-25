@@ -97,12 +97,14 @@ export function enterPhase(ctx: PassContext, id: string, phase: TaskPhase): void
  * One model pass in the task's current step, then Drimvox's own decision about what comes next.
  * Returns the message that starts the next pass, or null when the task now waits or is done.
  */
-export async function runPass(ctx: PassContext, id: string, userText: string): Promise<string | null> {
+export async function runPass(ctx: PassContext, id: string, userText: string, fromDrimvox = false): Promise<string | null> {
   const row = ctx.tasks.row(id)!;
   const phase = row.phase;
   const messages: ModelMessage[] = [...ctx.tasks.messages(id), { role: "user", content: userText }];
   ctx.tasks.update(id, { messages: JSON.stringify(messages) });
-  ctx.event("user", { text: userText });
+  // Drimvox's own nudges to the model ("write the plan now") are marked: the feed does not show them as the user's words
+  // (seen live: English instructions to the model appeared in the user's feed).
+  ctx.event("user", fromDrimvox ? { text: userText, drimvox: true } : { text: userText });
   ctx.setStatus("running", null);
 
   const conn = row.provider_id ? ctx.providers.connection(row.provider_id) : null;

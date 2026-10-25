@@ -88,7 +88,7 @@ export async function withCatalogPrices(models: ModelInfo[], fetchFn: typeof fet
   });
 }
 
-const GOOGLE_NOT_CHAT = /embedding|aqa|imagen|veo|tts|lyria|transcribe|robotics|deep-research|antigravity|computer-use|-latest$/i;
+const GOOGLE_NOT_CHAT = /embedding|aqa|imagen|veo|tts|lyria|transcribe|robotics|deep-research|antigravity|computer-use|-latest$|-image\b|image-preview|nano-banana/i;
 
 /**
  * Which Gemini API models a key without billing may use free, up to a daily limit. Google's API does not say it; its

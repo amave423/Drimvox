@@ -9,6 +9,8 @@ import { checkFree, forgetModels, freeFirst, isFree, loadModels, storedModels, t
 import { ErrorNote } from "../ErrorNote";
 
 const LIMIT = 200;
+/** The panel's one height with the providers' column, whatever the provider chosen has. */
+const PANEL_H = 460;
 /** The tab of starred models, across providers, in the row of providers. */
 const FAVORITES = "favorites";
 
@@ -48,6 +50,9 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   // The speech engine on this computer only writes dictation down: it is offered for that alone.
   const providers = audio ? all.filter((p) => hearing?.has(p.id)) : all.filter((p) => p.preset !== "whispercpp");
   const favorites = settings.favoriteModels;
+  const sidebar = providers.length > 1 || (favorites.length > 0 && !audio);
+  const byKey = providers.filter((p) => p.billing !== "subscription");
+  const bySubscription = providers.filter((p) => p.billing === "subscription");
   const [open, setOpen] = useState(false);
   const [chosenProvider, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
   // A provider that is not offered (no model that hears) gives way to the first that is.
@@ -250,25 +255,35 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
       </button>
       {open && (
         <div
-          className={`picker-panel${(nested ? true : flip.above) ? " is-above" : ""}`}
-          style={nested ? undefined : { maxHeight: flip.maxHeight ? Math.min(560, flip.maxHeight) : undefined }}
+          className={`picker-panel model-panel${(nested ? true : flip.above) ? " is-above" : ""}${sidebar ? " has-providers" : ""}`}
+          style={nested ? undefined : { height: sidebar ? Math.min(PANEL_H, flip.maxHeight ?? PANEL_H) : undefined, maxHeight: flip.maxHeight ? Math.min(560, flip.maxHeight) : undefined }}
         >
           {audio && hearing !== null && providers.length === 0 && <p className="muted">{t("voice.noModels")}</p>}
           {/* Every provider stays in the row whichever is chosen (seen: choosing the picture engine hid the others). */}
-          {(providers.length > 1 || favorites.length > 0) && (
-            <div className="picker-providers">
+          {/* Providers in a column of their own that scrolls, so fifty of them fit and the list beside keeps its place;
+              the panel keeps one height whatever the provider has (seen: it jumped with each provider's count).
+              Programs on a subscription are a group of their own. */}
+          {sidebar && (
+            <nav className="picker-providers" aria-label={t("model.providers")}>
               {wanted.includes("text") && !audio && (
                 <button type="button" className={onFavorites ? "is-on" : undefined} onClick={() => setProviderId(FAVORITES)}>
                   {t("model.favorites")}
                 </button>
               )}
-              {providers.map((p) => (
+              {byKey.map((p) => (
                 <button type="button" key={p.id} className={p.id === providerId ? "is-on" : undefined} onClick={() => setProviderId(p.id)}>
                   {p.name}
                 </button>
               ))}
-            </div>
+              {bySubscription.length > 0 && <span className="picker-providers-h">{t("model.bySubscription")}</span>}
+              {bySubscription.map((p) => (
+                <button type="button" key={p.id} className={`is-subscription${p.id === providerId ? " is-on" : ""}`} onClick={() => setProviderId(p.id)}>
+                  {p.name}
+                </button>
+              ))}
+            </nav>
           )}
+          <div className="picker-main">
           {kinds.length > 1 && !onFavorites && (
             <div className="picker-kinds" role="tablist">
               {kinds.map((k) => (
@@ -309,6 +324,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
               shown.map(item)
             )}
           </ul>
+          </div>
         </div>
       )}
     </div>

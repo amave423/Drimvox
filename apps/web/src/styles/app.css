@@ -65,7 +65,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 /* The list reaches 8px past the column for its highlight: room for it inside the scroller, or a sideways scrollbar appears. */
 .side .side-projects { max-height: 30%; overflow-y: auto; overflow-x: hidden; margin-inline: -8px; padding-inline: 8px; }
 .side .side-chats-group { flex: 1 1 0; min-height: 96px; display: flex; flex-direction: column; }
-.side .side-chats { overflow-y: auto; min-height: 0; flex: 1 1 auto; align-content: start; }
+.side .side-chats { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1 1 auto; align-content: start; }
 .side-h { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
 .side-empty { margin: 0; font-size: 14px; color: var(--muted); }
 .side-nav { margin-top: auto; display: grid; gap: 2px; border-top: 1px solid var(--line); padding-top: 10px; }
@@ -199,16 +199,16 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
   * { animation: none !important; }
 }
 
-/* The start page: a question for a model first, the recent chats, the guide folded under its heading. */
-.home-ask { display: grid; gap: 10px; margin: 0 0 8px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); }
-.home-ask textarea { resize: vertical; min-height: 76px; background: var(--sheet); }
+/* The start page, as in the chat apps: a greeting and a box to ask in, in the middle of the sheet. */
+.home-start > .home-center { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; min-height: calc(100vh - var(--topbar-h) - 30px - 130px); text-align: center; }
+.home-greet { font-size: clamp(30px, 3.4vw, 40px) !important; font-weight: 600; }
+.home-lede { margin: -6px 0 0; max-width: 52ch; color: var(--muted); }
+.home-actions { justify-content: center; }
+.home-ask { width: min(100%, 720px); display: grid; gap: 8px; padding: 14px 14px 10px; border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: var(--sheet-shadow); text-align: left; }
+.home-ask:focus-within { border-color: var(--ink); }
+.home-ask-input { width: 100%; min-height: 64px; max-height: 40vh; resize: none; border: 0; outline: none; background: transparent; color: var(--fg); font: inherit; font-size: 16px; line-height: 1.5; padding: 4px 6px; }
 .home-ask-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
 .home-ask-bar .picker { min-width: 0; max-width: min(100%, 360px); }
-.home-recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
-.home-recent button { width: calc(100% + 20px); display: flex; justify-content: space-between; gap: 16px; padding: 8px 10px; margin: 0 -10px; border-radius: 8px; text-align: left; font-size: 14.5px; }
-.home-recent button:hover { background: var(--paper); }
-.home-recent-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-guide > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
-.home-guide > summary::-webkit-details-marker { display: none; }
-.home-guide > summary::after { content: "▾"; font: 400 13px var(--font-ui); color: var(--muted); transition: transform 120ms; }
-.home-guide:not([open]) > summary::after { transform: rotate(-90deg); }
+.home-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.home-chips .chip { padding: 6px 14px; font-size: 13.5px; color: var(--muted); background: var(--sheet); }
+.home-chips .chip:hover { color: var(--fg); border-color: var(--muted); }

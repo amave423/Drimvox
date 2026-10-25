@@ -42,6 +42,8 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
         "someone/Z-Image-Turbo-Fun-GGUF": ["z_image_turbo_fun-Q5_K_M.gguf", "z_image_turbo_fun-Q8_0.gguf", "vae/ae.safetensors"],
         "someone/flux-mystery-GGUF": ["flux-mystery-Q4_K_S.gguf"],
         "ggerganov/whisper.cpp": ["ggml-base.bin", "ggml-small-q5_1.bin", "ggml-large-v3-turbo-q5_0.bin"],
+        // A speech model found by the search: whisper.cpp's file and a Core ML encoder beside it.
+        "someone/whisper-ru-ggml": ["ggml-ru-q5_0.bin", "ggml-ru-encoder.mlmodelc.bin"],
         "Comfy-Org/Wan_2.1_ComfyUI_repackaged": ["split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors", "split_files/vae/wan_2.1_vae.safetensors"],
       };
       const all = url.searchParams.get("recursive") === "true";
@@ -65,7 +67,12 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
             ]
           : kind === "text-to-video"
             ? [{ id: "QuantStack/Wan2.2-TI2V-5B-GGUF", downloads: 7000, likes: 70, pipeline_tag: "text-to-video" }]
-            : [];
+            : kind === "automatic-speech-recognition"
+              ? [
+                  { id: "openai/whisper-large-v3", downloads: 90000, tags: ["transformers"] },
+                  { id: "someone/whisper-ru-ggml", downloads: 800, tags: ["ggml"] },
+                ]
+              : [];
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify(found));
     }

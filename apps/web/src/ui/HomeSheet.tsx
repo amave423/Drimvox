@@ -1,74 +1,58 @@
 import { useState } from "react";
 import { useApp } from "../context";
-import type { MessageKey } from "../i18n";
 import { readLastModel, rememberLastModel, type ModelChoice } from "../lib/lastModel";
 import { ModelPicker } from "./chat/ModelPicker";
-import { FirstSteps } from "./FirstSteps";
-import { LinkedText } from "./LinkedText";
-
-/** How to use Drimvox, by what the user meets first (seen: testers asked for hints and instructions). */
-const guide: { title: MessageKey; items: MessageKey[] }[] = [
-  { title: "home.guide.models", items: ["home.guide.models1", "home.guide.models2", "home.guide.models3"] },
-  { title: "home.guide.chat", items: ["home.guide.chat1", "home.guide.chat2", "home.guide.chat3", "home.guide.chat4"] },
-  { title: "home.guide.project", items: ["home.guide.project1", "home.guide.project2", "home.guide.project3"] },
-  { title: "home.guide.safety", items: ["home.guide.safety1", "home.guide.safety2"] },
-];
-
-const RECENT = 5;
+import { useAddProject } from "./projects/AddProject";
 
 /**
- * The start: a question to a model right here, the chats from last time, the first steps while some are left, and the
- * guide folded away once a model is connected (seen: the page was a manual with no way to just ask something).
+ * The start page, as in the chat apps (asked for): a greeting and a box to ask in, in the middle of the sheet, and a
+ * few ways onward under it. The explanations live on the instructions' page. Someone with no model yet is shown how
+ * to connect one instead of the box.
  */
 export function HomeSheet() {
-  const { t, providers, chats, navigate, settings } = useApp();
+  const { t, providers, navigate } = useApp();
+  const project = useAddProject();
   const ready = providers.length > 0;
-  const recent = chats.filter((c) => !c.projectId).slice(0, RECENT);
   return (
-    <article className="sheet">
-      <div className="sheet-body home">
-        <h1>{t("home.title")}</h1>
-        <p className="lede">{t("home.lede")}</p>
-        {ready && <HomeAsk />}
-        <FirstSteps />
-        {recent.length > 0 && (
-          <section aria-labelledby="home-recent-h">
-            <h2 className="sheet-h" id="home-recent-h">
-              {t("home.recent")}
-            </h2>
-            <ul className="home-recent">
-              {recent.map((c) => (
-                <li key={c.id}>
-                  <button type="button" onClick={() => navigate({ kind: "chat", chatId: c.id, key: c.id })}>
-                    <span className="home-recent-title">{c.title ?? t("chat.untitled")}</span>
-                    <span className="muted">{new Date(c.updatedAt).toLocaleDateString(settings.locale === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short" })}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+    <article className="sheet home-start">
+      <div className="sheet-body home-center">
+        {ready ? (
+          <>
+            <h1 className="home-greet">{t("home.greet")}</h1>
+            <HomeAsk />
+            <div className="home-chips">
+              {window.drimvox?.pickFolder && (
+                <button type="button" className="chip" onClick={() => void project.pick()}>
+                  {t("home.chipProject")}
+                </button>
+              )}
+              <button type="button" className="chip" onClick={() => navigate({ kind: "gallery" })}>
+                {t("home.chipGallery")}
+              </button>
+              <button type="button" className="chip" onClick={() => navigate({ kind: "guide" })}>
+                {t("home.chipGuide")}
+              </button>
+            </div>
+            {project.failed && <p className="error-note">{t("project.addFailed")}</p>}
+          </>
+        ) : (
+          <>
+            <h1 className="home-greet">{t("home.title")}</h1>
+            <p className="home-lede">{t("home.startLede")}</p>
+            <div className="actions home-actions">
+              <button className="btn is-primary" onClick={() => navigate({ kind: "providers" })}>
+                {t("start.connect")}
+              </button>
+              <button className="btn" onClick={() => navigate({ kind: "local" })}>
+                {t("start.local")}
+              </button>
+            </div>
+            <button type="button" className="link" onClick={() => navigate({ kind: "guide" })}>
+              {t("home.chipGuide")}
+            </button>
+          </>
         )}
-        <details className="home-guide" open={!ready}>
-          <summary className="sheet-h">{t("home.next")}</summary>
-          <div className="guide">
-            {guide.map((g) => (
-              <section key={g.title} className="guide-part" aria-label={t(g.title)}>
-                <h3>{t(g.title)}</h3>
-                <ul>
-                  {g.items.map((key) => (
-                    <li key={key}>
-                      <LinkedText text={t(key)} />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </details>
       </div>
-      <aside className="margin">
-        <p className="note">{t("home.noteHelp")}</p>
-      </aside>
     </article>
   );
 }
@@ -96,9 +80,10 @@ function HomeAsk() {
       }}
     >
       <textarea
-        className="field-input"
+        className="home-ask-input"
         rows={3}
         value={text}
+        autoFocus
         placeholder={t("home.askPlaceholder")}
         aria-label={t("home.ask")}
         onChange={(e) => setText(e.target.value)}

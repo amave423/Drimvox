@@ -9,6 +9,7 @@ const [kind, ...args] = process.argv.slice(2);
 const dir = process.env.FAKE_CLI_DIR;
 // `agy models` lists the slugs, one per line, under a header.
 if (kind === "agy" && args[0] === "models") {
+  appendFileSync(join(dir, "models.log"), "models ");
   process.stdout.write(["Available models:", "  gemini-4-argon        Gemini 4 Argon", "  gemini-3.8-flash      Gemini 3.8 Flash", "  claude-sonnet-5-5     Claude Sonnet 5.5", ""].join("\n"));
   process.exit(0);
 }

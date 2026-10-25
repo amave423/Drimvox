@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../context";
-import { ComputerIcon, GalleryIcon, GearIcon, KeyIcon } from "./NavIcons";
-import { PencilIcon } from "./SideChats";
+import { BookIcon, ComputerIcon, GalleryIcon, GearIcon, KeyIcon } from "./NavIcons";
+import { PencilIcon, showStart } from "./SideChats";
 import { AddProject } from "./projects/AddProject";
 import { SideChats } from "./SideChats";
 import { StatusDot } from "./tasks/StatusDot";
@@ -16,7 +16,7 @@ export function Sidebar() {
   async function rename(id: string) {
     const next = name.trim();
     setRenaming(null);
-    if (!next) return;
+    if (!next || next === projects.find((p) => p.id === id)?.name) return;
     await api.projects[":id"].$patch({ param: { id }, json: { name: next } }).catch(() => null);
     await reloadProjects();
   }
@@ -55,6 +55,7 @@ export function Sidebar() {
                         value={name}
                         autoFocus
                         onChange={(e) => setName(e.target.value)}
+                        onFocus={showStart}
                         onBlur={() => void rename(project.id)}
                         onKeyDown={(e) => e.key === "Escape" && setRenaming(null)}
                       />
@@ -134,6 +135,10 @@ export function Sidebar() {
         <button className={`side-link${view.kind === "settings" ? " is-on" : ""}`} onClick={() => navigate({ kind: "settings" })}>
           <GearIcon />
           {t("top.settings")}
+        </button>
+        <button className={`side-link${view.kind === "guide" ? " is-on" : ""}`} onClick={() => navigate({ kind: "guide" })}>
+          <BookIcon />
+          {t("side.guide")}
         </button>
       </nav>
     </aside>

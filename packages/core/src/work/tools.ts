@@ -12,17 +12,24 @@ export interface WorkToolHooks {
   onCall(name: string, input: string): void;
 }
 
+/** Trimmed to a length, with an ellipsis where it was cut. */
+const clip = (text: string, max: number) => (text.trim().length > max ? `${text.trim().slice(0, max - 1).trimEnd()}…` : text.trim());
+
 /** The agent's own tools for a project's run (docs/specs/project-work.md): its checklist, questions without waiting, the end. */
 export function workTools(h: WorkToolHooks): ToolSet {
   return {
     update_checklist: tool({
       description:
         "Replace your checklist of the work with its new state: every item, short (a few words), with done marked. The user sees it next to the conversation. Mark items done as soon as they are, add items you discover, keep it under 30.",
+      // Generous limits, trimmed when kept: a long item should not lose the whole checklist (seen live with the plan).
       inputSchema: z.object({
-        items: z.array(z.object({ text: z.string().min(1).max(200), done: z.boolean() })).min(1).max(40),
+        items: z.array(z.object({ text: z.string().max(2000), done: z.boolean() })).min(1).max(100),
       }),
       execute: async ({ items }) => {
-        const clean = items.map((i) => ({ text: i.text.trim(), done: i.done })).filter((i) => i.text);
+        const clean = items
+          .map((i) => ({ text: clip(i.text, 200), done: i.done }))
+          .filter((i) => i.text)
+          .slice(0, 40);
         h.setChecklist(clean);
         h.onCall("update_checklist", `${clean.filter((i) => i.done).length}/${clean.length}`);
         const open = clean.filter((i) => !i.done);
@@ -32,9 +39,9 @@ export function workTools(h: WorkToolHooks): ToolSet {
     ask_user: tool({
       description:
         "Ask the user something you cannot decide well yourself, without waiting: say what you assume meanwhile and go on with it. The user may answer later in the conversation; then follow the answer.",
-      inputSchema: z.object({ question: z.string().min(1).max(1000), assumption: z.string().min(1).max(1000) }),
+      inputSchema: z.object({ question: z.string().min(1).max(5000), assumption: z.string().min(1).max(5000) }),
       execute: async ({ question, assumption }) => {
-        h.ask(question.trim(), assumption.trim());
+        h.ask(clip(question, 1000), clip(assumption, 1000));
         h.onCall("ask_user", question.trim());
         return "The user sees the question. Do not wait: go on with your assumption.";
       },
@@ -43,11 +50,11 @@ export function workTools(h: WorkToolHooks): ToolSet {
       description:
         "Call when the whole work is done and checked for real: every checklist item is done, the project starts, the pages look right and the main scenarios work. The report goes to the user.",
       inputSchema: z.object({
-        report: z.string().min(1).max(8000).describe("In the user's language: what is done, how to start it, what is worth knowing"),
+        report: z.string().min(1).max(40_000).describe("In the user's language: what is done, how to start it, what is worth knowing"),
         start: z
           .object({
-            command: z.string().min(1).max(500).describe("The one command that starts the result in the project's folder, such as npm run dev"),
-            url: z.string().url().max(500).describe("Where to open it once started, such as http://localhost:5173/"),
+            command: z.string().min(1).max(2000).describe("The one command that starts the result in the project's folder, such as npm run dev"),
+            url: z.string().url().max(2000).describe("Where to open it once started, such as http://localhost:5173/"),
           })
           .optional()
           .describe("When the result is something to open (a site, a server): Drimvox starts it for the user"),
@@ -55,7 +62,7 @@ export function workTools(h: WorkToolHooks): ToolSet {
       execute: async ({ report, start }) => {
         const open = h.checklist().filter((i) => !i.done);
         if (open.length) return `These checklist items are not done: ${open.map((i) => i.text).join("; ")}. Finish them, or update the checklist if they are not needed, then call finish_work again.`;
-        h.finish(report.trim(), start ? { command: start.command.trim(), url: start.url.trim() } : null);
+        h.finish(clip(report, 8000), start ? { command: clip(start.command, 500), url: start.url.trim() } : null);
         h.onCall("finish_work", "");
         return "Done. The user sees the report: stop now, write nothing more.";
       },

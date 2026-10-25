@@ -63,9 +63,9 @@ export class ProjectWork {
       shots: row?.shots ?? [],
       budgetUsd: row?.budgetUsd ?? 1,
       hours: row?.hours ?? 2,
-      spentUsd: spending.spentUsd,
       // A run still going counts its current stretch too.
-      workedMs: row?.workedMs ?? 0,
+      spentUsd: spending.spentUsd + (live?.progress().inFlightUsd ?? 0),
+      workedMs: live ? live.progress().workedMs : (row?.workedMs ?? 0),
       actions: spending.actions,
       waitingApproval: !!chatId && !!live && this.o.approvals.open(chatId).length > 0,
       escalated: row?.escalated ?? false,

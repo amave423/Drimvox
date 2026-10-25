@@ -13,13 +13,17 @@ import { SiteCard } from "./Workspace";
  * "Go"; then how the run goes, with the way into the project's conversation.
  */
 export function ProjectWork({ projectId, choice }: { projectId: string; choice: ModelChoice | null }) {
-  const { t, navigate, reloadTasks } = useApp();
+  const { t, navigate, reloadTasks, tasks } = useApp();
   const { work, reload } = useProjectWork(projectId);
   const [fresh, setFresh] = useState(false);
   if (!work) return null;
 
   const started = work.status === "running" || work.status === "paused" || work.status === "done" || work.status === "stopped";
-  if (work.status === "idle" || (fresh && started && work.status !== "running")) {
+  // The interview's task may have failed or been stopped while the work still says "planning" (seen live: the page said
+  // "the interview goes on" under a failed task): said as it is, with a way to start over.
+  const planTask = tasks.find((x) => x.id === work.planTaskId);
+  const interviewEnded = work.status === "planning" && !work.plan && (planTask?.status === "failed" || planTask?.status === "stopped");
+  if (work.status === "idle" || (fresh && (started || interviewEnded) && work.status !== "running")) {
     return (
       <ProjectStart
         projectId={projectId}
@@ -42,10 +46,21 @@ export function ProjectWork({ projectId, choice }: { projectId: string; choice: 
   if (work.status === "planning" || work.status === "ready") {
     return (
       <>
-        {work.status === "planning" && !work.plan && (
+        {work.status === "planning" && !work.plan && !interviewEnded && (
           <div className="note">
             <p>{t("projectWork.planning")}</p>
             {interview}
+          </div>
+        )}
+        {interviewEnded && (
+          <div className="note is-pencil">
+            <p>{t(planTask?.status === "stopped" ? "projectWork.interviewStopped" : "projectWork.interviewFailed")}</p>
+            <div className="actions">
+              {interview}
+              <button className="link" onClick={() => setFresh(true)}>
+                {t("projectWork.newTask")}
+              </button>
+            </div>
           </div>
         )}
         {work.plan && <PlanCard key={work.plan.context} work={work} onChanged={() => void reload()} />}

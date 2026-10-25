@@ -37,7 +37,8 @@ export function buildFeed(events: TaskEvent[]): FeedItem[] {
     const d = e.data ?? {};
     switch (e.kind) {
       case "user":
-        items.push({ kind: "user", seq: e.seq, text: String(d.text ?? "") });
+        // Drimvox's nudges to the model are not the user's words: left out of the feed.
+        if (!d.drimvox) items.push({ kind: "user", seq: e.seq, text: String(d.text ?? "") });
         break;
       case "text":
         items.push({ kind: "note", seq: e.seq, text: String(d.text ?? "") });

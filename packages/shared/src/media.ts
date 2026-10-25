@@ -20,6 +20,13 @@ export interface PhotoInput {
   max: number;
 }
 
+/** A model as the provider lists it, and where Drimvox offers it: null where it does not. */
+export interface ListedModel {
+  id: string;
+  name: string;
+  offered: "text" | "image" | "video" | null;
+}
+
 export interface MediaModel {
   id: string;
   name: string;
@@ -34,6 +41,8 @@ export interface MediaModel {
   viaChat: boolean;
   /** Draws through OpenAI's /images/generations (a custom server that lists pictures among its chat models). */
   openaiImages?: boolean;
+  /** Draws through the vendor's own API: Gemini's generateContent, NVIDIA's genai endpoints. */
+  native?: "gemini" | "nvidia";
   /** Null: the model takes no photos, and none is sent to it. */
   photos: PhotoInput | null;
   /** Null until loaded: image prices live on a separate endpoint per model. */

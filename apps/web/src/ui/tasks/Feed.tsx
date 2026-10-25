@@ -145,7 +145,10 @@ function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props
                 ? input.name
                 : item.name === "read_skill_file"
                   ? `${input.name}/${input.path}`
-                  : input.path;
+                  : // The project's own folder is "." to the model: said in words (seen: "looks at files in .").
+                    input.path === "." || input.path === "./" || input.path === ""
+                    ? t("action.projectRoot")
+                    : input.path;
   const mcp = item.name.includes("/");
   const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image", "web_search", "open_page", "use_skill", "read_skill_file", "start_background", "read_background", "stop_background", "look_at_page"].includes(
     item.name,

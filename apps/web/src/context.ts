@@ -24,6 +24,8 @@ export type View =
   /** `part`: which of the local models to show first (text through Ollama, pictures, video). */
   | { kind: "local"; part?: LocalPart }
   | { kind: "gallery" }
+  /** How to use Drimvox, apart from the start page. */
+  | { kind: "guide" }
   /** `send`: a message to send at once, the first of a project task's conversation. */
   | { kind: "chat"; chatId: string | null; key: string; send?: string }
   | { kind: "project"; projectId: string }

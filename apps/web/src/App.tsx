@@ -14,6 +14,7 @@ import { ProvidersSheet } from "./ui/providers/ProvidersSheet";
 import { LocalModelsSheet } from "./ui/local/LocalModelsSheet";
 import { TaskSheet } from "./ui/tasks/TaskSheet";
 import { GallerySheet } from "./ui/GallerySheet";
+import { GuideSheet } from "./ui/GuideSheet";
 import { SettingsSheet } from "./ui/SettingsSheet";
 import { preloadModels } from "./lib/models";
 import { DownloadNote } from "./ui/DownloadNote";
@@ -226,6 +227,7 @@ export function App({ api, token, initialSettings, status }: Props) {
           {view.kind === "providers" && <ProvidersSheet />}
           {view.kind === "local" && <LocalModelsSheet part={view.part} />}
           {view.kind === "gallery" && <GallerySheet />}
+          {view.kind === "guide" && <GuideSheet />}
           {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} autoSend={view.send} />}
           {view.kind === "project" && <ProjectSheet key={view.projectId} projectId={view.projectId} />}
           {view.kind === "task" && <TaskSheet key={view.taskId} taskId={view.taskId} />}

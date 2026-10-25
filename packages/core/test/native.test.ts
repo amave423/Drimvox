@@ -126,6 +126,86 @@ describe("Google Gemini", () => {
   });
 });
 
+// Seen with the user's keys: Gemini's picture models sat among the text ones, and NVIDIA's FLUX was nowhere, since its
+// list of models leaves out the ones on its genai endpoints.
+const PNG = Buffer.from("iVBORw0KGgo=", "base64").toString("base64");
+
+async function drawOnce(providerId: string, model: string, confirm = false) {
+  const chat = await (await env.call("POST", "/api/chats", { providerId, model, kind: "image" })).json();
+  const events = await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Кот в очках", options: { aspectRatio: "16:9" }, ...(confirm ? { confirm: true } : {}) }));
+  return events.find((e) => e.type === "done").message;
+}
+
+describe("pictures from vendors' own APIs", () => {
+  it("Gemini: picture models on their own tab, drawn by generateContent", async () => {
+    vendor = await startFakeProvider({
+      authorized: (h) => h["x-goog-api-key"] === KEY,
+      handle: (method, path) => {
+        if (method === "GET" && path === "/v1beta/models") {
+          return {
+            json: {
+              models: ["gemini-2.5-flash", "gemini-2.5-flash-image", "nano-banana-pro-preview", "gemini-3.1-flash-image-preview"].map((m) => ({
+                name: `models/${m}`,
+                displayName: m,
+                supportedGenerationMethods: ["generateContent"],
+              })),
+            },
+          };
+        }
+        if (method === "POST" && path === "/v1beta/models/gemini-2.5-flash-image:generateContent") {
+          return { json: { candidates: [{ content: { parts: [{ text: "Вот" }, { inlineData: { mimeType: "image/png", data: PNG } }] } }] } };
+        }
+        return undefined;
+      },
+    });
+    const id = await connect("google", `${vendor.origin}/v1beta`);
+    const text = await (await env.call("GET", `/api/providers/${id}/models`)).json();
+    expect(text.map((m: any) => m.id)).toEqual(["gemini-2.5-flash"]);
+    const images = await (await env.call("GET", `/api/providers/${id}/media-models?kind=image`)).json();
+    expect(images.map((m: any) => m.id)).toEqual(["gemini-2.5-flash-image", "gemini-3.1-flash-image-preview", "nano-banana-pro-preview"]);
+    // Gemini does not say what a picture costs: it waits for "Start".
+    expect(await drawOnce(id, "gemini-2.5-flash-image", true)).toMatchObject({ status: "done", media: [expect.objectContaining({ mime: "image/png" })] });
+    const sent = vendor.requests.find((r) => r.path.endsWith(":generateContent"))!.body as any;
+    expect(sent.generationConfig).toEqual({ responseModalities: ["TEXT", "IMAGE"], imageConfig: { aspectRatio: "16:9" } });
+  });
+
+  it("NVIDIA: FLUX on the genai endpoints, sized for the aspect ratio", async () => {
+    vendor = await startFakeProvider({
+      authorized: (h) => h.authorization === `Bearer ${KEY}`,
+      handle: (method, path) => {
+        if (method === "GET" && path === "/v1/models") return { json: { data: [{ id: "meta/llama-3.3-70b-instruct" }] } };
+        if (method === "POST" && path === "/v1/genai/black-forest-labs/flux.1-dev") return { json: { artifacts: [{ base64: PNG, finishReason: "SUCCESS" }] } };
+        return undefined;
+      },
+    });
+    const id = await connect("nvidia", `${vendor.origin}/v1`);
+    const images = await (await env.call("GET", `/api/providers/${id}/media-models?kind=image`)).json();
+    expect(images.map((m: any) => m.id)).toEqual(["black-forest-labs/flux.1-dev", "black-forest-labs/flux.1-schnell"]);
+    expect(await drawOnce(id, "black-forest-labs/flux.1-dev")).toMatchObject({ status: "done", media: [expect.objectContaining({ mime: "image/png" })] });
+    const sent = vendor.requests.find((r) => r.path.includes("/genai/"))!.body as any;
+    expect(sent).toMatchObject({ prompt: "Кот в очках", width: 1344, height: 768 });
+  });
+
+  // Asked for: a way to see every model a provider lists, even the ones Drimvox does not offer.
+  it("lists every model of a provider with where it is offered", async () => {
+    vendor = await startFakeProvider({
+      authorized: (h) => h.authorization === `Bearer ${KEY}`,
+      handle: (method, path) => {
+        if (method === "GET" && path === "/v1/models") return { json: { data: [{ id: "meta/llama-3.3-70b-instruct" }, { id: "nvidia/nv-embedqa-e5-v5" }] } };
+        return undefined;
+      },
+    });
+    const id = await connect("nvidia", `${vendor.origin}/v1`);
+    const all = await (await env.call("GET", `/api/providers/${id}/models/all`)).json();
+    expect(all.map((m: any) => [m.id, m.offered])).toEqual([
+      ["black-forest-labs/flux.1-dev", "image"],
+      ["black-forest-labs/flux.1-schnell", "image"],
+      ["meta/llama-3.3-70b-instruct", "text"],
+      ["nvidia/nv-embedqa-e5-v5", null],
+    ]);
+  });
+});
+
 describe("Google's free tier", () => {
   // The pricing page as of 2026-10: Flash, Flash-Lite, Gemma and 2.5 Pro have a free tier; newer Pro, Argon, Omni and
   // picture models do not. The API does not say it, so Drimvox marks it by name (seen: the user could not tell).

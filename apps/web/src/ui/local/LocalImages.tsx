@@ -4,6 +4,7 @@ import { ok } from "../../api";
 import { downloadsChanged } from "../DownloadNote";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
+import { EngineRow } from "./EngineRow";
 import { LocalMediaSearch } from "./LocalMediaSearch";
 import { PullControl, type PullActions } from "./PullControl";
 import { useSize } from "./size";
@@ -83,6 +84,16 @@ export function LocalImagesSection({ kind }: { kind: "image" | "video" }) {
               )}
               {ep?.error && <span className="is-pencil-text local-why">{t("localImages.engineFailed")}</span>}
             </div>
+          )}
+          {status.engine && (
+            <EngineRow
+              name="stable-diffusion.cpp"
+              onRemove={async () => {
+                const res = await api.local.images.engine.$delete().catch(() => null);
+                await load();
+                return !!res?.ok;
+              }}
+            />
           )}
           <ul className="local-cards local-image-cards">
             {models.map((m) => (

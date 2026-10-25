@@ -231,7 +231,7 @@ export class AgentRunner {
           : row.status_reason === "acceptance_error"
             ? "The work could not be accepted yet. Run the checks once more, then call finish so it is accepted again."
             : "Continue the task.";
-    this.launch(id, note || again);
+    this.launch(id, note || again, !note);
     return this.view(id)!;
   }
 
@@ -336,11 +336,12 @@ export class AgentRunner {
     return row;
   }
 
-  private launch(id: string, userText: string | ((ctx: PassContext) => Promise<string>)): void {
+  /** `fromDrimvox`: the first message is Drimvox's own ("continue the task"), not the user's words. */
+  private launch(id: string, userText: string | ((ctx: PassContext) => Promise<string>), fromDrimvox = false): void {
     const controller = new AbortController();
     const live: Live = { controller, approval: null, done: Promise.resolve() };
     this.live.set(id, live);
-    live.done = this.run(id, userText, live)
+    live.done = this.run(id, userText, live, fromDrimvox)
       .catch((err) => {
         if (!this.closed) this.finish(id, "failed", "unknown", String(err));
       })
@@ -356,12 +357,15 @@ export class AgentRunner {
   }
 
   /** Passes follow each other until the task waits for the user, finishes or is stopped. */
-  private async run(id: string, userText: string | ((ctx: PassContext) => Promise<string>), live: Live): Promise<void> {
+  private async run(id: string, userText: string | ((ctx: PassContext) => Promise<string>), live: Live, first = false): Promise<void> {
     const ctx = this.context(id, live.controller, live);
     if (typeof userText !== "string") ctx.setStatus("running", null);
     let next: string | null = typeof userText === "string" ? userText : await userText(ctx);
+    // The first message is the user's (or a resumed task's own); the ones after it are Drimvox's nudges.
+    let fromDrimvox = first || typeof userText !== "string";
     while (next !== null && !this.closed && !live.controller.signal.aborted) {
-      next = await runPass(ctx, id, next);
+      next = await runPass(ctx, id, next, fromDrimvox);
+      fromDrimvox = true;
     }
   }
 

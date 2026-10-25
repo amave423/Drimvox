@@ -90,6 +90,17 @@ export class WorkRun {
     return this.d.repo.get(this.projectId)!;
   }
 
+  /** The stretch going on now: when it began, the time worked before it, and what its answer has cost so far. */
+  private stretch = { since: 0, base: 0, costUsd: 0 };
+
+  /**
+   * Time and money including the stretch going on now (seen live: the panel said "0 min, 0 ₽" for minutes, as both were
+   * counted only when an answer of many steps ended).
+   */
+  progress(): { workedMs: number; inFlightUsd: number } {
+    return { workedMs: this.stretch.since ? this.stretch.base + (Date.now() - this.stretch.since) : this.row().workedMs, inFlightUsd: this.stretch.costUsd };
+  }
+
   private spent(): number {
     const row = this.row();
     return this.d.repo.spending(this.chatId, row.startedAt ?? 0).spentUsd;
@@ -102,6 +113,7 @@ export class WorkRun {
     let workedBase = this.row().workedMs;
     let since = Date.now();
     const worked = () => workedBase + (Date.now() - since);
+    this.stretch = { since, base: workedBase, costUsd: 0 };
     let nudges = 0;
     let errors = 0;
     let doneBefore = this.row().checklist.filter((i) => i.done).length;
@@ -132,6 +144,7 @@ export class WorkRun {
         this.d.repo.update(this.projectId, { workedMs: worked() });
         workedBase = worked();
         since = Date.now();
+        this.stretch = { since, base: workedBase, costUsd: 0 };
         if (signal.aborted || outcome.kind === "stopped") return stopWith("stopped", "user");
         if (this.finished) return stopWith("done", null);
         if (outcome.kind === "error") {
@@ -288,11 +301,14 @@ export class WorkRun {
         input += step.inputTokens;
         output += step.outputTokens;
         cost += step.costUsd;
+        this.stretch.costUsd = cost;
         if (!step.priced) priced = false;
       },
     });
     const stopped = outcome.kind === "stopped";
     const error = outcome.kind === "error" ? outcome.error : null;
+    // From here the answer's cost is in its message: not counted twice.
+    this.stretch.costUsd = 0;
     this.d.chats.finishAnswer(answer.id, {
       content,
       reasoning: null,

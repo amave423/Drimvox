@@ -39,45 +39,59 @@ export function planTools(onPlan: (plan: ProjectPlan) => void): ToolSet {
   return {
     write_plan: tool({
       description: "Write the project's final plan: the summary, the screens, the technical decisions, the steps of the work, the checks, the pages and the design.",
+      // Generous limits, trimmed when kept: a model that writes a long step should not lose the whole plan (seen live:
+      // one step of 230 characters refused it twice and the project failed).
       inputSchema: z.object({
-        summary: z.string().min(1).max(4000),
-        steps: z.array(z.string().min(1).max(200)).min(1).max(30),
+        summary: z.string().min(1).max(20_000),
+        steps: z.array(z.string().max(2000)).min(1).max(100),
         checks: z
-          .array(z.string().min(1).max(500))
-          .max(10)
+          .array(z.string().max(2000))
+          .max(50)
           .default([])
           .describe("Shell commands that exit 0 when the project works, such as npm test or npm run build; never a description in words"),
         pages: z
-          .array(z.object({ url: z.string().min(1).max(2000), command: z.string().min(1).max(500).optional() }))
-          .max(5)
+          .array(z.object({ url: z.string().max(4000), command: z.string().max(2000).optional() }))
+          .max(20)
           .default([]),
         screens: z
-          .array(z.object({ name: z.string().min(1).max(120), contents: z.string().min(1).max(1500) }))
-          .max(20)
+          .array(z.object({ name: z.string().max(1000), contents: z.string().max(10_000) }))
+          .max(60)
           .default([])
           .describe("Every page or screen and what is on it"),
         decisions: z
-          .array(z.object({ what: z.string().min(1).max(200), why: z.string().min(1).max(600) }))
-          .max(20)
+          .array(z.object({ what: z.string().max(2000), why: z.string().max(5000) }))
+          .max(60)
           .default([])
           .describe("Technical decisions with the reason for each"),
         design: briefInput,
       }),
       execute: async (p) => {
         onPlan({
-          context: p.summary.trim(),
-          steps: p.steps.map((s) => s.trim()).filter(Boolean),
-          checks: p.checks.map((c) => c.trim()).filter(isCommand),
-          pages: p.pages.filter((page) => /^https?:\/\//.test(page.url)).map((page) => ({ url: page.url, command: page.command?.trim() || undefined })),
+          context: clip(p.summary, 4000),
+          steps: p.steps.map((s) => clip(s, 200)).filter(Boolean).slice(0, 30),
+          checks: p.checks.map((c) => c.trim()).filter((c) => c.length <= 500 && isCommand(c)).slice(0, 10),
+          pages: p.pages
+            .filter((page) => /^https?:\/\//.test(page.url) && page.url.length <= 2000)
+            .slice(0, 5)
+            .map((page) => ({ url: page.url, command: page.command ? clip(page.command, 500) || undefined : undefined })),
           design: toBrief(p.design),
-          screens: p.screens.map((x) => ({ name: x.name.trim(), contents: x.contents.trim() })),
-          decisions: p.decisions.map((x) => ({ what: x.what.trim(), why: x.why.trim() })),
+          screens: p.screens
+            .map((x) => ({ name: clip(x.name, 120), contents: clip(x.contents, 1500) }))
+            .filter((x) => x.name && x.contents)
+            .slice(0, 20),
+          decisions: p.decisions
+            .map((x) => ({ what: clip(x.what, 200), why: clip(x.why, 600) }))
+            .filter((x) => x.what && x.why)
+            .slice(0, 20),
         });
         return "Plan written. The user reads it now.";
       },
     }),
   };
 }
+
+/** Trimmed to a length, with an ellipsis where it was cut. */
+const clip = (text: string, max: number) => (text.trim().length > max ? `${text.trim().slice(0, max - 1).trimEnd()}…` : text.trim());
 
 /** Keeps the plan; the task waits for "Go" or for the user's corrections. */
 export function savePlan(ctx: PassContext, id: string, row: TaskRow, plan: ProjectPlan | null, messages: ModelMessage[]): string | null {

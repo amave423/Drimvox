@@ -5,6 +5,8 @@ import type { Connection } from "../providers/repo";
 import type { CliId } from "./kinds";
 import { resolveCli } from "./resolve";
 import { execFile } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 /**
  * Which of the vendor's catalog models a CLI can be started with, and the name it takes on the command line.
@@ -46,18 +48,53 @@ export function parseModelList(output: string): { id: string; name: string }[] {
   return found;
 }
 
-/** A CLI's own list, asked for rarely (seen: running it on every visit to the providers flashed a console window). */
-const LISTED_MS = 6 * 60 * 60_000;
-const listed = new Map<string, { at: number; models: { id: string; name: string }[] }>();
+/**
+ * A CLI's own list, asked for rarely and kept on disk across restarts (seen: agy starts a helper with a console window
+ * of its own, so every run flashed one; it ran on each visit to the subscriptions and after each restart). A list that
+ * did not come is not asked for again for an hour either.
+ */
+const LISTED_MS = 24 * 60 * 60_000;
+const FAILED_MS = 60 * 60_000;
+type Listed = { at: number; models: { id: string; name: string }[] };
+const listed = new Map<string, Listed>();
+let store: string | null = null;
+
+/** The file the lists are kept in, in the app's data folder. */
+export function keepCliListsIn(file: string | null): void {
+  store = file;
+  listed.clear();
+  if (!file) return;
+  try {
+    for (const [key, value] of Object.entries(JSON.parse(readFileSync(file, "utf8")) as Record<string, Listed>)) listed.set(key, value);
+  } catch {
+    // No lists yet.
+  }
+}
+
+/** Tests: forget what is in memory, as a restart does; the file stays. */
+export function forgetCliLists(): void {
+  keepCliListsIn(store);
+}
+
+function save(): void {
+  if (!store) return;
+  try {
+    mkdirSync(dirname(store), { recursive: true });
+    writeFileSync(store, JSON.stringify(Object.fromEntries(listed)));
+  } catch {
+    // Kept in memory only.
+  }
+}
 
 function listByCli(argv: string[]): Promise<{ id: string; name: string }[]> {
   const key = argv.join("|");
   const hit = listed.get(key);
-  if (hit && Date.now() - hit.at < LISTED_MS) return Promise.resolve(hit.models);
+  if (hit && Date.now() - hit.at < (hit.models.length ? LISTED_MS : FAILED_MS)) return Promise.resolve(hit.models);
   return new Promise((resolve) => {
     execFile(argv[0]!, [...argv.slice(1), "models"], { timeout: 20_000, windowsHide: true }, (err, stdout) => {
       const models = err ? [] : parseModelList(String(stdout));
-      if (models.length) listed.set(key, { at: Date.now(), models });
+      listed.set(key, { at: Date.now(), models });
+      save();
       resolve(models);
     });
   });

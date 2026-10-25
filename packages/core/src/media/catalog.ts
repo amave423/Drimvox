@@ -22,6 +22,9 @@ const style = (conn: Connection): "separate" | "combined" | null =>
 export async function listMediaModels(conn: Connection, kind: MediaKind): Promise<MediaModel[]> {
   // Pictures on this computer: the downloaded models, no catalog to ask.
   if (conn.preset === "sdcpp") return localMediaModels(kind);
+  // Gemini lists its picture models among the others; NVIDIA keeps them off its list (seen: both had none here).
+  if (conn.preset === "google") return kind === "image" ? cached(conn, kind, () => geminiImageModels(conn)) : [];
+  if (conn.preset === "nvidia") return kind === "image" ? NVIDIA_IMAGES.map(nvidiaModel) : [];
   const how = style(conn);
   if (!how) return [];
   const key = `${conn.cacheKey}|${kind}`;
@@ -48,6 +51,61 @@ export async function listMediaModels(conn: Connection, kind: MediaKind): Promis
   lists.set(key, { at: Date.now(), models });
   return models;
 }
+
+async function cached(conn: Connection, kind: MediaKind, load: () => Promise<MediaModel[]>): Promise<MediaModel[]> {
+  const key = `${conn.cacheKey}|${kind}`;
+  const hit = lists.get(key);
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.models;
+  const models = await load().catch(() => []);
+  lists.set(key, { at: Date.now(), models });
+  return models;
+}
+
+const ASPECTS = ["1:1", "3:4", "4:3", "9:16", "16:9"];
+
+/** Gemini's picture models ("…-image", Nano Banana): drawn by generateContent, with photos as references. */
+async function geminiImageModels(conn: Connection): Promise<MediaModel[]> {
+  const body = (await fetchJson(`${conn.baseUrl}/models?pageSize=1000`, null, 15_000, { "x-goog-api-key": conn.apiKey ?? "" }, conn.fetch)) as {
+    models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
+  };
+  return (body.models ?? [])
+    .filter((m) => m.supportedGenerationMethods?.includes("generateContent") && /-image\b|image-preview|nano-banana/i.test(m.name))
+    .map((m): MediaModel => ({
+      id: m.name.replace(/^models\//, ""),
+      name: m.displayName || m.name.replace(/^models\//, ""),
+      kind: "image",
+      aspectRatios: ASPECTS,
+      resolutions: [],
+      durations: [],
+      audio: false,
+      viaChat: false,
+      native: "gemini",
+      photos: { use: "reference", min: 0, max: 3 },
+      pricing: { lines: [], skus: {} },
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** NVIDIA's picture models that answer on its genai endpoints (checked live 2026-10-26: SD 3 and 3.5 are gone). */
+const NVIDIA_IMAGES = [
+  { id: "black-forest-labs/flux.1-dev", name: "FLUX.1 [dev]" },
+  { id: "black-forest-labs/flux.1-schnell", name: "FLUX.1 [schnell]" },
+];
+
+const nvidiaModel = (m: { id: string; name: string }): MediaModel => ({
+  id: m.id,
+  name: m.name,
+  kind: "image",
+  aspectRatios: ASPECTS,
+  resolutions: [],
+  durations: [],
+  audio: false,
+  viaChat: false,
+  native: "nvidia",
+  photos: null,
+  // Drawn on NVIDIA's free developer credits: no money, so no question before each picture.
+  pricing: { lines: [{ billable: "output_image", unit: "image", costUsd: 0, variant: null }], skus: {} },
+});
 
 /** One model with its prices, ready for an estimate. Null when the provider does not list it. */
 export async function mediaModel(conn: Connection, kind: MediaKind, id: string): Promise<MediaModel | null> {

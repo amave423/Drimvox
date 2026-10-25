@@ -8,6 +8,7 @@ import { listMediaModels, mediaModel } from "../media/catalog";
 import { fetchBalance } from "../providers/balance";
 import { checkFree, withAvailability } from "../providers/availability";
 import { listModels } from "../providers/catalog";
+import { allModels } from "../providers/all-models";
 import { describeError } from "../providers/errors";
 import { InvalidInput, type ProviderRepo } from "../providers/repo";
 
@@ -67,6 +68,12 @@ export function providerRoutes(providers: ProviderRepo) {
       } catch (err) {
         return c.json({ error: describeError(err) }, 502);
       }
+    })
+    // Everything the provider lists, the models Drimvox does not offer too.
+    .get("/:id/models/all", async (c) => {
+      const conn = providers.connection(c.req.param("id"));
+      if (!conn) return c.json(notFound, 404);
+      return c.json(await allModels(conn), 200);
     })
     .get("/:id/media-models", zValidator("query", z.object({ kind: z.enum(["image", "video"]) })), async (c) => {
       const conn = providers.connection(c.req.param("id"));

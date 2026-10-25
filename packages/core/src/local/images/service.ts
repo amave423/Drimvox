@@ -290,6 +290,16 @@ export class LocalImages {
   }
 
   /** Deletes a model's files, except those another downloaded model needs. */
+  /** Deletes the engine, the models staying; refused while it draws or downloads. */
+  removeEngine(): boolean {
+    if (this.drawing > 0 || (this.enginePull && !this.enginePull.pull.done) || [...this.pulls.values()].some((a) => !a.pull.done && !a.pull.paused)) return false;
+    this.stopServer();
+    this.enginePull = null;
+    this.engineJob = null;
+    rmSync(join(this.d.dir, "engine"), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    return true;
+  }
+
   async remove(id: LocalImageModelId): Promise<boolean> {
     const model = this.defs().find((m) => m.id === id);
     if (!model) return false;

@@ -1,9 +1,11 @@
-import type { LocalAudioModelId, LocalAudioStatus } from "@drimvox/shared";
+import type { LocalAudioStatus } from "@drimvox/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { downloadsChanged } from "../DownloadNote";
+import { EngineRow } from "./EngineRow";
+import { LocalAudioSearch } from "./LocalAudioSearch";
 import { PullControl, type PullActions } from "./PullControl";
 
 /**
@@ -34,23 +36,43 @@ export function LocalAudioSection() {
     return () => clearInterval(timer);
   }, [downloading, load]);
 
-  const act = (run: (model: LocalAudioModelId) => Promise<unknown>) => (model: string) =>
-    void run(model as LocalAudioModelId)
+  const act = (run: (model: string) => Promise<unknown>) => (model: string) =>
+    void run(model)
       .catch(() => null)
       .then(() => (downloadsChanged(), load()));
   const actions: PullActions = {
     pull: act((model) => api.local.audio.pulls.$post({ json: { model } })),
     pause: act((model) => api.local.audio.pulls.pause.$post({ json: { model } })),
     cancel: act((model) => api.local.audio.pulls.$delete({ query: { model } })),
-    remove: act((model) => api.local.audio.models[":id"].$delete({ param: { id: model } })),
+    remove: act((model) => api.local.audio.models.$delete({ query: { model } })),
   };
 
   if (!status) return null;
+  const installed = status.models.find((m) => m.installed);
   return (
     <>
       <h2 className="sheet-h">{t("localAudio.title")}</h2>
       <p className="muted">{t("localAudio.hint")}</p>
       {!status.supported && <p className="note">{t("localAudio.unsupported")}</p>}
+      {status.supported && status.engine && (
+        <EngineRow
+          name="whisper.cpp"
+          onRemove={async () => {
+            const res = await api.local.audio.engine.$delete().catch(() => null);
+            await load();
+            return !!res?.ok;
+          }}
+        />
+      )}
+      {/* The engine was deleted but models are here: one click brings it back. */}
+      {status.supported && !status.engine && installed && !downloading && (
+        <div className="local-row local-engine">
+          <span>{t("local.engineMissing", { name: "whisper.cpp" })}</span>
+          <button type="button" className="btn" onClick={() => actions.pull(installed.id)}>
+            {t("local.engineGetBack")}
+          </button>
+        </div>
+      )}
       {status.supported && (
         <ul className="local-cards local-audio-cards">
           {status.models.map((m) => {
@@ -60,9 +82,9 @@ export function LocalAudioSection() {
                 <div className="local-card-head">
                   <span className="local-card-name">{m.name}</span>
                   {/* Speed and accuracy are not good or bad: only the recommended one is green (seen: three greens said nothing). */}
-                  <span className={m.note === "balanced" ? "local-fit is-fast" : "local-fit is-quiet"}>{t(`localAudio.note.${m.note}` as MessageKey)}</span>
+                  {m.note && <span className={m.note === "balanced" ? "local-fit is-fast" : "local-fit is-quiet"}>{t(`localAudio.note.${m.note}` as MessageKey)}</span>}
                 </div>
-                <p>{t(`localAudio.model.${m.id}` as MessageKey)}</p>
+                <p>{m.source === "hf" ? t("localImages.found") : t(`localAudio.model.${m.id}` as MessageKey)}</p>
                 <PullControl model={m.id} sizeBytes={m.sizeBytes} installed={m.installed} pull={m.pull ?? undefined} actions={actions} />
                 {m.installed && status.providerId && (
                   <p>
@@ -80,6 +102,7 @@ export function LocalAudioSection() {
           })}
         </ul>
       )}
+      {status.supported && <LocalAudioSearch status={status} actions={actions} />}
     </>
   );
 }

@@ -11,6 +11,7 @@ export function TopBar() {
   if (view.kind === "providers") crumb = t("top.keys");
   if (view.kind === "local") crumb = t("side.local");
   if (view.kind === "gallery") crumb = t("side.gallery");
+  if (view.kind === "guide") crumb = t("side.guide");
   if (view.kind === "project") crumb = projects.find((p) => p.id === view.projectId)?.name ?? "";
   if (view.kind === "task") crumb = tasks.find((x) => x.id === view.taskId)?.title ?? "";
   if (view.kind === "chat") crumb = chats.find((c) => c.id === view.chatId)?.title ?? t("chat.untitled");

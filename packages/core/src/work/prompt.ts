@@ -48,6 +48,8 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean): string
     // Seen live: after "Go" the agent wrote in English until the user asked in Russian.
     "Write to the user in the language the user writes in (the plan's language): your messages, the checklist, questions",
     "and the report.",
+    // Seen live: a cheap model wrote "Now let me create…" to a Russian user all the same; the language named outright helps.
+    ...(plan?.context && /[а-яё]/i.test(plan.context) ? ["The user writes in Russian: everything you write to the user is in Russian."] : []),
     "Rules:",
     "- Names in code are English: files, folders, page addresses, variables (calculator, /cart). Never transliterate another",
     "  language into Latin letters. Text people read stays in the user's language.",

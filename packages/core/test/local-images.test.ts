@@ -138,6 +138,18 @@ describe("downloading", () => {
   });
 });
 
+// Asked for: a way to delete the engines.
+it("deletes the engine, and the models stay to use once it is downloaded again", async () => {
+  const hf = await startFakeHub(servers);
+  setup(hf.url);
+  await download("z-image-turbo");
+  expect((await env.call("DELETE", "/api/local/images/engine")).status).toBe(204);
+  const s = await status();
+  expect(s.engine).toBe(false);
+  expect(model(s, "z-image-turbo").installed).toBe(true);
+  expect(existsSync(join(env.dir, "images", "engine"))).toBe(false);
+});
+
 describe("drawing", () => {
   it("starts the engine with the model's files, draws for free, and keeps it running for the next picture", async () => {
     const hf = await startFakeHub(servers);

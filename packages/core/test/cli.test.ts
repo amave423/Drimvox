@@ -7,6 +7,7 @@ import { createTestEnv, readEvents, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider } from "./fake-provider";
 import { startFakeProxy } from "./fake-proxy";
 import { makeRepo } from "./git-repo";
+import { forgetCliLists } from "../src/cli/models";
 
 const FAKE = fileURLToPath(new URL("./fake-cli.mjs", import.meta.url));
 const MATH = "export function add(a, b) {\n  return a + b;\n}\n";
@@ -227,6 +228,16 @@ describe("chat", () => {
 });
 
 describe("Antigravity CLI", () => {
+  // Seen: opening the subscriptions' tab flashed a console window each time: agy's list was asked for again and again.
+  it("keeps agy's list on disk, so a restart does not run agy again", async () => {
+    const id = await connect("antigravity");
+    await env.call("GET", `/api/providers/${id}/models`);
+    forgetCliLists();
+    const models = await (await env.call("GET", `/api/providers/${id}/models`)).json();
+    expect(models.map((m: any) => m.id)).toContain("gemini-4-argon");
+    expect(readFileSync(join(dir, "models.log"), "utf8").trim().split(/\s+/)).toHaveLength(1);
+  });
+
   it("lists the models agy names, answers through it and continues the conversation", async () => {
     const id = await connect("antigravity");
     const models = await (await env.call("GET", `/api/providers/${id}/models`)).json();

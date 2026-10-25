@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
+import { HfCard } from "./HfCard";
 import { PullControl, type PullActions } from "./PullControl";
 
 interface Props {
@@ -109,30 +110,25 @@ function HfSearch({ status, actions, pullOf }: Props & { pullOf(model: string): 
       </form>
       {error && <p className="note is-pencil">{t("local.hfFailed")}</p>}
       {repos && repos.length === 0 && <p className="muted">{t("local.hfNone")}</p>}
-      <ul className="local-list">
+      <ul className="hf-cards">
         {repos?.map((r) => (
-          <li key={r.repo} className={`local-repo${r.unsupported ? " is-unsupported" : ""}`}>
-            <button
-              type="button"
-              className="local-repo-head"
-              disabled={!!r.unsupported}
-              aria-expanded={r.unsupported ? undefined : open === r.repo}
-              onClick={() => setOpen(open === r.repo ? null : r.repo)}
-            >
-              <span className="mono">{r.repo}</span>
-              {r.unfiltered && (
+          <HfCard
+            key={r.repo}
+            repo={r.repo}
+            facts={`${r.params ? `${t("local.params", { n: compact.format(r.params) })} · ` : ""}${t("local.downloads", { n: compact.format(r.downloads) })}`}
+            badge={
+              r.unfiltered && (
                 <span className="local-unfiltered" title={t("local.unfilteredHint")}>
                   {t("local.unfiltered")}
                 </span>
-              )}
-              <span className="muted">
-                {r.params ? `${t("local.params", { n: compact.format(r.params) })} · ` : ""}
-                {t("local.downloads", { n: compact.format(r.downloads) })}
-              </span>
-              {r.unsupported && <span className="local-why">{t(`local.unsupported.${r.unsupported}`)}</span>}
-            </button>
-            {open === r.repo && <Variants repo={r.repo} status={status} actions={actions} pullOf={pullOf} />}
-          </li>
+              )
+            }
+            why={r.unsupported ? t(`local.unsupported.${r.unsupported}`) : null}
+            open={open === r.repo}
+            onToggle={() => setOpen(open === r.repo ? null : r.repo)}
+          >
+            <Variants repo={r.repo} status={status} actions={actions} pullOf={pullOf} />
+          </HfCard>
         ))}
       </ul>
     </>

@@ -43,6 +43,15 @@ describe("chats", () => {
     expect(res.status).toBe(400);
   });
 
+  // Seen: renaming a chat moved it to the top of the list, even with the name left as it was.
+  it("renames a chat without moving it up the list", async () => {
+    const { chat } = await setup();
+    const other = await (await env.call("POST", "/api/chats", { providerId: chat.providerId, model: "fake-model" })).json();
+    const res = await env.call("PATCH", `/api/chats/${chat.id}`, { title: "Про здание" });
+    expect(await res.json()).toMatchObject({ title: "Про здание", updatedAt: chat.updatedAt });
+    expect((await (await env.call("GET", "/api/chats")).json()).map((c: { id: string }) => c.id)).toEqual([other.id, chat.id]);
+  });
+
   it("switches the model of a chat", async () => {
     const { chat } = await setup();
     const res = await env.call("PATCH", `/api/chats/${chat.id}`, { model: "other" });

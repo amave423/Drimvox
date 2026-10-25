@@ -185,7 +185,8 @@ export class ChatRepo {
       provider_id: patch.providerId ?? row.provider_id,
       model: patch.model ?? row.model,
       kind: patch.kind ?? row.kind,
-      updated_at: Date.now(),
+      // A new name is not news: the chat keeps its place in the list (seen: renaming moved it to the top).
+      updated_at: patch.providerId || patch.model || patch.kind ? Date.now() : row.updated_at,
     };
     this.db.sql
       .prepare(

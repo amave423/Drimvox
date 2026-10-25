@@ -29,6 +29,13 @@ export function CheckIcon() {
   );
 }
 
+/** A name opened for editing is selected whole, its beginning in view (seen: the field showed the end of a long name). */
+export const showStart = (e: { currentTarget: HTMLInputElement }) => {
+  const input = e.currentTarget;
+  input.setSelectionRange(0, input.value.length, "backward");
+  input.scrollLeft = 0;
+};
+
 export function CrossIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -64,7 +71,8 @@ export function SideChats() {
   async function rename(id: string) {
     const title = name.trim();
     setRenaming(null);
-    if (!title) return;
+    // The same name is no change: nothing is sent.
+    if (!title || title === chats.find((c) => c.id === id)?.title) return;
     await api.chats[":id"].$patch({ param: { id }, json: { title } }).catch(() => null);
     await reloadChats();
   }
@@ -123,6 +131,7 @@ export function SideChats() {
                       value={name}
                       autoFocus
                       onChange={(e) => setName(e.target.value)}
+                      onFocus={showStart}
                       onBlur={() => void rename(chat.id)}
                       onKeyDown={(e) => e.key === "Escape" && setRenaming(null)}
                     />
@@ -134,8 +143,18 @@ export function SideChats() {
               const on = selected.includes(chat.id);
               return (
                 <li key={chat.id}>
+                  {/* A round mark in the app's ink instead of the system's checkbox; the row lights up when picked
+                      (seen: grey system boxes and a list that scrolled sideways). */}
                   <label className={`side-item side-pick${on ? " is-on" : ""}`}>
-                    <input type="checkbox" checked={on} onChange={() => setSelected(on ? selected.filter((id) => id !== chat.id) : [...selected, chat.id])} />
+                    <input
+                      type="checkbox"
+                      className="side-pick-input"
+                      checked={on}
+                      onChange={() => setSelected(on ? selected.filter((id) => id !== chat.id) : [...selected, chat.id])}
+                    />
+                    <span className="side-pick-mark" aria-hidden>
+                      {on && <CheckIcon />}
+                    </span>
                     <span className="side-item-title">{title}</span>
                   </label>
                 </li>

@@ -120,9 +120,17 @@
   background: var(--sheet); box-shadow: var(--sheet-shadow);
 }
 .picker-panel > .muted, .picker-panel > .error-note { margin: 4px 6px; }
-.picker-providers { display: flex; flex-wrap: wrap; gap: 4px; }
-.picker-providers button { padding: 4px 10px; border-radius: 999px; font-size: 13px; color: var(--muted); }
+/* The model list: a column of providers that scrolls on its own, the models beside it; one height for the panel. */
+.picker-panel.model-panel { display: flex; flex-direction: column; }
+.picker-panel.model-panel.has-providers { flex-direction: row; width: min(720px, calc(100vw - 32px)); }
+.picker-providers { flex: none; width: 168px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; padding-right: 8px; border-right: 1px solid var(--line); }
+.picker-providers button { flex: none; padding: 6px 10px; border-radius: 8px; font-size: 13px; color: var(--muted); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-providers button:hover { background: var(--paper); color: var(--fg); }
 .picker-providers button.is-on { background: var(--choice); color: var(--on-choice); }
+.picker-providers-h { flex: none; margin: 10px 10px 2px; font-size: 12px; color: var(--muted); }
+.picker-main { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.picker-main > .picker-list { flex: 1; }
+.picker-main > .muted, .picker-main > .error-note { margin: 4px 6px; }
 .picker-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
 .picker-list button { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 7px 8px; border-radius: 8px; text-align: left; }
 /* What a model does with a photo; one that takes none is greyed while a photo waits (docs/specs/media.md). */
@@ -305,3 +313,5 @@
 /* On the switch itself the blue fill already says search is on; the coloured dots stay in its list, where they tell the
    ways apart (seen: a dot on the button read as a status light). */
 .web-switch > .picker-button .web-dot { display: none; }
+/* Inside the chat's options the list has no measured room: the same height, kept inside the window. */
+.options-panel .model-panel.has-providers { height: min(460px, calc(100vh - 140px)); }

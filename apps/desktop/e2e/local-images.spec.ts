@@ -113,7 +113,11 @@ test("offers the picture engine on its own on the sheet", async () => {
   await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByRole("button", { name: "Скачать движок · 30 МБ" }).click();
   await expect(page.getByRole("button", { name: /Скачать движок/ })).toHaveCount(0, { timeout: 10_000 });
-  await expect(page.getByText(/Движок stable-diffusion\.cpp/)).toHaveCount(0);
+  // Once here, the engine's line says so and offers to delete it (asked for).
+  await expect(page.getByText("Движок stable-diffusion.cpp скачан")).toBeVisible();
+  await page.getByRole("button", { name: "Удалить движок" }).click();
+  await page.getByRole("button", { name: "Удалить движок stable-diffusion.cpp" }).click();
+  await expect(page.getByRole("button", { name: /Скачать движок/ })).toBeVisible();
 });
 
 test("downloads a video model in the video part and films a free clip in a chat", async () => {

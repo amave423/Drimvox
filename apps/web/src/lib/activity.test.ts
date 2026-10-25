@@ -21,6 +21,12 @@ describe("buildFeed", () => {
     ]);
   });
 
+  // Seen live: "Nothing more to ask. Write the plan now…" showed in the feed as if the user had written it.
+  it("leaves Drimvox's own nudges to the model out", () => {
+    const feed = buildFeed([ev(1, "user", { text: "Звёздное небо" }), ev(2, "user", { text: "Write the plan now.", drimvox: true })]);
+    expect(feed).toEqual([{ kind: "user", seq: 1, text: "Звёздное небо" }]);
+  });
+
   it("updates an approval when the user answers", () => {
     const feed = buildFeed([
       ev(1, "approval", { id: "p", command: "git push", reason: "push", allowed: null }),

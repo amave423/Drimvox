@@ -165,6 +165,30 @@ describe("work on a project", () => {
     expect(chat.messages.filter((m: any) => m.role === "user").map((m: any) => m.content)).toContain("Сделай кнопку зелёной");
   });
 
+  // Seen live: "0 min, 0 ₽" for minutes in the panel, as time and money were counted only when an answer of many steps ended.
+  it("counts the time and the money of the answer going on now", async () => {
+    const s = await setup(
+      {
+        coder: [
+          noQuestions,
+          writePlan,
+          { ...call("list_files", { path: "." }), usage: { prompt_tokens: 100_000, completion_tokens: 1000 } },
+          { ...call("list_files", { path: "." }), delayMs: 1500 },
+          call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
+          call("finish_work", { report: "Готово." }),
+        ],
+      },
+      PRICED,
+    );
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 5, hours: 2 });
+    const during = await until(s.project.id, (w) => w.status === "running" && w.spentUsd > 0);
+    expect(during.workedMs).toBeGreaterThan(0);
+    expect(during.spentUsd).toBeCloseTo(0.102, 3);
+    const done = await until(s.project.id, (w) => w.status === "done");
+    expect(done.spentUsd).toBeCloseTo(during.spentUsd, 3);
+  });
+
   it("asks without waiting: the question is kept and the work goes on", async () => {
     const s = await setup({
       coder: [

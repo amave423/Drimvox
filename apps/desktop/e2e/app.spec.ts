@@ -28,6 +28,10 @@ test("opens with a working core and remembers theme and language", async () => {
   let page = await app.firstWindow();
 
   await expect(page.getByRole("heading", { name: "Добро пожаловать в Drimvox" })).toBeVisible();
+  // The start page shows someone new how to connect a model; the explanations are on the guide's page.
+  await expect(page.locator(".home-center").getByRole("button", { name: "Подключить нейросеть" })).toBeVisible();
+  await page.getByRole("button", { name: "Инструкция" }).click();
+  await expect(page.getByRole("heading", { name: "Как пользоваться Drimvox", level: 1 })).toBeVisible();
   // Someone new sees three first steps, the first with its ways and buttons.
   const steps = page.getByRole("region", { name: "Первые шаги" });
   await expect(steps).toContainText("Подключи нейросеть");

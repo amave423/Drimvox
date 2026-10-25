@@ -63,7 +63,9 @@ export function speak(text: string, locale: string, onEnd: () => void): () => vo
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
   const utterance = new SpeechSynthesisUtterance(plain);
   utterance.lang = locale === "ru" ? "ru-RU" : "en-US";
-  const voice = speechSynthesis.getVoices().find((v) => v.lang.startsWith(utterance.lang.slice(0, 2)));
+  // A natural (neural) voice where the system has one: the plain ones sound like a robot (seen: Windows' Irina).
+  const own = speechSynthesis.getVoices().filter((v) => v.lang.startsWith(utterance.lang.slice(0, 2)));
+  const voice = own.find((v) => /natural|neural|online/i.test(v.name)) ?? own[0];
   if (voice) utterance.voice = voice;
   utterance.onend = onEnd;
   utterance.onerror = onEnd;

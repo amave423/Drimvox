@@ -119,8 +119,19 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .icon-button.is-pencil:hover { color: var(--pencil); background: var(--pencil-soft); }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; color: var(--muted); }
 .icon-button:hover { color: var(--fg); background: var(--paper); }
-.side-pick { display: flex !important; align-items: center; gap: 8px; cursor: pointer; }
-.side-rename .field-input { width: 100%; padding: 5px 8px; font-size: 14px; }
+.side-pick { display: flex !important; align-items: center; gap: 10px; cursor: pointer; min-width: 0; overflow: hidden; position: relative; }
+.side-pick .side-item-title { flex: 1; min-width: 0; }
+/* The checkbox itself covers the row, unseen: a click anywhere on it picks the chat. */
+.side-pick-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.side-pick.is-on { background: var(--ink-soft); }
+.side-pick-mark { pointer-events: none; flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--muted); color: var(--sheet); }
+.side-pick.is-on .side-pick-mark { border-color: var(--ink); background: var(--ink); }
+.side-pick-mark svg { width: 12px; height: 12px; }
+.side-pick:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: -2px; }
+/* Renaming in the list: the row itself turns into the field, at its height and with its padding (seen: a boxed field
+   with a heavy outline, narrower than the row). */
+.side-rename .field-input { width: 100%; height: auto; padding: 6px 8px; font-size: 14px; line-height: 1.45; border: 1px solid var(--ink); border-radius: 8px; background: var(--sheet); }
+.side-rename .field-input:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ink-soft); }
 .more-settings { margin-top: 16px; }
 .more-settings summary { cursor: pointer; color: var(--ink); font-size: 14px; }
 

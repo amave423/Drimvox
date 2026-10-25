@@ -47,7 +47,7 @@ export class FoundModels {
   }
 }
 
-async function hub(url: string): Promise<unknown> {
+export async function hub(url: string): Promise<unknown> {
   const res = await fetch(url, { signal: AbortSignal.timeout(30_000) }).catch((err: unknown) => {
     throw new HubError(`Hugging Face did not answer: ${err instanceof Error ? err.message : String(err)}`);
   });

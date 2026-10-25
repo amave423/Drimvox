@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { localAudioPullSchema, hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@drimvox/shared";
+import { localAudioPullSchema, localAudioSearchSchema, hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { CatalogError } from "../local/catalog";
@@ -52,19 +52,38 @@ export function localRoutes(local: LocalModels) {
     // Pictures on this computer (docs/specs/local-images.md): the short list, downloads of the engine and the models.
     // Speech on this computer (docs/specs/local-audio.md): the speech models, the engine with the first one.
     .get("/audio", (c) => c.json(local.audio.status()))
-    .post("/audio/pulls", zValidator("json", localAudioPullSchema), (c) => {
+    .post("/audio/pulls", zValidator("json", localAudioPullSchema), async (c) => {
       try {
-        return c.json(local.audio.pull(c.req.valid("json").model), 202);
+        return c.json(await local.audio.pull(c.req.valid("json").model), 202);
       } catch (err) {
         return c.json({ error: { code: "unsupported", detail: err instanceof Error ? err.message : String(err) } }, 409);
       }
     })
     .post("/audio/pulls/pause", zValidator("json", localAudioPullSchema), (c) => (local.audio.pause(c.req.valid("json").model) ? c.json({ ok: true as const }, 200) : c.json({ error: { code: "not_found" } }, 404)))
     .delete("/audio/pulls", zValidator("query", localAudioPullSchema), (c) => (local.audio.cancel(c.req.valid("query").model) ? c.body(null, 204) : c.json({ error: { code: "not_found" } }, 404)))
-    .delete("/audio/models/:id", (c) =>
-      local.audio.remove(c.req.param("id") as never) ? c.body(null, 204) : c.json({ error: { code: "not_found" } }, 404),
+    // By query: a found model's id has the repository's slash in it.
+    .delete("/audio/models", zValidator("query", localAudioPullSchema), (c) =>
+      local.audio.remove(c.req.valid("query").model) ? c.body(null, 204) : c.json({ error: { code: "not_found" } }, 404),
     )
+    .get("/audio/search", zValidator("query", localAudioSearchSchema), async (c) => {
+      try {
+        return c.json(await local.audio.search(c.req.valid("query").q), 200);
+      } catch (err) {
+        if (err instanceof HubError) return c.json(unreachable(err), 502);
+        throw err;
+      }
+    })
+    .get("/audio/hf", zValidator("query", z.object({ repo: hfRepoName })), async (c) => {
+      try {
+        return c.json(await local.audio.files(c.req.valid("query").repo), 200);
+      } catch (err) {
+        if (err instanceof HubError) return c.json(unreachable(err), 502);
+        throw err;
+      }
+    })
+    .delete("/audio/engine", (c) => (local.audio.removeEngine() ? c.body(null, 204) : c.json({ error: { code: "busy" } }, 409)))
     .get("/images", async (c) => c.json(await local.images.status()))
+    .delete("/images/engine", (c) => (local.images.removeEngine() ? c.body(null, 204) : c.json({ error: { code: "busy" } }, 409)))
     .post("/images/pulls", zValidator("json", localImagePullSchema), async (c) => {
       try {
         return c.json(await local.images.pull(c.req.valid("json").model), 202);

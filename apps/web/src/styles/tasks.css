@@ -333,3 +333,18 @@
 .work-summary .actions { margin: 4px 0 0; }
 .field-label { color: var(--muted); font-size: 14px; }
 .project-templates { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+
+/* Models found on Hugging Face: cards in a grid; an opened one takes the row for its files. */
+.hf-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.hf-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); min-width: 0; }
+.hf-card.is-open { grid-column: 1 / -1; background: var(--paper); }
+.hf-card.is-unsupported { opacity: 0.6; }
+.hf-card-name { display: grid; min-width: 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.hf-card-owner { color: var(--muted); font-size: 12px; }
+.hf-card-repo { font-weight: 500; }
+.hf-card-facts { margin: 0; color: var(--muted); font-size: 13px; }
+.hf-card-foot { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: auto; padding-top: 2px; }
+.hf-card-link::after { content: " ↗"; }
+.hf-card-files { align-self: stretch; }
+/* A note right under a row of tabs keeps clear of the tabs' line (seen: its bar ran into it). */
+.tabs + .note { margin-top: 14px; }
