@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useApp } from "../../context";
 import { Hint } from "../Hint";
 import { Toggle } from "../Toggle";
+import { Pills } from "./MediaOptions";
 import { ModelPicker } from "./ModelPicker";
 
 /** A director for pictures and clips: on or off, its model (one that sees pictures), how many attempts it may make. */
@@ -58,16 +59,10 @@ export function DirectorControl({ value, video, onChange }: { value: Director; v
             onChange={({ providerId, model }) => onChange({ ...value, providerId, model })}
           />
           {!video && (
-            <label className="director-row">
+            <span className="director-row">
               <span className="muted">{t("director.attempts")}</span>
-              <select className="field-input director-attempts" value={value.attempts} onChange={(e) => onChange({ ...value, attempts: Number(e.target.value) })}>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <Pills label={t("director.attempts")} options={[1, 2, 3, 4, 5]} current={value.attempts} show={String} onPick={(n) => onChange({ ...value, attempts: Number(n) })} />
+            </span>
           )}
         </>
       )}

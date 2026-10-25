@@ -1,6 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useApp } from "../context";
+import { dimTitleBar } from "../theme";
 import { CrossIcon } from "./SideChats";
 
 /** Copies a picture to the clipboard as PNG, the one kind every program pastes. */
@@ -65,6 +66,13 @@ export function ZoomableImage({ src, alt, className, download }: { src: string; 
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+
+  // The window's buttons dim with the page under the viewer.
+  useEffect(() => {
+    if (!open) return;
+    dimTitleBar(true, "--overlay");
+    return () => dimTitleBar(false, "--overlay");
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

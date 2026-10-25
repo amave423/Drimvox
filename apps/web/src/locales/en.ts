@@ -213,7 +213,7 @@ export const en: Record<keyof typeof ru, string> = {
   "boot.noToken": "Open Drimvox from the desktop app or at your Drimvox server's address.",
 
   "bottom.today": "Spent today {cost}",
-  "bottom.downloading": "Downloading {name}: {share}%",
+  "bottom.downloading": "Downloading {name}",
   "bottom.downloadingMore": "and {n} more",
   "bottom.version": "Drimvox {version}",
 

@@ -10,7 +10,7 @@ interface Props {
 }
 
 /** A row of pills for one setting; the first is chosen when nothing is. */
-function Pills({ label, options, current, show, onPick }: { label: string; options: (string | number)[]; current: string | number | undefined; show(o: string | number): string; onPick(o: string): void }) {
+export function Pills({ label, options, current, show, onPick }: { label: string; options: (string | number)[]; current: string | number | undefined; show(o: string | number): string; onPick(o: string): void }) {
   const chosen = String(current ?? options[0]);
   return (
     <div className="pills" role="radiogroup" aria-label={label}>

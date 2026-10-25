@@ -171,10 +171,13 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
           </span>
         ) : (
           <span className="picker-name">
-            {m.name}
+            {/* What it does with a photo, before its name (asked for). */}
+            <span className="picker-title">
+              {kind !== "text" && m.photoInput && <PhotoMark photos={m.photoInput} />}
+              {m.name}
+            </span>
             {onFavorites && <small>{providers.find((p) => p.id === pid)?.name}</small>}
             {m.name !== m.id && <small className="mono">{m.id}</small>}
-            {kind !== "text" && m.photoInput && <PhotoMark photos={m.photoInput} />}
             {refused(m) && <small className="picker-why">{t("photos.cannot")}</small>}
           </span>
         )}

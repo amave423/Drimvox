@@ -164,9 +164,14 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .start-ways { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; line-height: 1.5; }
 
 /* A local model downloading, wherever the user is; a click opens the local models. */
-.download-note { display: inline-flex; align-items: center; gap: 8px; color: inherit; font: inherit; }
-.download-note:hover { color: var(--fg); }
-.download-note progress { width: 80px; height: 6px; }
+.download-note { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: min(520px, 60vw); margin-right: 18px; padding: 3px 10px; border-radius: 999px; color: inherit; font: inherit; }
+.download-note:hover { color: var(--fg); background: var(--sheet); }
+.download-bar { flex: none; width: 72px; height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.download-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--ink); transition: width 400ms; }
+.download-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.download-share { flex: none; color: var(--fg); font-variant-numeric: tabular-nums; }
+.download-time { flex: none; }
+.download-time::before { content: "·"; margin-right: 8px; }
 
 /* Scrollbars: a thin rounded thumb on nothing, no arrows (seen: the system bar with arrows on a white strip). */
 ::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }

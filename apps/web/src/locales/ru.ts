@@ -213,7 +213,7 @@ export const ru = {
   "boot.noToken": "Открой Drimvox через приложение на компьютере или через адрес сервера Drimvox.",
 
   "bottom.today": "Сегодня потрачено {cost}",
-  "bottom.downloading": "Скачивается {name}: {share}%",
+  "bottom.downloading": "Скачивается {name}",
   "bottom.downloadingMore": "и ещё {n}",
   "bottom.version": "Drimvox {version}",
 

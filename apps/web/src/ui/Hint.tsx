@@ -30,11 +30,23 @@ export function Hint({ text, inButton = false }: { text: string; inButton?: bool
   const common = { className: "hint", "aria-label": text, onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide };
   return inButton ? (
     <span ref={(el) => void (ref.current = el)} {...common} role="img">
-      ?{tip}
+      <QuestionMark />
+      {tip}
     </span>
   ) : (
     <button ref={(el) => void (ref.current = el)} type="button" {...common} onClick={(e) => (e.preventDefault(), at ? hide() : show())}>
-      ?{tip}
+      <QuestionMark />
+      {tip}
     </button>
+  );
+}
+
+/** The mark drawn, not typed: a font's "?" sits off the circle's middle (seen). */
+function QuestionMark() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8.5 8.5a3.5 3.5 0 1 1 5.2 3.06c-.98.55-1.7 1.3-1.7 2.44v.5" />
+      <path d="M12 19h.01" />
+    </svg>
   );
 }

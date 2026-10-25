@@ -68,14 +68,18 @@ export function DownloadNote() {
   const first = downloads[0]!;
   const share = first.pull.total > 0 ? Math.min(100, Math.round((first.pull.completed / first.pull.total) * 100)) : 0;
   const time = left(first.pull);
+  // A short name: the repository's model without the address and the quantisation (seen: a whole hf.co path in the bar).
+  // Ollama's names keep their tag: it is the size (qwen3:1.7b).
+  const short = first.name.startsWith("hf.co/") ? first.name.split("/").at(-1)!.split(":")[0]! : first.name;
   return (
-    <button type="button" className="download-note" onClick={() => navigate({ kind: "local" })}>
-      <progress max={100} value={share} aria-hidden />
-      <span>
-        {t("bottom.downloading", { name: first.name, share })}
-        {time ? ` · ${time}` : ""}
-        {downloads.length > 1 ? ` ${t("bottom.downloadingMore", { n: downloads.length - 1 })}` : ""}
+    <button type="button" className="download-note" title={first.name} onClick={() => navigate({ kind: "local" })}>
+      <span className="download-bar" aria-hidden>
+        <span style={{ width: `${Math.max(share, 2)}%` }} />
       </span>
+      <span className="download-name">{t("bottom.downloading", { name: short })}</span>
+      <span className="download-share">{share}%</span>
+      {time && <span className="download-time">{time}</span>}
+      {downloads.length > 1 && <span>{t("bottom.downloadingMore", { n: downloads.length - 1 })}</span>}
     </button>
   );
 }

@@ -125,7 +125,7 @@ test("a director writes the prompt, looks at the picture and says what it made",
   await page.locator(".director label.toggle").click();
   await page.locator(".director").getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Chatty/ }).click();
-  await page.locator(".director").getByRole("combobox", { name: "Попыток" }).selectOption("1");
+  await page.locator(".director").getByRole("radiogroup", { name: "Попыток" }).getByRole("radio", { name: "1" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: /Параметры: .*режиссёр · 1/ })).toBeVisible();
   await page.getByLabel(/Опиши картинку/).fill("Лиса в шарфе");
@@ -143,7 +143,7 @@ test("a photo goes only to a model that takes one, and the others say so", async
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("tab", { name: "Картинки" }).click();
   // The list marks what takes a photo.
-  await expect(page.getByRole("option", { name: /Portrait Painter.*по фото/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /по фото.*Portrait Painter/ })).toBeVisible();
   await page.getByRole("option", { name: /Cheap Painter/ }).click();
   // A model without photos: the paperclip is there, off, with why.
   await expect(page.getByRole("button", { name: /Эта модель не работает по фото/ })).toBeDisabled();

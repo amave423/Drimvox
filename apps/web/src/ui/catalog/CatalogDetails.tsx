@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
+import { dimTitleBar } from "../../theme";
 import type { MessageKey } from "../../i18n";
 import type { CatalogEntry } from "../../lib/catalog";
 import { CrossIcon } from "../SideChats";
@@ -64,6 +65,9 @@ export function CatalogDetails(p: {
   const [secret, setSecret] = useState("");
   useEffect(() => {
     ref.current?.showModal();
+    // The window's buttons dim with the page under the window.
+    dimTitleBar(true, "--overlay-soft");
+    return () => dimTitleBar(false, "--overlay-soft");
   }, []);
   const e = p.entry;
   const name = text(e, "name");
