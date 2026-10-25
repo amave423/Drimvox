@@ -1,5 +1,5 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,7 +26,7 @@ test.afterEach(async () => {
 
 async function launch(chunks: FakeChunk[], delayMs = 0, script?: FakeTurn[]): Promise<Page> {
   fake = await startFakeProvider({ key: KEY, models, chunks, delayMs, ...(script ? { script } : {}) });
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData } });
+  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_SAVE_PDF: join(userData, "chat.pdf") } });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Ключи и модели" }).click();
@@ -185,6 +185,17 @@ test("a code block has a copy button", async () => {
   await block.getByRole("button", { name: "Копировать" }).click();
   await expect(block.getByRole("button", { name: "Скопировано" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("const total = 1;");
+});
+
+// Asked for: export a chat, as Markdown and as a PDF of what the window shows.
+test("a chat is saved as Markdown and as a PDF", async () => {
+  const page = await launch([{ text: "Ответ с **жирным** текстом" }]);
+  await ask(page, "Привет");
+  await expect(page.locator(".msg-assistant .md")).toContainText("Ответ с");
+  await expect(page.locator(".chat-export").getByRole("button", { name: "Markdown" })).toBeVisible();
+  await page.locator(".chat-export").getByRole("button", { name: "PDF" }).click();
+  await expect(page.locator(".chat-export")).toContainText("chat.pdf");
+  expect(readFileSync(join(userData, "chat.pdf")).subarray(0, 4).toString()).toBe("%PDF");
 });
 
 // Asked for: edit one's own message, get a new answer, and switch between the versions.

@@ -62,3 +62,16 @@ describe("editing a message", () => {
     expect((await env.call("POST", `/api/chats/${chat.id}/branch`, { messageId: "nope" })).status).toBe(404);
   });
 });
+
+// Asked for: export a chat.
+describe("exporting a chat", () => {
+  it("gives the shown branch as Markdown, each message under who wrote it", async () => {
+    const chat = await setup([{ text: "Ответ **жирный**" }]);
+    await send(chat.id, "Привет");
+    const res = await env.call("GET", `/api/chats/${chat.id}/export.md?you=Ты`);
+    expect(res.headers.get("content-type")).toMatch(/markdown/);
+    const text = await res.text();
+    expect(text).toContain("## Ты\n\nПривет");
+    expect(text).toContain("## fake-model\n\nОтвет **жирный**");
+  });
+});

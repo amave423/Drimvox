@@ -1,4 +1,5 @@
 import { isFreeToRun } from "../budget";
+import { chatMarkdown } from "../chats/export";
 import { zValidator } from "@hono/zod-validator";
 import { type MonthUsage, type ModelSpending,
   approvalDecisionSchema,
@@ -174,6 +175,12 @@ export function chatRoutes(
       }),
     )
     .post("/:id/seen", (c) => (chats.markSeen(c.req.param("id")) ? c.json({ ok: true as const }, 200) : c.json(notFound, 404)))
+    // The chat as Markdown, to save (asked for: export a chat).
+    .get("/:id/export.md", (c) => {
+      const chat = chats.get(c.req.param("id"));
+      if (!chat) return c.json(notFound, 404);
+      return c.body(chatMarkdown(chat, c.req.query("you") ?? "You"), 200, { "Content-Type": "text/markdown; charset=utf-8" });
+    })
     // Another version of an edited message: the chat shows that branch and goes on from it.
     .post("/:id/branch", zValidator("json", messageBranchSchema), (c) => {
       const id = c.req.param("id");

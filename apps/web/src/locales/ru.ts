@@ -175,6 +175,8 @@ export const ru = {
   "chat.reasoning": "Размышления модели",
   "chat.stopped": "Остановлено",
   "chat.you": "Ты",
+  "chat.export": "Сохранить чат:",
+  "chat.exportSaved": "Сохранено: {path}",
   "chat.delete": "Удалить чат",
   "chat.deleteConfirm": "Удалить этот чат вместе с перепиской?",
   "chat.totals": "В этом чате: {cost}, {tokens} токенов",

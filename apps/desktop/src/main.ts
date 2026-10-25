@@ -3,7 +3,7 @@ import { attachContextMenu } from "./context-menu";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { InitMessage } from "./core-process";
 import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, type PageAction } from "@drimvox/shared";
@@ -356,6 +356,18 @@ function registerIpc() {
     return token;
   });
 
+  // The chat as it shows, saved as a PDF (asked for: export a chat). The page hides everything but the conversation for print.
+  ipcMain.handle("drimvox:save-pdf", async (event, name: unknown) => {
+    if (!fromOurPage(event.senderFrame?.url)) throw new Error("Forbidden");
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    if (!owner) return null;
+    const safe = (typeof name === "string" && name.trim() ? name : "chat").replace(/[\\/:*?"<>|]+/g, " ").slice(0, 80);
+    const target = process.env.DRIMVOX_TEST_SAVE_PDF ?? (await dialog.showSaveDialog(owner, { defaultPath: `${safe}.pdf`, filters: [{ name: "PDF", extensions: ["pdf"] }] })).filePath;
+    if (!target) return null;
+    const pdf = await event.sender.printToPDF({ pageSize: "A4", printBackground: true });
+    writeFileSync(target, pdf);
+    return target;
+  });
   ipcMain.handle("drimvox:pick-folder", async (event) => {
     if (!fromOurPage(event.senderFrame?.url)) throw new Error("Forbidden");
     // Tests cannot click a native dialog; they hand the folder over through the environment.

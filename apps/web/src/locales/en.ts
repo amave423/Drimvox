@@ -175,6 +175,8 @@ export const en: Record<keyof typeof ru, string> = {
   "chat.reasoning": "Model reasoning",
   "chat.stopped": "Stopped",
   "chat.you": "You",
+  "chat.export": "Save the chat:",
+  "chat.exportSaved": "Saved: {path}",
   "chat.delete": "Delete chat",
   "chat.deleteConfirm": "Delete this chat and its messages?",
   "chat.totals": "This chat: {cost}, {tokens} tokens",

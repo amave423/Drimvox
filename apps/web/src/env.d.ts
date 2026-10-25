@@ -4,6 +4,7 @@ interface DrimvoxBridge {
   setTitleBar(colors: { background: string; symbols: string }): void;
   /** Native folder picker; null when the user cancels. */
   pickFolder(): Promise<string | null>;
+  savePdf?(name: string): Promise<string | null>;
   /** A Windows notification; shown only while the window is not in front. */
   notify(notice: { title: string; body: string; taskId: string }): void;
   /** A notification right now, even with the window in front: to check that they reach the desktop. */

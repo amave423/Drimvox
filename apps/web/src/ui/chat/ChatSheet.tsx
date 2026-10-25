@@ -520,7 +520,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
       {projectId && work ? (
         <WorkPanel work={work} onChanged={() => void reloadWork().then(() => chat && load(chat.id))} />
       ) : (
-        <ChatMargin choice={choice} answers={answers} onDelete={chat ? () => void remove() : null} />
+        <ChatMargin choice={choice} answers={answers} chat={chat && chat.messages.length ? { id: chat.id, title: chat.title } : null} onDelete={chat ? () => void remove() : null} />
       )}
     </article>
   );

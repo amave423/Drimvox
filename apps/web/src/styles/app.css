@@ -182,3 +182,15 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .bottom-month { margin-left: 16px; }
 .bottom-month.is-near { color: var(--wait); }
 .bottom-month.is-over { color: var(--pencil); }
+
+/* A chat saved as a PDF: only the conversation, full width, nothing that scrolls or sticks. */
+.chat-export { font-size: 13px; }
+.chat-export-saved { display: block; margin-top: 4px; overflow-wrap: anywhere; }
+@media print {
+  .side, .topbar, .bottombar, .margin, .composer, .chat-head .tabs, .msg-user-tools, .code-copy, .lightbox-close { display: none !important; }
+  html, body, #root, .shell, .desk, .sheet, .sheet-body, .messages { height: auto !important; max-height: none !important; overflow: visible !important; }
+  .shell, .desk { display: block !important; padding: 0 !important; }
+  html, body, .shell, .desk { background: var(--sheet) !important; }
+  .sheet { box-shadow: none !important; border: 0 !important; border-radius: 0 !important; margin: 0 !important; max-width: none !important; animation: none !important; }
+  * { animation: none !important; }
+}
