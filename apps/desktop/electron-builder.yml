@@ -1,6 +1,6 @@
 # Installers: Windows (NSIS, per user), Linux (AppImage and .deb). Releases go to GitHub, where the app looks for updates.
 # Build with `npm run dist` (this computer's system) or let .github/workflows/release.yml build both on a version tag.
-appId: com.artel.app
+appId: com.drimvox.app
 productName: Drimvox
 copyright: Copyright © 2026 amave423
 directories:

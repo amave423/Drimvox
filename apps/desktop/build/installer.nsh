@@ -130,6 +130,9 @@
   !macroend
 
   !macro customInstall
+    ; Releases up to 0.13 had another identity: their entry in "Installed apps" goes, so there is one Drimvox there.
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\24c82f08-5da5-5aa5-a5f3-3efe79e17fd0"
+    DeleteRegKey HKCU "Software\24c82f08-5da5-5aa5-a5f3-3efe79e17fd0"
     ${If} $DrimvoxNoDesktop == "1"
       WinShell::UninstShortcut "$newDesktopLink"
       Delete "$newDesktopLink"
