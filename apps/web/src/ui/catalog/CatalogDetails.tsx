@@ -1,3 +1,5 @@
+import type { McpServerView, McpTrust } from "@drimvox/shared";
+import { McpTrustChoice } from "../McpTrustChoice";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
 import { dimTitleBar } from "../../theme";
@@ -55,14 +57,20 @@ export function CatalogDetails(p: {
   on: boolean;
   busy: boolean;
   needsSecret: boolean;
+  /** A server switched on for the first time: how much it is trusted is chosen here. */
+  setup: boolean;
+  /** A server already added: how much it is trusted, changed here. */
+  server?: McpServerView | null;
+  onTrust?(trust: McpTrust): void;
   error: string | null;
-  onTurn(on: boolean, secret?: string): void;
+  onTurn(on: boolean, secret?: string, trust?: McpTrust): void;
   onClose(): void;
 }) {
   const { t } = useApp();
   const text = useEntryText();
   const ref = useRef<HTMLDialogElement>(null);
   const [secret, setSecret] = useState("");
+  const [trust, setTrust] = useState<McpTrust>(p.entry.kind === "mcp" ? (p.entry.trust ?? "changes") : "changes");
   useEffect(() => {
     ref.current?.showModal();
     // The window's buttons dim with the page under the window.
@@ -110,12 +118,15 @@ export function CatalogDetails(p: {
           {t("catalog.source")}
         </a>
       </p>
+      {/* Asked for: a server one switches on works without questions — once it is said what it may do. */}
+      {p.setup && e.kind === "mcp" && <McpTrustChoice value={trust} onChange={setTrust} name={name} />}
+      {!p.setup && p.server && p.onTrust && <McpTrustChoice value={p.server.trust} onChange={p.onTrust} name={name} />}
       {p.needsSecret && e.kind === "mcp" && e.secret ? (
         <form
           className="catalog-secret"
           onSubmit={(ev) => {
             ev.preventDefault();
-            if (secret.trim()) p.onTurn(true, secret.trim());
+            if (secret.trim()) p.onTurn(true, secret.trim(), trust);
           }}
         >
           <label className="field">
@@ -136,7 +147,7 @@ export function CatalogDetails(p: {
         </form>
       ) : (
         <div className="actions">
-          <button className={p.on ? "btn" : "btn is-primary"} disabled={p.busy} onClick={() => p.onTurn(!p.on)}>
+          <button className={p.on ? "btn" : "btn is-primary"} disabled={p.busy} onClick={() => p.onTurn(!p.on, undefined, p.setup ? trust : undefined)}>
             {p.busy ? t("catalog.installing") : t(p.on ? "catalog.turnOff" : "catalog.turnOn")}
           </button>
         </div>

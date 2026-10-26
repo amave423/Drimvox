@@ -1,4 +1,4 @@
-import type { McpServerView, SkillView } from "@drimvox/shared";
+import type { McpServerView, SkillView, McpTrust } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";
@@ -36,7 +36,7 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
   useEffect(() => void load(), []);
 
   /** On: installs the skill or creates the server (or switches it back on); off: removes the skill, switches the server off. */
-  async function turn(entry: CatalogEntry, on: boolean, secret?: string): Promise<boolean> {
+  async function turn(entry: CatalogEntry, on: boolean, secret?: string, trust?: McpTrust): Promise<boolean> {
     setBusy(entry.id);
     setFailed(null);
     const have = installed(entry, servers, skills);
@@ -52,7 +52,7 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
       const env = s?.env && secret ? { [s.env]: secret } : {};
       const headers = s?.header && secret ? { [s.header.name]: `${s.header.prefix}${secret}` } : {};
       const how = entry.server.command ? { command: entry.server.command, args: entry.server.args ?? [] } : { url: entry.server.url! };
-      res = (await api.mcp.$post({ json: { name: text(entry, "name"), ...how, env, headers } }).catch(() => null)) as Response | null;
+      res = (await api.mcp.$post({ json: { name: text(entry, "name"), ...how, env, headers, trust: trust ?? entry.trust ?? "changes" } }).catch(() => null)) as Response | null;
     }
     setBusy(null);
     const done = !!res?.ok;
@@ -82,6 +82,8 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
     return !!have && (entry.kind === "skill" || (have as McpServerView).enabled);
   };
   const needsSecret = (entry: CatalogEntry) => entry.kind === "mcp" && !!entry.secret && !installed(entry, servers, skills);
+  // A server switched on for the first time opens its window: what it may do without asking is said and chosen there.
+  const needsSetup = (entry: CatalogEntry) => entry.kind === "mcp" && !installed(entry, servers, skills);
   const own = CATALOG.filter((e) => e.kind === kind);
   // Only the categories that have cards of this kind.
   const categories = CATEGORIES.filter((c) => c === "all" || own.some((e) => e.category === c));
@@ -117,7 +119,7 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
                 disabled={busy === entry.id}
                 onChange={(on) => {
                   // A server that needs a key asks for it in its window first.
-                  if (on && needsSecret(entry)) return setOpen(entry);
+                  if (on && needsSetup(entry)) return setOpen(entry);
                   void turn(entry, on);
                 }}
               >
@@ -152,8 +154,15 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
           on={isOn(open)}
           busy={busy === open.id}
           needsSecret={needsSecret(open)}
+          setup={needsSetup(open)}
+          server={open.kind === "mcp" ? (installed(open, servers, skills) as McpServerView | null) : null}
+          onTrust={async (trust) => {
+            const have = installed(open, servers, skills) as McpServerView | null;
+            if (have) await api.mcp[":id"].$patch({ param: { id: have.id }, json: { trust } }).catch(() => null);
+            await load();
+          }}
           error={failed?.id === open.id ? failed.code : null}
-          onTurn={(on, secret) => void turn(open, on, secret).then((done) => done && setOpen(null))}
+          onTurn={(on, secret, trust) => void turn(open, on, secret, trust).then((done) => done && setOpen(null))}
           onClose={() => setOpen(null)}
         />
       )}

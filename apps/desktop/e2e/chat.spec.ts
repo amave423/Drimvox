@@ -401,8 +401,10 @@ test("an MCP server from the settings gives the chat a tool that asks first", as
   await page.getByRole("button", { name: "Добавить сервер" }).click();
   await page.getByLabel("Название").fill("demo");
   await page.getByLabel("Команда", { exact: true }).fill(`node "${server}"`);
+  // A new server asks only about what changes something; this test is about the questions themselves.
+  await page.getByRole("radio", { name: "Всегда спрашивать" }).click();
   await page.getByRole("button", { name: "Подключить" }).click();
-  await expect(page.getByText(/Инструментов: 3/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Инструментов: 6/)).toBeVisible({ timeout: 20_000 });
 
   await startChat(page);
   await say(page, "Повтори привет через сервер");
@@ -435,8 +437,10 @@ test("a chat waiting for a permission says so by a notification, and a whole ser
   await page.getByRole("button", { name: "Добавить сервер" }).click();
   await page.getByLabel("Название").fill("demo");
   await page.getByLabel("Команда", { exact: true }).fill(`node "${server}"`);
+  // A new server asks only about what changes something; this test is about the questions themselves.
+  await page.getByRole("radio", { name: "Всегда спрашивать" }).click();
   await page.getByRole("button", { name: "Подключить" }).click();
-  await expect(page.getByText(/Инструментов: 3/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Инструментов: 6/)).toBeVisible({ timeout: 20_000 });
 
   await startChat(page);
   await say(page, "Сложи через сервер");

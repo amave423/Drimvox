@@ -9,6 +9,23 @@ interface McpTool {
   name: string;
   description?: string;
   inputSchema: Record<string, unknown>;
+  /** The server's own word on what a tool does (MCP tool annotations). */
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean };
+}
+
+/** Words in a tool's name that say it changes or sends something, when the server gives no hints. */
+const CHANGES = /(^|[_\-.])(add|append|apply|approve|archive|assign|buy|cancel|clear|close|commit|create|delete|deploy|drop|edit|exec|execute|fork|insert|install|merge|modify|move|order|pay|post|publish|purchase|push|put|remove|rename|reply|reset|restore|revert|run|save|send|set|share|submit|transfer|update|upload|upsert|write)([_\-.]|$)/i;
+
+/**
+ * Whether a call needs the user's word (asked for: a server one switched on should not ask about what only reads):
+ * "changes" asks about tools that change or send something — by the server's hints, else by the tool's name.
+ */
+export function needsAsking(trust: McpServerConfig["trust"], t: Pick<McpTool, "name" | "annotations">): boolean {
+  if (trust === "trusted") return false;
+  if (trust === "ask") return true;
+  if (t.annotations?.destructiveHint === true) return true;
+  if (t.annotations?.readOnlyHint === true) return false;
+  return CHANGES.test(t.name);
 }
 
 interface Connection {
@@ -73,7 +90,7 @@ export class McpHub {
               hooks.onResult({ callId: o.toolCallId, name: label, ok, output: output.slice(0, 4000) });
               return output;
             };
-            if (!this.repo.isAllowed(server.id, t.name)) {
+            if (needsAsking(server.trust, t) && !this.repo.isAllowed(server.id, t.name)) {
               const answer = await ask({ server: server.name, tool: t.name, input, signal: o.abortSignal });
               if (!answer) return done(false, "The user did not allow this tool call. Do not retry it; do without it.");
               if (answer === "always") this.repo.allow(server.id, t.name);

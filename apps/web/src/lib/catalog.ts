@@ -1,4 +1,4 @@
-import type { McpServerView, SkillView } from "@drimvox/shared";
+import type { McpServerView, SkillView, McpTrust } from "@drimvox/shared";
 import { siAnthropic, siFigma, siGithub, siGooglechrome, siNotion, siShadcnui, siSupabase, siUpstash } from "simple-icons";
 
 /** What the card is about: the catalog's filter. */
@@ -35,6 +35,8 @@ export interface McpEntry extends Base {
   kind: "mcp";
   server: { command?: string; args?: string[]; url?: string };
   secret?: CatalogSecret;
+  /** How much it is trusted when switched on, unless the user picks otherwise; "changes" when not said. */
+  trust?: McpTrust;
   /** Whether a server the user already has is this one. */
   matches(s: McpServerView): boolean;
 }
@@ -81,7 +83,7 @@ const brand = (icon: { path: string }): CatalogLogo => ({ path: icon.path });
 
 export const CATALOG: CatalogEntry[] = [
   // Servers: what they open to the model.
-  { kind: "mcp", id: "playwright", name: "Playwright", vendor: "Microsoft", category: "web", logo: drawn(glyph.browser), link: "https://github.com/microsoft/playwright-mcp", license: "Apache-2.0", server: npx("@playwright/mcp@latest", "--headless"), matches: (s) => hasArg(s, "@playwright/mcp") },
+  { kind: "mcp", id: "playwright", name: "Playwright", vendor: "Microsoft", category: "web", logo: drawn(glyph.browser), link: "https://github.com/microsoft/playwright-mcp", license: "Apache-2.0", server: npx("@playwright/mcp@latest", "--headless"), trust: "trusted", matches: (s) => hasArg(s, "@playwright/mcp") },
   { kind: "mcp", id: "chrome-devtools", name: "Chrome DevTools", vendor: "Google", category: "web", logo: brand(siGooglechrome), link: "https://github.com/ChromeDevTools/chrome-devtools-mcp", license: "Apache-2.0", server: npx("chrome-devtools-mcp@latest", "--no-usage-statistics"), matches: (s) => hasArg(s, "chrome-devtools-mcp") },
   { kind: "mcp", id: "exa", name: "Exa", vendor: "Exa Labs", category: "web", logo: drawn(glyph.search), link: "https://github.com/exa-labs/exa-mcp-server", license: "MIT", server: { url: "https://mcp.exa.ai/mcp" }, matches: (s) => (s.url ?? "").includes("mcp.exa.ai") },
   { kind: "mcp", id: "firecrawl", name: "Firecrawl", vendor: "Mendable", category: "web", logo: drawn(glyph.flame), link: "https://github.com/firecrawl/firecrawl-mcp-server", license: "MIT", server: npx("firecrawl-mcp"), secret: { env: "FIRECRAWL_API_KEY", helpUrl: "https://www.firecrawl.dev/app/api-keys" }, matches: (s) => hasArg(s, "firecrawl-mcp") },

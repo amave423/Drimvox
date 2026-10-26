@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BASE, auth, createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
-import { HEADLESS_PLAYWRIGHT } from "../src/db";
+import { HEADLESS_PLAYWRIGHT, TRUST_PLAYWRIGHT } from "../src/db";
+import { needsAsking } from "../src/mcp/hub";
+
+const NL = String.fromCharCode(10);
+const BLANK = NL + NL;
 
 const KEY = "good-key";
 const SERVER = fileURLToPath(new URL("./mcp-server.mjs", import.meta.url));
@@ -25,7 +29,8 @@ afterEach(async () => {
 });
 
 async function addServer(extra: Record<string, unknown> = {}) {
-  const res = await env.call("POST", "/api/mcp", { name: "demo", command: process.execPath, args: [SERVER], ...extra });
+  // These tests are about the questions: the server asks about every tool unless a test says otherwise.
+  const res = await env.call("POST", "/api/mcp", { name: "demo", command: process.execPath, args: [SERVER], trust: "ask", ...extra });
   expect(res.status).toBe(201);
   return (await res.json()).id as string;
 }
@@ -35,7 +40,7 @@ describe("servers", () => {
     const id = await addServer();
     const status = await (await env.call("GET", `/api/mcp/${id}/status`)).json();
     expect(status.ok).toBe(true);
-    expect(status.tools.map((t: any) => t.name).sort()).toEqual(["add", "echo", "secret"]);
+    expect(status.tools.map((t: any) => t.name).sort()).toEqual(["add", "echo", "list_notes", "save_note", "secret", "tidy"]);
   });
 
   it("keeps environment values secret and passes them to the server", async () => {
@@ -134,6 +139,75 @@ describe("tools for agents", () => {
     for (let i = 0; i < 100 && !fake!.requests.some((r) => r.path === "/v1/chat/completions"); i++) await new Promise((r) => setTimeout(r, 20));
     const tools = fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body.tools.map((t: any) => t.function.name);
     expect(tools.some((n: string) => n.startsWith("mcp_"))).toBe(false);
+  });
+});
+
+/** A chat answer calling these tools of the demo server in turn; the tools it asked about, each allowed once. */
+async function askedInChat(calls: { name: string; args: Record<string, unknown> }[]): Promise<string[]> {
+  fake = await startFakeProvider({ key: KEY, models: [{ id: "chatty" }], script: [...calls.map((c) => ({ toolCalls: [{ name: `mcp_demo_${c.name}`, args: c.args }] })), { text: "Готово." }] });
+  const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+  const chat = await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "chatty" })).json();
+  const res = await env.app().request(`${BASE}/api/chats/${chat.id}/messages`, {
+    method: "POST",
+    headers: { ...auth, "Content-Type": "application/json" },
+    body: JSON.stringify({ content: "Поработай с заметками", web: "off" }),
+  });
+  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+  const asked: string[] = [];
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    for (let end = buffer.indexOf(BLANK); end !== -1; end = buffer.indexOf(BLANK)) {
+      const line = buffer.slice(0, end).split(NL).find((l) => l.startsWith("data: "));
+      buffer = buffer.slice(end + 2);
+      const event = line ? JSON.parse(line.slice(6)) : null;
+      if (event?.type !== "approval") continue;
+      asked.push(event.tool);
+      await env.call("POST", `/api/chats/${chat.id}/approvals/${event.id}`, { allow: true });
+    }
+  }
+  return asked;
+}
+
+const NOTES = [
+  { name: "list_notes", args: {} },
+  { name: "echo", args: { text: "раз" } },
+  { name: "save_note", args: { text: "купить доски" } },
+  { name: "tidy", args: {} },
+];
+
+// Asked for: a server the user switched on works without questions about what only reads (seen: twenty questions).
+describe("how much a server is trusted", () => {
+  it("a new server asks only about what changes something: by the server's hints, else by the tool's name", async () => {
+    const res = await env.call("POST", "/api/mcp", { name: "demo", command: process.execPath, args: [SERVER] });
+    expect((await res.json()).trust).toBe("changes");
+    expect(await askedInChat(NOTES)).toEqual(["save_note", "tidy"]);
+  });
+
+  it("tells changes by the words of a tool's name, whole words only", () => {
+    const asks = (name: string) => needsAsking("changes", { name });
+    for (const name of ["create_issue", "push_files", "send-message", "delete_branch", "fs.write", "save_note", "run"]) expect(asks(name), name).toBe(true);
+    for (const name of ["browser_navigate", "browser_snapshot", "get_settings", "list_issues", "search_code", "read_password_info"]) expect(asks(name), name).toBe(false);
+  });
+
+  it("a trusted server asks nothing, a server set to ask asks about everything", async () => {
+    const id = (await (await env.call("POST", "/api/mcp", { name: "demo", command: process.execPath, args: [SERVER], trust: "trusted" })).json()).id;
+    expect(await askedInChat(NOTES)).toEqual([]);
+    await fake!.close();
+    expect((await (await env.call("PATCH", `/api/mcp/${id}`, { trust: "ask" })).json()).trust).toBe("ask");
+    expect(await askedInChat(NOTES)).toEqual(["list_notes", "echo", "save_note", "tidy"]);
+  });
+
+  it("trusts a Playwright server already added, which only works in its own browser", async () => {
+    const add = async (name: string, args: string[]) => (await (await env.call("POST", "/api/mcp", { name, command: "npx", args, trust: "changes" })).json()).id as string;
+    const browser = await add("Playwright", ["-y", "@playwright/mcp@latest"]);
+    const other = await add("GitHub", ["-y", "github-mcp"]);
+    env.db.sql.exec(TRUST_PLAYWRIGHT);
+    const trust = async (id: string) => (await (await env.call("GET", "/api/mcp")).json()).find((s: any) => s.id === id).trust;
+    expect(await trust(browser)).toBe("trusted");
+    expect(await trust(other)).toBe("changes");
   });
 });
 

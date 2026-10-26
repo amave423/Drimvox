@@ -142,6 +142,10 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   const playwright = page.getByRole("dialog", { name: "Playwright" });
   await expect(playwright.getByRole("figure", { name: "Как это выглядит" })).toContainText("проверь, что форма входа работает");
   await expect(playwright).toContainText("Microsoft · лицензия Apache-2.0");
+  // Before a server is switched on, what it may do without asking is said and chosen (asked for): the browser works
+  // in its own window without the user's sign-ins, so it asks nothing.
+  await expect(playwright.getByRole("radio", { name: "Без вопросов" })).toHaveAttribute("aria-checked", "true");
+  await expect(playwright).toContainText("будет делать всё без вопросов");
   await page.keyboard.press("Escape");
 
   // GitHub needs a token: switching it on asks for one in its window; Escape closes the window, nothing is added.
@@ -149,6 +153,8 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   const dialog = page.getByRole("dialog", { name: "GitHub" });
   await expect(dialog).toContainText("api.githubcopilot.com/mcp");
   await expect(dialog.getByLabel("Ключ GitHub")).toBeVisible();
+  // A server that can change things asks before it does.
+  await expect(dialog.getByRole("radio", { name: "Только об изменениях" })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(cards.filter({ has: page.locator("strong", { hasText: /^GitHub$/ }) }).getByRole("switch")).not.toBeChecked();

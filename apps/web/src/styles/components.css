@@ -205,3 +205,8 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 
 .speech-voice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .catalog-card-actions { display: inline-flex; align-items: center; gap: 10px; }
+
+/* How much an MCP server is trusted: the three ways, and what the chosen one means under them. */
+.mcp-trust { display: grid; gap: 6px; justify-items: start; margin: 8px 0; }
+.mcp-trust p { margin: 0; font-size: 13px; max-width: 70ch; }
+.mcp-trust .segmented { flex-wrap: wrap; }

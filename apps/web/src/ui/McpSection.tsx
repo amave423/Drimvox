@@ -1,4 +1,5 @@
-import type { McpServerView, McpStatus } from "@drimvox/shared";
+import type { McpServerView, McpStatus, McpTrust } from "@drimvox/shared";
+import { McpTrustChoice } from "./McpTrustChoice";
 import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { Hint } from "./Hint";
@@ -33,6 +34,10 @@ export function McpSection() {
 
   async function toggle(s: McpServerView) {
     await api.mcp[":id"].$patch({ param: { id: s.id }, json: { enabled: !s.enabled } }).catch(() => null);
+    await load();
+  }
+  async function trust(s: McpServerView, next: McpTrust) {
+    await api.mcp[":id"].$patch({ param: { id: s.id }, json: { trust: next } }).catch(() => null);
     await load();
   }
   async function remove(s: McpServerView) {
@@ -73,6 +78,7 @@ export function McpSection() {
                   <span className="is-pencil-text">{t("mcp.failed", { error: st.error })}</span>
                 )}
               </div>
+              <McpTrustChoice value={s.trust} name={s.name} onChange={(next) => void trust(s, next)} />
               {s.allowed.length > 0 && (
                 <div className="mcp-allowed">
                   <span className="muted">{t("mcp.allowed")}</span>
@@ -126,6 +132,7 @@ function McpForm({ onDone, onCancel }: { onDone(): void; onCancel(): void }) {
   const [url, setUrl] = useState("");
   const [headers, setHeaders] = useState("");
   const [failed, setFailed] = useState(false);
+  const [trust, setTrust] = useState<McpTrust>("changes");
 
   const parsed = splitCommand(line);
   const ready = name.trim() && (kind === "stdio" ? !!parsed : /^https?:\/\//.test(url.trim()));
@@ -134,8 +141,8 @@ function McpForm({ onDone, onCancel }: { onDone(): void; onCancel(): void }) {
     setFailed(false);
     const json =
       kind === "stdio"
-        ? { name: name.trim(), command: parsed!.command, args: parsed!.args, env: parsePairs(env, "=") }
-        : { name: name.trim(), url: url.trim(), headers: parsePairs(headers, ":") };
+        ? { name: name.trim(), command: parsed!.command, args: parsed!.args, env: parsePairs(env, "="), trust }
+        : { name: name.trim(), url: url.trim(), headers: parsePairs(headers, ":"), trust };
     const res = await api.mcp.$post({ json }).catch(() => null);
     if (!res?.ok) return setFailed(true);
     onDone();
@@ -183,6 +190,7 @@ function McpForm({ onDone, onCancel }: { onDone(): void; onCancel(): void }) {
           </label>
         </>
       )}
+      <McpTrustChoice value={trust} onChange={setTrust} name={name.trim() || t("mcp.thisServer")} />
       <p className="muted mcp-secret">{t("mcp.secretNote")}</p>
       <div className="actions">
         <button className="btn is-primary" disabled={!ready}>

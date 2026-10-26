@@ -8,6 +8,9 @@ import { DatabaseSync } from "node:sqlite";
 export const HEADLESS_PLAYWRIGHT = `update mcp_servers set args = json_insert(args, '$[#]', '--headless'), updated_at = cast(unixepoch('subsec') * 1000 as integer)
   where args like '%@playwright/mcp%' and args not like '%--headless%' and args not like '%--headed%';`;
 
+/** The Playwright server works only in its own browser, without the user's sign-ins: it asks about nothing. */
+export const TRUST_PLAYWRIGHT = `update mcp_servers set trust = 'trusted' where args like '%@playwright/mcp%';`;
+
 const migrations: string[] = [
   `create table settings (key text primary key, value text not null) strict;`,
   `create table providers (
@@ -261,6 +264,8 @@ const migrations: string[] = [
   // A provider paid by a flat fee, not by tokens (a reseller's subscription): its models are free to Drimvox.
   `alter table providers add column flat integer not null default 0;`,
   HEADLESS_PLAYWRIGHT,
+  // How much a server is trusted: a new one asks only about what changes something.
+  `alter table mcp_servers add column trust text not null default 'changes'; ${TRUST_PLAYWRIGHT}`,
 ];
 
 export interface Database {

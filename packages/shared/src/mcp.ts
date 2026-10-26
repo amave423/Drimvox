@@ -2,6 +2,13 @@ import { z } from "zod";
 
 const text = z.string().trim().min(1);
 
+/**
+ * How much a server the user switched on is trusted (asked for: no questions about what only reads): "ask" asks about
+ * every tool, "changes" only about what changes or sends something, "trusted" about nothing.
+ */
+export const mcpTrusts = ["ask", "changes", "trusted"] as const;
+export type McpTrust = (typeof mcpTrusts)[number];
+
 /** An MCP server: a command Drimvox starts (stdio) or an address it connects to (Streamable HTTP). */
 export const mcpServerCreateSchema = z
   .object({
@@ -12,11 +19,12 @@ export const mcpServerCreateSchema = z
     env: z.record(z.string().max(200), z.string().max(5000)).default({}),
     url: z.string().trim().url().max(2000).optional(),
     headers: z.record(z.string().max(200), z.string().max(5000)).default({}),
+    trust: z.enum(mcpTrusts).default("changes"),
   })
   .strict()
   .refine((s) => !!s.command !== !!s.url, "Either a command or an address");
 
-export const mcpServerUpdateSchema = z.object({ name: text.max(60).optional(), enabled: z.boolean().optional() }).strict();
+export const mcpServerUpdateSchema = z.object({ name: text.max(60).optional(), enabled: z.boolean().optional(), trust: z.enum(mcpTrusts).optional() }).strict();
 
 export interface McpServerView {
   id: string;
@@ -28,7 +36,8 @@ export interface McpServerView {
   url: string | null;
   headerKeys: string[];
   enabled: boolean;
-  /** Tools the user allowed for good with "Always allow". */
+  trust: McpTrust;
+  /** Tools the user allowed for good with "Always allow"; "*" is the whole server. */
   allowed: string[];
   createdAt: number;
 }
