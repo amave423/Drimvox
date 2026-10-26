@@ -68,6 +68,8 @@ test("a project: the interview, the plan with Go, the agent works alone with its
     { text: "Каталог готов: откройте index.html." },
   ]);
 
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+
   await page.getByRole("button", { name: "+ Проект" }).click();
   // No task list, no points, no order: what to make and who does what.
   await expect(page.getByRole("checkbox")).toHaveCount(0);
@@ -93,30 +95,38 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(plan.getByLabel("Время, часов")).toHaveValue("2");
   await plan.getByRole("button", { name: "Начать работу" }).click();
 
-  // The project's conversation: the plan as its first message, the panel on the right with the checklist.
-  await expect(page.locator(".msg-user").first()).toContainText("Каталог досок");
-  const panel = page.getByRole("complementary", { name: "Ход работы" });
-  await expect(panel).toContainText("Чек-лист");
-  await expect(panel).toContainText("Агент работает");
+  // The workshop: the run's timeline with the plan as its first message, the state on top, the checklist in the sidebar.
+  await expect(page.locator(".timeline .msg-user").first()).toContainText("Каталог досок");
+  const head = page.locator(".workshop-head");
+  await expect(head.getByRole("status")).toContainText("Агент работает");
   // A message while it works goes in at once and the agent takes it on the way.
   await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").fill("Сделай заголовок крупнее");
   await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").press("Enter");
   await expect(page.locator(".msg-user", { hasText: "Сделай заголовок крупнее" })).toBeVisible();
 
-  await expect(panel).toContainText("Готово", { timeout: 30_000 });
-  await expect(panel).toContainText("2 из 2");
-  await expect(panel).toContainText("Нужна доставка?");
-  await expect(panel).toContainText("Пока считает: Пока без доставки");
-  // The workspace's tabs: the actions are in the conversation; the plan, the folder's changes and the report apart.
-  await expect(panel).not.toContainText("Журнал действий");
-  await page.getByRole("tab", { name: "План" }).click();
-  await expect(page.locator(".plan-details")).toContainText("Сайт лесопилки с каталогом досок.");
-  await page.getByRole("tab", { name: "Изменения" }).click();
-  await expect(page.locator(".diff")).toContainText("index.html");
-  await page.getByRole("tab", { name: "Запуск" }).click();
-  await expect(page.locator(".work-report")).toContainText("Каталог готов");
-  await page.getByRole("tab", { name: "Работа" }).click();
+  await expect(head.getByRole("status")).toContainText("Готово", { timeout: 30_000 });
+  await expect(head).toContainText("2 из 2");
+  await expect(page.getByRole("list", { name: "Чек-лист" })).toContainText("Проверить страницу");
+  await expect(page.locator(".work-questions-note")).toContainText("Нужна доставка?");
+  await expect(page.locator(".work-questions-note")).toContainText("Пока считает: Пока без доставки");
+  // The result panel: the report, the folder's changes and the plan; it folds away with its button.
+  const result = page.getByRole("complementary", { name: "Результат" });
+  await expect(result.locator(".work-report")).toContainText("Каталог готов");
+  await result.getByRole("tab", { name: "План" }).click();
+  await expect(result.locator(".plan-details")).toContainText("Сайт лесопилки с каталогом досок.");
+  await result.getByRole("tab", { name: "Изменения" }).click();
+  await expect(result.locator(".diff")).toContainText("index.html");
+  const toggle = head.getByRole("button", { name: "Результат" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(result).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByPlaceholder("Напиши агенту — он учтёт на ходу")).toBeVisible();
+  // Chats are the other mode: the workshop comes back with the project opened last.
+  await page.getByRole("button", { name: "Чат", exact: true }).click();
+  await expect(page.locator(".workshop")).toHaveCount(0);
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await expect(page.locator(".workshop-head h1")).toHaveText(/drimvox-repo-/);
   expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Доски");
   // Nothing to accept, and git stays the user's.
   expect(execFileSync("git", ["log", "--oneline"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);

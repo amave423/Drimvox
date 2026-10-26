@@ -30,8 +30,9 @@ export async function startTask(page: Page, s: Start): Promise<void> {
     const res = await fetch(`/api/projects/${projects.at(-1)!.id}/tasks`, { method: "POST", headers, body: JSON.stringify(body) });
     if (!res.ok) throw new Error(`task not started: ${res.status}`);
   }, { task: s.task, model: s.model, stages: s.stages ?? DIRECT, team: s.team });
-  // The project page lists its tasks; a reload picks up the new one.
+  // The projects' sidebar lists a project's tasks; a reload picks up the new one, back on the start page.
   await page.reload();
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await page.getByRole("button", { name: new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
   await expect(page.locator(".task-head h1")).toHaveText(title);
 }

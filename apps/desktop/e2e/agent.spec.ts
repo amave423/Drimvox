@@ -59,6 +59,7 @@ async function launch(script: FakeTurn[], env: Record<string, string> = {}): Pro
 
 /** Direct mode unless asked otherwise: these tests cover the agent, the pipeline has its own test. */
 async function startTask(page: Page, task: string, pipeline = false) {
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await page.getByRole("button", { name: "+ Проект" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/drimvox-repo-/);
   const all = { interview: true, spec: true, approveSpec: true, testsFirst: true };

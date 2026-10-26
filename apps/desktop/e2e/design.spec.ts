@@ -117,6 +117,8 @@ test("the look: samples in the interview, the user's own sample, the brief, a de
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
   await expect(page.getByText("Моделей: 1")).toBeVisible();
 
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+
   await page.getByRole("button", { name: "+ Проект" }).click();
   await startTask(page, {
     task: "Сделай страницу меню для кофейни",

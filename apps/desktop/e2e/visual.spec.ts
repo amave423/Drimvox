@@ -81,6 +81,8 @@ async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
   await expect(page.getByText("Моделей: 1")).toBeVisible();
 
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+
   await page.getByRole("button", { name: "+ Проект" }).click();
   await startTask(page, { task: "Проверь, как выглядит страница", model: "coder" });
 

@@ -34,7 +34,9 @@ export function PlanCard({ work, onChanged }: { work: ProjectWorkView; onChanged
     const body = (await res?.json().catch(() => null)) as { chatId?: string; error?: { code?: string } } | null;
     if (!res?.ok || !body?.chatId) return setFailed(body?.error?.code ?? "unknown");
     await reloadChats();
-    navigate({ kind: "chat", chatId: body.chatId, key: body.chatId });
+    // The work goes on in the project's workshop: there already, or brought there from the interview's page.
+    navigate({ kind: "project", projectId: work.projectId });
+    onChanged();
   }
 
   async function revise() {

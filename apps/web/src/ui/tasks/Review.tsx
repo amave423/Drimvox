@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
-import { IdentityHelp } from "../projects/ProjectSheet";
+import { IdentityHelp } from "../projects/Workshop";
 import { AcceptanceReport } from "./AcceptanceReport";
 import { DesignReviewView } from "./Design";
 import { DiffView, type LineComment } from "./DiffView";

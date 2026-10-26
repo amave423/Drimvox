@@ -7,18 +7,8 @@ import { formatUsd } from "../../lib/format";
 import { activityLine } from "../chat/activityLine";
 import { Markdown } from "../chat/Markdown";
 import { hoursAndMinutes } from "./useProjectWork";
-import { Tabs } from "../Tabs";
 import { DiffView } from "../tasks/DiffView";
 import { PlanDetails } from "./PlanDetails";
-
-export type WorkTab = "work" | "plan" | "changes" | "run";
-const TABS: WorkTab[] = ["work", "plan", "changes", "run"];
-
-/** The project workspace's tabs over the conversation (docs/specs/project-work.md): the work, the plan, the changes, the result. */
-export function WorkTabs({ tab, onTab }: { tab: WorkTab; onTab(tab: WorkTab): void }) {
-  const { t } = useApp();
-  return <Tabs value={tab} label={t("projectWork.panel")} options={TABS.map((name) => ({ value: name, label: t(`projectWork.tab.${name}`) }))} onChange={onTab} />;
-}
 
 /** The plan the work follows, read only: corrections go to the agent as messages. */
 export function PlanTab({ work }: { work: ProjectWorkView }) {

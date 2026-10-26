@@ -29,12 +29,13 @@ const UNFINISHED = new Set(["budget", "steps", "acceptance_error"]);
 /** Waiting states whose last status line explains what went wrong. */
 const WITH_DETAIL = new Set(["stuck", "integration_red", "subtask_stuck", "visual_failed"]);
 
-export function TaskSheet({ taskId }: { taskId: string }) {
+/** A task on its page; `embedded`: the interview inside a project's workshop, without the page's margin. */
+export function TaskSheet({ taskId, embedded }: { taskId: string; embedded?: boolean }) {
   const { api, t, settings, navigate } = useApp();
   const { task, events } = useTaskStream(taskId);
   const [comments, setComments] = useState<LineComment[]>([]);
 
-  if (!task) return <article className="sheet" aria-busy />;
+  if (!task) return <article className={embedded ? "sheet is-embedded" : "sheet"} aria-busy />;
   // A subtask's brief is written for the model; the user sees what the subtask is about instead.
   const feed = buildFeed(events).map((item) =>
     task.kind === "subtask" && item.kind === "user" && item.text.includes("Subtask id: ") ? { ...item, text: task.task } : item,
@@ -60,7 +61,7 @@ export function TaskSheet({ taskId }: { taskId: string }) {
     void api.tasks[":id"].approvals[":approvalId"].$post({ param: { id: task.id, approvalId }, json: { allow, always } }).catch(() => null);
 
   return (
-    <article className="sheet task">
+    <article className={`sheet task${embedded ? " is-embedded" : ""}`}>
       <div className="sheet-body">
         <header className="task-head">
           <GoalLink task={task} />
@@ -89,7 +90,7 @@ export function TaskSheet({ taskId }: { taskId: string }) {
         {waitingFor === "questions" && <Interview key={task.updatedAt} task={task} />}
         {waitingFor === "spec_review" && <SpecReview key={task.spec ?? ""} task={task} />}
         {waitingFor === "plan_review" && <PlanReview key={task.updatedAt} task={task} />}
-        {(waitingFor === "plan_ready" || started) && <ProjectPlanHere projectId={task.projectId} />}
+        {!embedded && (waitingFor === "plan_ready" || started) && <ProjectPlanHere projectId={task.projectId} />}
         {task.subtasks.length > 0 && <SubtaskBoard task={task} />}
 
         {answered && <Answer task={task} />}
@@ -122,7 +123,7 @@ export function TaskSheet({ taskId }: { taskId: string }) {
         )}
       </div>
 
-      <aside className="margin">
+      <aside className="margin" hidden={embedded}>
         <p className="note">
           {task.costUsd === 0 && task.steps > 0
             ? t("task.free")

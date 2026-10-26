@@ -2,7 +2,7 @@ import { useApp } from "../../context";
 import { PlanCard } from "./PlanCard";
 import { useProjectWork } from "./useProjectWork";
 
-/** Right under the interview: the plan with "Go", or the way to the work once it started (docs/specs/project-work.md). */
+/** Right under the interview: the plan with "Go", or the way to the workshop once it started (docs/specs/project-work.md). */
 export function ProjectPlanHere({ projectId }: { projectId: string }) {
   const { t, navigate } = useApp();
   const { work, reload } = useProjectWork(projectId);
@@ -12,7 +12,7 @@ export function ProjectPlanHere({ projectId }: { projectId: string }) {
   return (
     <div className="note is-ok">
       <p>{t("projectWork.started")}</p>
-      <button className="btn is-primary" onClick={() => navigate({ kind: "chat", chatId: work.chatId!, key: work.chatId! })}>
+      <button className="btn is-primary" onClick={() => navigate({ kind: "project", projectId })}>
         {t("projectWork.openChat")}
       </button>
     </div>

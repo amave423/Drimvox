@@ -1,4 +1,4 @@
-import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@drimvox/shared";
+import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary, ProjectWorkView } from "@drimvox/shared";
 import { createContext, useContext } from "react";
 import type { Api } from "./api";
 import type { MessageKey } from "./i18n";
@@ -29,6 +29,8 @@ export type View =
   /** `send`: a message to send at once, the first of a project task's conversation. */
   | { kind: "chat"; chatId: string | null; key: string; send?: string }
   | { kind: "project"; projectId: string }
+  /** The projects' mode with no project open yet. */
+  | { kind: "projects" }
   | { kind: "task"; taskId: string };
 
 export interface AppContextValue {
@@ -56,7 +58,17 @@ export interface AppContextValue {
   reloadProjects(): Promise<void>;
   tasks: TaskView[];
   reloadTasks(): Promise<void>;
+  /** Every project's work, kept fresh: the projects' list shows how each goes. */
+  works: ProjectWorkView[];
+  reloadWorks(): void;
 }
+
+/**
+ * The projects' mode (asked for: a mode of its own, switched like Claude Code's): a project's workshop, the projects'
+ * start, a project's task and a task's conversation.
+ */
+export const inProjects = (view: View, chats: ChatView[] = []) =>
+  view.kind === "project" || view.kind === "projects" || view.kind === "task" || (view.kind === "chat" && !!chats.find((c) => c.id === view.chatId)?.projectId);
 
 export const AppContext = createContext<AppContextValue | null>(null);
 

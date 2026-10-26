@@ -49,7 +49,10 @@ test("publishes a project on GitHub: the code to enter, the name, private by def
   });
   const page = await app.firstWindow();
   await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await page.getByRole("button", { name: "+ Проект" }).click();
+  // The project's GitHub is in the workshop's result panel, under "Проект".
+  await page.getByRole("tab", { name: "Проект" }).click();
 
   const github = page.getByRole("region", { name: "GitHub" });
   await github.getByRole("button", { name: "Подключить GitHub" }).click();

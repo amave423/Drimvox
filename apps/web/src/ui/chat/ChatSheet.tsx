@@ -12,7 +12,7 @@ import {
   type AttachmentView,
   type ActivityEntry,
 } from "@drimvox/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
@@ -35,8 +35,6 @@ import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFil
 import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
 import { useLiveAnswer } from "./useLiveAnswer";
-import { WorkPanel } from "../projects/WorkPanel";
-import { ChangesTab, PlanTab, RunTab, WorkTabs, type WorkTab } from "../projects/Workspace";
 import { useProjectWork } from "../projects/useProjectWork";
 
 interface Draft {
@@ -57,8 +55,12 @@ interface Draft {
 /** Answers still being made on the provider's side, such as clips, are checked this often. */
 const PENDING_POLL_MS = 3000;
 
-export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null; viewKey: string; autoSend?: string }) {
-  const { api, token, t, providers, navigate, reloadChats, reloadToday } = useApp();
+/**
+ * A chat, or in a project's workshop (`workshop`) the run's conversation as a timeline: the agent's actions and the
+ * user's messages in time, with the box to write to the run under them.
+ */
+export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: string | null; viewKey: string; autoSend?: string; workshop?: boolean }) {
+  const { api, token, t, settings, providers, navigate, reloadChats, reloadToday } = useApp();
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -165,9 +167,12 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   const list = useRef<HTMLDivElement>(null);
   useFollow(end, list, chat?.id, [chat?.id, draft?.user], chat?.messages.length);
 
-  // A project's conversation (docs/specs/project-work.md): the run goes on in the core; the chat follows it, messages
-  // join it on the way, and the panel next to it shows the checklist and the limits.
+  // A project's conversation (docs/specs/project-work.md): the run goes on in the core; the chat follows it in the
+  // project's workshop, and messages join it on the way.
   const projectId = chat?.projectId && !chat.itemId ? chat.projectId : null;
+  useEffect(() => {
+    if (projectId && !workshop) navigate({ kind: "project", projectId });
+  }, [projectId, workshop]);
   /** What the model did, as the answer shows it in order; a project's screenshots by their address. */
   const toActions = (entries: ActivityEntry[]): AnswerAction[] =>
     entries.flatMap((a) =>
@@ -178,9 +183,6 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         : [{ line: activityLine(t, a.name, a.input), at: a.at }],
     );
   const { work, reload: reloadWork } = useProjectWork(projectId);
-  // The project workspace: the work in the conversation, the plan, the changes, the started result.
-  const [tab, setTab] = useState<WorkTab>("work");
-  useEffect(() => setTab("work"), [projectId]);
   const running = work?.status === "running";
   useEffect(() => {
     if (!running || !chat) return;
@@ -395,22 +397,30 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
   // One's own message is edited in a text chat; a project's run and a program on a subscription keep their own course.
   const editable = kind === "text" && !projectId && !chat?.itemId && providers.find((p) => p.id === chat?.providerId)?.billing !== "subscription";
 
+  // In the workshop every message stands at its time on the timeline.
+  const at = (key: string, time: number, node: ReactNode) =>
+    workshop ? (
+      <div className="tl-item" key={key}>
+        <time className="tl-time mono">{new Date(time).toLocaleTimeString(settings.locale, { hour: "2-digit", minute: "2-digit" })}</time>
+        {node}
+      </div>
+    ) : (
+      node
+    );
+
   return (
-    <article className="sheet chat">
-      <div className="sheet-body chat-body">
-        <header className="chat-head">
-          <h1>{chat?.title ?? t("chat.emptyTitle")}</h1>
-          {projectId && work && <WorkTabs tab={tab} onTab={setTab} />}
-        </header>
+    <article className={workshop ? "workshop-chat" : "sheet chat"}>
+      <div className={workshop ? "workshop-chat-body" : "sheet-body chat-body"}>
+        {!workshop && (
+          <header className="chat-head">
+            <h1>{chat?.title ?? t("chat.emptyTitle")}</h1>
+          </header>
+        )}
 
-        {projectId && work && tab === "plan" && <PlanTab work={work} />}
-        {projectId && work && tab === "changes" && <ChangesTab work={work} />}
-        {projectId && work && tab === "run" && <RunTab work={work} onChanged={() => void reloadWork()} />}
+        {empty && !workshop && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
 
-        {empty && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
-
-        <div className="messages" ref={list} hidden={!!projectId && tab !== "work"}>
-          {(cutAt !== null ? messages.slice(0, cutAt) : messages).map((m) =>
+        <div className={`messages${workshop ? " timeline" : ""}`} ref={list}>
+          {(cutAt !== null ? messages.slice(0, cutAt) : messages).map((m) => at(m.id, m.createdAt,
             m.role === "user" ? (
               <UserMessage
                 key={m.id}
@@ -438,7 +448,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
                 onApprove={approve}
               />
             ),
-          )}
+          ))}
           {draft && (
             <>
               <UserMessage content={draft.user} files={chat ? <SentFiles chatId={chat.id} files={draft.attachments} /> : null} />
@@ -464,9 +474,23 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         {chat?.projectId && chat.itemId && (
           <WorkReview projectId={chat.projectId} itemId={chat.itemId} busy={!!draft} answers={answers.length} />
         )}
+        {workshop && work && work.questions.length > 0 && (
+          <section className="note work-questions-note">
+            <h3 className="margin-h">{t("projectWork.questions")}</h3>
+            <ul className="work-questions">
+              {work.questions.map((q, n) => (
+                <li key={n}>
+                  <p>{q.question}</p>
+                  <p className="muted">{t("projectWork.assumes", { assumption: q.assumption })}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="muted">{t("projectWork.answerHint")}</p>
+          </section>
+        )}
         {projectId ? (
-          // A project's conversation: the run goes on while the user writes; Stop is in the panel.
-          tab === "work" && <Composer
+          // A project's conversation: the run goes on while the user writes; Stop is in the workshop's header.
+          <Composer
             disabled={!work?.startedAt}
             streaming={false}
             onSend={(text) => void send(text)}
@@ -519,9 +543,7 @@ export function ChatSheet({ chatId, viewKey, autoSend }: { chatId: string | null
         )}
       </div>
 
-      {projectId && work ? (
-        <WorkPanel work={work} onChanged={() => void reloadWork().then(() => chat && load(chat.id))} />
-      ) : (
+      {!workshop && (
         <ChatMargin choice={choice} answers={answers} chat={chat && chat.messages.length ? { id: chat.id, title: chat.title } : null} onDelete={chat ? () => void remove() : null} />
       )}
     </article>

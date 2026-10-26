@@ -81,6 +81,7 @@ async function launch(): Promise<Page> {
 
 test("a team: plan review with a removed subtask, the board, a subtask sheet, one review", async () => {
   const page = await launch();
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await page.getByRole("button", { name: "+ Проект" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/drimvox-repo-/);
   await startTask(page, {

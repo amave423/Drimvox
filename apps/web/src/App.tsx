@@ -9,7 +9,7 @@ import { workNotices } from "./lib/workNotices";
 import { applyTheme, resolveTheme } from "./theme";
 import { ChatSheet } from "./ui/chat/ChatSheet";
 import { HomeSheet } from "./ui/HomeSheet";
-import { ProjectSheet } from "./ui/projects/ProjectSheet";
+import { ProjectsStart, Workshop } from "./ui/projects/Workshop";
 import { ProvidersSheet } from "./ui/providers/ProvidersSheet";
 import { LocalModelsSheet } from "./ui/local/LocalModelsSheet";
 import { TaskSheet } from "./ui/tasks/TaskSheet";
@@ -124,6 +124,9 @@ export function App({ api, token, initialSettings, status }: Props) {
   // seen live, a run waited half an hour on a permission nobody saw.
   const seenWork = useRef<ProjectWorkView[] | null>(null);
   const [works, setWorks] = useState<ProjectWorkView[]>([]);
+  // An open workshop asks for a fresh look when its work changes: the sidebar's checklist follows it at once.
+  const [worksAsked, setWorksAsked] = useState(0);
+  const reloadWorks = useCallback(() => setWorksAsked((n) => n + 1), []);
   const working = works.some((w) => w.status === "running" || w.status === "planning");
   useEffect(() => {
     const look = async () => {
@@ -143,7 +146,7 @@ export function App({ api, token, initialSettings, status }: Props) {
     void look();
     const timer = setInterval(() => void look(), working ? 3000 : 15000);
     return () => clearInterval(timer);
-  }, [api, working, settings.notifications, settings.locale, projects]);
+  }, [api, working, settings.notifications, settings.locale, projects, worksAsked]);
 
   useEffect(() => {
     void reloadProviders();
@@ -194,6 +197,8 @@ export function App({ api, token, initialSettings, status }: Props) {
       reloadProjects,
       tasks,
       reloadTasks,
+      works,
+      reloadWorks,
     }),
     [
       api,
@@ -213,6 +218,8 @@ export function App({ api, token, initialSettings, status }: Props) {
       reloadProjects,
       tasks,
       reloadTasks,
+      works,
+      reloadWorks,
     ],
   );
 
@@ -221,7 +228,7 @@ export function App({ api, token, initialSettings, status }: Props) {
       <div className="shell">
         <TopBar />
         <Sidebar />
-        <main className="desk">
+        <main className={`desk${view.kind === "project" || view.kind === "projects" ? " is-workshop" : ""}`}>
           {view.kind === "home" && <HomeSheet />}
           {view.kind === "settings" && <SettingsSheet />}
           {view.kind === "providers" && <ProvidersSheet />}
@@ -229,7 +236,8 @@ export function App({ api, token, initialSettings, status }: Props) {
           {view.kind === "gallery" && <GallerySheet />}
           {view.kind === "guide" && <GuideSheet />}
           {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} autoSend={view.send} />}
-          {view.kind === "project" && <ProjectSheet key={view.projectId} projectId={view.projectId} />}
+          {view.kind === "project" && <Workshop key={view.projectId} projectId={view.projectId} />}
+          {view.kind === "projects" && <ProjectsStart />}
           {view.kind === "task" && <TaskSheet key={view.taskId} taskId={view.taskId} />}
         </main>
         <footer className="bottombar">

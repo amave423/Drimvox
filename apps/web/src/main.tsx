@@ -12,6 +12,7 @@ import "./styles/components.css";
 import "./styles/providers.css";
 import "./styles/chat.css";
 import "./styles/tasks.css";
+import "./styles/workshop.css";
 import "./styles/media.css";
 import "./styles/shape.css";
 import "./styles/motion.css";
