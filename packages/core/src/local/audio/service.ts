@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fetchVia } from "../../proxy";
-import { downloadFile, fileByPath, type Route } from "../hf-download";
+import { downloadFile, fileByPath, type Route, removePartial } from "../hf-download";
 import { AUDIO_MODELS, type AudioModelDef } from "./catalog";
 import { audioFiles, FoundAudio, foundAudio, parseFound, searchAudio } from "./found";
 import { findCli, installWhisper, whisperUrl } from "./engine";
@@ -199,7 +199,7 @@ export class LocalAudio {
     const def = this.defs().find((m) => m.id === id);
     if (def && id.startsWith("hf:") && !existsSync(this.pathOf(def))) this.found.remove(id);
     const file = a.partial;
-    if (file) setTimeout(() => rmSync(file, { force: true }), 500).unref();
+    if (file) setTimeout(() => removePartial(file), 500).unref();
     return true;
   }
 

@@ -13,7 +13,7 @@
 .provider-more { flex: none; }
 /* The state under the name, in line with it past the logo. */
 .provider-status { margin: 2px 0 0 44px; font-size: 14px; min-height: 22px; }
-.provider > :not(.provider-head):not(.provider-status) { margin-left: 44px; }
+.provider > :not(.provider-head):not(.provider-status):not(dialog) { margin-left: 44px; }
 .provider-proxy { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-top: 8px; font-size: 14px; }
 .provider-actions { display: flex; gap: 16px; margin-top: 6px; }
 

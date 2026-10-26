@@ -2,7 +2,7 @@ import type { HfMediaFile, HfMediaRepo, LocalHardware, LocalImageModelId, LocalI
 import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fetchVia } from "../../proxy";
-import { downloadFile, fileByPath, type Route } from "../hf-download";
+import { downloadFile, fileByPath, type Route, removePartial } from "../hf-download";
 import { FoundModels, mediaFiles, searchMedia } from "./found";
 import { familyOf, fileKey, foundModel, IMAGE_MODELS, IMAGE_SIZES, sizeOf, variantFor, VIDEO_DURATIONS, VIDEO_SIZES, type ImageFile, type ImageFileRole, type ImageModelDef } from "./catalog";
 import { ENGINE_TAG, engineUrl, findServer, installEngine } from "./engine";
@@ -284,7 +284,7 @@ export class LocalImages {
     if (a.partial) {
       const file = a.partial;
       // The download lets go of the file a moment after the abort; Windows refuses to delete it before that.
-      setTimeout(() => rmSync(file, { force: true }), 500).unref();
+      setTimeout(() => removePartial(file), 500).unref();
     }
     return true;
   }

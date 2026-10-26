@@ -113,3 +113,14 @@ export const hfRepoName = z
   .string()
   .trim()
   .regex(/^[\w.-]+\/[\w.-]+$/);
+
+/**
+ * A model Ollama runs from Hugging Face is named by its address there (hf.co/<owner>/<repo>:<quant>): shown as the
+ * repository's name and the quantisation instead (asked for: the list showed bare links). Other names stay as they are.
+ */
+export function localModelTitle(name: string): { title: string; owner: string | null } {
+  const m = /^hf\.co\/([^/]+)\/([^:]+)(?::(.+))?$/i.exec(name);
+  if (!m) return { title: name, owner: null };
+  const repo = m[2]!.replace(/[-_.]?gguf$/i, "");
+  return { title: m[3] ? `${repo} · ${m[3]}` : repo, owner: m[1]! };
+}

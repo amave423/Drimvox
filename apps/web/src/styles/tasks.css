@@ -348,3 +348,5 @@
 .hf-card-files { align-self: stretch; }
 /* A note right under a row of tabs keeps clear of the tabs' line (seen: its bar ran into it). */
 .tabs + .note { margin-top: 14px; }
+.local-model-name { flex: 1 1 240px; display: grid; min-width: 0; overflow-wrap: anywhere; }
+.local-model-name small { font-size: 12px; }

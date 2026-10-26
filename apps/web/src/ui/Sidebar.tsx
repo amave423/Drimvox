@@ -1,15 +1,33 @@
 import { useState } from "react";
 import { useApp } from "../context";
-import { BookIcon, ComputerIcon, GalleryIcon, GearIcon, KeyIcon } from "./NavIcons";
+import { BookIcon, ComputerIcon, GalleryIcon, GearIcon, KeyIcon, MenuIcon } from "./NavIcons";
 import { PencilIcon, showStart } from "./SideChats";
 import { AddProject } from "./projects/AddProject";
 import { SideChats } from "./SideChats";
 import { StatusDot } from "./tasks/StatusDot";
 
 const FINISHED = new Set(["accepted", "discarded"]);
+const SECTIONS_KEY = "drimvox.sidebarSections";
 
 export function Sidebar() {
   const { api, t, view, navigate, projects, tasks, chats, reloadProjects } = useApp();
+  // The sections at the bottom fold under one button (asked for), remembered in this window.
+  const [sectionsOpen, setSectionsOpen] = useState(() => {
+    try {
+      return localStorage.getItem(SECTIONS_KEY) !== "closed";
+    } catch {
+      return true;
+    }
+  });
+  const toggleSections = () => {
+    const next = !sectionsOpen;
+    setSectionsOpen(next);
+    try {
+      localStorage.setItem(SECTIONS_KEY, next ? "open" : "closed");
+    } catch {
+      // Kept for this visit only.
+    }
+  };
   // A project is called by its folder until the user names it (asked for: renaming like chats).
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -119,7 +137,16 @@ export function Sidebar() {
 
       <SideChats />
 
-      <nav className="side-nav">
+      <nav className="side-nav" aria-label={t("side.sections")}>
+        <button type="button" className="side-link side-sections" aria-expanded={sectionsOpen} onClick={toggleSections}>
+          <MenuIcon />
+          {t("side.sections")}
+          <span className="side-sections-arrow" aria-hidden>
+            ▾
+          </span>
+        </button>
+        {sectionsOpen && (
+          <div className="side-nav-items">
         <button className={`side-link${view.kind === "gallery" ? " is-on" : ""}`} onClick={() => navigate({ kind: "gallery" })}>
           <GalleryIcon />
           {t("side.gallery")}
@@ -140,6 +167,8 @@ export function Sidebar() {
           <BookIcon />
           {t("side.guide")}
         </button>
+          </div>
+        )}
       </nav>
     </aside>
   );

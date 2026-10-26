@@ -1,3 +1,4 @@
+import { speechText } from "@drimvox/shared";
 /** Models take WAV and MP3, not the browser's own WebM: the recording is turned into 16 kHz mono WAV. */
 const RATE = 16_000;
 
@@ -55,12 +56,9 @@ export async function startRecording(): Promise<() => Promise<string>> {
     });
 }
 
-/** The words of an answer to read aloud: no code blocks, no Markdown marks, links as their words. */
+/** The words of an answer to read aloud: no emoji, code, addresses or symbols (asked for). */
 export function plainText(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/[*_#>`~|]/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  return speechText(text);
 }
 
 /**

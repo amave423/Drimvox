@@ -1,7 +1,7 @@
 import type { LocalHardware, LocalModel, LocalPull } from "@drimvox/shared";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
-import { downloadHf } from "./hf-download";
+import { downloadHf, removePartial } from "./hf-download";
 import { fetchVia } from "../proxy";
 import { join } from "node:path";
 import { onPath } from "../cli/resolve";
@@ -338,7 +338,7 @@ export class OllamaManager {
       // The download lets go of the file a moment after the abort; Windows refuses to delete it before that.
       setTimeout(() => {
         try {
-          rmSync(file, { force: true });
+          removePartial(file);
         } catch {
           // Left for the next download of the same file to reuse.
         }

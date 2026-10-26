@@ -1,5 +1,5 @@
 import { withOllamaDetails } from "./ollama-details";
-import { presets, type ModelInfo, type PresetId } from "@drimvox/shared";
+import { localModelTitle, presets, type ModelInfo, type PresetId } from "@drimvox/shared";
 import { fetchJson } from "./http";
 import { usdPer } from "../rates";
 import { NATIVE, nativeModels, withCatalogPrices } from "./native";
@@ -132,7 +132,7 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
     const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
     const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
     models = normalizeModels(conn.preset, items, await usdPer(conn.currency));
-    if (conn.preset === "ollama") models = await withOllamaDetails(conn, models);
+    if (conn.preset === "ollama") models = (await withOllamaDetails(conn, models)).map((m) => (m.name === m.id ? { ...m, name: localModelTitle(m.id).title } : m));
     // A flat fee: nothing per answer. OpenRouter and RouterAI price their own models; a model without a price there is
     // priced per request, not missing. Others get the catalog's estimate.
     if (conn.flat) models = models.map((m) => ({ ...m, priceIn: 0, priceOut: 0, priceEstimated: false }));

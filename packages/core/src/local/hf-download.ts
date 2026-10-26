@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { downloadInPieces, hasPieces, SEGMENT_MIN, SEGMENTS } from "./segments";
 
 /** Where GGUF files come from. Hugging Face redirects to its CDN, which some networks cannot reach (seen from Russia). */
 export const HF_FILE_BASES = ["https://huggingface.co"];
@@ -25,6 +26,9 @@ export interface HfDownload {
   ollamaUrl: string;
   /** Unfinished files stay here between pauses. */
   dir: string;
+  /** How many pieces a big file comes in at once, and from what size; tests set them small. */
+  pieces?: number;
+  piecesFrom?: number;
   signal: AbortSignal;
   progress(p: { status: string; completed: number; total: number }): void;
   /** The partial file this download writes, so a cancel can delete it. */
@@ -108,6 +112,7 @@ export async function fileByPath(apiUrl: string, repo: string, path: string, sig
 }
 
 export type FileDownload = Omit<HfDownload, "model" | "ollamaUrl">;
+export { removePartial } from "./segments";
 
 /**
  * Downloads one file of a repository into `d.dir` as `<sha256>.part` and checks it; resolves with that path, or with
@@ -119,6 +124,34 @@ export async function downloadFile(d: FileDownload, repo: string, file: { path: 
   d.partial(part);
 
   const have = () => (existsSync(part) ? statSync(part).size : 0);
+  // A big file in pieces at once, unless it was begun in one go before (a paused download goes on as it began).
+  const pieces = d.pieces ?? SEGMENTS;
+  if (have() === 0 && pieces > 1 && file.size >= (d.piecesFrom ?? SEGMENT_MIN)) {
+    const url = (base: string) => `${base}/${repo}/resolve/main/${file.path.split("/").map(encodeURIComponent).join("/")}`;
+    const tries = d.routes.flatMap((route) => d.bases.map((base) => ({ key: `${route.label}|${base}`, fetch: route.fetch, url: url(base) })));
+    const ways = [...tries.filter((t) => t.key === preferred), ...tries.filter((t) => t.key !== preferred)];
+    const whole = await downloadInPieces({
+      ways,
+      part,
+      size: file.size,
+      pieces,
+      signal: d.signal,
+      startMs: START_MS,
+      stallMs: STALL_MS,
+      stalledRounds: STALLED_ROUNDS,
+      retryMs: RETRY_MS,
+      progress: (completed) => d.progress({ status: "downloading", completed, total: file.size }),
+      worked: (key) => (preferred = key),
+    }).catch((err: unknown) => {
+      if (d.signal.aborted) return null;
+      const hint = d.routes.length > 1 ? "" : " Set a proxy in the settings: Drimvox then downloads through it.";
+      throw new HfDownloadError(`Hugging Face's file server did not answer (${err instanceof Error ? err.message : String(err)}).${hint}`);
+    });
+    if (whole === null) return null;
+  } else if (hasPieces(part)) {
+    // Pieces left by an older way of downloading are of no use to one connection.
+    for (let i = 0; existsSync(`${part}.${i}`); i++) unlinkSync(`${part}.${i}`);
+  }
   if (have() < file.size) {
     const tries = d.routes.flatMap((route) => d.bases.map((base) => ({ route, base, key: `${route.label}|${base}` })));
     const order = [...tries.filter((t) => t.key === preferred), ...tries.filter((t) => t.key !== preferred)];

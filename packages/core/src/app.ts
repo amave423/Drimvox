@@ -8,7 +8,7 @@ import { workRoutes } from "./routes/work";
 import { resolveVision } from "./visual/look";
 import { findModel } from "./providers/catalog";
 import { zValidator } from "@hono/zod-validator";
-import { settingsPatchSchema, speakSchema, type PresetId } from "@drimvox/shared";
+import { settingsPatchSchema, speakSchema, speechText, type PresetId } from "@drimvox/shared";
 import { Hono } from "hono";
 import { join } from "node:path";
 import { ProjectRepo, TaskRepo } from "./agent/repo";
@@ -236,7 +236,9 @@ export function createCore(o: AppOptions) {
       const voice = readSettings(o.db).speechVoice;
       if (!voice) return c.json({ error: { code: "no_speech_voice" as const } }, 409);
       try {
-        const wav = await local.speech.speak(voice, c.req.valid("json").text);
+        const words = speechText(c.req.valid("json").text);
+        if (!words) return c.json({ error: { code: "nothing_to_read" as const } }, 400);
+        const wav = await local.speech.speak(voice, words);
         return c.body(new Uint8Array(wav), 200, { "Content-Type": "audio/wav" });
       } catch (err) {
         return c.json({ error: { code: "speech_failed" as const, detail: err instanceof Error ? err.message : String(err) } }, 502);
@@ -256,7 +258,7 @@ export function createCore(o: AppOptions) {
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills"), o.skillSources ?? SKILL_SOURCES))
-    .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), (since) => spendingByModel(o.db, providers, since)))
+    .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), async (since) => spendingByModel(o.db, providers, since)))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
     .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo))

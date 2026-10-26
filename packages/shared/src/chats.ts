@@ -157,7 +157,6 @@ export interface ModelSpending {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
-  cheaper: { model: string; name: string; priceIn: number; priceOut: number; wouldCostUsd: number }[];
 }
 
 /** This month's spending against the app's monthly budget. */

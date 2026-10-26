@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fetchVia } from "../../proxy";
-import { downloadFile, fileByPath, type Route } from "../hf-download";
+import { downloadFile, fileByPath, type Route, removePartial } from "../hf-download";
 import { VOICES, type VoiceDef } from "./catalog";
 import { findPiper, installPiper, piperUrl } from "./engine";
 
@@ -163,7 +163,7 @@ export class LocalSpeech {
     a.abort.abort();
     this.pulls.delete(id);
     const file = a.partial;
-    if (file) setTimeout(() => rmSync(file, { force: true }), 500).unref();
+    if (file) setTimeout(() => removePartial(file), 500).unref();
     return true;
   }
 

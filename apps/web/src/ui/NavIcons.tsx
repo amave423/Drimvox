@@ -10,6 +10,7 @@ const icon = (paths: string[]) =>
     );
   };
 
+export const MenuIcon = icon(["M4 7h16", "M4 12h16", "M4 17h16"]);
 export const BookIcon = icon(["M5 4h9a5 5 0 0 1 5 5v11H10a5 5 0 0 1-5-5z", "M9 9h6", "M9 13h4"]);
 export const GalleryIcon = icon(["M4 5h16v14H4z", "M4 16l5-5 4 4 2-2 5 5", "M15.5 9.5h.01"]);
 export const KeyIcon = icon(["M8 20a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9z", "M11.2 12.3L20 3.5", "M16.5 7l2.5 2.5", "M14 9.5l2 2"]);

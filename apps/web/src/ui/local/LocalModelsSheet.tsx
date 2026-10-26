@@ -1,4 +1,4 @@
-import type { LocalPull, LocalStatus } from "@drimvox/shared";
+import { localModelTitle, type LocalPull, type LocalStatus } from "@drimvox/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { downloadsChanged } from "../DownloadNote";
@@ -126,7 +126,7 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
                 <ul className="local-list">
                   {status.pulls.map((p) => (
                     <li key={p.model} className="local-row local-pull">
-                      <span className="mono">{p.model}</span>
+                      <span className="local-model-name" title={p.model}>{localModelTitle(p.model).title}</span>
                       <PullControl model={p.model} sizeBytes={p.total} installed={false} pull={p} actions={actions} />
                     </li>
                   ))}
@@ -148,7 +148,10 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
                 <ul className="local-list">
                   {status.models.map((m) => (
                     <li key={m.name} className="local-row">
-                      <span className="mono">{m.name}</span>
+                      <span className="local-model-name" title={m.name}>
+                        {localModelTitle(m.name).title}
+                        {localModelTitle(m.name).owner && <small className="muted">{localModelTitle(m.name).owner} · Hugging Face</small>}
+                      </span>
                       <span className="muted local-size">{size(m.sizeBytes)}</span>
                       {confirm === m.name ? (
                         <span className="local-actions">

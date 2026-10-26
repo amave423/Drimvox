@@ -32,6 +32,12 @@ export function SpendingSection() {
         <p className="muted">{t("spending.empty")}</p>
       ) : (
         <ul className="spending-list">
+          <li className="spending-total">
+            <div className="spending-row">
+              <span className="spending-model">{t("spending.total")}</span>
+              <strong className="mono">{formatUsd(rows.reduce((sum, r) => sum + r.costUsd, 0))}</strong>
+            </div>
+          </li>
           {rows.map((r) => (
             <li key={`${r.providerId}/${r.model}`}>
               <div className="spending-row">
@@ -41,15 +47,6 @@ export function SpendingSection() {
                 <span className="muted">{t("spending.answers", { n: r.answers })}</span>
                 <strong className="mono">{formatUsd(r.costUsd)}</strong>
               </div>
-              {r.cheaper.map((c) => (
-                <p key={c.model} className="spending-cheaper">
-                  {t("spending.cheaper", {
-                    name: c.name,
-                    cost: formatUsd(c.wouldCostUsd),
-                    share: Math.round((1 - c.wouldCostUsd / r.costUsd) * 100),
-                  })}
-                </p>
-              ))}
             </li>
           ))}
         </ul>

@@ -87,6 +87,14 @@ export async function startFakeHub(servers: Server[] = []): Promise<{ url: strin
       const path = decodeURIComponent(file[1]!);
       files.set(path, (files.get(path) ?? 0) + 1);
       const body = fileOf(path);
+      // Parts of files, as the real one sends them (big files come in pieces at once).
+      const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? "");
+      if (range) {
+        const from = Number(range[1]);
+        const to = range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1;
+        res.writeHead(206, { "content-length": String(to - from + 1), "content-range": `bytes ${from}-${to}/${body.length}` });
+        return res.end(body.subarray(from, to + 1));
+      }
       res.writeHead(200, { "content-length": String(body.length) });
       return res.end(body);
     }

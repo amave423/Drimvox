@@ -161,6 +161,21 @@ test("closing the window keeps Drimvox working in the tray, and it shows the win
   await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isVisible())).toBe(true);
 });
 
+// Asked for: the sections at the bottom of the sidebar fold under one button.
+test("folds the sidebar's sections under one button, and remembers it", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  const sections = page.getByRole("button", { name: "Разделы" });
+  await expect(page.getByRole("navigation", { name: "Разделы" }).getByRole("button", { name: "Галерея" })).toBeVisible();
+  await sections.click();
+  await expect(sections).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("navigation", { name: "Разделы" }).getByRole("button", { name: "Галерея" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Разделы" })).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "Разделы" }).click();
+  await expect(page.getByRole("navigation", { name: "Разделы" }).getByRole("button", { name: "Настройки" })).toBeVisible();
+});
+
 // Asked for: reading answers aloud with Piper's voices instead of the system's.
 test("offers Piper's voices on the audio tab and in the settings", async () => {
   app = await launch();

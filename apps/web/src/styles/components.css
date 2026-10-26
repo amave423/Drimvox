@@ -190,7 +190,7 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .spending-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .spending-row { display: flex; align-items: baseline; gap: 12px; }
 .spending-model { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.spending-cheaper { margin: 2px 0 0; padding-left: 12px; border-left: 2px solid var(--ok); color: var(--ok); font-size: 13px; }
+.spending-total { padding-bottom: 8px; border-bottom: 1px solid var(--line); font-weight: 600; }
 
 /* A setting inside a group: name, a quiet line about it, the control. */
 .setting { display: grid; gap: 6px; justify-items: start; margin-top: 18px; }
