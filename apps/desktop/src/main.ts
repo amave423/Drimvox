@@ -404,14 +404,16 @@ function registerIpc() {
     win.focus();
     if (target.taskId) win.webContents.send("drimvox:open-task", target.taskId);
     else if (target.projectId) win.webContents.send("drimvox:open-project", target.projectId);
+    else if (target.chatId) win.webContents.send("drimvox:open-chat", target.chatId);
   });
 
   ipcMain.on("drimvox:notify", (event, notice: unknown) => {
     if (!fromOurPage(event.senderFrame?.url)) return;
     const request = noticeRequest(notice);
     if (!request) return;
-    const { taskId, projectId } = (notice ?? {}) as { taskId?: unknown; projectId?: unknown };
-    const target = { taskId: typeof taskId === "string" && taskId ? taskId : undefined, projectId: typeof projectId === "string" && projectId ? projectId : undefined };
+    const { taskId, projectId, chatId } = (notice ?? {}) as { taskId?: unknown; projectId?: unknown; chatId?: unknown };
+    const id = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+    const target = { taskId: id(taskId), projectId: id(projectId), chatId: id(chatId) };
     // Tests cannot take the focus away from the window; they say it is elsewhere.
     const away = process.env.DRIMVOX_TEST_UNFOCUSED === "1" || !win?.isFocused();
     if (!away) return;
@@ -421,8 +423,9 @@ function registerIpc() {
       const click = () => {
         if (target.taskId) win?.webContents.send("drimvox:open-task", target.taskId);
         else if (target.projectId) win?.webContents.send("drimvox:open-project", target.projectId);
+        else if (target.chatId) win?.webContents.send("drimvox:open-chat", target.chatId);
       };
-      shown.push({ title: request.title, body: request.body, taskId: target.taskId ?? "", projectId: target.projectId ?? "", click });
+      shown.push({ title: request.title, body: request.body, taskId: target.taskId ?? "", projectId: target.projectId ?? "", chatId: target.chatId ?? "", click });
       return;
     }
     void quiet().then((silent) => showNotice(origin, request, target, silent));

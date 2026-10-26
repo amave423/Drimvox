@@ -5,6 +5,7 @@ import { join } from "node:path";
 export interface NoticeTarget {
   taskId?: string;
   projectId?: string;
+  chatId?: string;
 }
 
 /** What the page asks to show: checked here, it comes from the renderer. */

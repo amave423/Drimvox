@@ -160,7 +160,7 @@ export const taskFeedbackSchema = z
 
 export const taskContinueSchema = z.object({ note: z.string().trim().max(20_000).optional() }).strict();
 export const taskAcceptSchema = z.object({ message: z.string().trim().min(1).max(500).optional() }).strict();
-export const approvalAnswerSchema = z.object({ allow: z.boolean(), always: z.boolean().default(false) }).strict();
+export const approvalAnswerSchema = z.object({ allow: z.boolean(), always: z.boolean().default(false), server: z.boolean().default(false) }).strict();
 
 export type TaskFeedback = z.infer<typeof taskFeedbackSchema>;
 

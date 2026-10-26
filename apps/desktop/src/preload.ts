@@ -22,6 +22,11 @@ contextBridge.exposeInMainWorld("drimvox", {
     ipcRenderer.on("drimvox:open-task", handler);
     return () => void ipcRenderer.removeListener("drimvox:open-task", handler);
   },
+  onOpenChat: (listener: (chatId: string) => void) => {
+    const handler = (_event: unknown, chatId: unknown) => typeof chatId === "string" && listener(chatId);
+    ipcRenderer.on("drimvox:open-chat", handler);
+    return () => void ipcRenderer.removeListener("drimvox:open-chat", handler);
+  },
   onOpenProject: (listener: (projectId: string) => void) => {
     const handler = (_event: unknown, projectId: unknown) => typeof projectId === "string" && listener(projectId);
     ipcRenderer.on("drimvox:open-project", handler);

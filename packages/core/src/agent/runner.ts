@@ -271,10 +271,10 @@ export class AgentRunner {
     return !!live;
   }
 
-  answer(id: string, approvalId: string, allow: boolean, always = false): boolean {
+  answer(id: string, approvalId: string, allow: boolean, always = false, server = false): boolean {
     const approval = this.live.get(id)?.approval;
     if (!approval || approval.id !== approvalId) return false;
-    approval.resolve(allow && always ? "always" : allow);
+    approval.resolve(allow ? (server ? "server" : always ? "always" : true) : false);
     return true;
   }
 

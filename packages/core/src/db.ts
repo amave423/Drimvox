@@ -1,6 +1,13 @@
 import { DatabaseSync } from "node:sqlite";
 
 /** Append-only. Never edit a migration that has shipped; add a new one. */
+/**
+ * The Playwright server's browser works out of sight (asked for: its window kept jumping in front); "--headed" in the
+ * server's command brings it back.
+ */
+export const HEADLESS_PLAYWRIGHT = `update mcp_servers set args = json_insert(args, '$[#]', '--headless'), updated_at = cast(unixepoch('subsec') * 1000 as integer)
+  where args like '%@playwright/mcp%' and args not like '%--headless%' and args not like '%--headed%';`;
+
 const migrations: string[] = [
   `create table settings (key text primary key, value text not null) strict;`,
   `create table providers (
@@ -253,6 +260,7 @@ const migrations: string[] = [
    update chats set head_id = (select m.id from messages m where m.chat_id = chats.id order by m.created_at desc, m.rowid desc limit 1);`,
   // A provider paid by a flat fee, not by tokens (a reseller's subscription): its models are free to Drimvox.
   `alter table providers add column flat integer not null default 0;`,
+  HEADLESS_PLAYWRIGHT,
 ];
 
 export interface Database {

@@ -415,6 +415,44 @@ test("an MCP server from the settings gives the chat a tool that asks first", as
   await expect(page.getByRole("button", { name: "echo ×" })).toBeVisible();
 });
 
+// Seen live: a browser server asked for each of its tools in turn, and a chat stood still on a request nobody saw.
+test("a chat waiting for a permission says so by a notification, and a whole server can be trusted at once", async () => {
+  fake = await startFakeProvider({
+    key: KEY,
+    models,
+    script: [
+      { toolCalls: [{ name: "mcp_demo_echo", args: { text: "привет" } }] },
+      { toolCalls: [{ name: "mcp_demo_add", args: { a: 2, b: 3 } }] },
+      { text: "Сервер сложил: 5" },
+    ],
+  });
+  const page = await launch({ DRIMVOX_TEST_UNFOCUSED: "1" });
+  await connect(page);
+  await expect(page.getByText("Моделей: 1")).toBeVisible();
+  const server = fileURLToPath(new URL("../../../packages/core/test/mcp-server.mjs", import.meta.url));
+  await openSection(page, "Настройки");
+  await page.getByRole("tab", { name: "Серверы MCP" }).click();
+  await page.getByRole("button", { name: "Добавить сервер" }).click();
+  await page.getByLabel("Название").fill("demo");
+  await page.getByLabel("Команда", { exact: true }).fill(`node "${server}"`);
+  await page.getByRole("button", { name: "Подключить" }).click();
+  await expect(page.getByText(/Инструментов: 3/)).toBeVisible({ timeout: 20_000 });
+
+  await startChat(page);
+  await say(page, "Сложи через сервер");
+  await expect(page.getByText("Инструмент MCP-сервера")).toBeVisible();
+  await expect
+    .poll(() => app!.evaluate(() => ((globalThis as any).drimvoxNotices ?? []).map((n: any) => n.title)))
+    .toContain("Чат ждёт твоего разрешения");
+  await page.getByRole("button", { name: "Доверять всему серверу demo" }).click();
+  // The server's other tool goes without a question.
+  await expect(page.getByText("Сервер сложил: 5")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Доверять всему серверу demo" })).toHaveCount(0);
+  await openSection(page, "Настройки");
+  await page.getByRole("tab", { name: "Серверы MCP" }).click();
+  await expect(page.getByRole("button", { name: "все инструменты ×" })).toBeVisible();
+});
+
 // Like ChatGPT and Claude: leave a chat while it answers, see a spinner on it, come back and watch the answer go on;
 // an answer that came while the chat was closed leaves a dot until it is opened.
 test("an answer goes on live after coming back to the chat, with a spinner and then a dot in the list", async () => {

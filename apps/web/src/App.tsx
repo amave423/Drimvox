@@ -155,6 +155,7 @@ export function App({ api, token, initialSettings, status }: Props) {
   }, [tasks]);
   useEffect(() => window.drimvox?.onOpenTask?.((taskId) => setView({ kind: "task", taskId })), []);
   useEffect(() => window.drimvox?.onOpenProject?.((projectId) => setView({ kind: "project", projectId })), []);
+  useEffect(() => window.drimvox?.onOpenChat?.((chatId) => setView({ kind: "chat", chatId, key: chatId })), []);
 
   // A project's run that waits for a permission, is done or stopped becomes a notification too (docs/specs/project-work.md):
   // seen live, a run waited half an hour on a permission nobody saw.

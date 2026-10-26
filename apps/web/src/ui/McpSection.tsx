@@ -78,7 +78,7 @@ export function McpSection() {
                   <span className="muted">{t("mcp.allowed")}</span>
                   {s.allowed.map((tool) => (
                     <button key={tool} className="chip" title={t("mcp.forget")} onClick={() => void forget(s, tool)}>
-                      {tool} ×
+                      {tool === "*" ? t("mcp.allowedAll") : tool} ×
                     </button>
                   ))}
                 </div>

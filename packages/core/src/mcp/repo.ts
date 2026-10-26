@@ -113,7 +113,8 @@ export class McpRepo {
   }
 
   isAllowed(serverId: string, tool: string): boolean {
-    return !!this.db.sql.prepare("select 1 from mcp_allowed where server_id = ? and tool = ?").get(serverId, tool);
+    // "*": the user trusted the whole server.
+    return !!this.db.sql.prepare("select 1 from mcp_allowed where server_id = ? and tool in (?, '*')").get(serverId, tool);
   }
 
   allow(serverId: string, tool: string): void {

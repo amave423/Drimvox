@@ -9,7 +9,7 @@ interface Props {
   allowed: boolean | null;
   always?: boolean;
   /** Present where the question is answered: at the top of the task. The feed only records it. */
-  onAnswer?(approvalId: string, allow: boolean, always?: boolean): void;
+  onAnswer?(approvalId: string, allow: boolean, always?: boolean, server?: boolean): void;
 }
 
 /** A command the agent wants to run and needs the user's word for. */
@@ -28,9 +28,14 @@ export function ApprovalCard({ approval, allowed, always = false, onAnswer }: Pr
             {t("approval.allow")}
           </button>
           {approval.reason === "mcp" && (
-            <button className="btn" onClick={() => onAnswer(approval.id, true, true)}>
-              {t("approval.always")}
-            </button>
+            <>
+              <button className="btn" onClick={() => onAnswer(approval.id, true, true)}>
+                {t("approval.always")}
+              </button>
+              <button className="btn" onClick={() => onAnswer(approval.id, true, true, true)}>
+                {t("approval.serverAny")}
+              </button>
+            </>
           )}
           <button className="btn is-pencil" onClick={() => onAnswer(approval.id, false)}>
             {t("approval.deny")}

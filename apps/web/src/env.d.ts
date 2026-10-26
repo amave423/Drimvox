@@ -6,7 +6,7 @@ interface DrimvoxBridge {
   pickFolder(): Promise<string | null>;
   savePdf?(name: string): Promise<string | null>;
   /** Drimvox's own notification; shown only while the window is not in front. A click opens the task or the project. */
-  notify(notice: NoticeRequest & { taskId?: string; projectId?: string }): void;
+  notify(notice: NoticeRequest & { taskId?: string; projectId?: string; chatId?: string }): void;
   /** A notification right now, even with the window in front: to check that they reach the desktop and sound. */
   testNotify(notice: NoticeRequest): void;
   /** Windows' Focus Assist: 0 off, 1 priority only, 2 alarms only; null where it cannot be told. */
@@ -23,6 +23,7 @@ interface DrimvoxBridge {
   /** Called when the user clicks a notification; returns a function that stops listening. */
   onOpenTask(listener: (taskId: string) => void): () => void;
   onOpenProject?(listener: (projectId: string) => void): () => void;
+  onOpenChat?(listener: (chatId: string) => void): () => void;
 }
 
 /** What a notification says and how it looks and sounds: the window's theme and mode, the settings' sound. */

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BASE, auth, createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
+import { HEADLESS_PLAYWRIGHT } from "../src/db";
 
 const KEY = "good-key";
 const SERVER = fileURLToPath(new URL("./mcp-server.mjs", import.meta.url));
@@ -51,6 +52,20 @@ describe("servers", () => {
     const status = await (await env.call("GET", `/api/mcp/${(await res.json()).id}/status`)).json();
     expect(status.ok).toBe(false);
     expect(status.error).toBeTruthy();
+  });
+
+  // Asked for: the browser of the Playwright server kept jumping in front; it works out of sight now.
+  it("moves a Playwright server already added to a browser out of sight, leaving the others and a chosen window alone", async () => {
+    const add = async (name: string, args: string[]) => (await (await env.call("POST", "/api/mcp", { name, command: "npx", args })).json()).id as string;
+    const shown = await add("Playwright", ["-y", "@playwright/mcp@latest"]);
+    const headed = await add("Окно", ["-y", "@playwright/mcp@latest", "--headed"]);
+    const other = await add("Другой", ["-y", "some-server"]);
+    // What the new version does once to a database made before it.
+    env.db.sql.exec(HEADLESS_PLAYWRIGHT);
+    const args = (id: string) => JSON.parse((env.db.sql.prepare("select args from mcp_servers where id = ?").get(id) as { args: string }).args);
+    expect(args(shown)).toEqual(["-y", "@playwright/mcp@latest", "--headless"]);
+    expect(args(headed)).toEqual(["-y", "@playwright/mcp@latest", "--headed"]);
+    expect(args(other)).toEqual(["-y", "some-server"]);
   });
 
   it("switches a server off and deletes it", async () => {
@@ -169,6 +184,48 @@ describe("tools in a chat", () => {
     expect((await (await env.call("GET", `/api/chats/${chat.id}`)).json()).approvals).toEqual([]);
     const lastChat = fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!;
     expect(JSON.stringify(lastChat.body.messages)).toContain("echo: привет");
+  });
+
+  // Seen live: a browser server has some twenty tools, and each one asked on its own; the run waited on the next.
+  it("trusts a whole server at once: its other tools no longer ask", async () => {
+    const serverId = await addServer();
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [{ id: "chatty" }],
+      script: [
+        { toolCalls: [{ name: "mcp_demo_echo", args: { text: "раз" } }] },
+        { toolCalls: [{ name: "mcp_demo_add", args: { a: 2, b: 3 } }] },
+        { text: "Готово." },
+      ],
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const chat = await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "chatty" })).json();
+    const res = await env.app().request(`${BASE}/api/chats/${chat.id}/messages`, {
+      method: "POST",
+      headers: { ...auth, "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "Два инструмента", web: "off" }),
+    });
+    const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+    const asked: string[] = [];
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      let end: number;
+      while ((end = buffer.indexOf("\n\n")) !== -1) {
+        const line = buffer.slice(0, end).split("\n").find((l) => l.startsWith("data: "));
+        buffer = buffer.slice(end + 2);
+        if (!line) continue;
+        const event = JSON.parse(line.slice(6));
+        if (event.type === "approval") {
+          asked.push(event.tool);
+          await env.call("POST", `/api/chats/${chat.id}/approvals/${event.id}`, { allow: true, server: true });
+        }
+      }
+    }
+    expect(asked).toEqual(["echo"]);
+    expect((await (await env.call("GET", "/api/mcp")).json()).find((s: any) => s.id === serverId).allowed).toEqual(["*"]);
   });
 
   // Seen live: a browser server (Playwright MCP) opened the page, typed and clicked, and the answer stopped at 8 steps

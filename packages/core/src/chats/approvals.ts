@@ -1,10 +1,11 @@
 import type { ChatApprovalView, StreamEvent } from "@drimvox/shared";
+import type { ApprovalAnswer } from "../agent/approvals";
 import { randomUUID } from "node:crypto";
 
 interface Pending {
   chatId: string;
   card: ChatApprovalView;
-  settle(answer: boolean | "always"): void;
+  settle(answer: ApprovalAnswer): void;
 }
 
 /**
@@ -19,7 +20,7 @@ export class ChatApprovals {
     chatId: string,
     emit: (event: StreamEvent) => Promise<void>,
     call: { server: string; tool: string; input: unknown; reason?: string; purpose?: string; signal?: AbortSignal },
-  ): Promise<boolean | "always"> {
+  ): Promise<ApprovalAnswer> {
     const id = randomUUID();
     const card: ChatApprovalView = {
       id,
@@ -31,7 +32,7 @@ export class ChatApprovals {
     };
     return new Promise((resolve) => {
       const onAbort = () => settle(false);
-      const settle = (answer: boolean | "always") => {
+      const settle = (answer: ApprovalAnswer) => {
         if (!this.pending.delete(id)) return;
         call.signal?.removeEventListener("abort", onAbort);
         void emit({ type: "approved", id, allowed: answer !== false });
@@ -48,10 +49,10 @@ export class ChatApprovals {
     return [...this.pending.values()].filter((p) => p.chatId === chatId).map((p) => p.card);
   }
 
-  answer(chatId: string, id: string, allow: boolean, always: boolean): boolean {
+  answer(chatId: string, id: string, allow: boolean, always: boolean, server = false): boolean {
     const p = this.pending.get(id);
     if (!p || p.chatId !== chatId) return false;
-    p.settle(allow ? (always ? "always" : true) : false);
+    p.settle(allow ? (server ? "server" : always ? "always" : true) : false);
     return true;
   }
 }

@@ -195,8 +195,8 @@ export function chatRoutes(
       return c.json({ ok: true as const }, 200);
     })
     .post("/:id/approvals/:approvalId", zValidator("json", approvalDecisionSchema), (c) => {
-      const { allow, always } = c.req.valid("json");
-      const known = approvals.answer(c.req.param("id"), c.req.param("approvalId"), allow, always);
+      const { allow, always, server } = c.req.valid("json");
+      const known = approvals.answer(c.req.param("id"), c.req.param("approvalId"), allow, always, server);
       return known ? c.json({ ok: true as const }, 200) : c.json(notFound, 404);
     })
     .post("/:id/messages", zValidator("json", messageSendSchema), async (c) => {

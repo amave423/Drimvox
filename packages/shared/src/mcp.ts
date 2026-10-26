@@ -36,4 +36,5 @@ export interface McpServerView {
 export type McpStatus = { ok: true; tools: { name: string; description: string }[] } | { ok: false; error: string };
 
 /** The user's answer to a permission request; `always` remembers it for this tool of this server. */
-export const approvalDecisionSchema = z.object({ allow: z.boolean(), always: z.boolean().default(false) }).strict();
+/** `server`: allow every tool of the call's MCP server from now on (seen: a browser server asked for each of its twenty tools). */
+export const approvalDecisionSchema = z.object({ allow: z.boolean(), always: z.boolean().default(false), server: z.boolean().default(false) }).strict();

@@ -139,7 +139,7 @@ interface AssistantProps {
   actions?: AnswerAction[];
   /** MCP tools asking for permission in this answer. */
   approvals?: ChatApproval[];
-  onApprove?(id: string, allow: boolean, always: boolean): void;
+  onApprove?(id: string, allow: boolean, always: boolean, server?: boolean): void;
   /** Puts the chat's folder back as it was before this answer. */
   onUndo?(): void;
 }
@@ -217,6 +217,12 @@ export function AssistantMessage({
               <button className="btn" onClick={() => onApprove(a.id, true, true)}>
                 {t("approval.always")}
               </button>
+              {/* A server's tools one by one asked again and again (seen: a browser server has twenty of them). */}
+              {!a.reason && a.server && (
+                <button className="btn" onClick={() => onApprove(a.id, true, true, true)}>
+                  {t("approval.server", { server: a.server })}
+                </button>
+              )}
               <button className="btn is-pencil" onClick={() => onApprove(a.id, false, false)}>
                 {t("approval.deny")}
               </button>

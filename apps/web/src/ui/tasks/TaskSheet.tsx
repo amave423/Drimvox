@@ -57,8 +57,8 @@ export function TaskSheet({ taskId, embedded }: { taskId: string; embedded?: boo
     !answered &&
     (task.status === "failed" || task.status === "stopped" || (task.status === "waiting" && UNFINISHED.has(task.statusReason ?? "")));
 
-  const answer = (approvalId: string, allow: boolean, always = false) =>
-    void api.tasks[":id"].approvals[":approvalId"].$post({ param: { id: task.id, approvalId }, json: { allow, always } }).catch(() => null);
+  const answer = (approvalId: string, allow: boolean, always = false, server = false) =>
+    void api.tasks[":id"].approvals[":approvalId"].$post({ param: { id: task.id, approvalId }, json: { allow, always, server } }).catch(() => null);
 
   return (
     <article className={`sheet task${embedded ? " is-embedded" : ""}`}>
@@ -163,7 +163,7 @@ export function TaskSheet({ taskId, embedded }: { taskId: string; embedded?: boo
 }
 
 /** What the task waits for and the one action that moves it on. */
-function TaskNotice({ task, feed, onAnswer }: { task: TaskView; feed: FeedItem[]; onAnswer(approvalId: string, allow: boolean, always?: boolean): void }) {
+function TaskNotice({ task, feed, onAnswer }: { task: TaskView; feed: FeedItem[]; onAnswer(approvalId: string, allow: boolean, always?: boolean, server?: boolean): void }) {
   const { api, t, settings, navigate } = useApp();
   const stop = () => void api.tasks[":id"].stop.$post({ param: { id: task.id } }).catch(() => null);
   const carryOn = () => void api.tasks[":id"].continue.$post({ param: { id: task.id }, json: {} }).catch(() => null);

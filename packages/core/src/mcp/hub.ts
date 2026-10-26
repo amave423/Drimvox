@@ -17,14 +17,16 @@ interface Connection {
   tools: Promise<McpTool[]>;
 }
 
-/** Asks the user; true allows once, "always" also remembers the tool, false refuses. */
-export type McpAsk = (call: { server: string; tool: string; input: unknown; signal?: AbortSignal }) => Promise<boolean | "always">;
+/** Asks the user; true allows once, "always" also remembers the tool, "server" every tool of the server, false refuses. */
+export type McpAsk = (call: { server: string; tool: string; input: unknown; signal?: AbortSignal }) => Promise<boolean | "always" | "server">;
 
 export interface McpHooks {
   onCall(call: { callId: string; name: string; input: unknown }): void;
   onResult(result: { callId: string; name: string; ok: boolean; output: string }): void;
 }
 
+/** Kept as an allowed tool's name: every tool of the server is allowed. */
+export const ALL_TOOLS = "*";
 const CONNECT_MS = 20_000;
 const CALL_MS = 120_000;
 const MAX_OUTPUT = 20_000;
@@ -75,6 +77,7 @@ export class McpHub {
               const answer = await ask({ server: server.name, tool: t.name, input, signal: o.abortSignal });
               if (!answer) return done(false, "The user did not allow this tool call. Do not retry it; do without it.");
               if (answer === "always") this.repo.allow(server.id, t.name);
+              if (answer === "server") this.repo.allow(server.id, ALL_TOOLS);
             }
             try {
               const client = await this.connect(server).client;

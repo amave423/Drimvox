@@ -36,6 +36,7 @@ import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
 import { useLiveAnswer } from "./useLiveAnswer";
 import { useProjectWork } from "../projects/useProjectWork";
+import { noticeLookNow } from "../NoticeSoundSetting";
 import { ShotsContext, type Shot } from "../ShotGallery";
 
 interface Draft {
@@ -351,6 +352,9 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
           if (e.type === "approval") {
             const card: ChatApproval = { id: e.id, server: e.server, tool: e.tool, input: e.input, reason: e.reason, purpose: e.purpose, state: "open" };
             setDraft((d) => d && { ...d, approvals: [...d.approvals, card] });
+            // The answer waits on the user: said by a notification when the window is elsewhere (seen: a chat stood still
+            // for minutes on a request nobody saw).
+            if (settings.notifications) window.drimvox?.notify({ ...noticeLookNow(settings), mode: "chat", title: t("notice.chatApproval"), body: content.slice(0, 120), chatId: id });
           }
           if (e.type === "approved") {
             const state = e.allowed ? "allowed" : "denied";
@@ -373,9 +377,9 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
     void reloadToday();
   }
 
-  async function approve(approvalId: string, allow: boolean, always: boolean) {
+  async function approve(approvalId: string, allow: boolean, always: boolean, server = false) {
     if (!chat) return;
-    await api.chats[":id"].approvals[":approvalId"].$post({ param: { id: chat.id, approvalId }, json: { allow, always } }).catch(() => null);
+    await api.chats[":id"].approvals[":approvalId"].$post({ param: { id: chat.id, approvalId }, json: { allow, always, server } }).catch(() => null);
     if (!draft) await load(chat.id);
   }
 
