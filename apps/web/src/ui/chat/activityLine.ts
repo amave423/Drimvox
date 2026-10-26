@@ -23,6 +23,7 @@ const OWN_LINES = [
   "make_picture",
   "make_clip",
   "look_at_image",
+  "design_review",
 ];
 
 /** One line of what the model did: "Reads app.js", "Searches the web: …". */

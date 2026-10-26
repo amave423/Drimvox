@@ -1,9 +1,8 @@
-import type { ProjectView, ProjectWorkView, WorkShot } from "@drimvox/shared";
-import { useEffect, useState } from "react";
+import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
+import { useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
 import { ProjectSkills } from "../SkillsSection";
-import { AuthImage, ShotGallery, ShotStrip, useShotIndex, type Shot } from "../ShotGallery";
 import { Tabs } from "../Tabs";
 import { StatusChip } from "../tasks/StatusDot";
 import { GithubPublish } from "./GithubPublish";
@@ -34,61 +33,15 @@ export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView 
   );
 }
 
-/** The agent's looks at the pages, one at a time in a frame (the newest first shown), then the result and the report. */
+/** What came of the work: the started result, the report and the publishing. The screenshots stay in the timeline,
+ *  where they were taken (asked for: here they read as the result itself, and the report under them went unseen). */
 function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
   const { t } = useApp();
   return (
     <>
       {work.escalated && <p className="muted">{t("projectWork.escalated")}</p>}
-      {work.shots.length > 0 && <ShotStage key={work.projectId} projectId={work.projectId} shots={work.shots} />}
       <RunTab work={work} onChanged={onChanged} />
     </>
-  );
-}
-
-/**
- * One screenshot in a frame of a fixed height (seen: whole-page phone screenshots ran far down and over each other),
- * shown at its own width and scrolled inside; arrows, the count and a strip go between them (asked for), and a click
- * opens them over the window. A new one shows up by itself while the newest is being looked at.
- */
-function ShotStage({ projectId, shots }: { projectId: string; shots: WorkShot[] }) {
-  const { t, settings } = useApp();
-  const list: Shot[] = shots.map((s) => ({
-    url: `/api/projects/${projectId}/work/shots/${s.id}`,
-    caption: `${s.url} · ${new Date(s.at).toLocaleTimeString(settings.locale, { hour: "2-digit", minute: "2-digit" })}`,
-  }));
-  const nav = useShotIndex(list.length, list.length - 1);
-  const [following, setFollowing] = useState(true);
-  useEffect(() => {
-    if (following) nav.set(list.length - 1);
-  }, [list.length, following]);
-  const [open, setOpen] = useState(false);
-  const shot = list[nav.index];
-  if (!shot) return null;
-  const go = (i: number) => {
-    nav.set(i);
-    setFollowing(i === list.length - 1);
-  };
-  return (
-    <section className="shot-stage" aria-label={t("workshop.lastLook")}>
-      <button type="button" className="shot-stage-frame" aria-label={t("viewer.open", { name: shot.caption ?? "" })} onClick={() => setOpen(true)} key={shot.url}>
-        <AuthImage url={shot.url} alt={shot.caption ?? t("msg.screenshot")} />
-      </button>
-      <div className="shot-stage-bar">
-        <button type="button" className="icon-button" aria-label={t("shots.prev")} disabled={nav.index === 0} onClick={() => go(nav.index - 1)}>
-          ‹
-        </button>
-        <span className="shot-stage-count">{t("shots.count", { n: nav.index + 1, total: list.length })}</span>
-        <button type="button" className="icon-button" aria-label={t("shots.next")} disabled={nav.index === list.length - 1} onClick={() => go(nav.index + 1)}>
-          ›
-        </button>
-        <span className="shot-stage-caption mono muted" title={shot.caption}>
-          {shot.caption}
-        </span>
-      </div>
-      {list.length > 1 && <ShotStrip shots={list} index={nav.index} onPick={go} />}
-      {open && <ShotGallery shots={list} start={nav.index} onClose={() => setOpen(false)} />}
-    </section>
   );
 }
 

@@ -9,6 +9,8 @@ export interface WorkToolHooks {
   ask(question: string, assumption: string): void;
   /** The work is done: the report ends the run. */
   finish(report: string, start: { command: string; url: string } | null): void;
+  /** Before it is done, once: Drimvox's look at the result; notes for a round of polish, or null to finish. */
+  review(start: { command: string; url: string } | null): Promise<string | null>;
   onCall(name: string, input: string): void;
 }
 
@@ -62,7 +64,10 @@ export function workTools(h: WorkToolHooks): ToolSet {
       execute: async ({ report, start }) => {
         const open = h.checklist().filter((i) => !i.done);
         if (open.length) return `These checklist items are not done: ${open.map((i) => i.text).join("; ")}. Finish them, or update the checklist if they are not needed, then call finish_work again.`;
-        h.finish(clip(report, 8000), start ? { command: clip(start.command, 500), url: start.url.trim() } : null);
+        const site = start ? { command: clip(start.command, 500), url: start.url.trim() } : null;
+        const polish = await h.review(site);
+        if (polish) return polish;
+        h.finish(clip(report, 8000), site);
         h.onCall("finish_work", "");
         return "Done. The user sees the report: stop now, write nothing more.";
       },

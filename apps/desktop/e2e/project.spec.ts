@@ -160,9 +160,9 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   expect(fake!.requests.some((r) => JSON.stringify(r.body?.messages ?? []).includes("Сделай заголовок крупнее"))).toBe(true);
 });
 
-// Asked for: many screenshots are gone through with a switch, not opened and closed one by one; the result panel shows
-// one at a time in a frame; the folder's changes are listed folded, each file opened on its own.
-test("a run's screenshots: a switch in the timeline and in the result panel; changes folded by file", async () => {
+// Asked for: many screenshots are gone through with a switch, not opened and closed one by one; the result panel has none
+// (they read as the result); the folder's changes are listed folded, each file opened on its own.
+test("a run's screenshots: a switch in the timeline, none in the result panel; changes folded by file", async () => {
   // Two real looks at a page, each loading it afresh.
   test.setTimeout(90_000);
   const site = createServer((req, res) => {
@@ -207,15 +207,10 @@ test("a run's screenshots: a switch in the timeline and in the result panel; cha
     await page.keyboard.press("Escape");
     await expect(gallery).toHaveCount(0);
 
-    // The result panel: the newest one in a frame of a fixed height, the switch under it.
+    // The result panel shows what came of the work, not the screenshots: they stay in the timeline.
     const result = page.getByRole("complementary", { name: "Результат" });
-    const stage = result.getByRole("region", { name: "Как агент видел страницу в последний раз" });
-    await expect(stage).toContainText("2 из 2");
-    const frame = await stage.locator(".shot-stage-frame").boundingBox();
-    expect(frame!.height).toBeLessThan(560);
-    await stage.getByRole("button", { name: "Предыдущий скриншот" }).click();
-    await expect(stage).toContainText("1 из 2");
-    await expect(stage).toContainText(`localhost:${port}/a`);
+    await expect(result.locator(".work-report")).toContainText("Готово.");
+    await expect(result.locator("img")).toHaveCount(0);
 
     // The changes: each file folded until opened.
     await result.getByRole("tab", { name: "Изменения" }).click();

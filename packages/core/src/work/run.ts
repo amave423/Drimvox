@@ -17,6 +17,7 @@ import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from ".
 import type { Vision } from "../visual/look";
 import { VISUAL_HINT, visualTools, type VisualKit } from "../visual/tools";
 import { nudgeMessage, projectRules } from "./prompt";
+import { polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
 
@@ -66,6 +67,8 @@ export class WorkRun {
   done: Promise<void> = Promise.resolve();
   private readonly inbox: string[] = [];
   private finished = false;
+  /** Drimvox looked at the result's design in this run: one round of polish at most. */
+  private designReviewed = false;
   /** Actions since the checklist was last updated. */
   private sinceChecklist = 0;
 
@@ -253,6 +256,28 @@ export class WorkRun {
         finish: (report, start) => {
           this.finished = true;
           this.d.repo.update(this.projectId, { report, site: start });
+        },
+        review: async (start) => {
+          if (this.designReviewed || !vision || !this.d.visualKit.screenshot) return null;
+          this.designReviewed = true;
+          onCall("design_review", "");
+          const issues = await reviewProjectDesign(
+            {
+              kit: this.d.visualKit,
+              vision,
+              owner: this.chatId,
+              folder: this.folder,
+              plan,
+              signal: this.controller.signal,
+              onShot: (id, url, width) => {
+                this.shot("screenshot", { id, url, width });
+                onCall("screenshot", id);
+              },
+              onSpend: (usd) => (cost += usd),
+            },
+            start,
+          );
+          return issues ? polishWorkMessage(issues) : null;
         },
         onCall,
       }),

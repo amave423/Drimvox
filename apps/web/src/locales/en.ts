@@ -1185,7 +1185,6 @@ export const en: Record<keyof typeof ru, string> = {
   "workshop.part.plan": "Plan",
   "workshop.part.project": "Project",
   "workshop.noResult": "The result shows up once the agent starts working.",
-  "workshop.lastLook": "How the agent last saw the page",
   "workshop.emptyTitle": "What shall we build?",
   "workshop.emptyLede": "Pick the project's folder: the agent asks what you need, writes a plan and works until it's done.",
   "workshop.add": "Pick a project folder",
@@ -1273,6 +1272,7 @@ export const en: Record<keyof typeof ru, string> = {
   "folder.tool.make_picture": "Draws: {input}",
   "folder.tool.make_clip": "Films: {input}",
   "folder.tool.open_for_user": "Waits for you in a window: {input}",
+  "folder.tool.design_review": "Drimvox reviews the design on a desktop and a phone",
   "folder.tool.look_at_image": "Looks at the picture {input}",
   "folder.tool.use_skill": "Opens the skill {input}",
 };

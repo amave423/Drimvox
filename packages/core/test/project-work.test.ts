@@ -332,6 +332,56 @@ describe("work on a project", () => {
     await new Promise((r) => setTimeout(r, 300));
   });
 
+  // Asked for: the agent judged its pages only by "is it there", never by how they look.
+  it("has the result's look reviewed once before it is done: the pages on a desktop and a phone, notes for one round of polish", async () => {
+    const port = 43000 + Math.floor(Math.random() * 2000);
+    writeFileSync(join(folder, "server.js"), `require("http").createServer((q, r) => r.end("<h1>ok</h1>")).listen(${port});\n`);
+    const shots: { url: string; width: number }[] = [];
+    env.setScreenshot(async (url, size) => {
+      shots.push({ url, width: size.width });
+      return Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
+    });
+    const url = `http://localhost:${port}/`;
+    const brief = { direction: "Тихая бухгалтерия", concept: "Спокойный светлый кабинет", palette: [{ role: "фон", hex: "#F6F7F4" }, { role: "текст", hex: "#111827" }, { role: "акцент", hex: "#157F5B" }], fonts: { heading: { name: "Golos Text", kind: "sans-serif" }, body: { name: "Inter", kind: "sans-serif" } }, rules: ["Иконки — линейные SVG"] };
+    const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
+    const finishing = call("finish_work", { report: "Готово.", start: { command: "node server.js", url } });
+    const reviews: string[] = [];
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [
+        { id: "coder", supported_parameters: ["tools"] },
+        { id: "eyes", architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } },
+      ],
+      respond: (body) => {
+        if (body.model === "eyes") {
+          reviews.push(JSON.stringify(body.messages));
+          return { text: "POLISH\n- Иконки категорий — эмодзи: заменить на линейные SVG\n- На телефоне суммы налезают на названия: перенести суммы на новую строку" };
+        }
+        return queue.shift() ?? { text: "Готово." };
+      },
+    });
+    const queue: FakeTurn[] = [noQuestions, call("write_plan", { ...PLAN, pages: [{ url, command: "node server.js" }], design: brief }), done, finishing, call("write_file", { path: "index.html", content: "<h1>ok</h1>\n" }), finishing];
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    await env.call("PATCH", "/api/settings", { visionModel: { providerId: provider.id, model: "eyes" } });
+    const project = await (await env.call("POST", "/api/projects", { path: folder })).json();
+    const ref = { providerId: provider.id, model: "coder" };
+    await env.call("POST", `/api/projects/${project.id}/work/plan`, { task: "Сайт", models: { interview: ref, plan: ref, work: ref, strong: null } });
+    await until(project.id, (w) => w.status === "ready");
+    await env.call("POST", `/api/projects/${project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    const w = await until(project.id, (x) => x.status === "done");
+
+    // One review, against the plan's brief, of the page on a desktop and a phone.
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0]).toContain("Тихая бухгалтерия");
+    expect(shots).toEqual(expect.arrayContaining([{ url, width: 1280 }, { url, width: 390 }]));
+    // The first finish_work brought the notes, not the end; the second one ended the work.
+    const coder = requestsOf("coder").map((r) => JSON.stringify(r.body.messages));
+    expect(coder.some((m) => m.includes("Иконки категорий — эмодзи"))).toBe(true);
+    expect(w.report).toBe("Готово.");
+    await env.call("POST", `/api/projects/${project.id}/work/site/stop`);
+    for (let i = 0; i < 50 && (await fetch(url).then(() => true, () => false)); i++) await new Promise((r) => setTimeout(r, 100));
+  });
+
   it("offers the project's skills in the run, and the agent can open one", async () => {
     mkdirSync(join(folder, ".drimvox", "skills", "style"), { recursive: true });
     writeFileSync(join(folder, ".drimvox", "skills", "style", "SKILL.md"), ["---", "name: style", "description: When making pages for this site", "---", "Use the brand green.", ""].join("\n"));

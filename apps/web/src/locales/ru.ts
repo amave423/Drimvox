@@ -1185,7 +1185,6 @@ export const ru = {
   "workshop.part.plan": "План",
   "workshop.part.project": "Проект",
   "workshop.noResult": "Результат появится, когда агент начнёт работу.",
-  "workshop.lastLook": "Как агент видел страницу в последний раз",
   "workshop.emptyTitle": "Над чем поработаем?",
   "workshop.emptyLede": "Выберите папку проекта: агент расспросит, что нужно, составит план и будет работать, пока не закончит.",
   "workshop.add": "Выбрать папку проекта",
@@ -1273,6 +1272,7 @@ export const ru = {
   "folder.tool.make_picture": "Рисует: {input}",
   "folder.tool.make_clip": "Снимает ролик: {input}",
   "folder.tool.open_for_user": "Ждёт тебя в окне: {input}",
+  "folder.tool.design_review": "Drimvox проверяет дизайн на компьютере и телефоне",
   "folder.tool.look_at_image": "Смотрит картинку {input}",
   "folder.tool.use_skill": "Открывает навык {input}",
 } as const;
