@@ -119,10 +119,15 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .steps { list-style: none; counter-reset: step; margin: 0; padding: 0; display: grid; gap: 10px; }
 .steps li { counter-increment: step; display: grid; grid-template-columns: 28px 1fr; }
 .steps li::before { content: counter(step); font: italic 500 18px/1.4 var(--font-serif); color: var(--ink); }
-.guide { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 18px 28px; }
-.guide-part h3 { margin: 0 0 6px; font: 600 15px/1.4 var(--font-ui); }
-.guide-part ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
-.guide-part li { line-height: 1.5; }
+/* The guide: one column of readable width, the contents as chips, the project's points numbered as steps. */
+.guide-sheet { grid-template-columns: minmax(0, 1fr); }
+.guide-sheet .sheet-body { max-width: 80ch; }
+.guide-contents { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 4px; }
+.guide-part { scroll-margin-top: 16px; }
+.guide-part > p { margin: -4px 0 10px; }
+.guide-part ul, .guide-part ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; }
+.guide-part li { line-height: 1.6; padding-left: 2px; }
+.guide-steps li::marker { font-weight: 600; color: var(--ink); }
 .provider-note { margin: 4px 0 0; font-size: 13px; }
 
 .margin { display: grid; gap: 14px; align-content: start; padding-top: 6px; font-size: 13.5px; line-height: 1.5; }

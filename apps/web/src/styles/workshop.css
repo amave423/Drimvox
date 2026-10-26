@@ -96,6 +96,8 @@
 .workshop-scroll { max-width: 900px; width: 100%; }
 .workshop-feed { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .workshop-feed[hidden] { display: none; }
+/* The interview in the workshop: the task's words are the heading, kept to two lines (seen: three lines of a large serif). */
+.sheet.is-embedded .task-head h1 { font-size: 20px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .workshop-main > .sheet.is-embedded { border: 0; box-shadow: none; border-radius: 0; max-width: none; grid-template-columns: minmax(0, 1fr); }
 
 /* The handle: a slim strip with a small grip; drag it to set the width, to the edge to fold the panel away. */

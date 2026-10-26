@@ -373,6 +373,10 @@ describe("work on a project", () => {
     // One review, against the plan's brief, of the page on a desktop and a phone.
     expect(reviews).toHaveLength(1);
     expect(reviews[0]).toContain("Тихая бухгалтерия");
+    // The report counts the agent's actions, not the screenshots' marks or Drimvox's own review (seen: "Calls screenshot").
+    const report = await (await env.call("GET", `/api/projects/${project.id}/work/report`)).json();
+    expect(report.actions.map((a: { name: string }) => a.name)).not.toEqual(expect.arrayContaining(["screenshot"]));
+    expect(report.actions.map((a: { name: string }) => a.name)).not.toEqual(expect.arrayContaining(["design_review"]));
     expect(shots).toEqual(expect.arrayContaining([{ url, width: 1280 }, { url, width: 390 }]));
     // The first finish_work brought the notes, not the end; the second one ended the work.
     const coder = requestsOf("coder").map((r) => JSON.stringify(r.body.messages));
@@ -380,6 +384,8 @@ describe("work on a project", () => {
     expect(w.report).toBe("Готово.");
     await env.call("POST", `/api/projects/${project.id}/work/site/stop`);
     for (let i = 0; i < 50 && (await fetch(url).then(() => true, () => false)); i++) await new Promise((r) => setTimeout(r, 100));
+    // The folder is free once the process is gone.
+    await new Promise((r) => setTimeout(r, 300));
   });
 
   it("offers the project's skills in the run, and the agent can open one", async () => {

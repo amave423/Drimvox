@@ -53,6 +53,17 @@ describe("normalizeModels", () => {
     expect(model).toMatchObject({ priceIn: 1, priceOut: 2, priceCacheRead: 0.1 });
   });
 
+  // Seen: DeepSeek's own API lists what a model takes at the top level, not under "architecture" as OpenRouter does, and
+  // V4.1 Flash, which sees pictures, was taken for a model that does not.
+  it("reads what a model takes from DeepSeek's own list, where it stands at the top level", () => {
+    const models = normalizeModels("deepseek", [
+      { id: "deepseek-flash", name: "DeepSeek-V4.1-Flash", input_modalities: ["text", "image"], output_modalities: ["text"] },
+      { id: "deepseek-v4-pro", name: "DeepSeek-V4-Pro", input_modalities: ["text"], output_modalities: ["text"] },
+    ]);
+    expect(models.find((m) => m.id === "deepseek-flash")).toMatchObject({ vision: true });
+    expect(models.find((m) => m.id === "deepseek-v4-pro")).toMatchObject({ vision: false });
+  });
+
   it("uses the built-in price table for DeepSeek and marks it as an estimate", () => {
     const [model] = normalizeModels("deepseek", [{ id: "deepseek-flash", name: "DeepSeek-V4.1-Flash", context_window: 1048576 }]);
     expect(model).toMatchObject({ id: "deepseek-flash", name: "DeepSeek-V4.1-Flash", contextLength: 1048576, priceEstimated: true });

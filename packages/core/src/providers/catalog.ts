@@ -59,7 +59,8 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     if (preset === "nvidia" && nvidiaNonChat.test(raw.id)) continue;
     if (notChat.test(raw.id)) continue;
     // Music and speech models list text among their outputs too; a chat with them fails.
-    const out = (raw.architecture as { output_modalities?: unknown } | undefined)?.output_modalities;
+    // OpenRouter and its kin say it under "architecture"; DeepSeek's own API at the top level.
+    const out = (raw.architecture as { output_modalities?: unknown } | undefined)?.output_modalities ?? raw.output_modalities;
     if (Array.isArray(out) && (!out.includes("text") || out.includes("audio"))) continue;
     // A catalog that does not say: picture and video makers by their names go to their own tabs (seen live).
     if (!Array.isArray(out) && mediaKindByName(id)) continue;
@@ -85,7 +86,7 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     }
 
     const params = raw.supported_parameters;
-    const inputs = (raw.architecture as { input_modalities?: unknown } | undefined)?.input_modalities;
+    const inputs = (raw.architecture as { input_modalities?: unknown } | undefined)?.input_modalities ?? raw.input_modalities;
     models.push({
       id,
       name: typeof raw.name === "string" && raw.name ? raw.name : id,

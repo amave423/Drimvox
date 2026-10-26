@@ -2,6 +2,9 @@ import type { WorkReport } from "@drimvox/shared";
 import { folderChanges } from "./changes";
 import type { ProjectWorkRepo } from "./repo";
 
+/** Marks in an answer's activity that are not the agent's actions: where a screenshot went, Drimvox's own review. */
+const NOT_ACTIONS = new Set(["screenshot", "design_review"]);
+
 /**
  * The report after a project's work (asked for): how long it took, what it cost on each model, what the agent spent its
  * actions on, how much of the folder changed and how much of the checklist is done.
@@ -15,7 +18,7 @@ export async function workReport(repo: ProjectWorkRepo, projectId: string, folde
   for (const a of answers) {
     const m = byModel.get(a.model ?? "?") ?? { answers: 0, costUsd: 0 };
     byModel.set(a.model ?? "?", { answers: m.answers + 1, costUsd: m.costUsd + a.costUsd });
-    for (const name of a.actions) actions.set(name, (actions.get(name) ?? 0) + 1);
+    for (const name of a.actions) if (!NOT_ACTIONS.has(name)) actions.set(name, (actions.get(name) ?? 0) + 1);
   }
   const files = await folderChanges(folder).catch(() => []);
   return {
