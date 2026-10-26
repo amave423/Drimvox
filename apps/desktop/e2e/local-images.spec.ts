@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeHub } from "../../../packages/core/test/fake-hub";
+import { newChat, openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const FAKE_SD = fileURLToPath(new URL("../../../packages/core/test/fake-sd.mjs", import.meta.url));
@@ -42,9 +43,9 @@ test("downloads a picture model on the local models' sheet and draws with it in 
     env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) },
   });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await openSection(page, "Локальные модели");
   // Text, pictures and video are parts of the sheet.
   await page.getByRole("tab", { name: "Картинки" }).click();
   await expect(page.getByRole("heading", { name: "Картинки на этом компьютере" })).toBeVisible();
@@ -56,10 +57,10 @@ test("downloads a picture model on the local models' sheet and draws with it in 
   await expect(page.getByText(/Скачанные модели — во вкладке «Картинки»/)).toBeVisible();
 
   // The engine lives in "Local models", not among the keys (asked for: Ollama and the picture engine are not providers to manage).
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await openSection(page, "Ключи и модели");
   await expect(page.getByText(/Картинки на этом компьютере, бесплатно/)).toHaveCount(0);
 
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Z-Image Turbo/ }).click();
   await page.getByLabel(/Опиши картинку/).fill("Лиса в шарфе");
@@ -108,8 +109,8 @@ test("offers the picture engine on its own on the sheet", async () => {
   };
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await expect(paramsButton(page)).toBeVisible();
+  await openSection(page, "Локальные модели");
   await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByRole("button", { name: "Скачать движок · 30 МБ" }).click();
   await expect(page.getByRole("button", { name: /Скачать движок/ })).toHaveCount(0, { timeout: 10_000 });
@@ -132,7 +133,7 @@ test("downloads a video model in the video part and films a free clip in a chat"
   };
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
-  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await openSection(page, "Локальные модели");
   await page.getByRole("tab", { name: "Видео" }).click();
   await expect(page.getByRole("heading", { name: "Видео на этом компьютере" })).toBeVisible();
   // Only video models here.
@@ -141,7 +142,7 @@ test("downloads a video model in the video part and films a free clip in a chat"
   await card.getByRole("button", { name: /^Скачать · / }).click();
   await expect(card.getByText(/^Скачана · /)).toBeVisible({ timeout: 20_000 });
 
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("tab", { name: "Видео" }).click();
   await page.getByRole("option", { name: /Wan 2\.1 1\.3B/ }).click();
@@ -163,7 +164,7 @@ test("finds a picture model on Hugging Face, greys out an unknown family and dow
   };
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: "http://127.0.0.1:9/v1", DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page = await app.firstWindow();
-  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await openSection(page, "Локальные модели");
   await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByPlaceholder(/z-image или qwen-image/).fill("turbo");
   await page.getByRole("button", { name: "Найти" }).click();

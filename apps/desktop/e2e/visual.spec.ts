@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "../../../packages/core/test/fake-provider";
 import { makeRepo } from "../../../packages/core/test/git-repo";
+import { openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -72,9 +73,9 @@ async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
   });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo } });
   const page: Page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await openSection(page, "Ключи и модели");
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Адрес API").fill(fake.baseUrl);
   await page.getByLabel("Ключ API, если нужен").fill(KEY);

@@ -398,9 +398,9 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   const editable = kind === "text" && !projectId && !chat?.itemId && providers.find((p) => p.id === chat?.providerId)?.billing !== "subscription";
 
   // In the workshop every message stands at its time on the timeline.
-  const at = (key: string, time: number, node: ReactNode) =>
+  const at = (key: string, time: number, node: ReactNode, done = false) =>
     workshop ? (
-      <div className="tl-item" key={key}>
+      <div className={`tl-item${done ? " is-done" : ""}`} key={key}>
         <time className="tl-time mono">{new Date(time).toLocaleTimeString(settings.locale, { hour: "2-digit", minute: "2-digit" })}</time>
         {node}
       </div>
@@ -448,6 +448,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                 onApprove={approve}
               />
             ),
+            // On the timeline a finished answer is a filled point; one still being written, an open one.
+            m.role === "assistant" && m.status !== "streaming",
           ))}
           {draft && (
             <>
@@ -474,18 +476,12 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
         {chat?.projectId && chat.itemId && (
           <WorkReview projectId={chat.projectId} itemId={chat.itemId} busy={!!draft} answers={answers.length} />
         )}
+        {/* The agent's newest question over the box (variant A); all of them are in the workshop's "Questions". */}
         {workshop && work && work.questions.length > 0 && (
-          <section className="note work-questions-note">
-            <h3 className="margin-h">{t("projectWork.questions")}</h3>
-            <ul className="work-questions">
-              {work.questions.map((q, n) => (
-                <li key={n}>
-                  <p>{q.question}</p>
-                  <p className="muted">{t("projectWork.assumes", { assumption: q.assumption })}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="muted">{t("projectWork.answerHint")}</p>
+          <section className="work-questions-note">
+            <strong>{t("workshop.asks")}</strong>
+            <p>{work.questions.at(-1)!.question}</p>
+            <p className="muted">{t("projectWork.assumes", { assumption: work.questions.at(-1)!.assumption })}</p>
           </section>
         )}
         {projectId ? (

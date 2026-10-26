@@ -28,6 +28,10 @@ export function SideProjects() {
   const currentProject = view.kind === "project" ? view.projectId : undefined;
   const currentTask = view.kind === "task" ? view.taskId : undefined;
 
+  const current = works.find((w) => w.projectId === currentProject);
+  // The item being worked on: the first one not done yet.
+  const now = current?.status === "running" ? current.checklist.findIndex((i) => !i.done) : -1;
+
   return (
     <section className="side-group side-projects">
       <div className="side-row">
@@ -67,14 +71,9 @@ export function SideProjects() {
                   </form>
                 ) : (
                   <div className="side-project-row">
-                    <button className={`side-item${here ? " is-on" : ""}`} onClick={() => navigate({ kind: "project", projectId: project.id })} aria-current={here ? "page" : undefined}>
-                      <WorkDot work={work} />
+                    <button className={`side-item side-project${here ? " is-on" : ""}`} onClick={() => navigate({ kind: "project", projectId: project.id })} aria-current={here ? "page" : undefined}>
                       <span className="side-item-title">{project.name}</span>
-                      {work && work.checklist.length > 0 && (
-                        <span className="side-progress mono">
-                          {work.checklist.filter((i) => i.done).length}/{work.checklist.length}
-                        </span>
-                      )}
+                      <WorkLine work={work} />
                     </button>
                     <span className="side-chat-actions">
                       <button
@@ -90,19 +89,6 @@ export function SideProjects() {
                       </button>
                     </span>
                   </div>
-                )}
-                {here && work && work.checklist.length > 0 && (
-                  <ul className="checklist side-checklist" aria-label={t("projectWork.checklist")}>
-                    {work.checklist.map((item, n) => (
-                      <li key={n} className={item.done ? "is-done" : undefined}>
-                        <span className="check-mark" aria-hidden>
-                          {item.done ? "✓" : ""}
-                        </span>
-                        <span className="visually-hidden">{item.done ? t("projectWork.itemDone") : t("projectWork.itemOpen")}</span>
-                        {item.text}
-                      </li>
-                    ))}
-                  </ul>
                 )}
                 {(open.length > 0 || talks.length > 0) && (
                   <ul className="side-sublist">
@@ -136,14 +122,44 @@ export function SideProjects() {
           })}
         </ul>
       )}
+      {current && current.checklist.length > 0 && (
+        <>
+          <h2 className="side-h side-checklist-h">{t("projectWork.checklist")}</h2>
+          <ul className="checklist side-checklist" aria-label={t("projectWork.checklist")}>
+            {current.checklist.map((item, n) => (
+              <li key={n} className={item.done ? "is-done" : n === now ? "is-now" : undefined}>
+                <span className="check-mark" aria-hidden>
+                  {item.done ? "✓" : ""}
+                </span>
+                <span className="visually-hidden">{item.done ? t("projectWork.itemDone") : t("projectWork.itemOpen")}</span>
+                {item.text}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   );
 }
 
-/** How a project's work goes, as a dot before its name: working, waiting for the user, done. */
-function WorkDot({ work }: { work: ProjectWorkView | null }) {
+/** How a project's work goes, under its name: working, waiting, done, with the checklist's progress as a bar. */
+function WorkLine({ work }: { work: ProjectWorkView | null }) {
   const { t } = useApp();
   if (!work || work.status === "idle") return null;
   const tone = work.status === "running" || work.status === "planning" ? (work.waitingApproval ? "wait" : "run") : work.status === "done" ? "ok" : "wait";
-  return <span className={`work-dot is-${tone}`} title={t(`workshop.dot.${tone}` as MessageKey)} aria-hidden />;
+  const done = work.checklist.filter((i) => i.done).length;
+  const total = work.checklist.length;
+  return (
+    <>
+      <small className={`side-work is-${tone}`}>
+        {t(`workshop.dot.${tone}` as MessageKey)}
+        {total > 0 && ` · ${t("projectWork.progress", { done, total })}`}
+      </small>
+      {total > 0 && tone !== "ok" && (
+        <span className="side-bar" aria-hidden>
+          <span style={{ width: `${Math.round((done / total) * 100)}%` }} />
+        </span>
+      )}
+    </>
+  );
 }

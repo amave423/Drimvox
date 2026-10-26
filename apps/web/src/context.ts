@@ -61,14 +61,28 @@ export interface AppContextValue {
   /** Every project's work, kept fresh: the projects' list shows how each goes. */
   works: ProjectWorkView[];
   reloadWorks(): void;
+  /** Chats or projects; the parameters' pages keep the mode they were opened from. */
+  mode: Mode;
+  /** Back from the parameters to where the user was. */
+  leaveParams(): void;
 }
 
+/** The window's two modes (asked for: switched like Claude Code's), each with its own colour of the mark. */
+export type Mode = "chat" | "projects";
+
+/** The parameters (asked for: one page of their own, its sections on the right, a way back). */
+export const PARAM_KINDS = ["settings", "providers", "local", "gallery", "guide"] as const;
+export const inParams = (view: View) => (PARAM_KINDS as readonly string[]).includes(view.kind);
+
 /**
- * The projects' mode (asked for: a mode of its own, switched like Claude Code's): a project's workshop, the projects'
- * start, a project's task and a task's conversation.
+ * The mode a screen belongs to: a project's workshop, the projects' start, a project's task and a task's conversation
+ * are the projects'; the parameters belong to none and keep the one they came from.
  */
-export const inProjects = (view: View, chats: ChatView[] = []) =>
-  view.kind === "project" || view.kind === "projects" || view.kind === "task" || (view.kind === "chat" && !!chats.find((c) => c.id === view.chatId)?.projectId);
+export function modeOf(view: View, chats: ChatView[] = []): Mode | null {
+  if (inParams(view)) return null;
+  const projects = view.kind === "project" || view.kind === "projects" || view.kind === "task" || (view.kind === "chat" && !!chats.find((c) => c.id === view.chatId)?.projectId);
+  return projects ? "projects" : "chat";
+}
 
 export const AppContext = createContext<AppContextValue | null>(null);
 

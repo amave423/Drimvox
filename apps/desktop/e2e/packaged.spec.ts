@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { openSection, paramsButton } from "./sections";
 
 // The app as the installer puts it: built by `npm run dist`. Without a build there is nothing to check.
 const unpacked = fileURLToPath(new URL("../release/", import.meta.url));
@@ -26,13 +27,13 @@ test("the packaged app starts its core from the archive and shows the interface"
   test.skip(!existsSync(exe), "no packaged build: run npm run dist");
   app = await electron.launch({ executablePath: exe, env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_NO_UPDATES: "1" } });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(paramsButton(page)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/^Drimvox \d+\.\d+\.\d+$/)).toBeVisible();
   expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(true);
   // Fonts and styles come from resources/web, not from the internet.
   // Loaded on purpose: whether the start page already used the face depends on timing; a missing file loads nothing.
   expect(await page.evaluate(async () => (await document.fonts.load('600 16px "Source Serif 4"')).length > 0)).toBe(true);
-  await page.getByRole("button", { name: "Настройки" }).click();
+  await openSection(page, "Настройки");
   await expect(page.getByRole("button", { name: "Проверить уведомление" })).toBeVisible();
 });
 
@@ -55,8 +56,8 @@ test("the installed app says whether it is the latest version, and what went wro
     for (const [path, expected] of [["ok", /Это последняя версия/], ["broken", /Не получилось проверить обновления/]] as const) {
       app = await electron.launch({ executablePath: exe, env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_UPDATE_URL: `${base}/${path}` } });
       const page = await app.firstWindow();
-      await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible({ timeout: 30_000 });
-      await page.getByRole("button", { name: "Настройки" }).click();
+      await expect(paramsButton(page)).toBeVisible({ timeout: 30_000 });
+      await openSection(page, "Настройки");
       const section = page.getByRole("region", { name: "Обновления" });
       await section.getByRole("button", { name: "Проверить сейчас" }).click();
       await expect(section).toContainText(expected, { timeout: 15_000 });

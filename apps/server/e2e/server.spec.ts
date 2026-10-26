@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider } from "../../../packages/core/test/fake-provider";
+import { newChat, openSection, paramsButton } from "../../desktop/e2e/sections";
 
 const serverJs = fileURLToPath(new URL("../dist/server.mjs", import.meta.url));
 const KEY = "good-key";
@@ -86,16 +87,16 @@ test("a browser sets the password with the setup code, chats, signs out and back
   await expect(page.getByText("Неверный код первого входа.")).toBeVisible();
   await page.getByLabel("Код первого входа").fill(code);
   await page.getByRole("button", { name: "Задать пароль и войти" }).click();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await openSection(page, "Ключи и модели");
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Адрес API").fill(fake.baseUrl);
   await page.getByLabel("Ключ API, если нужен").fill(KEY);
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
   await expect(page.getByText("Моделей: 1")).toBeVisible();
 
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Fake Model/ }).click();
   const box = page.getByRole("textbox", { name: /Сообщение/ });
@@ -103,7 +104,7 @@ test("a browser sets the password with the setup code, chats, signs out and back
   await box.press("Enter");
   await expect(page.getByText("Привет с сервера!")).toBeVisible();
 
-  await page.getByRole("button", { name: "Настройки" }).click();
+  await openSection(page, "Настройки");
   await expect(page.getByRole("switch", { name: /Уведомлять в браузере/ })).toBeVisible();
   await page.getByRole("button", { name: "Выйти" }).click();
   await expect(page.getByRole("heading", { name: "Вход в Drimvox" })).toBeVisible();
@@ -112,6 +113,6 @@ test("a browser sets the password with the setup code, chats, signs out and back
   await expect(page.getByText("Неверный пароль.")).toBeVisible();
   await page.getByLabel("Пароль").fill(PASSWORD);
   await page.getByRole("button", { name: "Войти" }).click();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
   await expect(page.getByRole("button", { name: /^Привет$/ })).toBeVisible();
 });

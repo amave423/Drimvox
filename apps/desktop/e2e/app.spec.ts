@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 
@@ -30,7 +31,7 @@ test("opens with a working core and remembers theme and language", async () => {
   await expect(page.getByRole("heading", { name: "Добро пожаловать в Drimvox" })).toBeVisible();
   // The start page shows someone new how to connect a model; the explanations are on the guide's page.
   await expect(page.locator(".home-center").getByRole("button", { name: "Подключить нейросеть" })).toBeVisible();
-  await page.getByRole("button", { name: "Инструкция" }).click();
+  await openSection(page, "Инструкция");
   await expect(page.getByRole("heading", { name: "Как пользоваться Drimvox", level: 1 })).toBeVisible();
   // Someone new sees three first steps, the first with its ways and buttons.
   const steps = page.getByRole("region", { name: "Первые шаги" });
@@ -44,11 +45,11 @@ test("opens with a working core and remembers theme and language", async () => {
   await page.getByRole("region", { name: "Модели" }).getByRole("link", { name: "Локальные модели" }).click();
   await expect(page.getByRole("heading", { name: "Локальные модели", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Drimvox" }).first().click();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
   // The bottom bar names the version the app was built as.
   await expect(page.getByText(/^Drimvox \d+\.\d+\.\d+$/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await openSection(page, "Настройки");
   // Updating says where it stands; a build that is not installed does not check.
   await expect(page.getByRole("region", { name: "Обновления" })).toContainText("Обновления проверяет только установленный Drimvox.");
   await expect(page.getByRole("button", { name: "Проверить сейчас" })).toBeDisabled();
@@ -73,14 +74,14 @@ test("opens with a working core and remembers theme and language", async () => {
 test("says when Windows hides notifications by Focus Assist", async () => {
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_FOCUS_ASSIST: "2" } });
   const page = await app.firstWindow();
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await openSection(page, "Настройки");
   await expect(page.getByText(/Фокусировка внимания/)).toBeVisible();
 });
 
 test("the core refuses callers that do not have the token", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
   const origin = new URL(page.url()).origin;
   const res = await fetch(`${origin}/api/settings`);
@@ -90,7 +91,7 @@ test("the core refuses callers that do not have the token", async () => {
 test("the page has no access to Node", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
   const exposed = await page.evaluate(() => ({
     require: typeof (window as unknown as { require?: unknown }).require,
@@ -103,8 +104,8 @@ test("the page has no access to Node", async () => {
 test("the catalog switches a ready skill on and off, and shows a server's details with the token it needs", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await expect(paramsButton(page)).toBeVisible();
+  await openSection(page, "Настройки");
   // Skills and servers each on their own tab.
   await page.getByRole("tab", { name: "Скиллы" }).click();
   const cards = page.locator(".catalog-card");
@@ -152,7 +153,7 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
 test("closing the window keeps Drimvox working in the tray, and it shows the window again", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
   await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([false]);
   // The core still answers: the app did not quit.
@@ -161,30 +162,34 @@ test("closing the window keeps Drimvox working in the tray, and it shows the win
   await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isVisible())).toBe(true);
 });
 
-// Asked for: the sections at the bottom of the sidebar fold under one button.
-test("folds the sidebar's sections under one button, and remembers it", async () => {
+// Asked for: one "Parameters" button; the parameters a page of their own, sections on the right, a way back, the mode kept.
+test("opens the parameters as a page of their own and goes back, keeping the mode", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  const sections = page.getByRole("button", { name: "Разделы" });
-  await expect(page.getByRole("navigation", { name: "Разделы" }).getByRole("button", { name: "Галерея" })).toBeVisible();
-  await sections.click();
-  await expect(sections).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByRole("navigation", { name: "Разделы" }).getByRole("button", { name: "Галерея" })).toHaveCount(0);
-  await page.reload();
-  await expect(page.getByRole("button", { name: "Разделы" })).toHaveAttribute("aria-expanded", "false");
-  await page.getByRole("button", { name: "Разделы" }).click();
-  await expect(page.getByRole("navigation", { name: "Разделы" }).getByRole("button", { name: "Настройки" })).toBeVisible();
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Над чем поработаем?" })).toBeVisible();
+  await paramsButton(page).click();
+  const nav = page.getByRole("navigation", { name: "Разделы параметров" });
+  for (const name of ["Настройки", "Ключи и модели", "Локальные модели", "Галерея", "Инструкция"]) await expect(nav.getByRole("button", { name })).toBeVisible();
+  // The page covers the window: no sidebar; the mode stays the one it was opened from.
+  await expect(page.locator(".side")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Проекты", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await nav.getByRole("button", { name: "Галерея" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Галерея" })).toBeVisible();
+  await page.getByRole("button", { name: "Назад" }).click();
+  await expect(page.getByRole("heading", { name: "Над чем поработаем?" })).toBeVisible();
+  await expect(page.locator(".side")).toBeVisible();
 });
 
 // Asked for: reading answers aloud with Piper's voices instead of the system's.
 test("offers Piper's voices on the audio tab and in the settings", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await page.getByRole("button", { name: "Локальные модели" }).first().click();
+  await openSection(page, "Локальные модели");
   await page.getByRole("tab", { name: "Аудио" }).click();
   await expect(page.getByRole("heading", { name: "Озвучка ответов" })).toBeVisible();
   await expect(page.locator(".local-card", { hasText: "Ирина" })).toContainText("русский, женский");
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await openSection(page, "Настройки");
   await page.getByRole("tab", { name: "Модели и деньги" }).click();
   await expect(page.getByRole("region", { name: "Голос для чтения ответов" })).toContainText("Скачать голоса Piper");
 });
@@ -193,8 +198,8 @@ test("offers Piper's voices on the audio tab and in the settings", async () => {
 test("a model list near the bottom of the window opens upwards and stays inside it", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await expect(paramsButton(page)).toBeVisible();
+  await openSection(page, "Настройки");
   await page.getByRole("tab", { name: "Модели и деньги" }).click();
   const setting = page.getByRole("region", { name: "Проверка по скриншотам" });
   const button = setting.getByRole("button", { name: "Выбери модель" });
@@ -212,8 +217,8 @@ test("a model list near the bottom of the window opens upwards and stays inside 
 test("creates and deletes a shared skill in the settings", async () => {
   app = await launch();
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await expect(paramsButton(page)).toBeVisible();
+  await openSection(page, "Настройки");
   await page.getByRole("tab", { name: "Скиллы" }).click();
 
   await page.getByRole("button", { name: "Создать скилл" }).click();

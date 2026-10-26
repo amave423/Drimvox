@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "../../../packages/core/test/fake-provider";
 import { git, makeRepo } from "../../../packages/core/test/git-repo";
+import { openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -46,9 +47,9 @@ async function launch(script: FakeTurn[], env: Record<string, string> = {}): Pro
   fake = await startFakeProvider({ key: KEY, models, script });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo, ...env } });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await openSection(page, "Ключи и модели");
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Адрес API").fill(fake.baseUrl);
   await page.getByLabel("Ключ API, если нужен").fill(KEY);
@@ -61,7 +62,7 @@ async function launch(script: FakeTurn[], env: Record<string, string> = {}): Pro
 async function startTask(page: Page, task: string, pipeline = false) {
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await page.getByRole("button", { name: "+ Проект" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/drimvox-repo-/);
+  await expect(page.locator(".topbar .crumb")).toHaveText(/drimvox-repo-/);
   const all = { interview: true, spec: true, approveSpec: true, testsFirst: true };
   await start(page, { task, model: "coder", stages: pipeline ? all : undefined });
 }
@@ -175,7 +176,7 @@ test("a Windows notification says the task is ready, and a click opens it", asyn
     app!.evaluate(() => ((globalThis as any).drimvoxNotices ?? []).map((n: any) => ({ title: n.title, body: n.body })));
   await expect.poll(notices, { timeout: 10_000 }).toEqual([{ title: "Готово, можно смотреть правки", body: "Добавь notes.txt" }]);
 
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await openSection(page, "Настройки");
   await expect(page.getByRole("heading", { level: 1, name: "Настройки" })).toBeVisible();
   await app!.evaluate(() => (globalThis as any).drimvoxNotices[0].click());
   await expect(page.getByRole("heading", { level: 1, name: "Добавь notes.txt" })).toBeVisible();

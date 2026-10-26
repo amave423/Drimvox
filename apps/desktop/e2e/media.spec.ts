@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "../../../packages/core/test/fake-provider";
+import { newChat, openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -61,9 +62,9 @@ async function launch(script?: FakeTurn[]): Promise<Page> {
   });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_USD_RUB: "80" } });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await openSection(page, "Ключи и модели");
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Адрес API").fill(fake.baseUrl);
   await page.getByLabel("Ключ API, если нужен").fill(KEY);
@@ -74,7 +75,7 @@ async function launch(script?: FakeTurn[]): Promise<Page> {
 
 test("a picture in a chat: the price before, the picture after, the gallery", async () => {
   const page = await launch();
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByRole("option", { name: /Dear Painter/ }).click();
@@ -89,7 +90,7 @@ test("a picture in a chat: the price before, the picture after, the gallery", as
   await expect(page.getByText("≈ 3,20 ₽")).toBeVisible();
   // The settings of the picture are pills behind the options button, not bare selects under the box.
   await expect(page.locator("select")).toHaveCount(0);
-  await page.getByRole("button", { name: /^Параметры/ }).click();
+  await page.locator(".composer").getByRole("button", { name: /^Параметры/ }).click();
   await page.getByRole("radiogroup", { name: "Формат" }).getByRole("radio", { name: "16:9" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Параметры: 16:9" })).toBeVisible();
@@ -103,7 +104,7 @@ test("a picture in a chat: the price before, the picture after, the gallery", as
   const sent = fake!.requests.find((r) => r.path === "/v1/images")!.body;
   expect(sent).toMatchObject({ model: "img/cheap", prompt: "Лиса в шарфе", aspect_ratio: "16:9" });
 
-  await page.getByRole("button", { name: "Галерея" }).click();
+  await openSection(page, "Галерея");
   await expect(page.getByRole("heading", { level: 1, name: "Галерея" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Лиса в шарфе" })).toBeVisible();
   await page.getByRole("button", { name: "Открыть чат" }).click();
@@ -117,11 +118,11 @@ test("a director writes the prompt, looks at the picture and says what it made",
     { text: "Рыжая лиса в вязаном шарфе в осеннем лесу." },
     { text: "Готово: лиса в шарфе, с первой попытки." },
   ]);
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("tab", { name: "Картинки" }).click();
   await page.getByRole("option", { name: /Cheap Painter/ }).click();
-  await page.getByRole("button", { name: /^Параметры/ }).click();
+  await page.locator(".composer").getByRole("button", { name: /^Параметры/ }).click();
   const panel = page.getByRole("dialog", { name: "Параметры" });
   await panel.locator("label.toggle").click();
   await panel.getByRole("button", { name: "Выбери модель" }).click();
@@ -140,7 +141,7 @@ test("a director writes the prompt, looks at the picture and says what it made",
 // docs/specs/media.md: a photo only for a model that takes one; the others say they do not.
 test("a photo goes only to a model that takes one, and the others say so", async () => {
   const page = await launch();
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("tab", { name: "Картинки" }).click();
   // The list marks what takes a photo.

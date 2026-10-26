@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider } from "../../../packages/core/test/fake-provider";
 import { startFakeProxy, type FakeProxy } from "../../../packages/core/test/fake-proxy";
+import { openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -38,13 +39,13 @@ async function launch(): Promise<Page> {
     env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PROXY_CHECK_URL: `${page204.origin}/ping` },
   });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
   return page;
 }
 
 test("notifications are a switch, the proxy is set once and each provider opts in", async () => {
   const page = await launch();
-  await page.getByRole("button", { name: "Настройки" }).click();
+  await openSection(page, "Настройки");
   const notify = page.getByRole("switch", { name: /Уведомлять в Windows/ });
   await expect(notify).toBeChecked();
   await notify.click({ force: true });
@@ -61,7 +62,7 @@ test("notifications are a switch, the proxy is set once and each provider opts i
   await expect(page.getByText(/Прокси работает: ответ за \d+ мс/)).toBeVisible();
   await expect(page.getByText("s3cret")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await openSection(page, "Ключи и модели");
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Адрес API").fill(fake.baseUrl);
   await page.getByLabel("Ключ API, если нужен").fill(KEY);

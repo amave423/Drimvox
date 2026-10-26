@@ -1,45 +1,54 @@
 import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
-import type { MessageKey } from "../../i18n";
-import { formatUsd } from "../../lib/format";
 import { readLastModel, type ModelChoice } from "../../lib/lastModel";
 import { ChatSheet } from "../chat/ChatSheet";
+import { Tabs } from "../Tabs";
 import { TaskSheet } from "../tasks/TaskSheet";
 import { useAddProject } from "./AddProject";
-import { LimitsForm } from "./LimitsForm";
 import { PlanCard } from "./PlanCard";
 import { ProjectStart } from "./ProjectStart";
-import { hoursAndMinutes, useProjectWork } from "./useProjectWork";
+import { ResultSplit, useResultWidth } from "./ResultSplit";
+import { useProjectWork } from "./useProjectWork";
+import { PlanTab } from "./Workspace";
 import { WorkshopResult } from "./WorkshopResult";
 
-const RESULT_KEY = "drimvox.workshopResult";
+export const LAST_PROJECT_KEY = "drimvox.lastProject";
+
+export type Stage = "git" | "loading" | "start" | "interview" | "plan" | "work";
+
+/** Where a project's work is: git first, the start, the interview, the plan, then the work itself. */
+export function stageOf(project: ProjectView, work: ProjectWorkView | null, fresh = false): Stage {
+  if (project.gitState === "not_repo") return "git";
+  if (!work) return "loading";
+  if (fresh || work.status === "idle") return "start";
+  if (work.status === "planning" && !work.plan) return "interview";
+  if (work.status === "ready" || work.status === "planning") return "plan";
+  return work.startedAt && work.chatId ? "work" : "start";
+}
+
+type Part = "work" | "plan" | "questions";
 
 /**
- * A project's workshop (asked for: the projects' mode as a window of its own, variant A with variant C's timeline): the
- * project's state and controls on top, the work in the middle as it goes (the start, the interview, the plan, then the
- * agent's timeline with the box to write to it), the result on the right, which folds away.
+ * A project's workshop (asked for: variant A with variant C's timeline): the work in the middle as it goes (the start,
+ * the interview, the plan, then the agent's timeline with its plan and questions beside it in tabs), the result on the
+ * right, its width dragged by the handle between them, folded away at the edge. The state and the controls are in the
+ * top bar (WorkshopBar), the projects and the checklist in the sidebar.
  */
 export function Workshop({ projectId }: { projectId: string }) {
   const { t, projects, providers, reloadTasks, reloadWorks } = useApp();
   const project = projects.find((p) => p.id === projectId);
   const { work, reload } = useProjectWork(projectId);
   const [fresh, setFresh] = useState(false);
-  const [limits, setLimits] = useState(false);
-  const [resultOpen, setResultOpen] = useState(() => {
-    try {
-      return localStorage.getItem(RESULT_KEY) !== "closed";
-    } catch {
-      return true;
-    }
-  });
+  const [part, setPart] = useState<Part>("work");
+  const split = useResultWidth();
   const [choice] = useState<ModelChoice | null>(() => {
     const last = readLastModel();
     return last && providers.some((p) => p.id === last.providerId) ? last : null;
   });
-  // The sidebar shows this work's state and checklist: kept in step with what the workshop sees.
+  // The top bar and the sidebar show this work's state and checklist: kept in step with what the workshop sees.
   const doneItems = work?.checklist.filter((i) => i.done).length;
-  useEffect(reloadWorks, [work?.status, work?.checklist.length, doneItems]);
+  useEffect(reloadWorks, [work?.status, work?.checklist.length, doneItems, work?.spentUsd, work?.questions.length]);
   // The last project opened is where the projects' mode comes back to.
   useEffect(() => {
     try {
@@ -50,23 +59,12 @@ export function Workshop({ projectId }: { projectId: string }) {
   }, [projectId]);
   if (!project) return null;
 
-  const toggleResult = () => {
-    const next = !resultOpen;
-    setResultOpen(next);
-    try {
-      localStorage.setItem(RESULT_KEY, next ? "open" : "closed");
-    } catch {
-      // Kept for this visit only.
-    }
-  };
-  const started = !!work?.startedAt && !!work.chatId;
-  const stage: Stage = project.gitState === "not_repo" ? "git" : !work ? "loading" : fresh || work.status === "idle" ? "start" : work.status === "planning" && !work.plan ? "interview" : work.status === "ready" || (work.status === "planning" && work.plan) ? "plan" : started ? "work" : "start";
+  const stage = stageOf(project, work, fresh);
+  const questions = work?.questions.length ?? 0;
 
   return (
     <div className="workshop">
-      <WorkshopHead project={project} work={work} stage={stage} onLimits={() => setLimits(!limits)} resultOpen={resultOpen} onResult={toggleResult} onChanged={() => void reload()} />
-      {limits && work && <LimitsForm work={work} onSaved={() => (setLimits(false), void reload())} />}
-      <div className={`workshop-body${resultOpen ? " has-result" : ""}`}>
+      <div className={`workshop-body${split.dragging ? " is-dragging" : ""}`} ref={split.body} style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${split.width}px` }}>
         <section className="workshop-main" aria-label={t("workshop.work")}>
           {stage === "git" && <GitNotice project={project} />}
           {stage === "loading" && <p className="muted workshop-pad">{t("model.loading")}</p>}
@@ -89,84 +87,63 @@ export function Workshop({ projectId }: { projectId: string }) {
               <PlanCard key={work.plan?.context} work={work} onChanged={() => void reload()} />
             </div>
           )}
-          {stage === "work" && work?.chatId && <ChatSheet key={work.chatId} chatId={work.chatId} viewKey={work.chatId} workshop />}
+          {stage === "work" && work?.chatId && (
+            <>
+              <div className="workshop-tabs">
+                <Tabs<Part>
+                  value={part}
+                  label={t("workshop.work")}
+                  options={[
+                    { value: "work", label: t("workshop.part.work") },
+                    { value: "plan", label: t("workshop.part.plan") },
+                    { value: "questions", label: questions ? t("workshop.part.questionsN", { n: questions }) : t("workshop.part.questions") },
+                  ]}
+                  onChange={setPart}
+                />
+              </div>
+              {/* The timeline stays put while another tab is open: what is typed in its box is kept. */}
+              <div className="workshop-feed" hidden={part !== "work"}>
+                <ChatSheet key={work.chatId} chatId={work.chatId} viewKey={work.chatId} workshop />
+              </div>
+              {part === "plan" && (
+                <div className="workshop-pad workshop-scroll">
+                  <PlanTab work={work} />
+                </div>
+              )}
+              {part === "questions" && <Questions work={work} />}
+            </>
+          )}
         </section>
-        {resultOpen && (
-          <WorkshopResult project={project} work={work} onChanged={() => void reload()} onNew={work && work.status !== "idle" && work.status !== "running" ? () => setFresh(true) : undefined} />
-        )}
+        <ResultSplit split={split} />
+        <WorkshopResult
+          project={project}
+          work={work}
+          open={split.width > 0}
+          onChanged={() => void reload()}
+          onNew={work && work.status !== "idle" && work.status !== "running" ? () => setFresh(true) : undefined}
+        />
       </div>
     </div>
   );
 }
 
-type Stage = "git" | "loading" | "start" | "interview" | "plan" | "work";
-export const LAST_PROJECT_KEY = "drimvox.lastProject";
-
-/** The project's name, its state in one pill, how far the work got, its time and money, and the controls. */
-function WorkshopHead(p: { project: ProjectView; work: ProjectWorkView | null; stage: Stage; onLimits(): void; resultOpen: boolean; onResult(): void; onChanged(): void }) {
-  const { api, t } = useApp();
-  const w = p.work;
-  const done = w?.checklist.filter((i) => i.done).length ?? 0;
-  const total = w?.checklist.length ?? 0;
-  async function act(kind: "stop" | "continue") {
-    if (!w) return;
-    await (kind === "stop" ? api.projects[":id"].work.stop.$post({ param: { id: w.projectId } }) : api.projects[":id"].work.continue.$post({ param: { id: w.projectId } })).catch(() => null);
-    p.onChanged();
-  }
-  const pill = pillOf(p.stage, w);
+/** What the agent asked without waiting, with what it assumes meanwhile; answered by a message in the timeline. */
+function Questions({ work }: { work: ProjectWorkView }) {
+  const { t } = useApp();
+  if (work.questions.length === 0) return <p className="muted workshop-pad">{t("workshop.noQuestions")}</p>;
   return (
-    <header className="workshop-head">
-      <div className="workshop-title">
-        <h1>{p.project.name}</h1>
-        <span className="mono muted">{p.project.path}</span>
-      </div>
-      <span className={`workshop-pill is-${pill.tone}`} role="status" title={t(pill.key, { detail: w?.detail ?? "" })}>
-        {pill.tone === "run" && <span className="action-spinner" aria-hidden />}
-        {t(pill.key, { detail: w?.detail ?? "" })}
-      </span>
-      {total > 0 && (
-        <span className="workshop-progress" title={t("projectWork.progress", { done, total })}>
-          <span className="workshop-bar" aria-hidden>
-            <span style={{ width: `${Math.round((done / total) * 100)}%` }} />
-          </span>
-          {t("projectWork.progress", { done, total })}
-        </span>
-      )}
-      <span className="spacer" />
-      {w?.startedAt && (
-        <button type="button" className="link workshop-numbers" onClick={p.onLimits} title={t("workshop.limits")}>
-          {hoursAndMinutes(w.workedMs, t)} / {t("projectWork.hoursShort", { h: w.hours })} · {formatUsd(w.spentUsd)} / {formatUsd(w.budgetUsd)}
-        </button>
-      )}
-      {w?.status === "running" && (
-        <button className="btn is-pencil" onClick={() => void act("stop")}>
-          {t("projectWork.stop")}
-        </button>
-      )}
-      {w?.startedAt && (w.status === "paused" || w.status === "stopped") && (
-        <button className="btn is-primary" onClick={() => void act("continue")}>
-          {t("projectWork.continue")}
-        </button>
-      )}
-      <button type="button" className={`btn workshop-toggle${p.resultOpen ? " is-on" : ""}`} aria-pressed={p.resultOpen} onClick={p.onResult} title={t(p.resultOpen ? "workshop.hideResult" : "workshop.showResult")}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M15 4v16" />
-        </svg>
-        {t("workshop.result")}
-      </button>
-    </header>
+    <div className="workshop-pad workshop-scroll">
+      <ul className="work-questions">
+        {[...work.questions].reverse().map((q, n) => (
+          <li key={n} className="work-question">
+            <p>{q.question}</p>
+            <p className="muted">{t("projectWork.assumes", { assumption: q.assumption })}</p>
+          </li>
+        ))}
+      </ul>
+      <p className="muted">{t("projectWork.answerHint")}</p>
+    </div>
   );
-}
-
-function pillOf(stage: Stage, w: ProjectWorkView | null): { key: MessageKey; tone: "run" | "ok" | "wait" | "idle" } {
-  if (stage === "git") return { key: "workshop.state.git", tone: "wait" };
-  if (!w || stage === "start") return { key: "workshop.state.new", tone: "idle" };
-  if (stage === "interview") return { key: "workshop.state.interview", tone: "run" };
-  if (stage === "plan") return { key: w.status === "planning" ? "workshop.state.rewriting" : "workshop.state.plan", tone: w.status === "planning" ? "run" : "wait" };
-  if (w.status === "running") return w.waitingApproval ? { key: "projectWork.waitingApproval", tone: "wait" } : { key: "projectWork.status.running", tone: "run" };
-  if (w.status === "done") return { key: "workshop.state.done", tone: "ok" };
-  return { key: `projectWork.reason.${w.reason ?? "user"}` as MessageKey, tone: "wait" };
 }
 
 /** A folder without git: the work needs it first (the agent works right in the folder, git keeps the history). */

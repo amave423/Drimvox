@@ -1,4 +1,4 @@
-import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
+import type { ProjectView, ProjectWorkView, WorkShot } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
@@ -7,44 +7,50 @@ import { ProjectSkills } from "../SkillsSection";
 import { Tabs } from "../Tabs";
 import { StatusChip } from "../tasks/StatusDot";
 import { GithubPublish } from "./GithubPublish";
-import { ChangesTab, PlanTab, RunTab } from "./Workspace";
+import { ChangesTab, RunTab } from "./Workspace";
 
-type Part = "result" | "changes" | "plan" | "project";
-const PARTS: Part[] = ["result", "changes", "plan", "project"];
+type Part = "result" | "changes" | "project";
+const PARTS: Part[] = ["result", "changes", "project"];
 
 /**
- * The workshop's right side, folded away by its button in the header: what came of the work (the last looks at the
- * pages, the started result and the report), the folder's changes, the plan, and the project itself.
+ * The workshop's right side, its width set by the handle beside it: what came of the work (the agent's last look at
+ * the page, large, the started result and the report), the folder's changes, and the project itself.
  */
-export function WorkshopResult({ project, work, onChanged, onNew }: { project: ProjectView; work: ProjectWorkView | null; onChanged(): void; onNew?: () => void }) {
+export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView | null; open: boolean; onChanged(): void; onNew?: () => void }) {
   const { t } = useApp();
   const [part, setPart] = useState<Part>("result");
+  const { work } = p;
   return (
-    <aside className="workshop-result" aria-label={t("workshop.result")}>
-      <Tabs<Part> value={part} label={t("workshop.result")} options={PARTS.map((p) => ({ value: p, label: t(`workshop.part.${p}`) }))} onChange={setPart} />
+    <aside id="workshop-result" className="workshop-result" aria-label={t("workshop.result")} aria-hidden={!p.open} inert={!p.open}>
+      <div className="workshop-tabs">
+        <Tabs<Part> value={part} label={t("workshop.result")} options={PARTS.map((x) => ({ value: x, label: t(`workshop.part.${x}`) }))} onChange={setPart} />
+      </div>
       <div className="workshop-result-body">
-        {part === "result" && (work?.startedAt ? <ResultPart work={work} onChanged={onChanged} /> : <p className="muted">{t("workshop.noResult")}</p>)}
+        {part === "result" && (work?.startedAt ? <ResultPart work={work} onChanged={p.onChanged} /> : <p className="muted">{t("workshop.noResult")}</p>)}
         {part === "changes" && (work ? <ChangesTab work={work} /> : null)}
-        {part === "plan" && (work ? <PlanTab work={work} /> : null)}
-        {part === "project" && <ProjectPart project={project} onNew={onNew} />}
+        {part === "project" && <ProjectPart project={p.project} onNew={p.onNew} />}
       </div>
     </aside>
   );
 }
 
-/** The newest looks the agent took at the pages, large, then the started result and the report. */
+/** The agent's newest look at the page, large as a preview; the ones before it small; then the result and the report. */
 function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
   const { t } = useApp();
-  const shots = [...work.shots].reverse().slice(0, 4);
+  const [latest, ...before] = [...work.shots].reverse().slice(0, 4);
   return (
     <>
       {work.escalated && <p className="muted">{t("projectWork.escalated")}</p>}
-      {shots.length > 0 && (
-        <section className="workshop-shots">
-          <p className="muted">{t("workshop.lastLook")}</p>
-          {shots.map((s) => (
-            <Shot key={s.id} projectId={work.projectId} id={s.id} url={s.url} />
-          ))}
+      {latest && (
+        <section className="workshop-shots" aria-label={t("workshop.lastLook")}>
+          <Shot projectId={work.projectId} shot={latest} />
+          {before.length > 0 && (
+            <div className="workshop-shots-before">
+              {before.map((s) => (
+                <Shot key={s.id} projectId={work.projectId} shot={s} small />
+              ))}
+            </div>
+          )}
         </section>
       )}
       <RunTab work={work} onChanged={onChanged} />
@@ -52,13 +58,16 @@ function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): v
   );
 }
 
-function Shot({ projectId, id, url }: { projectId: string; id: string; url: string }) {
-  const { token } = useApp();
-  const src = useAuthorizedUrl(`/api/projects/${projectId}/work/shots/${id}`, token);
+function Shot({ projectId, shot, small }: { projectId: string; shot: WorkShot; small?: boolean }) {
+  const { t, token, settings } = useApp();
+  const src = useAuthorizedUrl(`/api/projects/${projectId}/work/shots/${shot.id}`, token);
   return (
-    <figure className="workshop-shot">
-      {src ? <img src={src} alt={url} /> : <div className="workshop-shot-wait" />}
-      <figcaption className="mono muted">{url}</figcaption>
+    <figure className={`workshop-shot${small ? " is-small" : ""}`}>
+      {src ? <img src={src} alt={shot.url} /> : <div className="workshop-shot-wait" />}
+      <figcaption className="mono muted">
+        <span>{shot.url}</span>
+        {!small && <span>{t("workshop.shotAt", { time: new Date(shot.at).toLocaleTimeString(settings.locale, { hour: "2-digit", minute: "2-digit" }) })}</span>}
+      </figcaption>
     </figure>
   );
 }

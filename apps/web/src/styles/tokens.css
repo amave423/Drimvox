@@ -1,4 +1,7 @@
 /* Design tokens — see docs/DESIGN.md. Both themes are defined here and nowhere else. */
+/* The mark's colours change with the mode, smoothly: registered as colours so they can be animated. */
+@property --brand-from { syntax: "<color>"; inherits: true; initial-value: #8b6fe0; }
+@property --brand-to { syntax: "<color>"; inherits: true; initial-value: #3b7bd8; }
 :root {
   color-scheme: light;
   --bg: #e4e5e0;
@@ -36,6 +39,13 @@
   /* Only for samples of an agent's design direction: the nearest handwritten font the system has. */
   --font-hand: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
   --topbar-h: 44px;
+  transition: --brand-from 0.6s ease, --brand-to 0.6s ease;
+}
+
+/* The projects' mode has a mark of its own (chosen: spring green to pine). */
+:root[data-mode="projects"] {
+  --brand-from: #5ad17a;
+  --brand-to: #127a5a;
 }
 
 :root[data-theme="dark"] {
@@ -54,6 +64,10 @@
   --ok-soft: #1f3326;
   --wait: #e3a948;
   --wait-soft: #3a2e18;
+  /* In the dark theme the chosen and the active take the mark's colour, the mode's own (asked for); the light theme
+     keeps its ink. */
+  --ink: color-mix(in oklab, color-mix(in oklab, var(--brand-from), var(--brand-to)) 62%, white);
+  --ink-soft: color-mix(in oklab, color-mix(in oklab, var(--brand-from), var(--brand-to)) 30%, #2a2a27);
   --choice: var(--ink-soft);
   --on-choice: var(--ink);
   --sheet-shadow: 0 18px 40px -30px rgba(0, 0, 0, 0.8);

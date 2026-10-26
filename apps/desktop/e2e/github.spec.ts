@@ -6,6 +6,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 // @ts-expect-error A plain module shared with the core's tests.
 import { startFakeGithub } from "../../../packages/core/test/fake-github.mjs";
+import { paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 
@@ -48,7 +49,7 @@ test("publishes a project on GitHub: the code to enter, the name, private by def
     },
   });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await page.getByRole("button", { name: "+ Проект" }).click();
   // The project's GitHub is in the workshop's result panel, under "Проект".

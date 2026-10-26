@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider } from "../../../packages/core/test/fake-provider";
+import { newChat, openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -29,12 +30,12 @@ test.afterEach(async () => {
 async function launch(env: Record<string, string> = {}): Promise<Page> {
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_USD_RUB: "80", ...env } });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
   return page;
 }
 
 async function connect(page: Page, apiKey = KEY) {
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await openSection(page, "Ключи и модели");
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Название").fill("Тестовый");
   await page.getByLabel("Адрес API").fill(fake!.baseUrl);
@@ -43,7 +44,7 @@ async function connect(page: Page, apiKey = KEY) {
 }
 
 async function startChat(page: Page) {
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Fake Model/ }).click();
 }
@@ -86,7 +87,7 @@ test("free models come first in the list, under their own heading", async () => 
   });
   const page = await launch();
   await connect(page);
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   const list = page.getByRole("listbox");
   await expect(list.getByText("Бесплатные · 1")).toBeVisible();
@@ -106,7 +107,7 @@ test("a starred model is in the favourites tab, and choosing it there picks it",
   });
   const page = await launch();
   await connect(page);
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("button", { name: "В избранное: Beta Model" }).click();
   await expect(page.getByRole("button", { name: "Убрать из избранного: Beta Model" })).toHaveAttribute("aria-pressed", "true");
@@ -140,7 +141,7 @@ test("asks the free models a word, hides those that are gone and marks the busy 
   });
   const page = await launch();
   await connect(page);
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   const list = page.getByRole("listbox");
   await expect(list.getByText("Бесплатные · 2")).toBeVisible();
@@ -235,7 +236,7 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
   });
   const page = await launch();
   await connect(page);
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Long Model/ }).click();
   await say(page, "Сделай калькулятор");
@@ -301,7 +302,7 @@ test("fits code to the sheet, widens the sheet with the window and keeps the com
   expect(tight.model).toBe(false);
   expect(Math.abs(tight.sendRight)).toBeLessThanOrEqual(1);
   expect(Math.max(...tight.tops) - Math.min(...tight.tops)).toBeLessThanOrEqual(1);
-  await page.getByRole("button", { name: /^Параметры/ }).click();
+  await page.locator(".composer").getByRole("button", { name: /^Параметры/ }).click();
   await expect(page.getByRole("dialog", { name: "Параметры" }).getByRole("button", { name: /Long Model|a-very-long/ })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.locator(".composer").evaluate((el) => ((el as HTMLElement).style.width = ""));
@@ -324,7 +325,7 @@ test("works in a connected folder and undoes an answer", async () => {
   const page = await launch({ DRIMVOX_TEST_PICK_FOLDER: folder });
   await connect(page);
   await startChat(page);
-  await page.getByRole("button", { name: "Параметры", exact: true }).click();
+  await page.locator(".composer").getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByRole("button", { name: "Папка" }).click();
   // A connected folder is never hidden: the options button names it.
   await expect(page.getByRole("button", { name: /^Параметры: Папка: drimvox-e2e-folder-/ })).toBeVisible();
@@ -395,7 +396,7 @@ test("an MCP server from the settings gives the chat a tool that asks first", as
   await expect(page.getByText("Моделей: 1")).toBeVisible();
 
   const server = fileURLToPath(new URL("../../../packages/core/test/mcp-server.mjs", import.meta.url));
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await openSection(page, "Настройки");
   await page.getByRole("tab", { name: "Серверы MCP" }).click();
   await page.getByRole("button", { name: "Добавить сервер" }).click();
   await page.getByLabel("Название").fill("demo");
@@ -409,7 +410,7 @@ test("an MCP server from the settings gives the chat a tool that asks first", as
   await page.getByRole("button", { name: "Разрешать всегда" }).click();
   await expect(page.getByText("Сервер ответил: echo: привет")).toBeVisible();
 
-  await page.getByRole("button", { name: "Настройки" }).first().click();
+  await openSection(page, "Настройки");
   await expect(page.getByText("Разрешены всегда:")).toBeVisible();
   await expect(page.getByRole("button", { name: "echo ×" })).toBeVisible();
 });
@@ -431,7 +432,7 @@ test("an answer goes on live after coming back to the chat, with a spinner and t
   await expect(page.getByText(/кусок1 /)).toBeVisible();
 
   // Away, in a new chat: the first one is still answering.
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   const row = page.locator(".side-chat", { hasText: "Длинно" });
   await expect(row.getByRole("img", { name: "Модель отвечает" })).toBeVisible();
 
@@ -444,7 +445,7 @@ test("an answer goes on live after coming back to the chat, with a spinner and t
 
   // Another answer while the chat is closed: a dot until it is opened.
   await say(page, "Ещё");
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await expect(row.getByRole("img", { name: "Новый ответ" })).toBeVisible({ timeout: 20_000 });
   await row.getByRole("button", { name: /Длинно/ }).click();
   await expect(row.getByRole("img", { name: "Новый ответ" })).toHaveCount(0);

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider } from "../../../packages/core/test/fake-provider";
+import { newChat, openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const fakeCli = fileURLToPath(new URL("../../../packages/core/test/fake-cli.mjs", import.meta.url));
@@ -48,8 +49,8 @@ async function launch(): Promise<Page> {
     },
   });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await expect(paramsButton(page)).toBeVisible();
+  await openSection(page, "Ключи и модели");
   return page;
 }
 
@@ -69,7 +70,7 @@ test("connects Claude Code without a key, names its models and chats through it"
   await expect(page.getByText("По подписке: Drimvox считает токены, но не деньги")).toBeVisible();
   await expect(page.getByRole("button", { name: "Заменить ключ" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await expect(page.getByRole("option", { name: /Claude Fable 5\.1/ })).toBeVisible();
   await page.getByRole("option", { name: /По умолчанию.*модель, выбранная в самой программе/ }).click();

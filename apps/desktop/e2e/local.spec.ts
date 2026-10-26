@@ -5,6 +5,7 @@ import { createServer as netServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { newChat, openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const FAKE_OLLAMA = fileURLToPath(new URL("../../../packages/core/test/fake-ollama.mjs", import.meta.url));
@@ -71,9 +72,9 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
     env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, DRIMVOX_TEST_LOCAL: JSON.stringify(local) },
   });
   const page: Page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await openSection(page, "Локальные модели");
   await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Drimvox/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/видеокарта NVIDIA GeForce RTX 3080, 10 ГБ; память 32 ГБ/)).toBeVisible();
 
@@ -100,11 +101,11 @@ test("local models: Ollama starts by itself, picks fit the computer, a download 
   await expect(cards.nth(0).getByRole("button", { name: "Удалить" })).toBeVisible();
 
   // The download added the Ollama provider: the model is in the chat and answers.
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /qwen3:1\.7b/ }).click();
   // A model this small gets no search: the switch says so instead of offering it.
-  await page.getByRole("button", { name: /^Параметры/ }).click();
+  await page.locator(".composer").getByRole("button", { name: /^Параметры/ }).click();
   await page.getByRole("button", { name: /^Интернет:/ }).click();
   await expect(page.getByText("Эта модель слишком мала, чтобы искать в интернете: она отвечает сама.")).toBeVisible();
   await expect(page.getByRole("option", { name: /Поиск Drimvox/ })).toHaveCount(0);
@@ -140,9 +141,9 @@ test("installs Ollama from the sheet: the size first, then Drimvox finds it", as
   };
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page: Page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Локальные модели" }).click();
+  await openSection(page, "Локальные модели");
   await expect(page.getByText(/Ollama не установлена/)).toBeVisible();
   await page.getByRole("button", { name: "Установить Ollama · 3 МБ" }).click();
   await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Drimvox/)).toBeVisible({ timeout: 30_000 });

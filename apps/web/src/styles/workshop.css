@@ -1,57 +1,111 @@
-/* ---------- The projects' mode ---------- */
-/* Chats or projects, in the top bar: the projects' mode is a window of its own (asked for, like Claude Code's). */
-.mode-switch { margin-left: auto; display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--sheet); }
-.mode-switch button { padding: 4px 14px; border-radius: 999px; color: var(--muted); font-size: 13.5px; }
+/* ---------- The modes, the parameters and the projects' workshop ---------- */
+/* Chats or projects, next to the mark (asked for, like Claude Code's). */
+.mode-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--sheet); align-self: center; }
+.mode-switch button { padding: 3px 13px; border-radius: 999px; color: var(--muted); font-size: 13px; }
 .mode-switch button:hover { color: var(--fg); }
 .mode-switch button.is-on { background: var(--choice); color: var(--on-choice); }
+.topbar-title { flex: 1; }
+.topbar-title .crumb { align-self: center; font-size: 13.5px; }
 
-/* The sidebar's projects: how each goes before its name, its checklist under the open one. */
-.side-projects .side-item { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
-.side-progress { color: var(--muted); font-size: 11.5px; }
-.work-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-soft); }
-.work-dot.is-run { background: var(--ink); }
-.work-dot.is-wait { background: var(--wait); }
-.work-dot.is-ok { background: var(--ok); }
-.side-checklist { margin: 4px 0 8px 14px; font-size: 12.5px; line-height: 1.4; }
+/* The mark drawn along its outline, then filled: at the start and on a change of mode. */
+.logo-draw { position: fixed; inset: 0; z-index: 50; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--bg); animation: logo-out 0.35s ease 0.7s forwards; }
+.logo-draw.is-start { animation-delay: 1.3s; }
+.logo-draw-name { font: 600 26px var(--font-ui); letter-spacing: -0.01em; opacity: 0; animation: logo-name 0.5s ease 0.6s forwards; }
+.logo-mark.is-drawn path { stroke-width: 2.4; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; fill-opacity: 0; animation: logo-line 0.6s ease-in-out forwards, logo-fill 0.3s ease 0.45s forwards; }
+.logo-mark.is-drawn path:nth-child(3) { animation-delay: 0.12s, 0.5s; }
+.logo-mark.is-drawn path:nth-child(4) { animation-delay: 0.24s, 0.55s; }
+.is-start .logo-mark.is-drawn path { animation-duration: 0.9s, 0.35s; animation-delay: 0s, 0.75s; }
+.is-start .logo-mark.is-drawn path:nth-child(3) { animation-delay: 0.15s, 0.8s; }
+.is-start .logo-mark.is-drawn path:nth-child(4) { animation-delay: 0.3s, 0.85s; }
+.logo-mark path { stroke-width: 0; }
+.logo-mark .logo-light { opacity: 0.55; }
+@keyframes logo-line { to { stroke-dashoffset: 0; } }
+@keyframes logo-fill { to { fill-opacity: 1; stroke-opacity: 0; } }
+@keyframes logo-name { to { opacity: 1; } }
+@keyframes logo-out { to { opacity: 0; visibility: hidden; } }
 
-/* The workshop fills the desk edge to edge: the header on top, the work and the result side by side under it. */
-.desk.is-workshop { padding: 0; overflow: hidden; display: block; }
-.workshop { height: 100%; display: flex; flex-direction: column; min-width: 0; background: var(--sheet); }
-.workshop-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 22px; border-bottom: 1px solid var(--line); }
-.workshop-title { display: grid; min-width: 0; max-width: 40%; }
-.workshop-title h1 { margin: 0; font: 600 20px/1.25 var(--font-serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workshop-title .mono { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workshop-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; border: 1px solid var(--line); color: var(--muted); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workshop-pill.is-run { color: var(--ink); border-color: var(--ink-soft); }
+/* The parameters: a page over the whole window, the way back on the top left, the sections on the right. */
+.shell.is-params { grid-template-columns: 1fr; }
+.params { width: 100%; max-width: 1400px; display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 0 28px; align-items: start; }
+.params-main { min-width: 0; display: grid; gap: 12px; }
+.params-main > .sheet { max-width: none; }
+.params-back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 999px; color: var(--muted); font-size: 14px; }
+.params-back:hover { color: var(--fg); background: var(--sheet); }
+.params-nav { position: sticky; top: 0; display: grid; gap: 2px; padding: 46px 0 0 14px; border-left: 1px solid var(--line); }
+.params-nav .side-link { margin: 0; }
+.params-nav .side-link.is-on { background: var(--sheet); box-shadow: 0 1px 0 var(--line); }
+@container (max-width: 880px) {
+  .params { grid-template-columns: minmax(0, 1fr); }
+  .params-nav { position: static; order: -1; padding: 0; border: 0; display: flex; flex-wrap: wrap; }
+}
+
+/* The projects in the sidebar: a card each with its state and progress, the open one's checklist under them. */
+.side-project { gap: 3px; }
+.side-project .side-item-title { font-weight: 600; }
+.side-work { color: var(--muted); }
+.side-work.is-wait { color: var(--wait); }
+.side-work.is-ok { color: var(--ok); }
+.side-bar { display: block; height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 3px; }
+.side-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-from), var(--brand-to)); transition: width 0.4s ease; }
+.side-checklist-h { margin-top: 16px; }
+.side-checklist { font-size: 13px; line-height: 1.4; gap: 7px; }
+.checklist li.is-now { font-weight: 500; }
+.checklist li.is-now .check-mark { border-color: var(--ink); box-shadow: inset 0 0 0 3px var(--ink-soft); }
+
+/* The run in the top bar: its state, time and money, Stop. */
+.workshop-bar-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.workshop-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; color: var(--muted); background: var(--sheet); border: 1px solid var(--line); max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workshop-pill-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.workshop-pill.is-run { color: var(--ink); background: var(--ink-soft); border-color: transparent; }
+.workshop-pill.is-run .workshop-pill-dot { animation: pulse 1.6s ease-in-out infinite; }
 .workshop-pill.is-wait { color: var(--wait); background: var(--wait-soft); border-color: transparent; }
 .workshop-pill.is-ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
-.workshop-progress { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
-.workshop-bar { width: 90px; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.workshop-bar > span { display: block; height: 100%; background: var(--ok); }
-.workshop-numbers { font: 12.5px var(--font-mono); color: var(--muted); }
-.workshop-numbers:hover { color: var(--fg); }
-.workshop-toggle { display: inline-flex; align-items: center; gap: 6px; }
-.workshop-toggle.is-on { background: var(--paper); box-shadow: inset 0 0 0 1px var(--ink-soft); }
-.workshop-limits { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 14px; padding: 12px 22px; border-bottom: 1px solid var(--line); background: var(--paper); }
-.workshop-limits .field { width: 160px; }
-.workshop-limits p { flex-basis: 100%; margin: 0; font-size: 12.5px; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .workshop-pill.is-run .workshop-pill-dot { animation: none; } }
+.workshop-numbers { font-size: 13px; text-decoration: none; white-space: nowrap; }
+.workshop-limits-box { position: relative; }
+.workshop-limits-pop { position: absolute; right: 0; top: calc(100% + 10px); z-index: 20; width: 320px; padding: 14px; background: var(--sheet); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sheet-shadow); }
+.workshop-limits { display: grid; gap: 10px; }
+.workshop-limits .btn { justify-self: start; }
+.workshop-limits p { margin: 0; font-size: 12.5px; }
+.btn.is-small { min-height: 28px; padding: 0 14px; font-size: 13px; }
 
-.workshop-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
-.workshop-body.has-result { grid-template-columns: minmax(0, 1fr) minmax(300px, 38%); }
+/* The workshop fills the desk edge to edge: the work, the handle, the result. */
+.desk.is-workshop { padding: 0; overflow: hidden; display: block; }
+.workshop { height: 100%; display: flex; flex-direction: column; min-width: 0; background: var(--sheet); }
+.workshop-body { flex: 1; min-height: 0; display: grid; transition: grid-template-columns 0.3s ease; }
+.workshop-body.is-dragging { transition: none; user-select: none; cursor: col-resize; }
+@media (prefers-reduced-motion: reduce) { .workshop-body { transition: none; } }
 .workshop-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: auto; }
-.workshop-pad { padding: 22px 26px; }
+.workshop-tabs { flex: none; padding: 0 18px; }
+.workshop-tabs .tabs { margin-top: 0; }
+.workshop-tabs .tab { padding: 10px 12px; font-size: 13.5px; }
+.workshop-pad { padding: 20px 24px; }
 .workshop-scroll { max-width: 900px; width: 100%; }
+.workshop-feed { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.workshop-feed[hidden] { display: none; }
 .workshop-main > .sheet.is-embedded { border: 0; box-shadow: none; border-radius: 0; max-width: none; grid-template-columns: minmax(0, 1fr); }
 
-.workshop-result { min-height: 0; overflow: auto; border-left: 1px solid var(--line); background: var(--paper); padding: 6px 18px 22px; font-size: 13.5px; }
-.workshop-result .tabs { position: sticky; top: -6px; background: var(--paper); z-index: 1; }
-.workshop-result-body { display: grid; gap: 14px; padding-top: 14px; align-content: start; }
+/* The handle: a slim strip with a small grip; drag it to set the width, to the edge to fold the panel away. */
+.workshop-split { width: 12px; position: relative; border-left: 1px solid var(--line); background: var(--paper); }
+.workshop-split.is-closed { border-left-color: var(--line); }
+.workshop-grip { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 10px; height: 44px; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: var(--sheet); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: col-resize; touch-action: none; }
+.workshop-grip span { width: 4px; height: 1.5px; border-radius: 1px; background: var(--muted); }
+.workshop-grip:hover, .workshop-grip:focus-visible { border-color: var(--ink); }
+.workshop-grip:hover span, .workshop-grip:focus-visible span { background: var(--ink); }
+.workshop-split::before { content: ""; position: absolute; inset: 0 -4px; cursor: col-resize; }
+
+.workshop-result { min-height: 0; min-width: 0; overflow: hidden auto; background: var(--sheet); font-size: 13.5px; }
+.workshop-result .workshop-tabs { position: sticky; top: 0; background: var(--sheet); z-index: 1; }
+.workshop-result-body { display: grid; gap: 14px; padding: 14px 18px 22px; align-content: start; min-width: 280px; }
 .workshop-shots { display: grid; gap: 10px; }
-.workshop-shots p { margin: 0; }
 .workshop-shot { margin: 0; display: grid; gap: 4px; }
-.workshop-shot img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
-.workshop-shot-wait { aspect-ratio: 16 / 10; border-radius: 8px; background: var(--line); }
-.workshop-shot figcaption { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workshop-shot img { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; background: var(--paper); }
+.workshop-shot-wait { aspect-ratio: 16 / 10; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); }
+.workshop-shot figcaption { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; }
+.workshop-shot figcaption span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workshop-shots-before { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.workshop-shot.is-small img { border-radius: 6px; }
 .workshop-project { display: grid; gap: 12px; align-content: start; }
 .workshop-project > .mono { margin: 0; overflow-wrap: anywhere; }
 .workshop-project > .btn { justify-self: start; }
@@ -62,21 +116,24 @@
 
 /* The run's conversation as a timeline (variant C): each message at its time, on one line down the side. */
 .workshop-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.workshop-chat-body { flex: 1; display: flex; flex-direction: column; padding: 18px 26px 0; max-width: 1000px; width: 100%; }
+.workshop-chat-body { flex: 1; display: flex; flex-direction: column; padding: 16px 22px 0; max-width: 1000px; width: 100%; }
 .timeline { gap: 0; }
-.tl-item { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 0 14px; position: relative; padding-bottom: 18px; }
-.tl-item::before { content: ""; position: absolute; left: 56px; top: 4px; bottom: 0; width: 2px; background: var(--line); }
-.tl-item::after { content: ""; position: absolute; left: 52px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--sheet); border: 2px solid var(--ink); box-sizing: border-box; }
-.tl-item:last-of-type::before { bottom: 18px; }
-.tl-time { color: var(--muted); font-size: 11.5px; text-align: right; padding-top: 2px; }
+.tl-item { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0 14px; position: relative; padding-bottom: 16px; }
+.tl-item::before { content: ""; position: absolute; left: 54px; top: 6px; bottom: -6px; width: 2px; background: var(--line); }
+.tl-item::after { content: ""; position: absolute; left: 50px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--sheet); border: 2px solid var(--ink); box-sizing: border-box; }
+.tl-item.is-done::after { background: var(--ok); border-color: var(--ok); }
+.tl-item:has(+ div:not(.tl-item))::before { bottom: 0; }
+.tl-time { color: var(--muted); font-size: 11.5px; text-align: right; padding-top: 1px; }
 .tl-item > :last-child { padding-left: 16px; min-width: 0; }
+.tl-item .msg-who, .tl-item .msg-meta { display: none; }
 .tl-item > .msg-user-wrap { justify-self: start; max-width: 100%; justify-items: start; }
-.tl-item > .msg-user-wrap > .msg-user { justify-self: start; }
-.work-questions-note { margin: 4px 0 12px; }
-.workshop-chat .composer { margin: 0 -26px; padding-left: 26px; padding-right: 26px; }
+.tl-item > .msg-user-wrap > .msg-user, .tl-item > .msg-user { justify-self: start; }
+.work-questions-note { margin: 0 0 10px; padding: 9px 12px; border-left: 3px solid var(--wait); background: var(--wait-soft); border-radius: 0 10px 10px 0; display: grid; gap: 2px; font-size: 13.5px; }
+.work-questions-note p { margin: 0; }
+.work-question { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.work-question p { margin: 0; }
+.workshop-chat .composer { margin: 0 -22px; padding-left: 22px; padding-right: 22px; }
 
 @container (max-width: 880px) {
-  .workshop-body.has-result { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 45%); }
-  .workshop-result { border-left: 0; border-top: 1px solid var(--line); }
-  .workshop-title { max-width: 100%; }
+  .workshop-result-body { min-width: 0; }
 }

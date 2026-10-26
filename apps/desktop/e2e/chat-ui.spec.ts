@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider, type FakeChunk, type FakeTurn } from "../../../packages/core/test/fake-provider";
+import { newChat, openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -28,8 +29,8 @@ async function launch(chunks: FakeChunk[], delayMs = 0, script?: FakeTurn[]): Pr
   fake = await startFakeProvider({ key: KEY, models, chunks, delayMs, ...(script ? { script } : {}) });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_SAVE_PDF: join(userData, "chat.pdf") } });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await expect(paramsButton(page)).toBeVisible();
+  await openSection(page, "Ключи и модели");
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Название").fill("Тестовый");
   await page.getByLabel("Адрес API").fill(fake.baseUrl);
@@ -40,7 +41,7 @@ async function launch(chunks: FakeChunk[], delayMs = 0, script?: FakeTurn[]): Pr
 }
 
 async function ask(page: Page, text: string) {
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   const picker = page.getByRole("button", { name: "Выбери модель" });
   if (await picker.isVisible()) {
     await picker.click();
@@ -165,8 +166,9 @@ test("an answer still being written shows how far it got after coming back, and 
   const page = await launch(Array.from({ length: 80 }, (_, i) => ({ text: `часть ${i} ` })), 150);
   await ask(page, "Пиши долго");
   await expect(page.locator(".msg-assistant .md")).toContainText("часть 0", { timeout: 10_000 });
-  await page.getByRole("button", { name: "Настройки" }).first().click();
-  await page.locator(".side-chat", { hasText: "Пиши долго" }).click();
+  await openSection(page, "Настройки");
+  // Back from the parameters to the chat, which reopens.
+  await page.getByRole("button", { name: "Назад" }).click();
   // Under way: "answering" shows only until the window follows the answer live, then the words go on with a caret.
   await expect(page.getByRole("button", { name: "Стоп" })).toBeVisible({ timeout: 5_000 });
   await expect(page.getByText(/Ролик/)).toHaveCount(0);
@@ -235,7 +237,7 @@ test("links in an answer stand out, and a popular site's carries its mark", asyn
 // Seen: a 4.5 MB photo came back as "too heavy" from the provider.
 test("a big photo is made smaller before it goes", async () => {
   const page = await launch([{ text: "Вижу фото." }]);
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Fake Model/ }).click();
   // A 4000×3000 picture of noise: about 5 MB as PNG.
@@ -278,11 +280,11 @@ test("a big photo is made smaller before it goes", async () => {
 // Seen live: left to itself, a model thought for minutes and wrote nothing; the user can now say how much it thinks.
 test("the thinking switch goes with the question, and an answer of thoughts only says so", async () => {
   const page = await launch([{ reasoning: "Думаю…" }]);
-  await page.getByRole("button", { name: "+ Новый чат" }).click();
+  await newChat(page);
   await page.getByRole("button", { name: "Выбери модель" }).click();
   await page.getByRole("option", { name: /Fake Model/ }).click();
   // Internet, thinking and the folder wait behind one button; what differs from the usual shows on it.
-  await page.getByRole("button", { name: "Параметры", exact: true }).click();
+  await page.locator(".composer").getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByRole("button", { name: "Мышление: авто" }).click();
   await page.getByRole("option", { name: /без/ }).click();
   await page.keyboard.press("Escape");

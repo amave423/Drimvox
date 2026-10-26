@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "../../../packages/core/test/fake-provider";
 import { git, makeRepo } from "../../../packages/core/test/git-repo";
+import { openSection, paramsButton } from "./sections";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -68,9 +69,9 @@ async function launch(): Promise<Page> {
   fake = await startFakeProvider({ key: KEY, models, respond: team() });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo } });
   const page = await app.firstWindow();
-  await expect(page.getByRole("button", { name: "Ключи и модели" }).first()).toBeVisible();
+  await expect(paramsButton(page)).toBeVisible();
 
-  await page.getByRole("button", { name: "Ключи и модели" }).click();
+  await openSection(page, "Ключи и модели");
   await page.getByRole("radio", { name: /OpenAI-совместимый/ }).click();
   await page.getByLabel("Адрес API").fill(fake.baseUrl);
   await page.getByLabel("Ключ API, если нужен").fill(KEY);
@@ -83,7 +84,7 @@ test("a team: plan review with a removed subtask, the board, a subtask sheet, on
   const page = await launch();
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await page.getByRole("button", { name: "+ Проект" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/drimvox-repo-/);
+  await expect(page.locator(".topbar .crumb")).toHaveText(/drimvox-repo-/);
   await startTask(page, {
     task: "Добавь модули sub и mul",
     model: "lead",

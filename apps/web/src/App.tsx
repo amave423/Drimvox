@@ -1,7 +1,7 @@
 import type { MonthUsage, ChatView, ProjectView, ProjectWorkView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@drimvox/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ok, type Api } from "./api";
-import { AppContext, type AppContextValue, type CoreStatus, type View } from "./context";
+import { AppContext, inParams, modeOf, type AppContextValue, type CoreStatus, type Mode, type View } from "./context";
 import { translate } from "./i18n";
 import { formatUsd, setDisplayCurrency, startOfToday } from "./lib/format";
 import { noticesFor } from "./lib/notices";
@@ -20,6 +20,8 @@ import { preloadModels } from "./lib/models";
 import { DownloadNote } from "./ui/DownloadNote";
 import { UpdateNote } from "./ui/UpdateNote";
 import { Sidebar } from "./ui/Sidebar";
+import { ParamsPage } from "./ui/ParamsPage";
+import { LogoDraw } from "./ui/LogoDraw";
 import { TopBar } from "./ui/TopBar";
 
 interface Props {
@@ -44,6 +46,21 @@ export function App({ api, token, initialSettings, status }: Props) {
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [usdRub, setUsdRub] = useState(0);
   const systemDark = useSystemDark();
+  // The mode follows the screen; the parameters keep the one they were opened from, and go back to where the user was.
+  const [lastMode, setLastMode] = useState<Mode>("chat");
+  const ownMode = modeOf(view, chats);
+  const mode = ownMode ?? lastMode;
+  useEffect(() => {
+    if (ownMode) setLastMode(ownMode);
+  }, [ownMode]);
+  useEffect(() => {
+    document.documentElement.dataset.mode = mode;
+  }, [mode]);
+  const lastMain = useRef<View>({ kind: "home" });
+  useEffect(() => {
+    if (!inParams(view)) lastMain.current = view;
+  }, [view]);
+  const leaveParams = useCallback(() => setView(lastMain.current), []);
 
   useEffect(() => {
     void api.rates
@@ -199,6 +216,8 @@ export function App({ api, token, initialSettings, status }: Props) {
       reloadTasks,
       works,
       reloadWorks,
+      mode,
+      leaveParams,
     }),
     [
       api,
@@ -220,21 +239,28 @@ export function App({ api, token, initialSettings, status }: Props) {
       reloadTasks,
       works,
       reloadWorks,
+      mode,
+      leaveParams,
     ],
   );
 
   return (
     <AppContext.Provider value={value}>
-      <div className="shell">
+      <div className={`shell${inParams(view) ? " is-params" : ""}`}>
         <TopBar />
-        <Sidebar />
+        {!inParams(view) && <Sidebar />}
+        <LogoDraw mode={mode} />
         <main className={`desk${view.kind === "project" || view.kind === "projects" ? " is-workshop" : ""}`}>
           {view.kind === "home" && <HomeSheet />}
-          {view.kind === "settings" && <SettingsSheet />}
-          {view.kind === "providers" && <ProvidersSheet />}
-          {view.kind === "local" && <LocalModelsSheet part={view.part} />}
-          {view.kind === "gallery" && <GallerySheet />}
-          {view.kind === "guide" && <GuideSheet />}
+          {inParams(view) && (
+            <ParamsPage>
+              {view.kind === "settings" && <SettingsSheet />}
+              {view.kind === "providers" && <ProvidersSheet />}
+              {view.kind === "local" && <LocalModelsSheet part={view.part} />}
+              {view.kind === "gallery" && <GallerySheet />}
+              {view.kind === "guide" && <GuideSheet />}
+            </ParamsPage>
+          )}
           {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} autoSend={view.send} />}
           {view.kind === "project" && <Workshop key={view.projectId} projectId={view.projectId} />}
           {view.kind === "projects" && <ProjectsStart />}

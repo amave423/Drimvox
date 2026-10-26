@@ -44,7 +44,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .topbar-title { display: flex; align-items: baseline; gap: 18px; min-width: 0; }
 .logo { display: inline-flex; align-items: center; gap: 8px; font: 600 18px var(--font-ui); letter-spacing: -0.01em; }
 .logo-name { align-self: baseline; }
-.logo img { display: block; }
+.logo svg { display: block; align-self: center; }
 .crumb { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-link { padding: 5px 12px; border-radius: 999px; color: var(--muted); }
 .topbar-link:hover { color: var(--fg); }
@@ -63,16 +63,12 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 }
 .side > * { flex: none; }
 /* The list reaches 8px past the column for its highlight: room for it inside the scroller, or a sideways scrollbar appears. */
-.side .side-projects { max-height: 30%; overflow-y: auto; overflow-x: hidden; margin-inline: -8px; padding-inline: 8px; }
+.side .side-projects { flex: 1 1 0; min-height: 0; align-content: start; overflow-y: auto; overflow-x: hidden; margin-inline: -8px; padding-inline: 8px; }
 .side .side-chats-group { flex: 1 1 0; min-height: 96px; display: flex; flex-direction: column; }
 .side .side-chats { overflow-y: auto; overflow-x: hidden; min-height: 0; flex: 1 1 auto; align-content: start; }
 .side-h { margin: 0 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); }
 .side-empty { margin: 0; font-size: 14px; color: var(--muted); }
 .side-nav { margin-top: auto; display: grid; gap: 2px; border-top: 1px solid var(--line); padding-top: 10px; }
-.side-nav-items { display: grid; gap: 2px; }
-.side-sections { color: var(--muted); }
-.side-sections-arrow { margin-left: auto; font-size: 11px; transition: transform 120ms; }
-.side-sections[aria-expanded="false"] .side-sections-arrow { transform: rotate(-90deg); }
 .side-link { margin: 0 -8px; display: flex; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 8px; font-size: 14px; text-align: left; }
 .side-icon { flex: none; color: var(--muted); }
 .side-link.is-on .side-icon, .side-link:hover .side-icon { color: var(--fg); }
