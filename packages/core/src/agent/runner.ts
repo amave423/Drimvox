@@ -133,8 +133,9 @@ export class AgentRunner {
       answers,
       more ? { kind: "round", round: row.interview_round + 1 } : { kind: planning ? "plan" : "spec", why: enough ? "enough" : "rounds" },
     );
-    // A style sample is looked at first, inside the task's turn: it can be stopped like the rest.
-    this.launch(id, reference ? async (ctx) => `${await describeReference(ctx, id, reference)}\n\n${message}` : message);
+    // A style sample is looked at first, inside the task's turn: it can be stopped like the rest. The message is Drimvox's
+    // to the model; the feed shows the answers themselves (seen: "Now interview round 2…" in English in the feed).
+    this.launch(id, reference ? async (ctx) => `${await describeReference(ctx, id, reference)}\n\n${message}` : message, true);
     return this.view(id)!;
   }
 

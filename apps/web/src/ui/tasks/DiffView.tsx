@@ -18,43 +18,73 @@ interface Props {
   comments: LineComment[];
   /** Absent when the review is closed: lines are then read-only. */
   onComment?(comment: LineComment): void;
+  /** Files listed folded, each opened on its own (asked for: a whole project's changes open at once weighed the app down). */
+  folded?: boolean;
 }
 
 /** The agent's changes as proofreading: removed text struck in red pencil, added text in ink. */
-export function DiffView({ taskId, files, comments, onComment }: Props) {
-  const { t } = useApp();
+export function DiffView({ taskId, files, comments, onComment, folded }: Props) {
   return (
     <div className="diff">
       {files.map((file) => (
-        <section key={file.path} className="diff-file">
-          <header className="diff-head">
-            <span className="mono">{file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}</span>
-            <span className="mono diff-count">
-              <span className="is-ink">+{file.added}</span> <span className="is-pencil-text">−{file.removed}</span>
-            </span>
-          </header>
-          {taskId && file.binary && IMAGE.test(file.path) && file.status !== "deleted" ? (
-            <DiffImage taskId={taskId} path={file.path} />
-          ) : file.binary ? (
-            <p className="muted diff-binary">{t("review.binary")}</p>
-          ) : (
-            file.hunks.map((hunk, h) => (
-              <div key={h} className="diff-hunk">
-                {hunk.lines.map((line, i) => (
-                  <Line
-                    key={i}
-                    path={file.path}
-                    line={line}
-                    comments={comments.filter((c) => c.path === file.path && c.side === sideOf(line) && c.line === lineNumber(line))}
-                    onComment={onComment}
-                  />
-                ))}
-              </div>
-            ))
-          )}
-        </section>
+        <DiffFileView key={file.path} taskId={taskId} file={file} comments={comments} onComment={onComment} folded={!!folded} />
       ))}
     </div>
+  );
+}
+
+/** One file's changes; folded, only its name and counts, its lines drawn once it is opened. */
+function DiffFileView({ taskId, file, comments, onComment, folded }: Omit<Props, "files" | "folded"> & { file: DiffFile; folded: boolean }) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(!folded);
+  const name = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+  const counts = (
+    <span className="mono diff-count">
+      <span className="is-ink">+{file.added}</span> <span className="is-pencil-text">−{file.removed}</span>
+    </span>
+  );
+  return (
+    <section className={`diff-file${folded && !open ? " is-folded" : ""}`}>
+      {folded ? (
+        <button
+          type="button"
+          className="diff-head diff-toggle"
+          aria-expanded={open}
+          aria-label={t(open ? "diff.hide" : "diff.show", { path: file.path })}
+          onClick={() => setOpen(!open)}
+        >
+          <span className="diff-caret" aria-hidden>
+            {open ? "▾" : "▸"}
+          </span>
+          <span className="mono">{name}</span>
+          {counts}
+        </button>
+      ) : (
+        <header className="diff-head">
+          <span className="mono">{name}</span>
+          {counts}
+        </header>
+      )}
+      {!open ? null : taskId && file.binary && IMAGE.test(file.path) && file.status !== "deleted" ? (
+        <DiffImage taskId={taskId} path={file.path} />
+      ) : file.binary ? (
+        <p className="muted diff-binary">{t("review.binary")}</p>
+      ) : (
+        file.hunks.map((hunk, h) => (
+          <div key={h} className="diff-hunk">
+            {hunk.lines.map((line, i) => (
+              <Line
+                key={i}
+                path={file.path}
+                line={line}
+                comments={comments.filter((c) => c.path === file.path && c.side === sideOf(line) && c.line === lineNumber(line))}
+                onComment={onComment}
+              />
+            ))}
+          </div>
+        ))
+      )}
+    </section>
   );
 }
 

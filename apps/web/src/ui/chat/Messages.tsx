@@ -11,6 +11,7 @@ import { ErrorNote } from "../ErrorNote";
 import { Markdown } from "./Markdown";
 import { MediaView } from "./MediaView";
 import { ZoomableImage } from "../Lightbox";
+import { AuthImage, ShotGallery, useShots } from "../ShotGallery";
 import { useAuthorizedUrl } from "../../lib/media";
 import { Reasoning } from "./Reasoning";
 
@@ -322,9 +323,18 @@ function ActionGroup({ actions, open }: { actions: AnswerAction[]; open: boolean
   );
 }
 
-/** A screenshot comes from the core with the token, which an <img> cannot send. */
+/** A screenshot; a click opens it among all of the conversation's, to go through them with the arrows. */
 function ShotImage({ url }: { url: string }) {
-  const { t, token } = useApp();
-  const src = useAuthorizedUrl(url, token);
-  return src ? <ZoomableImage className="msg-shot" src={src} alt={t("msg.screenshot")} /> : <span className="msg-shot is-empty" aria-hidden />;
+  const { t } = useApp();
+  const all = useShots();
+  const [open, setOpen] = useState<number | null>(null);
+  const shots = all.some((s) => s.url === url) ? all : [{ url }];
+  return (
+    <>
+      <button type="button" className="zoomable" aria-label={t("viewer.open", { name: t("msg.screenshot") })} onClick={() => setOpen(shots.findIndex((s) => s.url === url))}>
+        <AuthImage className="msg-shot" url={url} alt={t("msg.screenshot")} />
+      </button>
+      {open !== null && <ShotGallery shots={shots} start={open} onClose={() => setOpen(null)} />}
+    </>
+  );
 }

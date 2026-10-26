@@ -58,3 +58,23 @@
 .gallery-empty { display: grid; gap: 14px; justify-items: start; margin-top: 4px; }
 .gallery-empty-frames { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: min(100%, 480px); }
 .gallery-empty-frames span { aspect-ratio: 4 / 3; border: 1.5px dashed var(--line); border-radius: 12px; background: var(--paper); }
+
+/* Screenshots one at a time over the window (ui/ShotGallery.tsx): the count and the page on top, arrows at the sides, a
+   strip below. A whole-page screenshot keeps its own width and scrolls in its frame. */
+.shot-gallery { position: fixed; inset: 0; z-index: 100; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; padding: calc(var(--topbar-h) + 8px) 16px 16px; background: var(--overlay); color: var(--on-overlay); animation: fade-in 160ms ease-out backwards; }
+.shot-gallery-top { display: flex; align-items: center; gap: 14px; min-width: 0; font-size: 14px; }
+.shot-gallery-caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; font-size: 12.5px; }
+.shot-gallery-close { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 999px; color: var(--on-overlay); background: var(--overlay-soft); }
+.shot-gallery-close svg { width: 18px; height: 18px; }
+.shot-gallery-stage { min-height: 0; display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; gap: 8px; }
+.shot-gallery-frame { height: 100%; min-height: 0; overflow: auto; display: flex; justify-content: center; align-items: flex-start; border-radius: 10px; }
+.shot-gallery-frame img { display: block; max-width: 100%; height: auto; border-radius: 8px; box-shadow: var(--sheet-shadow); }
+.shot-gallery-arrow { width: 44px; height: 44px; border-radius: 999px; font-size: 28px; line-height: 1; color: var(--on-overlay); background: var(--overlay-soft); }
+.shot-gallery-arrow:hover:not(:disabled) { background: var(--overlay); }
+.shot-gallery-arrow:disabled { opacity: 0.3; cursor: default; }
+.shot-strip { position: relative; display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px; scrollbar-width: thin; }
+.shot-thumb { flex: none; width: 72px; height: 48px; padding: 0; border-radius: 6px; overflow: hidden; border: 2px solid transparent; opacity: 0.65; background: var(--paper); }
+.shot-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.shot-thumb.is-on { border-color: var(--ink); opacity: 1; }
+.shot-thumb:hover { opacity: 1; }
+.shot-gallery .shot-strip { justify-content: center; }

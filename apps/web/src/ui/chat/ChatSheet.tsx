@@ -36,6 +36,7 @@ import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
 import { useLiveAnswer } from "./useLiveAnswer";
 import { useProjectWork } from "../projects/useProjectWork";
+import { ShotsContext, type Shot } from "../ShotGallery";
 
 interface Draft {
   user: string;
@@ -183,6 +184,14 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
         : [{ line: activityLine(t, a.name, a.input), at: a.at }],
     );
   const { work, reload: reloadWork } = useProjectWork(projectId);
+  // Every screenshot of the run in order, so one opened goes on to the others; captioned with its page.
+  const shots: Shot[] = projectId
+    ? (chat?.messages ?? []).flatMap((m) =>
+        (live?.messageId === m.id ? live.activity : m.activity)
+          .filter((a) => a.name === "screenshot")
+          .map((a) => ({ url: `/api/projects/${projectId}/work/shots/${a.input}`, caption: work?.shots.find((s) => s.id === a.input)?.url })),
+      )
+    : [];
   const running = work?.status === "running";
   useEffect(() => {
     if (!running || !chat) return;
@@ -419,6 +428,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
 
         {empty && !workshop && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
 
+        <ShotsContext.Provider value={shots}>
         <div className={`messages${workshop ? " timeline" : ""}`} ref={list}>
           {(cutAt !== null ? messages.slice(0, cutAt) : messages).map((m) => at(m.id, m.createdAt,
             m.role === "user" ? (
@@ -468,6 +478,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
           )}
           <div ref={end} />
         </div>
+        </ShotsContext.Provider>
 
         {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
         {monthRefusal && <p className="error-note">{t("chat.monthBudget", { spent: formatUsd(monthRefusal.spent), budget: formatUsd(monthRefusal.budget) })}</p>}

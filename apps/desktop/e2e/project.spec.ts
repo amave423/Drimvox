@@ -1,5 +1,7 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -38,12 +40,13 @@ test.afterEach(async () => {
 
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
 
-async function launch(script: FakeTurn[]): Promise<Page> {
+async function launch(script: FakeTurn[], sees = false): Promise<Page> {
   const queue = [...script];
   fake = await startFakeProvider({
     key: KEY,
-    models: [{ id: "coder", name: "Coder", supported_parameters: ["tools"] }],
-    respond: () => queue.shift() ?? { text: "Готово." },
+    models: [{ id: "coder", name: "Coder", supported_parameters: ["tools"], ...(sees ? { architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } } : {}) }],
+    // A model that sees answers the look at a screenshot itself; the rest follows the script.
+    respond: (body) => (sees && JSON.stringify(body.messages).includes("data:image/png;base64,") && !body.tools ? { text: "Да, видно." } : (queue.shift() ?? { text: "Готово." })),
   });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_PICK_FOLDER: repo } });
   const page = await app.firstWindow();
@@ -155,4 +158,75 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   // Nothing to accept, and git stays the user's.
   expect(execFileSync("git", ["log", "--oneline"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);
   expect(fake!.requests.some((r) => JSON.stringify(r.body?.messages ?? []).includes("Сделай заголовок крупнее"))).toBe(true);
+});
+
+// Asked for: many screenshots are gone through with a switch, not opened and closed one by one; the result panel shows
+// one at a time in a frame; the folder's changes are listed folded, each file opened on its own.
+test("a run's screenshots: a switch in the timeline and in the result panel; changes folded by file", async () => {
+  // Two real looks at a page, each loading it afresh.
+  test.setTimeout(90_000);
+  const site = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(`<body style="margin:0"><h1>${req.url === "/b" ? "Вторая" : "Первая"}</h1><div style="height:2400px"></div></body>`);
+  });
+  await new Promise<void>((done) => site.listen(0, "127.0.0.1", done));
+  const port = (site.address() as AddressInfo).port;
+  try {
+    const page = await launch(
+      [
+        call("ask_questions", { questions: [], understood: "Сайт", unknown: [] }),
+        call("write_plan", { summary: "Две страницы.", steps: ["Страницы"], checks: [], pages: [] }),
+        call("write_file", { path: "index.html", content: "<h1>Первая</h1>\n" }),
+        call("look_at_page", { url: `http://localhost:${port}/a`, question: "Видна первая?" }),
+        call("look_at_page", { url: `http://localhost:${port}/b`, question: "Видна вторая?" }),
+        call("update_checklist", { items: [{ text: "Страницы", done: true }] }),
+        call("finish_work", { report: "Готово." }),
+        { text: "Готово." },
+      ],
+      true,
+    );
+    await page.getByRole("button", { name: "Проекты", exact: true }).click();
+    await page.getByRole("button", { name: "+ Проект" }).click();
+    await page.getByLabel("Что сделать?").fill("Две страницы");
+    await page.getByRole("group", { name: "Модели" }).getByRole("button", { name: "Выбери модель" }).first().click();
+    await page.getByRole("option", { name: /Coder/ }).click();
+    await page.getByRole("button", { name: "Начать опрос" }).click();
+    await page.getByRole("region", { name: "Итоговый план" }).getByRole("button", { name: "Начать работу" }).click({ timeout: 30_000 });
+    await expect(page.locator(".topbar").getByRole("status")).toContainText("Готово", { timeout: 30_000 });
+
+    // The timeline: a screenshot opens over the window, the arrows go to the next one.
+    await page.locator(".timeline .msg-shot").first().click();
+    const gallery = page.getByRole("dialog", { name: "Скриншоты" });
+    await expect(gallery).toContainText("1 из 2");
+    await expect(gallery).toContainText(`localhost:${port}/a`);
+    await page.keyboard.press("ArrowRight");
+    await expect(gallery).toContainText("2 из 2");
+    await expect(gallery).toContainText(`localhost:${port}/b`);
+    await gallery.getByRole("tab", { name: "1 из 2" }).click();
+    await expect(gallery).toContainText("1 из 2");
+    await page.keyboard.press("Escape");
+    await expect(gallery).toHaveCount(0);
+
+    // The result panel: the newest one in a frame of a fixed height, the switch under it.
+    const result = page.getByRole("complementary", { name: "Результат" });
+    const stage = result.getByRole("region", { name: "Как агент видел страницу в последний раз" });
+    await expect(stage).toContainText("2 из 2");
+    const frame = await stage.locator(".shot-stage-frame").boundingBox();
+    expect(frame!.height).toBeLessThan(560);
+    await stage.getByRole("button", { name: "Предыдущий скриншот" }).click();
+    await expect(stage).toContainText("1 из 2");
+    await expect(stage).toContainText(`localhost:${port}/a`);
+
+    // The changes: each file folded until opened.
+    await result.getByRole("tab", { name: "Изменения" }).click();
+    const file = result.getByRole("button", { name: "Показать изменения в index.html" });
+    await expect(file).toHaveAttribute("aria-expanded", "false");
+    await expect(result.locator(".diff-hunk")).toHaveCount(0);
+    await file.click();
+    await expect(result.locator(".diff-hunk")).toContainText("Первая");
+  } finally {
+    // The window keeps its connections to the page open: they are cut, or closing waits for them.
+    site.closeAllConnections();
+    await new Promise((done) => site.close(done));
+  }
 });

@@ -59,6 +59,7 @@
 .side-bar { display: block; height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 3px; }
 .side-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-from), var(--brand-to)); transition: width 0.4s ease; }
 .side-checklist-h { margin-top: 16px; }
+.side, .side .side-projects, .checklist li { position: relative; }
 .side-checklist { font-size: 13px; line-height: 1.4; gap: 7px; }
 .checklist li.is-now { font-weight: 500; }
 .checklist li.is-now .check-mark { border-color: var(--ink); box-shadow: inset 0 0 0 3px var(--ink-soft); }
@@ -109,14 +110,6 @@
 .workshop-result { min-height: 0; min-width: 0; overflow: hidden auto; background: var(--sheet); font-size: 13.5px; }
 .workshop-result .workshop-tabs { position: sticky; top: 0; background: var(--sheet); z-index: 1; }
 .workshop-result-body { display: grid; gap: 14px; padding: 14px 18px 22px; align-content: start; min-width: 280px; }
-.workshop-shots { display: grid; gap: 10px; }
-.workshop-shot { margin: 0; display: grid; gap: 4px; }
-.workshop-shot img { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: block; background: var(--paper); }
-.workshop-shot-wait { aspect-ratio: 16 / 10; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); }
-.workshop-shot figcaption { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; }
-.workshop-shot figcaption span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workshop-shots-before { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.workshop-shot.is-small img { border-radius: 6px; }
 .workshop-project { display: grid; gap: 12px; align-content: start; }
 .workshop-project > .mono { margin: 0; overflow-wrap: anywhere; }
 .workshop-project > .btn { justify-self: start; }
@@ -152,3 +145,21 @@
 @container (max-width: 880px) {
   .workshop-result-body { min-width: 0; }
 }
+
+/* The result's screenshots: one in a frame of a fixed height, scrolled inside, with the switch under it. */
+.shot-stage { display: grid; gap: 8px; }
+.shot-stage-frame { display: flex; justify-content: center; align-items: flex-start; height: min(52vh, 520px); overflow: auto; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); cursor: zoom-in; }
+.shot-stage-frame img { display: block; max-width: 100%; height: auto; }
+.shot-stage-frame .is-empty { width: 100%; height: 100%; }
+.shot-stage-bar { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; }
+.shot-stage-bar .icon-button { width: 28px; height: 28px; font-size: 20px; line-height: 1; }
+.shot-stage-bar .icon-button:disabled { opacity: 0.35; }
+.shot-stage-count { white-space: nowrap; }
+.shot-stage-caption { flex: 1; min-width: 0; margin-left: 6px; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The folder's changes, each file folded until opened. */
+.diff-toggle { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer; }
+.diff-toggle .mono:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.diff-toggle:hover { color: var(--fg); }
+.diff-caret { width: 12px; flex: none; }
+.diff-file.is-folded .diff-head { border-bottom: 0; }

@@ -123,7 +123,8 @@ export function TaskSheet({ taskId, embedded }: { taskId: string; embedded?: boo
         )}
       </div>
 
-      <aside className="margin" hidden={embedded}>
+      {/* Inside the workshop the spending and the branch are in its own bars. */}
+      {!embedded && <aside className="margin">
         <p className="note">
           {task.costUsd === 0 && task.steps > 0
             ? t("task.free")
@@ -156,7 +157,7 @@ export function TaskSheet({ taskId, embedded }: { taskId: string; embedded?: boo
             ))}
           </div>
         )}
-      </aside>
+      </aside>}
     </article>
   );
 }

@@ -1,6 +1,9 @@
 /* Layout and components. Colors come only from tokens.css. */
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+/* The window never scrolls as a whole: its columns scroll on their own (seen: a hidden label under a long checklist made
+   the whole window scroll, and following the run's timeline slid everything up). */
+html:not(.is-notice), html:not(.is-notice) body { overflow: hidden; }
 body {
   background: var(--bg);
   color: var(--fg);

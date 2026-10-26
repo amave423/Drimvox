@@ -1,9 +1,9 @@
 import type { ProjectView, ProjectWorkView, WorkShot } from "@drimvox/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
-import { useAuthorizedUrl } from "../../lib/media";
 import { ProjectSkills } from "../SkillsSection";
+import { AuthImage, ShotGallery, ShotStrip, useShotIndex, type Shot } from "../ShotGallery";
 import { Tabs } from "../Tabs";
 import { StatusChip } from "../tasks/StatusDot";
 import { GithubPublish } from "./GithubPublish";
@@ -34,41 +34,61 @@ export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView 
   );
 }
 
-/** The agent's newest look at the page, large as a preview; the ones before it small; then the result and the report. */
+/** The agent's looks at the pages, one at a time in a frame (the newest first shown), then the result and the report. */
 function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
   const { t } = useApp();
-  const [latest, ...before] = [...work.shots].reverse().slice(0, 4);
   return (
     <>
       {work.escalated && <p className="muted">{t("projectWork.escalated")}</p>}
-      {latest && (
-        <section className="workshop-shots" aria-label={t("workshop.lastLook")}>
-          <Shot projectId={work.projectId} shot={latest} />
-          {before.length > 0 && (
-            <div className="workshop-shots-before">
-              {before.map((s) => (
-                <Shot key={s.id} projectId={work.projectId} shot={s} small />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
+      {work.shots.length > 0 && <ShotStage key={work.projectId} projectId={work.projectId} shots={work.shots} />}
       <RunTab work={work} onChanged={onChanged} />
     </>
   );
 }
 
-function Shot({ projectId, shot, small }: { projectId: string; shot: WorkShot; small?: boolean }) {
-  const { t, token, settings } = useApp();
-  const src = useAuthorizedUrl(`/api/projects/${projectId}/work/shots/${shot.id}`, token);
+/**
+ * One screenshot in a frame of a fixed height (seen: whole-page phone screenshots ran far down and over each other),
+ * shown at its own width and scrolled inside; arrows, the count and a strip go between them (asked for), and a click
+ * opens them over the window. A new one shows up by itself while the newest is being looked at.
+ */
+function ShotStage({ projectId, shots }: { projectId: string; shots: WorkShot[] }) {
+  const { t, settings } = useApp();
+  const list: Shot[] = shots.map((s) => ({
+    url: `/api/projects/${projectId}/work/shots/${s.id}`,
+    caption: `${s.url} · ${new Date(s.at).toLocaleTimeString(settings.locale, { hour: "2-digit", minute: "2-digit" })}`,
+  }));
+  const nav = useShotIndex(list.length, list.length - 1);
+  const [following, setFollowing] = useState(true);
+  useEffect(() => {
+    if (following) nav.set(list.length - 1);
+  }, [list.length, following]);
+  const [open, setOpen] = useState(false);
+  const shot = list[nav.index];
+  if (!shot) return null;
+  const go = (i: number) => {
+    nav.set(i);
+    setFollowing(i === list.length - 1);
+  };
   return (
-    <figure className={`workshop-shot${small ? " is-small" : ""}`}>
-      {src ? <img src={src} alt={shot.url} /> : <div className="workshop-shot-wait" />}
-      <figcaption className="mono muted">
-        <span>{shot.url}</span>
-        {!small && <span>{t("workshop.shotAt", { time: new Date(shot.at).toLocaleTimeString(settings.locale, { hour: "2-digit", minute: "2-digit" }) })}</span>}
-      </figcaption>
-    </figure>
+    <section className="shot-stage" aria-label={t("workshop.lastLook")}>
+      <button type="button" className="shot-stage-frame" aria-label={t("viewer.open", { name: shot.caption ?? "" })} onClick={() => setOpen(true)} key={shot.url}>
+        <AuthImage url={shot.url} alt={shot.caption ?? t("msg.screenshot")} />
+      </button>
+      <div className="shot-stage-bar">
+        <button type="button" className="icon-button" aria-label={t("shots.prev")} disabled={nav.index === 0} onClick={() => go(nav.index - 1)}>
+          ‹
+        </button>
+        <span className="shot-stage-count">{t("shots.count", { n: nav.index + 1, total: list.length })}</span>
+        <button type="button" className="icon-button" aria-label={t("shots.next")} disabled={nav.index === list.length - 1} onClick={() => go(nav.index + 1)}>
+          ›
+        </button>
+        <span className="shot-stage-caption mono muted" title={shot.caption}>
+          {shot.caption}
+        </span>
+      </div>
+      {list.length > 1 && <ShotStrip shots={list} index={nav.index} onPick={go} />}
+      {open && <ShotGallery shots={list} start={nav.index} onClose={() => setOpen(false)} />}
+    </section>
   );
 }
 

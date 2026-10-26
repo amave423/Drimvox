@@ -48,7 +48,7 @@ export function ChangesTab({ work }: { work: ProjectWorkView }) {
       <p className="muted">
         {files.length ? t("projectWork.changesCount", { n: files.length }) : t("projectWork.changesNone")} {t("projectWork.changesHint")}
       </p>
-      {files.length > 0 && <DiffView files={files} comments={[]} />}
+      {files.length > 0 && <DiffView files={files} comments={[]} folded />}
     </section>
   );
 }

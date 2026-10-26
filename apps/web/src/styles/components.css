@@ -1,6 +1,7 @@
 /* Shared controls: buttons, links, fields, notes. */
 .muted { color: var(--muted); }
 .is-ok { color: var(--ok); }
+/* Its own box stays put: it is placed in the nearest positioned box, and the side's lists are such boxes. */
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 a { color: var(--ink); }
 
