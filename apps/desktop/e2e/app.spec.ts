@@ -117,10 +117,16 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   const word = cards.filter({ hasText: "Документы Word" });
   await word.getByRole("switch").click({ force: true });
   await expect(word.getByRole("switch")).toBeChecked();
-  await expect(page.locator(".skill-list li", { hasText: "docx" })).toContainText("Word document");
+  // A ready skill lives on its card, not in the list of skills added by hand; the card can delete it at once.
+  await expect(page.locator(".skill-list li", { hasText: "docx" })).toHaveCount(0);
   await word.getByRole("switch").click({ force: true });
   await expect(word.getByRole("switch")).not.toBeChecked();
   await expect(page.getByText("Общих скиллов пока нет.")).toBeVisible();
+  await word.getByRole("switch").click({ force: true });
+  await expect(word.getByRole("switch")).toBeChecked();
+  await word.getByRole("button", { name: "Удалить «Документы Word»" }).click();
+  await expect(word.getByRole("switch")).not.toBeChecked();
+  await expect(word.getByRole("button", { name: /^Удалить/ })).toHaveCount(0);
 
   // The details show what using it looks like.
   await page.getByRole("tab", { name: "Серверы MCP" }).click();

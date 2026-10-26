@@ -20,7 +20,7 @@ export function workTools(h: WorkToolHooks): ToolSet {
   return {
     update_checklist: tool({
       description:
-        "Replace your checklist of the work with its new state: every item, short (a few words), with done marked. The user sees it next to the conversation. Mark items done as soon as they are, add items you discover, keep it under 30.",
+        "Replace your checklist of the work with its new state: every item, short (a few words), with done marked. The user sees it next to the conversation. Mark items done as soon as they are, add items you discover, keep it under 30. Keep the items you have as they are: do not rename, merge or drop them, so the user can follow the progress.",
       // Generous limits, trimmed when kept: a long item should not lose the whole checklist (seen live with the plan).
       inputSchema: z.object({
         items: z.array(z.object({ text: z.string().max(2000), done: z.boolean() })).min(1).max(100),

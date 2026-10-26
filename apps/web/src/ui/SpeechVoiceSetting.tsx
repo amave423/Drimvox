@@ -21,17 +21,25 @@ export function SpeechVoiceSetting() {
   const installed = status?.voices.filter((v) => v.installed) ?? [];
   return (
     <Setting id="speech-voice-label" title={t("settings.speechVoice")} about={t("settings.speechVoiceHint")}>
-      {installed.length > 0 && (
-        <Segmented<string>
-          labelledBy="speech-voice-label"
-          value={settings.speechVoice ?? SYSTEM}
-          options={[{ value: SYSTEM, label: t("settings.speechVoiceSystem") }, ...installed.map((v) => ({ value: v.id, label: v.name }))]}
-          onChange={(value) => void updateSettings({ speechVoice: value === SYSTEM ? null : (value as LocalVoiceId) })}
-        />
+      {/* The voices here are chosen in place; more are downloaded on the audio tab (seen: a lone link under the setting
+          looked out of place). */}
+      {installed.length > 0 ? (
+        <div className="speech-voice">
+          <Segmented<string>
+            labelledBy="speech-voice-label"
+            value={settings.speechVoice ?? SYSTEM}
+            options={[{ value: SYSTEM, label: t("settings.speechVoiceSystem") }, ...installed.map((v) => ({ value: v.id, label: v.name }))]}
+            onChange={(value) => void updateSettings({ speechVoice: value === SYSTEM ? null : (value as LocalVoiceId) })}
+          />
+          <button type="button" className="link" onClick={() => navigate({ kind: "local", part: "audio" })}>
+            {t("settings.speechVoiceMore")}
+          </button>
+        </div>
+      ) : (
+        <button type="button" className="btn" onClick={() => navigate({ kind: "local", part: "audio" })}>
+          {t("settings.speechVoiceGet")}
+        </button>
       )}
-      <button type="button" className="link" onClick={() => navigate({ kind: "local", part: "audio" })}>
-        {t("settings.speechVoiceGet")}
-      </button>
     </Setting>
   );
 }

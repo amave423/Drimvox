@@ -51,7 +51,10 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const providers = audio ? all.filter((p) => hearing?.has(p.id)) : all.filter((p) => p.preset !== "whispercpp");
   const favorites = settings.favoriteModels;
   const sidebar = providers.length > 1 || (favorites.length > 0 && !audio);
-  const byKey = providers.filter((p) => p.billing !== "subscription");
+  // Three groups: by key, on this computer, by subscription (asked for: local models in a section of their own).
+  const local = (p: ProviderView) => p.preset === "ollama" || p.preset === "lmstudio" || p.preset === "sdcpp" || p.preset === "whispercpp";
+  const byKey = providers.filter((p) => p.billing !== "subscription" && !local(p));
+  const onComputer = providers.filter(local);
   const bySubscription = providers.filter((p) => p.billing === "subscription");
   const [open, setOpen] = useState(false);
   const [chosenProvider, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
@@ -271,6 +274,12 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
                 </button>
               )}
               {byKey.map((p) => (
+                <button type="button" key={p.id} className={p.id === providerId ? "is-on" : undefined} onClick={() => setProviderId(p.id)}>
+                  {p.name}
+                </button>
+              ))}
+              {onComputer.length > 0 && <span className="picker-providers-h">{t("model.onComputer")}</span>}
+              {onComputer.map((p) => (
                 <button type="button" key={p.id} className={p.id === providerId ? "is-on" : undefined} onClick={() => setProviderId(p.id)}>
                   {p.name}
                 </button>

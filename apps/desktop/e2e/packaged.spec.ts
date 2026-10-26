@@ -30,7 +30,8 @@ test("the packaged app starts its core from the archive and shows the interface"
   await expect(page.getByText(/^Drimvox \d+\.\d+\.\d+$/)).toBeVisible();
   expect(await app.evaluate(({ app }) => app.isPackaged)).toBe(true);
   // Fonts and styles come from resources/web, not from the internet.
-  expect(await page.evaluate(() => document.fonts.check('600 16px "Source Serif 4"'))).toBe(true);
+  // Loaded on purpose: whether the start page already used the face depends on timing; a missing file loads nothing.
+  expect(await page.evaluate(async () => (await document.fonts.load('600 16px "Source Serif 4"')).length > 0)).toBe(true);
   await page.getByRole("button", { name: "Настройки" }).click();
   await expect(page.getByRole("button", { name: "Проверить уведомление" })).toBeVisible();
 });

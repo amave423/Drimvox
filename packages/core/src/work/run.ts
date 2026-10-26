@@ -1,4 +1,5 @@
 import type { ActivityEntry, ChecklistItem, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
+import { compactHistory } from "./compact";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
 import { isFreeToRun } from "../budget";
@@ -137,6 +138,8 @@ export class WorkRun {
         // The app's budget for the month is used up: the run waits until it is raised.
         if (this.d.month().over && !isFreeToRun(conn)) return stopWith("paused", "month_budget");
 
+        // The older part of a long run is shortened between answers: old outputs and written files, not the words.
+        compactHistory(messages);
         const outcome = await this.answer(messages, conn, ref.model, () => {
           const now = this.row();
           return worked() >= now.hours * 3_600_000;

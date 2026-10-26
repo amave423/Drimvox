@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { Hint } from "./Hint";
 import { useApp } from "../context";
+import { fromCatalog } from "../lib/catalog";
 import { parsePairs, splitCommand } from "../lib/commandLine";
 import { Toggle } from "./Toggle";
 
@@ -15,7 +16,7 @@ export function McpSection() {
 
   async function load() {
     const list = await api.mcp.$get().then((r) => ok<McpServerView[]>(r)).catch(() => []);
-    setServers(list);
+    setServers(list.filter((s) => !fromCatalog(s)));
     for (const s of list.filter((x) => x.enabled)) void check(s.id);
   }
   async function check(id: string) {

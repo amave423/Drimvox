@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";
 import { CATALOG, installed, type CatalogCategory, type CatalogEntry } from "../lib/catalog";
+import { TrashIcon } from "./SideChats";
 import { CatalogDetails, useEntryText } from "./catalog/CatalogDetails";
 import { CatalogLogo } from "./catalog/CatalogLogo";
 import { Hint } from "./Hint";
@@ -64,6 +65,18 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
     return done;
   }
 
+  /** Deletes what a card switched on, at once: the server with its settings, or the skill's folder (asked for). */
+  async function remove(entry: CatalogEntry) {
+    const have = installed(entry, servers, skills);
+    if (!have) return;
+    setBusy(entry.id);
+    if (entry.kind === "skill") await api.skills[":name"].$delete({ param: { name: entry.skill } }).catch(() => null);
+    else await api.mcp[":id"].$delete({ param: { id: (have as McpServerView).id } }).catch(() => null);
+    setBusy(null);
+    await load();
+    onChanged();
+  }
+
   const isOn = (entry: CatalogEntry) => {
     const have = installed(entry, servers, skills);
     return !!have && (entry.kind === "skill" || (have as McpServerView).enabled);
@@ -111,9 +124,23 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
                 <span className="visually-hidden">{text(entry, "name")}</span>
                 {busy === entry.id && <span className="muted">{t("catalog.installing")}</span>}
               </Toggle>
-              <button type="button" className="link" onClick={() => setOpen(entry)}>
-                {t("catalog.more")}
-              </button>
+              <span className="catalog-card-actions">
+                {installed(entry, servers, skills) && (
+                  <button
+                    type="button"
+                    className="icon-button is-pencil"
+                    aria-label={t("catalog.remove", { name: text(entry, "name") })}
+                    title={t("catalog.remove", { name: text(entry, "name") })}
+                    disabled={busy === entry.id}
+                    onClick={() => void remove(entry)}
+                  >
+                    <TrashIcon />
+                  </button>
+                )}
+                <button type="button" className="link" onClick={() => setOpen(entry)}>
+                  {t("catalog.more")}
+                </button>
+              </span>
             </div>
             {failed?.id === entry.id && !open && <p className="is-pencil-text">{t(failed.code === "download" ? "catalog.failedDownload" : "catalog.failed")}</p>}
           </li>

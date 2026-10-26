@@ -115,6 +115,16 @@ export const CATALOG: CatalogEntry[] = [
 ];
 
 /** The user's own server or skill that a card stands for, if any. */
+/**
+ * A server or a skill switched on from the catalog: its card manages it, so the list of servers and skills added by hand
+ * leaves it out (asked for).
+ */
+export function fromCatalog(item: McpServerView | SkillView): boolean {
+  return "scope" in item
+    ? item.scope === "shared" && CATALOG.some((e) => e.kind === "skill" && e.skill === item.name)
+    : CATALOG.some((e) => e.kind === "mcp" && e.matches(item));
+}
+
 export function installed(entry: CatalogEntry, servers: McpServerView[], skills: SkillView[]): McpServerView | SkillView | null {
   return entry.kind === "mcp" ? (servers.find((s) => entry.matches(s)) ?? null) : (skills.find((s) => s.scope === "shared" && s.name === entry.skill) ?? null);
 }

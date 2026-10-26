@@ -1,8 +1,7 @@
 import type { LocalPull, LocalSpeechStatus, LocalVoiceId } from "@drimvox/shared";
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fetchVia } from "../../proxy";
 import { downloadFile, fileByPath, type Route } from "../hf-download";
 import { VOICES, type VoiceDef } from "./catalog";
@@ -189,15 +188,29 @@ export class LocalSpeech {
   async speak(id: string, text: string): Promise<Buffer> {
     const voice = VOICES.find((v) => v.id === id);
     if (!voice || !this.installedVoice(voice)) throw new Error("This voice is not downloaded");
-    const program = this.o.command ?? [findPiper(this.engineDir) ?? ""];
+    const found = findPiper(this.engineDir);
+    const program = this.o.command ?? [found ?? ""];
     if (!program[0]) throw new Error("The speech engine is not downloaded");
-    const out = join(tmpdir(), `drimvox-speech-${Date.now()}-${Math.random().toString(36).slice(2)}.wav`);
+    const out = join(this.d.dir, `speaking-${Date.now()}-${Math.random().toString(36).slice(2)}.wav`);
+    // Piper runs in its own folder and gets every path relative to it (seen live: under a Windows user named in
+    // Cyrillic, onnxruntime crashed on the voice's full path and espeak-ng could not read its data; short 8.3 names did
+    // not help, relative paths do).
+    const cwd = found ? dirname(found) : this.engineDir;
+    mkdirSync(cwd, { recursive: true });
+    const espeak = join(cwd, "espeak-ng-data");
     try {
       await new Promise<void>((resolve, reject) => {
         const child = execFile(
           program[0]!,
-          [...program.slice(1), "--model", this.pathOf(voice), "--output_file", out],
-          { timeout: SPEAK_MS, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
+          [
+            ...program.slice(1),
+            "--model",
+            relative(cwd, this.pathOf(voice)),
+            ...(existsSync(espeak) ? ["--espeak_data", "espeak-ng-data"] : []),
+            "--output_file",
+            relative(cwd, out),
+          ],
+          { cwd, timeout: SPEAK_MS, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
           (err) => (err ? reject(err) : resolve()),
         );
         // The text goes in on standard input, as UTF-8: one sentence per line reads with natural pauses.

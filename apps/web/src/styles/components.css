@@ -201,3 +201,6 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .amount-field { position: relative; display: inline-flex; align-items: center; }
 .amount-field .field-input { width: 190px; padding-right: 30px; }
 .amount-field > span { position: absolute; right: 12px; color: var(--muted); font-size: 14px; pointer-events: none; }
+
+.speech-voice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.catalog-card-actions { display: inline-flex; align-items: center; gap: 10px; }

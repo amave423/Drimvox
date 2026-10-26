@@ -1,8 +1,7 @@
 import type { HfAudioFile, HfAudioRepo, LocalAudioStatus, LocalPull } from "@drimvox/shared";
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fetchVia } from "../../proxy";
 import { downloadFile, fileByPath, type Route } from "../hf-download";
 import { AUDIO_MODELS, type AudioModelDef } from "./catalog";
@@ -225,16 +224,20 @@ export class LocalAudio {
   async transcribe(id: string, wav: Buffer): Promise<string> {
     const model = this.installed().find((m) => m.id === id);
     if (!model) throw new Error("This speech model is not downloaded");
-    const cli = this.o.cliCommand ?? [findCli(this.engineDir) ?? ""];
+    const found = findCli(this.engineDir);
+    const cli = this.o.cliCommand ?? [found ?? ""];
     if (!cli[0]) throw new Error("The speech engine is not downloaded");
-    const file = join(tmpdir(), `drimvox-dictation-${Date.now()}.wav`);
+    const file = join(this.d.dir, `dictation-${Date.now()}.wav`);
     writeFileSync(file, wav);
+    // The engine runs in its own folder with paths relative to it: a full path with letters outside ASCII (a Windows
+    // user named in Cyrillic) broke Piper, and these engines read their files the same way.
+    const cwd = found ? dirname(found) : this.d.dir;
     try {
       const out = await new Promise<string>((resolve, reject) =>
         execFile(
           cli[0]!,
-          [...cli.slice(1), "-m", this.pathOf(model), "-f", file, "-l", "auto", "-nt", "-np"],
-          { timeout: TRANSCRIBE_MS, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
+          [...cli.slice(1), "-m", relative(cwd, this.pathOf(model)), "-f", relative(cwd, file), "-l", "auto", "-nt", "-np"],
+          { cwd, timeout: TRANSCRIBE_MS, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
           (err, stdout) => (err ? reject(err) : resolve(String(stdout))),
         ),
       );

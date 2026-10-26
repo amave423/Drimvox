@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { dirname } from "node:path";
+import { dirname, isAbsolute, relative } from "node:path";
 import type { ImageFileRole, ImageSettings } from "./catalog";
 
 /** Loading a model of several gigabytes into memory takes a while; longer than this means it will not start. */
@@ -55,9 +55,12 @@ export class ImageServer {
     this.port = await freePort();
     const { files, settings, offload } = this.loaded;
     const [file, ...pre] = this.command;
+    // The engine runs in its own folder with the models' paths relative to it: a full path with letters outside ASCII (a
+    // Windows user named in Cyrillic) broke Piper the same way.
+    const cwd = dirname(file!);
     const args = [
       ...pre,
-      ...Object.entries(files).flatMap(([role, path]) => [OPTION[role as ImageFileRole], path!]),
+      ...Object.entries(files).flatMap(([role, path]) => [OPTION[role as ImageFileRole], isAbsolute(path!) ? relative(cwd, path!) : path!]),
       "--listen-ip", "127.0.0.1",
       "--listen-port", String(this.port),
       "--cfg-scale", String(settings.cfg),
@@ -66,6 +69,7 @@ export class ImageServer {
     // Linux and macOS builds keep their libraries beside the program.
     const libs = dirname(file!);
     const child = spawn(file!, args, {
+      cwd,
       env: { ...process.env, LD_LIBRARY_PATH: [libs, process.env.LD_LIBRARY_PATH].filter(Boolean).join(":"), DYLD_LIBRARY_PATH: libs, ...this.env },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,

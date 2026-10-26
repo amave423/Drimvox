@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { Hint } from "./Hint";
 import { useApp } from "../context";
+import { fromCatalog } from "../lib/catalog";
 
 /** Shared skills: instructions any agent can open when they fit its task. */
 export function SkillsSection() {
@@ -16,7 +17,7 @@ export function SkillsSection() {
   const [removing, setRemoving] = useState<string | null>(null);
 
   async function load() {
-    setSkills(await api.skills.$get().then((r) => ok<SkillView[]>(r)).catch(() => []));
+    setSkills((await api.skills.$get().then((r) => ok<SkillView[]>(r)).catch(() => [] as SkillView[])).filter((s) => !fromCatalog(s)));
   }
   useEffect(() => {
     void load();

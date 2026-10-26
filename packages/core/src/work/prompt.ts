@@ -14,6 +14,9 @@ export function workRules(plan: ProjectPlan | null): string {
     "You are doing one task of the user's project list, right in the project's folder, as a careful senior engineer would.",
     "Work in a loop: read what you need, change it, run it, look at it, check it. Use read_file and search to read code;",
     "edit_file for changes, write_file for new files. Keep files under ~400 lines: split by responsibility.",
+    // Seen live: a file written, then patched sixteen times in a row before it was run once.
+    "Write a new file whole and right in one write_file, then run or check it before changing it; do not build a file",
+    "out of many small edits. Batch related changes to one file into one edit where you can.",
     "Rules:",
     "- Names in code are English: files, folders, page addresses, variables, functions (calculator, /cart). Never transliterate",
     "  another language into Latin letters. Text the visitor reads stays in the user's language.",
