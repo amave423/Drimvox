@@ -1146,6 +1146,8 @@ export const ru = {
   "workshop.showResult": "Показать панель результата",
   "params.back": "Назад",
   "params.sections": "Разделы параметров",
+  "side.hide": "Скрыть боковую панель",
+  "side.show": "Показать боковую панель",
   "side.params": "Параметры",
   "workshop.part.work": "Ход работы",
   "workshop.part.questions": "Вопросы",

@@ -1,7 +1,7 @@
 import { estimateCost, type ChatKind, type MediaModel, type ModelInfo, type PhotoInput, type ProviderView } from "@drimvox/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
-import { useFlip } from "../../lib/flip";
+import { fixedBy, useFlip, useOnWindow } from "../../lib/flip";
 import { formatPrice, formatTokens, formatUsd } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
 import { loadMediaModel, loadMediaModels } from "../../lib/media";
@@ -78,6 +78,10 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   // Where the list opens: where there is room. Inside the chat's options it opens over the panel instead (the CSS).
   const nested = !!root.current?.closest(".options-panel");
   const flip = useFlip(open, root, placement === "above");
+  // Placed on the window, not in its column: a narrow column (a project's workshop) cut the list off (seen).
+  const panel = useRef<HTMLDivElement>(null);
+  const onWindow = open && !nested ? fixedBy(flip, sidebar ? Math.min(720, window.innerWidth - 32) : Math.min(560, window.innerWidth * 0.8)) : undefined;
+  useOnWindow(panel, onWindow);
 
   useEffect(() => {
     if (!open || !providerId || providerId === FAVORITES) return;
@@ -259,7 +263,8 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
       {open && (
         <div
           className={`picker-panel model-panel${(nested ? true : flip.above) ? " is-above" : ""}${sidebar ? " has-providers" : ""}`}
-          style={nested ? undefined : { height: sidebar ? Math.min(PANEL_H, flip.maxHeight ?? PANEL_H) : undefined, maxHeight: flip.maxHeight ? Math.min(560, flip.maxHeight) : undefined }}
+          ref={panel}
+          style={nested ? undefined : { ...onWindow, height: sidebar ? Math.min(PANEL_H, flip.maxHeight ?? PANEL_H) : undefined, maxHeight: flip.maxHeight ? Math.min(560, flip.maxHeight) : undefined }}
         >
           {audio && hearing !== null && providers.length === 0 && <p className="muted">{t("voice.noModels")}</p>}
           {/* Every provider stays in the row whichever is chosen (seen: choosing the picture engine hid the others). */}

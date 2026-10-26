@@ -443,8 +443,10 @@ test("an answer goes on live after coming back to the chat, with a spinner and t
   await expect(page.getByText(/кусок29/)).toBeVisible({ timeout: 15_000 });
   await expect(row.getByRole("img", { name: "Модель отвечает" })).toHaveCount(0);
 
-  // Another answer while the chat is closed: a dot until it is opened.
+  // Another answer while the chat is closed: a dot until it is opened. Sent once the window is done with the first.
+  await expect(page.getByRole("button", { name: "Стоп" })).toHaveCount(0);
   await say(page, "Ещё");
+  await expect(page.locator(".msg-user", { hasText: "Ещё" })).toBeVisible();
   await newChat(page);
   await expect(row.getByRole("img", { name: "Новый ответ" })).toBeVisible({ timeout: 20_000 });
   await row.getByRole("button", { name: /Длинно/ }).click();

@@ -79,6 +79,12 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(models).toContainText("Модель для опроса, плана и работы");
   await expect(models).toContainText("Сильная модель");
   await models.getByRole("button", { name: "Выбери модель" }).first().click();
+  // The list opens whole inside the window, not cut by the workshop's column (seen).
+  const list = await page.locator(".model-panel").boundingBox();
+  const view = page.viewportSize() ?? (await page.evaluate(() => ({ width: innerWidth, height: innerHeight })));
+  expect(list!.x).toBeGreaterThanOrEqual(0);
+  expect(list!.x + list!.width).toBeLessThanOrEqual(view.width);
+  expect(await page.locator(".workshop-main").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.getByRole("option", { name: /Coder/ }).click();
   // One pick is the model of all three stages; each can be told apart on request.
   await page.getByRole("button", { name: "Разные модели для этапов" }).click();
@@ -136,6 +142,15 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(page.locator(".workshop")).toHaveCount(0);
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await expect(page.locator(".topbar .crumb")).toHaveText(/drimvox-repo-/);
+  // The mark leads to the projects' start, not to the chats.
+  await page.locator(".topbar .logo").click();
+  await expect(page.getByRole("heading", { name: "Над чем поработаем?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Проекты", exact: true })).toHaveAttribute("aria-pressed", "true");
+  // The sidebar has a handle of its own: it folds away and comes back.
+  await page.getByRole("button", { name: "Скрыть боковую панель" }).click();
+  await expect(page.locator("#sidebar")).toBeHidden();
+  await page.getByRole("button", { name: "Показать боковую панель" }).click();
+  await expect(page.locator("#sidebar")).toBeVisible();
   expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Доски");
   // Nothing to accept, and git stays the user's.
   expect(execFileSync("git", ["log", "--oneline"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);

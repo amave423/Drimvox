@@ -8,7 +8,7 @@ import { TaskSheet } from "../tasks/TaskSheet";
 import { useAddProject } from "./AddProject";
 import { PlanCard } from "./PlanCard";
 import { ProjectStart } from "./ProjectStart";
-import { ResultSplit, useResultWidth } from "./ResultSplit";
+import { PaneSplit, usePaneWidth } from "../PaneSplit";
 import { useProjectWork } from "./useProjectWork";
 import { PlanTab } from "./Workspace";
 import { WorkshopResult } from "./WorkshopResult";
@@ -41,7 +41,7 @@ export function Workshop({ projectId }: { projectId: string }) {
   const { work, reload } = useProjectWork(projectId);
   const [fresh, setFresh] = useState(false);
   const [part, setPart] = useState<Part>("work");
-  const split = useResultWidth();
+  const split = usePaneWidth();
   const [choice] = useState<ModelChoice | null>(() => {
     const last = readLastModel();
     return last && providers.some((p) => p.id === last.providerId) ? last : null;
@@ -114,7 +114,7 @@ export function Workshop({ projectId }: { projectId: string }) {
             </>
           )}
         </section>
-        <ResultSplit split={split} />
+        <PaneSplit split={split} controls="workshop-result" label={{ open: "workshop.hideResult", closed: "workshop.showResult" }} />
         <WorkshopResult
           project={project}
           work={work}
@@ -202,11 +202,11 @@ export function ProjectsStart() {
         </div>
         {add.failed && <p className="error-note">{t("project.addFailed")}</p>}
         {projects.length > 0 && (
-          <ul className="home-recent workshop-recent">
+          <ul className="workshop-recent">
             {projects.map((p) => (
               <li key={p.id}>
                 <button type="button" onClick={() => navigate({ kind: "project", projectId: p.id })}>
-                  <span className="home-recent-title">{p.name}</span>
+                  <span className="workshop-recent-title">{p.name}</span>
                   <span className="muted mono">{p.path}</span>
                 </button>
               </li>

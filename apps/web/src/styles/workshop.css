@@ -4,8 +4,19 @@
 .mode-switch button { padding: 3px 13px; border-radius: 999px; color: var(--muted); font-size: 13px; }
 .mode-switch button:hover { color: var(--fg); }
 .mode-switch button.is-on { background: var(--choice); color: var(--on-choice); }
-.topbar-title { flex: 1; }
-.topbar-title .crumb { align-self: center; font-size: 13.5px; }
+/* The mark, the name, the switch and the place on one middle line (seen: the name stood higher than the mark). */
+.topbar-title { flex: 1; align-items: center; }
+.topbar .logo { align-items: center; }
+.topbar .logo-name { align-self: center; line-height: 1; }
+.topbar-title .crumb { font-size: 13.5px; }
+
+/* The sidebar's width set by the handle beside it, sliding when it opens or folds (asked for). */
+.shell { transition: grid-template-columns 0.3s ease; }
+.shell.is-dragging { transition: none; user-select: none; cursor: col-resize; }
+@media (prefers-reduced-motion: reduce) { .shell { transition: none; } }
+.side { min-width: 0; }
+.side.is-closed { padding-inline: 0; border-right: 0; }
+.shell > .workshop-split { border-left: 0; }
 
 /* The mark drawn along its outline, then filled: at the start and on a change of mode. */
 .logo-draw { position: fixed; inset: 0; z-index: 50; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--bg); animation: logo-out 0.35s ease 0.7s forwards; }
@@ -112,7 +123,11 @@
 
 /* The projects' start, before a project is open. */
 .workshop-empty { margin: auto; max-width: 640px; padding: 40px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
-.workshop-recent { width: 100%; text-align: left; }
+.workshop-recent { width: 100%; list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 4px; text-align: left; }
+.workshop-recent button { width: 100%; display: grid; gap: 2px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--sheet); text-align: left; }
+.workshop-recent button:hover { border-color: var(--muted); }
+.workshop-recent-title { font-weight: 600; }
+.workshop-recent .mono { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The run's conversation as a timeline (variant C): each message at its time, on one line down the side. */
 .workshop-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }

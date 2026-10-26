@@ -4,7 +4,7 @@ import { LAST_PROJECT_KEY } from "./projects/Workshop";
 import { WorkshopBar } from "./projects/WorkshopBar";
 
 export function TopBar() {
-  const { t, view, navigate, chats, projects, tasks } = useApp();
+  const { t, view, mode, navigate, chats, projects, tasks } = useApp();
 
   // Every screen says where the user is (seen: the start page, the local models, the gallery and projects said nothing).
   let crumb = "";
@@ -19,7 +19,8 @@ export function TopBar() {
     <header className="topbar">
       {/* The name and the place stand on one line of text, the mark centred beside the name. */}
       <div className="topbar-title">
-        <button className="logo" onClick={() => navigate({ kind: "home" })} title={t("top.home")}>
+        {/* The mark leads to the start of the mode the user is in: it never switches the mode (asked for). */}
+        <button className="logo" onClick={() => navigate(mode === "projects" ? { kind: "projects" } : { kind: "home" })} title={t("top.home")}>
           <Logo size={22} />
           <span className="logo-name">Drimvox</span>
         </button>

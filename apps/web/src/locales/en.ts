@@ -1146,6 +1146,8 @@ export const en: Record<keyof typeof ru, string> = {
   "workshop.showResult": "Show the result panel",
   "params.back": "Back",
   "params.sections": "Sections of the parameters",
+  "side.hide": "Hide the sidebar",
+  "side.show": "Show the sidebar",
   "side.params": "Parameters",
   "workshop.part.work": "Progress",
   "workshop.part.questions": "Questions",

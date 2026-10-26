@@ -20,6 +20,7 @@ import { preloadModels } from "./lib/models";
 import { DownloadNote } from "./ui/DownloadNote";
 import { UpdateNote } from "./ui/UpdateNote";
 import { Sidebar } from "./ui/Sidebar";
+import { PaneSplit, SIDE_PANE, usePaneWidth } from "./ui/PaneSplit";
 import { ParamsPage } from "./ui/ParamsPage";
 import { LogoDraw } from "./ui/LogoDraw";
 import { TopBar } from "./ui/TopBar";
@@ -46,6 +47,7 @@ export function App({ api, token, initialSettings, status }: Props) {
   const [tasks, setTasks] = useState<TaskView[]>([]);
   const [usdRub, setUsdRub] = useState(0);
   const systemDark = useSystemDark();
+  const side = usePaneWidth(SIDE_PANE);
   // The mode follows the screen; the parameters keep the one they were opened from, and go back to where the user was.
   const [lastMode, setLastMode] = useState<Mode>("chat");
   const ownMode = modeOf(view, chats);
@@ -246,9 +248,14 @@ export function App({ api, token, initialSettings, status }: Props) {
 
   return (
     <AppContext.Provider value={value}>
-      <div className={`shell${inParams(view) ? " is-params" : ""}`}>
+      <div
+        className={`shell${inParams(view) ? " is-params" : ""}${side.dragging ? " is-dragging" : ""}`}
+        ref={side.body}
+        style={inParams(view) ? undefined : { gridTemplateColumns: `${side.width}px auto minmax(0, 1fr)` }}
+      >
         <TopBar />
-        {!inParams(view) && <Sidebar />}
+        {!inParams(view) && <Sidebar closed={side.width === 0} />}
+        {!inParams(view) && <PaneSplit split={side} controls="sidebar" label={{ open: "side.hide", closed: "side.show" }} />}
         <LogoDraw mode={mode} />
         <main className={`desk${view.kind === "project" || view.kind === "projects" ? " is-workshop" : ""}`}>
           {view.kind === "home" && <HomeSheet />}
