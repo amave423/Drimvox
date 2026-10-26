@@ -55,7 +55,7 @@ describe("status", () => {
 describe("settings", () => {
   it("returns defaults on a fresh database", async () => {
     const res = await app().request(`${BASE}/api/settings`, { headers: auth });
-    expect(await res.json()).toEqual({ theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, developer: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null });
+    expect(await res.json()).toEqual({ theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null });
   });
 
   it("saves a partial update and keeps it after reopening the database", async () => {
@@ -65,11 +65,21 @@ describe("settings", () => {
       body: JSON.stringify({ theme: "dark" }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ theme: "dark", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, developer: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null });
+    expect(await res.json()).toEqual({ theme: "dark", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null });
 
     env.reopen();
     const again = await app().request(`${BASE}/api/settings`, { headers: auth });
-    expect(await again.json()).toEqual({ theme: "dark", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, developer: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null });
+    expect(await again.json()).toEqual({ theme: "dark", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null });
+  });
+
+  it("keeps the notifications' sound and loudness, and refuses a sound it does not make", async () => {
+    const patch = (body: unknown) =>
+      app().request(`${BASE}/api/settings`, { method: "PATCH", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = await patch({ notifySound: "chime", notifyVolume: 0.3 });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ notifySound: "chime", notifyVolume: 0.3 });
+    expect((await patch({ notifySound: "trumpet.mp3" })).status).toBe(400);
+    expect((await patch({ notifyVolume: 2 })).status).toBe(400);
   });
 
   it("refuses unknown values", async () => {

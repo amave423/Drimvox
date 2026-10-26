@@ -1,0 +1,29 @@
+/* ---------- Drimvox's own notifications (apps/web/src/notice) ---------- */
+/* Their window is see-through: only the cards show, at the bottom right of the screen. */
+:root.is-notice, :root.is-notice body, :root.is-notice #root { background: transparent; height: auto; overflow: hidden; }
+.notice-stack { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; padding: 10px; }
+.notice-card {
+  position: relative; display: flex; align-items: stretch;
+  border-radius: 14px; border: 1px solid var(--line); background: var(--sheet); color: var(--fg);
+  box-shadow: var(--sheet-shadow);
+  animation: notice-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.notice-card.is-leaving { animation: notice-out 0.22s ease forwards; }
+.notice-main { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 12px; padding: 12px 34px 12px 12px; text-align: left; cursor: pointer; border-radius: 14px; }
+.notice-main:hover { background: var(--paper); }
+.notice-mark { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--paper); border: 1px solid var(--line); }
+.notice-text { min-width: 0; display: grid; gap: 2px; }
+.notice-head { display: flex; align-items: baseline; gap: 8px; }
+.notice-title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notice-when { margin-left: auto; flex: none; font-size: 11.5px; color: var(--muted); }
+.notice-body { font-size: 13px; line-height: 1.4; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.notice-close { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); opacity: 0; transition: opacity 120ms; }
+.notice-card:hover .notice-close, .notice-close:focus-visible { opacity: 1; }
+.notice-close:hover { background: var(--paper); color: var(--fg); }
+@keyframes notice-in { from { opacity: 0; transform: translateX(24px); } }
+@keyframes notice-out { to { opacity: 0; transform: translateX(24px); } }
+@media (prefers-reduced-motion: reduce) { .notice-card, .notice-card.is-leaving { animation: none; } }
+
+/* The settings' loudness: a slider and a way to hear it. */
+.notice-volume { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.notice-volume input { width: 200px; accent-color: var(--ink); }

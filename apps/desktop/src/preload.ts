@@ -6,8 +6,8 @@ contextBridge.exposeInMainWorld("drimvox", {
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke("drimvox:pick-folder"),
   savePdf: (name: string): Promise<string | null> => ipcRenderer.invoke("drimvox:save-pdf", name),
   openSkillsFolder: () => ipcRenderer.send("drimvox:open-skills"),
-  notify: (notice: { title: string; body: string; taskId: string }) => ipcRenderer.send("drimvox:notify", notice),
-  testNotify: (notice: { title: string; body: string }) => ipcRenderer.send("drimvox:notify-test", notice),
+  notify: (notice: unknown) => ipcRenderer.send("drimvox:notify", notice),
+  testNotify: (notice: unknown) => ipcRenderer.send("drimvox:notify-test", notice),
   focusAssist: (): Promise<number | null> => ipcRenderer.invoke("drimvox:focus-assist"),
   updateState: () => ipcRenderer.invoke("drimvox:update-state"),
   onUpdate: (listener: (state: unknown) => void) => {
@@ -21,5 +21,10 @@ contextBridge.exposeInMainWorld("drimvox", {
     const handler = (_event: unknown, taskId: unknown) => typeof taskId === "string" && listener(taskId);
     ipcRenderer.on("drimvox:open-task", handler);
     return () => void ipcRenderer.removeListener("drimvox:open-task", handler);
+  },
+  onOpenProject: (listener: (projectId: string) => void) => {
+    const handler = (_event: unknown, projectId: unknown) => typeof projectId === "string" && listener(projectId);
+    ipcRenderer.on("drimvox:open-project", handler);
+    return () => void ipcRenderer.removeListener("drimvox:open-project", handler);
   },
 });

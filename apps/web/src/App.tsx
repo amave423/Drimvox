@@ -7,6 +7,7 @@ import { formatUsd, setDisplayCurrency, startOfToday } from "./lib/format";
 import { noticesFor } from "./lib/notices";
 import { workNotices } from "./lib/workNotices";
 import { applyTheme, resolveTheme } from "./theme";
+import { playSound } from "./lib/sounds";
 import { ChatSheet } from "./ui/chat/ChatSheet";
 import { HomeSheet } from "./ui/HomeSheet";
 import { ProjectsStart, Workshop } from "./ui/projects/Workshop";
@@ -116,7 +117,29 @@ export function App({ api, token, initialSettings, status }: Props) {
     setTasks(next);
   }, [api]);
 
-  // A task that now needs the user becomes a Windows notification (shown only while the window is elsewhere).
+  // How Drimvox's own notifications look and sound now: the window's theme, the projects' colours (they are all about
+  // projects), the settings' sound. Kept in a ref: the effects that notify read the latest.
+  const noticeLook = useRef<Omit<NoticeRequest, "title" | "body">>(null!);
+  noticeLook.current = {
+    dark: resolveTheme(settings.theme, systemDark) === "dark",
+    mode: "projects",
+    locale: settings.locale,
+    sound: settings.notifySound,
+    volume: settings.notifyVolume,
+  };
+  /** In a browser: its own notification, with Drimvox's sound from the page. */
+  const browserNotice = (title: string, body: string, tag: string, open: () => void) => {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted" || !document.hidden) return;
+    const shown = new Notification(title, { body, tag, silent: true });
+    playSound(noticeLook.current.sound, noticeLook.current.volume);
+    shown.onclick = () => {
+      window.focus();
+      open();
+      shown.close();
+    };
+  };
+
+  // A task that now needs the user becomes a notification (shown only while the window is elsewhere).
   const seenTasks = useRef<TaskView[] | null>(null);
   useEffect(() => {
     if (!tasksLoaded.current) return;
@@ -125,19 +148,13 @@ export function App({ api, token, initialSettings, status }: Props) {
     if (!settings.notifications) return;
     for (const n of notices) {
       const title = translate(settings.locale, `notice.${n.kind}`);
-      if (window.drimvox?.notify) window.drimvox.notify({ title, body: n.title, taskId: n.taskId });
+      if (window.drimvox?.notify) window.drimvox.notify({ ...noticeLook.current, title, body: n.title, taskId: n.taskId });
       // In a browser: the browser's own notifications, once allowed, while the tab is in the background.
-      else if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) {
-        const shown = new Notification(title, { body: n.title, tag: n.taskId });
-        shown.onclick = () => {
-          window.focus();
-          setView({ kind: "task", taskId: n.taskId });
-          shown.close();
-        };
-      }
+      else browserNotice(title, n.title, n.taskId, () => setView({ kind: "task", taskId: n.taskId }));
     }
   }, [tasks]);
   useEffect(() => window.drimvox?.onOpenTask?.((taskId) => setView({ kind: "task", taskId })), []);
+  useEffect(() => window.drimvox?.onOpenProject?.((projectId) => setView({ kind: "project", projectId })), []);
 
   // A project's run that waits for a permission, is done or stopped becomes a notification too (docs/specs/project-work.md):
   // seen live, a run waited half an hour on a permission nobody saw.
@@ -158,8 +175,8 @@ export function App({ api, token, initialSettings, status }: Props) {
       for (const n of notices) {
         const title = translate(settings.locale, `notice.work.${n.kind}`);
         const body = projects.find((p) => p.id === n.projectId)?.name ?? "";
-        if (window.drimvox?.notify) window.drimvox.notify({ title, body, taskId: n.taskId ?? "" });
-        else if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.hidden) new Notification(title, { body, tag: n.projectId });
+        if (window.drimvox?.notify) window.drimvox.notify({ ...noticeLook.current, title, body, projectId: n.projectId });
+        else browserNotice(title, body, n.projectId, () => setView({ kind: "project", projectId: n.projectId }));
       }
     };
     void look();

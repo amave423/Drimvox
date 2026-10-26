@@ -5,10 +5,10 @@ interface DrimvoxBridge {
   /** Native folder picker; null when the user cancels. */
   pickFolder(): Promise<string | null>;
   savePdf?(name: string): Promise<string | null>;
-  /** A Windows notification; shown only while the window is not in front. */
-  notify(notice: { title: string; body: string; taskId: string }): void;
-  /** A notification right now, even with the window in front: to check that they reach the desktop. */
-  testNotify(notice: { title: string; body: string }): void;
+  /** Drimvox's own notification; shown only while the window is not in front. A click opens the task or the project. */
+  notify(notice: NoticeRequest & { taskId?: string; projectId?: string }): void;
+  /** A notification right now, even with the window in front: to check that they reach the desktop and sound. */
+  testNotify(notice: NoticeRequest): void;
   /** Windows' Focus Assist: 0 off, 1 priority only, 2 alarms only; null where it cannot be told. */
   focusAssist?(): Promise<number | null>;
   /** Where updating stands: checking, the latest, a newer version coming or ready, or what went wrong. */
@@ -22,6 +22,33 @@ interface DrimvoxBridge {
   openSkillsFolder(): void;
   /** Called when the user clicks a notification; returns a function that stops listening. */
   onOpenTask(listener: (taskId: string) => void): () => void;
+  onOpenProject?(listener: (projectId: string) => void): () => void;
+}
+
+/** What a notification says and how it looks and sounds: the window's theme and mode, the settings' sound. */
+interface NoticeRequest {
+  title: string;
+  body: string;
+  dark: boolean;
+  mode: "chat" | "projects";
+  locale: "ru" | "en";
+  sound: "drop" | "chime" | "soft" | "pop" | "off";
+  volume: number;
+}
+
+/** A notification as its window gets it: with its id, and silent while Windows' Focus Assist is on. */
+interface DrimvoxNotice extends NoticeRequest {
+  id: string;
+  silent: boolean;
+}
+
+/** The notifications window's own bridge (apps/desktop/src/notice-preload.ts). */
+interface NoticeBridge {
+  onNotice(listener: (notice: DrimvoxNotice) => void): () => void;
+  /** The notification was clicked: Drimvox comes forward on what it is about. */
+  open(id: string): void;
+  /** How tall the cards are; 0 hides the window. */
+  size(height: number): void;
 }
 
 interface UpdateState {
@@ -35,4 +62,5 @@ interface UpdateState {
 
 interface Window {
   drimvox?: DrimvoxBridge;
+  drimvoxNotice?: NoticeBridge;
 }

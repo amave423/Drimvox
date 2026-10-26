@@ -16,11 +16,13 @@ import "./styles/workshop.css";
 import "./styles/media.css";
 import "./styles/shape.css";
 import "./styles/motion.css";
+import "./styles/notice.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { BootError } from "./ui/BootError";
+import { NoticeStack } from "./notice/NoticeStack";
 import { SignIn } from "./ui/SignIn";
 import { createApi, ok } from "./api";
 import { guessLocale } from "./i18n";
@@ -29,6 +31,12 @@ import type { CoreStatus } from "./context";
 
 async function boot() {
   const root = createRoot(document.getElementById("root")!);
+  // The notifications' own window: only the cards, no core to talk to.
+  if (location.hash === "#notice" && window.drimvoxNotice) {
+    document.documentElement.classList.add("is-notice");
+    root.render(<NoticeStack bridge={window.drimvoxNotice} />);
+    return;
+  }
   const locale = guessLocale(navigator.languages);
 
   try {

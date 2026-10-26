@@ -8,7 +8,7 @@ const { version } = JSON.parse(readFileSync(new URL("./package.json", import.met
 /** Bundles main, preload and the core process into CommonJS files Electron loads directly. */
 export const options = {
   absWorkingDir: here,
-  entryPoints: { main: "src/main.ts", preload: "src/preload.ts", core: "src/core-process.ts" },
+  entryPoints: { main: "src/main.ts", preload: "src/preload.ts", "notice-preload": "src/notice-preload.ts", core: "src/core-process.ts" },
   outdir: "dist",
   outExtension: { ".js": ".cjs" },
   bundle: true,

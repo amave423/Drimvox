@@ -46,7 +46,7 @@ async function launch(): Promise<Page> {
 test("notifications are a switch, the proxy is set once and each provider opts in", async () => {
   const page = await launch();
   await openSection(page, "Настройки");
-  const notify = page.getByRole("switch", { name: /Уведомлять в Windows/ });
+  const notify = page.getByRole("switch", { name: /Показывать уведомления/ });
   await expect(notify).toBeChecked();
   await notify.click({ force: true });
   await expect(notify).not.toBeChecked();

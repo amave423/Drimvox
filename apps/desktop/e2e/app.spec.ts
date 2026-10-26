@@ -98,7 +98,7 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { drimvox?: object }).drimvox ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "getToken", "installUpdate", "notify", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "savePdf", "setTitleBar", "testNotify", "updateState"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "getToken", "installUpdate", "notify", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "savePdf", "setTitleBar", "testNotify", "updateState"] });
 });
 
 test("the catalog switches a ready skill on and off, and shows a server's details with the token it needs", async () => {
@@ -179,6 +179,40 @@ test("opens the parameters as a page of their own and goes back, keeping the mod
   await page.getByRole("button", { name: "Назад" }).click();
   await expect(page.getByRole("heading", { name: "Над чем поработаем?" })).toBeVisible();
   await expect(page.locator(".side")).toBeVisible();
+});
+
+// Asked for: notifications of Drimvox's own, like Telegram's, with a sound of its own.
+test("shows its own notification window with the chosen sound, and it goes away when closed", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await openSection(page, "Настройки");
+  const sounds = page.getByRole("radiogroup", { name: "Звук уведомлений" });
+  await sounds.getByRole("radio", { name: "Колокольчик" }).click();
+  await expect(sounds.getByRole("radio", { name: "Колокольчик" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("slider", { name: "Громкость" })).toBeVisible();
+  await page.getByRole("button", { name: "Проверить уведомление" }).click();
+  // A window of its own, at the bottom right, never in the taskbar.
+  const notice = await app.waitForEvent("window", (w) => w.url().endsWith("#notice"));
+  const card = notice.locator(".notice-card");
+  await expect(card).toContainText("Уведомления работают");
+  const bounds = await app.evaluate(({ BrowserWindow, screen }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().endsWith("#notice"))!;
+    return { win: w.getBounds(), area: screen.getPrimaryDisplay().workArea, visible: w.isVisible(), focusable: w.isFocusable() };
+  });
+  expect(bounds.visible).toBe(true);
+  expect(bounds.focusable).toBe(false);
+  expect(bounds.win.x + bounds.win.width).toBeLessThanOrEqual(bounds.area.x + bounds.area.width);
+  expect(bounds.win.y + bounds.win.height).toBeLessThanOrEqual(bounds.area.y + bounds.area.height);
+  await card.hover();
+  await notice.getByRole("button", { name: "Закрыть уведомление" }).click();
+  await expect(card).toHaveCount(0);
+  await expect
+    .poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().endsWith("#notice"))!.isVisible()))
+    .toBe(false);
+  // The setting stays.
+  await page.reload();
+  await openSection(page, "Настройки");
+  await expect(page.getByRole("radiogroup", { name: "Звук уведомлений" }).getByRole("radio", { name: "Колокольчик" })).toHaveAttribute("aria-checked", "true");
 });
 
 // Asked for: reading answers aloud with Piper's voices instead of the system's.

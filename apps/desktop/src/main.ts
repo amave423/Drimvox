@@ -1,6 +1,6 @@
 import { coreGitEnv } from "./git-env";
 import { attachContextMenu } from "./context-menu";
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, session, shell, utilityProcess, type UtilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -11,6 +11,7 @@ import { INSTALLER_ID } from "./installer-id";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
 import { keepInTray, offerUpdate } from "./tray";
+import { noticeRequest, setupNotices, showNotice } from "./notices";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
@@ -395,40 +396,47 @@ function registerIpc() {
     void shell.openPath(dir);
   });
 
-  ipcMain.on("drimvox:notify", (event, notice: { title?: unknown; body?: unknown; taskId?: unknown }) => {
+  // Drimvox's own notifications (notices.ts): a click brings the window forward on the task or the project.
+  setupNotices((target) => {
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    if (target.taskId) win.webContents.send("drimvox:open-task", target.taskId);
+    else if (target.projectId) win.webContents.send("drimvox:open-project", target.projectId);
+  });
+
+  ipcMain.on("drimvox:notify", (event, notice: unknown) => {
     if (!fromOurPage(event.senderFrame?.url)) return;
-    const { title, body, taskId } = notice ?? {};
-    if (typeof title !== "string" || typeof body !== "string" || typeof taskId !== "string") return;
+    const request = noticeRequest(notice);
+    if (!request) return;
+    const { taskId, projectId } = (notice ?? {}) as { taskId?: unknown; projectId?: unknown };
+    const target = { taskId: typeof taskId === "string" && taskId ? taskId : undefined, projectId: typeof projectId === "string" && projectId ? projectId : undefined };
     // Tests cannot take the focus away from the window; they say it is elsewhere.
     const away = process.env.DRIMVOX_TEST_UNFOCUSED === "1" || !win?.isFocused();
-    if (!away || !Notification.isSupported()) return;
-    const toast = makeToast(title, body);
-    toast.on("click", () => {
-      if (!win) return;
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
-      win.webContents.send("drimvox:open-task", taskId);
-    });
+    if (!away) return;
     if (process.env.DRIMVOX_TEST_UNFOCUSED === "1") {
       // Tests read and click notifications here instead of on the desktop.
       const shown = ((globalThis as { drimvoxNotices?: unknown[] }).drimvoxNotices ??= []);
-      shown.push({ title, body, taskId, click: () => toast.emit("click") });
+      const click = () => {
+        if (target.taskId) win?.webContents.send("drimvox:open-task", target.taskId);
+        else if (target.projectId) win?.webContents.send("drimvox:open-project", target.projectId);
+      };
+      shown.push({ title: request.title, body: request.body, taskId: target.taskId ?? "", projectId: target.projectId ?? "", click });
       return;
     }
-    show(toast);
-    // The taskbar button blinks too, until the window is in front again: it works even when Focus Assist hides toasts.
+    void quiet().then((silent) => showNotice(origin, request, target, silent));
+    // The taskbar button blinks too, until the window is in front again.
     win?.flashFrame(true);
   });
 
   ipcMain.handle("drimvox:focus-assist", (event) => (fromOurPage(event.senderFrame?.url) ? focusAssist() : null));
 
-  // Settings: one notification now, whatever window is in front, to see that they reach the desktop.
-  ipcMain.on("drimvox:notify-test", (event, notice: { title?: unknown; body?: unknown }) => {
-    if (!fromOurPage(event.senderFrame?.url) || !Notification.isSupported()) return;
-    const { title, body } = notice ?? {};
-    if (typeof title !== "string" || typeof body !== "string") return;
-    show(makeToast(title, body));
+  // Settings: one notification now, whatever window is in front, to see and hear how they come.
+  ipcMain.on("drimvox:notify-test", (event, notice: unknown) => {
+    if (!fromOurPage(event.senderFrame?.url)) return;
+    const request = noticeRequest(notice);
+    if (request) void quiet().then((silent) => showNotice(origin, request, {}, silent));
   });
 
   const hex = /^#[0-9a-f]{6}$/i;
@@ -528,35 +536,9 @@ function focusAssist(): Promise<number | null> {
   });
 }
 
-/**
- * Notifications being shown. Windows drops a toast whose object was collected: it went straight to the action centre,
- * without the banner and without the sound (seen on Windows 10 with every setting on). Each one is kept until it closes.
- */
-const showing = new Set<Notification>();
-
-function show(toast: Notification): void {
-  showing.add(toast);
-  const forget = () => showing.delete(toast);
-  toast.once("close", forget);
-  toast.once("failed", forget);
-  // A toast that went to the action centre never says "close": a minute is longer than any banner stays.
-  setTimeout(forget, 60_000).unref();
-  toast.show();
-}
-
-const xml = (text: string) => text.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
-/**
- * A notification with the system's sound. On Windows the sound comes from the toast's own template, so it is named
- * there (seen: toasts arrived without a sound).
- */
-function makeToast(title: string, body: string): Notification {
-  const t = title.slice(0, 120);
-  const b = body.slice(0, 300);
-  if (process.platform !== "win32") return new Notification({ title: t, body: b, silent: false });
-  return new Notification({
-    title: t,
-    body: b,
-    toastXml: `<toast><visual><binding template="ToastGeneric"><text>${xml(t)}</text><text>${xml(b)}</text></binding></visual><audio src="ms-winsoundevent:Notification.Default"/></toast>`,
-  });
+/** Focus Assist on: notifications come without a sound. Asked at most once a minute (it starts PowerShell). */
+let quietAsked: { at: number; value: Promise<boolean> } | null = null;
+function quiet(): Promise<boolean> {
+  if (!quietAsked || Date.now() - quietAsked.at > 60_000) quietAsked = { at: Date.now(), value: focusAssist().then((p) => p === 1 || p === 2) };
+  return quietAsked.value;
 }

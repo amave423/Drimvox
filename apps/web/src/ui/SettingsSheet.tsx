@@ -12,6 +12,7 @@ import { SkillsSection } from "./SkillsSection";
 import { UpdatesSection } from "./UpdatesSection";
 import { Catalog } from "./Catalog";
 import { Setting } from "./Setting";
+import { NoticeSoundSetting, noticeLookNow } from "./NoticeSoundSetting";
 import { SpeechVoiceSetting } from "./SpeechVoiceSetting";
 import { SearchSection } from "./SearchSection";
 import { SpendingSection } from "./SpendingSection";
@@ -103,12 +104,13 @@ export function SettingsSheet() {
             {window.drimvox ? t("settings.notificationsOn") : t("settings.notificationsBrowser")}
           </Toggle>
           {window.drimvox && (
-            <button type="button" className="link" onClick={() => window.drimvox?.testNotify({ title: t("notice.test"), body: t("notice.testBody") })}>
+            <button type="button" className="link" onClick={() => window.drimvox?.testNotify({ ...noticeLookNow(settings), title: t("notice.test"), body: t("notice.testBody") })}>
               {t("settings.notificationsTest")}
             </button>
           )}
           {focusAssist && <p className="note is-pencil">{t("settings.focusAssist")}</p>}
         </Setting>
+        <NoticeSoundSetting save={save} />
         <Setting id="developer-label" title={t("settings.developerTitle")} about={t("settings.developerHint")}>
           <Toggle checked={settings.developer} onChange={(developer) => void save({ developer })}>
             {t("settings.developer")}
