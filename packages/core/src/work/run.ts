@@ -74,6 +74,9 @@ export class WorkRun {
   private readonly inbox: string[] = [];
   private finished = false;
   /** Drimvox looked at the result's design in this run: one round of polish at most. */
+  /** Skills the agent opened in this run, and whether it was reminded of the others before finishing. */
+  private readonly skillsOpened = new Set<string>();
+  private skillsNudged = false;
   private designReviewed = false;
   /** Actions since the checklist was last updated. */
   private sinceChecklist = 0;
@@ -218,6 +221,7 @@ export class WorkRun {
     let priced = true;
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
     const onCall = (name: string, what: string) => {
+      if (name === "use_skill") this.skillsOpened.add(what);
       this.sinceChecklist = name === "update_checklist" ? 0 : this.sinceChecklist + 1;
       activity.push({ name, input: what, at: content.length });
       save();
@@ -270,6 +274,17 @@ export class WorkRun {
         finish: (report, start) => {
           this.finished = true;
           this.d.repo.update(this.projectId, { report, site: start });
+        },
+        skillsLeft: () => {
+          if (this.skillsNudged) return null;
+          this.skillsNudged = true;
+          const left = skills.filter((s) => !this.skillsOpened.has(s.name));
+          if (!left.length) return null;
+          return [
+            "Before you finish: these skills are ready and you have not opened them.",
+            ...left.map((s) => `- ${s.name}: ${s.description}`),
+            "If one is meant for this moment (checking the work before you say it is done, say), open it with use_skill and follow it. Then call finish_work again.",
+          ].join("\n");
         },
         review: async (start) => {
           if (this.designReviewed || !vision || !this.d.visualKit.screenshot) return null;

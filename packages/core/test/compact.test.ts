@@ -33,4 +33,17 @@ describe("compacting a long run's conversation", () => {
     // Done twice, nothing more is cut.
     expect(compactHistory(messages, 2)).toBe(0);
   });
+
+  // Seen live: frontend-design was opened first, and an answer later all that was left of it was its first 600 characters.
+  it("keeps a skill's instructions whole: they are followed the whole run", () => {
+    const skill = "Правило дизайна. ".repeat(1000);
+    const messages: ModelMessage[] = [
+      { role: "assistant", content: [{ type: "tool-call", toolCallId: "s", toolName: "use_skill", input: { name: "frontend-design" } }] },
+      { role: "tool", content: [{ type: "tool-result", toolCallId: "s", toolName: "use_skill", output: { type: "text", value: skill } }] },
+      ...step(1, "y".repeat(20_000)),
+    ];
+    compactHistory(messages, 0);
+    expect((messages[1]!.content as any)[0].output.value).toBe(skill);
+    expect((messages[3]!.content as any)[0].output.value).toMatch(/trimmed by Drimvox/);
+  });
 });

@@ -509,6 +509,23 @@ describe("work on a project", () => {
     expect(JSON.stringify(run[1]!.body.messages)).toContain("Use the brand green.");
   });
 
+  // Seen live: three skills were switched on and only one was ever opened, at the very start.
+  it("names the skills not opened yet before the work is done, once", async () => {
+    mkdirSync(join(folder, ".drimvox", "skills", "verify"), { recursive: true });
+    writeFileSync(join(folder, ".drimvox", "skills", "verify", "SKILL.md"), ["---", "name: verify", "description: Use when about to claim work is complete", "---", "Run the checks first.", ""].join("\n"));
+    const done = call("finish_work", { report: "Готово." });
+    const s = await setup({
+      coder: [noQuestions, writePlan, call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), done, call("use_skill", { name: "verify" }), done],
+    });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "done");
+    const sent = JSON.stringify(requestsOf("coder").at(-1)!.body.messages);
+    expect(sent).toContain("Before you finish: these skills are ready and you have not opened them.");
+    expect(sent).toContain("verify: Use when about to claim work is complete");
+    expect(sent).toContain("Run the checks first.");
+  });
+
   it("is done by Claude Code itself in the project's folder when the working model is on a subscription", async () => {
     const dir = mkdtempSync(join(tmpdir(), "drimvox-fake-cli-"));
     process.env.FAKE_CLI_DIR = dir;

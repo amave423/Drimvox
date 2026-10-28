@@ -7,6 +7,12 @@ const OUTPUT_KEPT = 600;
 const INPUT_KEPT = 400;
 const NOTE = "… (trimmed by Drimvox to keep the conversation short; read the file or run the command again if you need it)";
 
+/**
+ * A skill's instructions stay whole: they are followed the whole run (seen live: frontend-design was opened first, and
+ * an answer later all that was left of it was its first 600 characters).
+ */
+const KEPT_WHOLE = new Set(["use_skill", "read_skill_file"]);
+
 const cut = (text: string, keep: number) => (text.length > keep + NOTE.length ? `${text.slice(0, keep)}${NOTE}` : text);
 
 /**
@@ -22,7 +28,7 @@ export function compactHistory(messages: ModelMessage[], keepWhole = KEEP_WHOLE)
     const m = messages[i]!;
     if (!Array.isArray(m.content)) continue;
     for (const part of m.content as unknown as Record<string, unknown>[]) {
-      if (part.type === "tool-result") {
+      if (part.type === "tool-result" && !KEPT_WHOLE.has(String(part.toolName))) {
         const output = part.output as { type?: string; value?: unknown } | undefined;
         if (output && (output.type === "text" || output.type === "error-text") && typeof output.value === "string") {
           const short = cut(output.value, OUTPUT_KEPT);

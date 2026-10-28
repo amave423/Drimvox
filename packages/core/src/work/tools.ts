@@ -11,6 +11,8 @@ export interface WorkToolHooks {
   finish(report: string, start: { command: string; url: string } | null): void;
   /** Before it is done, once: Drimvox's look at the result; notes for a round of polish, or null to finish. */
   review(start: { command: string; url: string } | null): Promise<string | null>;
+  /** Before it is done, once: the skills the agent has not opened, which may be meant for this moment; null when none. */
+  skillsLeft?(): string | null;
   onCall(name: string, input: string): void;
 }
 
@@ -64,6 +66,9 @@ export function workTools(h: WorkToolHooks): ToolSet {
       execute: async ({ report, start }) => {
         const open = h.checklist().filter((i) => !i.done);
         if (open.length) return `These checklist items are not done: ${open.map((i) => i.text).join("; ")}. Finish them, or update the checklist if they are not needed, then call finish_work again.`;
+        // Seen live: three skills were switched on and only one was ever opened, at the very start.
+        const skills = h.skillsLeft?.();
+        if (skills) return skills;
         const site = start ? { command: clip(start.command, 500), url: start.url.trim() } : null;
         const polish = await h.review(site);
         if (polish) return polish;
