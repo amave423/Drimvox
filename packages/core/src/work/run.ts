@@ -33,7 +33,10 @@ const CHECKLIST_NOTE = "Tick off in the checklist what is done by now with updat
 const MAX_ERRORS = 2;
 const RETRY_MS = 5000;
 /** Looks at pages per answer: the desktop and the phone, scenarios, and again after fixes. */
-const LOOKS = { looks: 8, then: "You have looked at pages enough in this answer: go on with the work, you can look again in the next one." };
+const LOOKS = {
+  looks: 8,
+  then: "You have looked at pages enough in this answer: go on with the work, you can look again in the next one, or use browser_look. Never install Playwright or write screenshot scripts.",
+};
 
 export interface RunDeps {
   chats: ChatRepo;
@@ -242,7 +245,7 @@ export class WorkRun {
     const own: ToolSet = {
       ...mcpTools,
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
-      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true }),
+      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true, vision, onSpend: (usd) => (cost += usd) }),
       ...skillTools(skills, this.folder, hooks),
       ...visualTools(
         {

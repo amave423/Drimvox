@@ -36,6 +36,8 @@ export interface BrowserDriver {
   reload(): Promise<void>;
   /** A DevTools command in the shown tab's page; starts the browser and makes a tab first if needed. */
   command(method: string, params?: Record<string, unknown>): Promise<unknown>;
+  /** The page back at the panel's size after a look at another width; where the panel sets no size, nothing to do. */
+  restoreSize?(): Promise<void>;
   stop(): Promise<void>;
 }
 

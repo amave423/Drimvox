@@ -60,7 +60,7 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean): string
     "  (npm run dev, or what the project uses) starts without errors: run it with start_background, read its output.",
     "- Check your work for real: write and run tests for the logic; run the build;",
     canLook
-      ? "  start the interface and look at its pages with look_at_page on a desktop width and a phone width (390); go through the\n  main scenarios as a person would, with look_at_page steps (click, type, wait) — add to cart, order, sign in."
+      ? "  start the interface and look at its pages with look_at_page on a desktop width and a phone width (390); go through the\n  main scenarios as a person would (add to cart, order, sign in): open the page with browser_open, act with browser_click\n  and browser_type, and look at the state it reached with browser_look. Never install Playwright or another browser into\n  the project and never write screenshot scripts: these tools do it."
       : "  start the interface and request its pages to make sure they answer.",
     "- Never commit or push: git stays the user's.",
     "- Keep the project's notes current with update_notes: commands, decisions, what is done.",

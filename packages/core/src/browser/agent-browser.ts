@@ -148,6 +148,10 @@ export class AgentBrowser implements BrowserDriver {
     return this.send(method, params, this.session);
   }
 
+  restoreSize(): Promise<void> {
+    return this.applySize();
+  }
+
   /** Opens an address in the current tab; starts the browser first if needed. */
   async open(url: string): Promise<void> {
     await this.endpoint();

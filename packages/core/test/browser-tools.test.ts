@@ -45,7 +45,13 @@ describe("the agent's browser tools", () => {
       const browser = new Browser(driver);
       const calls: string[] = [];
       const run: ToolRun = async (_id, name, input, work) => (calls.push(`${name} ${input}`), work());
-      const tools = browserTools(browser, { local: true }, run);
+      // What a model that sees pictures was shown: the picture's size and the question.
+      const seen: { width: number; height: number; question: string }[] = [];
+      const see = async (png: Buffer, question: string) => {
+        seen.push({ width: png.readUInt32BE(16), height: png.readUInt32BE(20), question });
+        return "Кнопка «Найти» видна";
+      };
+      const tools = browserTools(browser, { local: true, see }, run);
       const call = (name: string, input: unknown) => (tools[name]!.execute as (i: unknown, o: unknown) => Promise<string>)(input, { toolCallId: name, messages: [] });
 
       const page = await call("browser_open", { url });
@@ -72,6 +78,13 @@ describe("the agent's browser tools", () => {
       browser.done();
       expect(await asked).toContain("The user says it is done");
       expect(browser.state().waiting).toBeNull();
+
+      // A look at a phone's width, the whole page; the page goes back to its own width after.
+      const before = (await driver.command("Runtime.evaluate", { expression: "innerWidth", returnByValue: true })) as { result: { value: number } };
+      expect(await call("browser_look", { question: "Видна ли кнопка?", width: 390, full_page: true })).toBe("Кнопка «Найти» видна");
+      expect(seen.at(-1)).toMatchObject({ width: 390, question: "Видна ли кнопка?" });
+      const after = (await driver.command("Runtime.evaluate", { expression: "innerWidth", returnByValue: true })) as { result: { value: number } };
+      expect(after.result.value).toBe(before.result.value);
 
       // Tabs: one more, shown, then closed.
       expect(await call("browser_open", { url, new_tab: true })).toMatch(/Tabs: 1 "Далеко", 2 "Поиск" \(shown\)/);

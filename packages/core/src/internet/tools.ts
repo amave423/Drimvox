@@ -1,6 +1,7 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import { browserTools } from "../browser/tools";
+import { BROWSER_HINT, browserTools } from "../browser/tools";
+import { askAboutPictures, type Vision } from "../visual/look";
 import { pageStepsInput } from "../visual/steps";
 import { clipPage, isPublicAddress, type WebAccess } from "./web";
 
@@ -29,14 +30,16 @@ export const WEB_HINT =
   "(browser_open and the other browser_ tools, or browse_page): it runs the page's scripts, types into a search field and " +
   "presses buttons. When web_search is limited, search in the browser instead. Search sparingly: a few " +
   "precise queries, then open the pages; when you know the site that has the answer, go to it directly. " +
-  FAIR_USE_HINT;
+  FAIR_USE_HINT +
+  " " +
+  BROWSER_HINT;
 
 /**
  * Search and page reading, free, through Drimvox itself; for any model that can call tools. With the agent's browser
  * the model also works in a real browser the user sees; `local` lets it open addresses on this computer (a project's
  * agent checks the app it runs).
  */
-export function webTools(web: WebAccess, hooks: WebHooks = {}, o: { local?: boolean } = {}): ToolSet {
+export function webTools(web: WebAccess, hooks: WebHooks = {}, o: { local?: boolean; vision?: Vision | null; onSpend?(usd: number): void } = {}): ToolSet {
   // Within one answer: a query asked again is answered from what was found (DuckDuckGo limits bursts), and a browser
   // call that failed twice exactly as it is is not tried a third time (seen: the same missing field, twelve times).
   const found = new Map<string, string>();
@@ -79,7 +82,17 @@ export function webTools(web: WebAccess, hooks: WebHooks = {}, o: { local?: bool
     }),
   };
   // The agent's own browser replaces reading in a hidden window and showing a page in a window of its own.
-  if (web.browser?.driver.available()) return { ...tools, ...browserTools(web.browser, { local: !!o.local }, run) };
+  if (web.browser?.driver.available()) {
+    const vision = o.vision;
+    const see = vision
+      ? async (png: Buffer, question: string, signal?: AbortSignal) => {
+          const r = await askAboutPictures(vision, [{ data: png, mediaType: "image/png" }], `${question}\nAnswer concretely, in the language of the question.`, signal);
+          o.onSpend?.(r.costUsd);
+          return r.text;
+        }
+      : undefined;
+    return { ...tools, ...browserTools(web.browser, { local: !!o.local, see }, run) };
+  }
   const show = web.show;
   // The user passes a captcha or signs in themselves, in a window of the same browser the model reads pages with.
   if (show) {

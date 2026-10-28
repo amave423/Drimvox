@@ -6,12 +6,19 @@ import { keyPress } from "./driver";
 import { chooseScript, focusScript, placeScript, READ_SCRIPT } from "./page-scripts";
 
 export const BROWSER_HINT =
-  "You have a real browser, which the user sees in Drimvox's Browser panel. browser_open goes to an address, browser_read " +
+  "When you have the browser_ tools, you have a real browser, which the user sees in Drimvox's Browser panel. browser_open goes to an address, browser_read " +
   "reads the page with its controls numbered like [3 button \"Search\"], browser_click, browser_type, browser_choose, " +
   "browser_press and browser_scroll act on them, and every action answers with the page as it is after. Use it when " +
   "web_search and open_page are not enough: pages drawn by scripts, search forms, sign-ins, several steps. When a page " +
   "asks to prove a person is there (a captcha, a bot check) or needs the user's sign-in, call browser_ask_user and wait: " +
-  "the user does it in the panel. Never try to pass such a check yourself.";
+  "the user does it in the panel. Never try to pass such a check yourself. browser_look shows you the page as a picture, " +
+  "at a phone's or a desktop's width, in the state your actions left it: never install Playwright, Puppeteer or another " +
+  "browser into a project, and never write scripts that take screenshots.";
+
+/** Looks at pages per answer; the next answer may look again. */
+export const MAX_BROWSER_LOOKS = 12;
+/** A whole page is photographed at most this tall: a picture taller than this tells a model little more. */
+const MAX_LOOK_HEIGHT = 8000;
 
 /** Runs one tool call with the chat's or the agent's hooks around it; what webTools gives. */
 export type ToolRun = (callId: string, name: string, input: string, work: () => Promise<string>) => Promise<string>;
@@ -25,8 +32,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * the tab is inside Drimvox's window, and on the server. `local` lets a project's agent open the app it runs on this
  * computer; a chat reads the public internet only.
  */
-export function browserTools(browser: Browser, o: { local: boolean }, run: ToolRun): ToolSet {
+/** Asks a model that sees pictures about one: what browser_look needs; absent, there is no browser_look. */
+export type See = (png: Buffer, question: string, signal?: AbortSignal) => Promise<string>;
+
+export function browserTools(browser: Browser, o: { local: boolean; see?: See }, run: ToolRun): ToolSet {
   const d = browser.driver;
+  let looks = 0;
 
   async function evaluate(expression: string): Promise<unknown> {
     const r = (await d.command("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })) as {
@@ -81,6 +92,30 @@ export function browserTools(browser: Browser, o: { local: boolean }, run: ToolR
     const events = keyPress(key, modifiers);
     if (!events) throw new Error(`Unknown key "${key}". Keys: Enter, Tab, Escape, Backspace, Delete, arrows (ArrowDown…), Home, End, PageUp, PageDown, a letter or digit.`);
     for (const e of events) await d.command("Input.dispatchKeyEvent", e);
+  }
+
+  /** The shown page as a picture: at a phone's or a desktop's width when asked, the whole page when asked. */
+  async function photograph(width: number | undefined, full: boolean): Promise<Buffer> {
+    if (width) {
+      // Exactly this width, as the page's own media queries see it (a "mobile" override lays a page out at 980 instead).
+      await d.command("Emulation.setDeviceMetricsOverride", { width, height: width < 768 ? 844 : 900, deviceScaleFactor: 1, mobile: false });
+      await sleep(600);
+    }
+    try {
+      let clip: Record<string, number> | undefined;
+      if (full) {
+        const [w, h] = (await evaluate("[innerWidth, document.documentElement.scrollHeight]")) as [number, number];
+        clip = { x: 0, y: 0, width: w, height: Math.min(h, MAX_LOOK_HEIGHT), scale: 1 };
+      }
+      const shot = (await d.command("Page.captureScreenshot", { format: "png", ...(clip ? { clip, captureBeyondViewport: true } : {}) })) as { data: string };
+      return Buffer.from(shot.data, "base64");
+    } finally {
+      // The page goes back to the size of its panel.
+      if (width) {
+        await d.command("Emulation.clearDeviceMetricsOverride").catch(() => {});
+        await d.restoreSize?.().catch(() => {});
+      }
+    }
   }
 
   function checkAddress(url: string): void {
@@ -181,6 +216,29 @@ export function browserTools(browser: Browser, o: { local: boolean }, run: ToolR
           return read(x.abortSignal);
         }),
     }),
+    ...(o.see
+      ? {
+          // Seen live: out of looks, an agent installed Playwright into the project and wrote its own screenshot scripts.
+          browser_look: tool({
+            description:
+              "Look at the page shown in the browser as a picture and ask about it (layout, colours, what is visible, what is " +
+              "broken). width 390 is a phone, 1280 a desktop; full_page takes the whole page, not only the screen. The page " +
+              "stays in the state your actions left it (an item added, a form sent).",
+            inputSchema: z.object({
+              question: z.string().min(1).max(2000),
+              width: z.number().int().min(320).max(1920).optional(),
+              full_page: z.boolean().optional(),
+            }),
+            execute: ({ question, width, full_page }, x: Opts) =>
+              run(x.toolCallId, "browser_look", question, async () => {
+                if (++looks > MAX_BROWSER_LOOKS) {
+                  throw new Error(`You have looked ${MAX_BROWSER_LOOKS} times in this answer: go on with the work, you can look again in the next one.`);
+                }
+                return o.see!(await photograph(width, !!full_page), question, x.abortSignal);
+              }),
+          }),
+        }
+      : {}),
     browser_ask_user: tool({
       description:
         "Ask the user to do something in the browser themselves: pass a captcha or a bot check, sign in. The browser panel " +
