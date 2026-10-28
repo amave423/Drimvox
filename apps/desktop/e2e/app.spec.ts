@@ -291,6 +291,16 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
   }
 });
 
+// Asked for: the window opens about 80% of the screen wide, as Claude Code does; the height stays.
+test("opens the window about 80% of the screen wide", async () => {
+  app = await launch();
+  await app.firstWindow();
+  const { win, area } = await app.evaluate(({ BrowserWindow, screen }) => ({ win: BrowserWindow.getAllWindows()[0]!.getBounds(), area: screen.getPrimaryDisplay().workAreaSize }));
+  expect(Math.abs(win.width - Math.max(960, Math.round(area.width * 0.8)))).toBeLessThanOrEqual(2);
+  // A few pixels either way: the display scale rounds the window frame.
+  expect(Math.abs(win.height - Math.min(860, area.height))).toBeLessThanOrEqual(6);
+});
+
 // Asked for: reading answers aloud with Piper's voices instead of the system's.
 test("offers Piper's voices on the audio tab and in the settings", async () => {
   app = await launch();

@@ -23,7 +23,7 @@ npm run server:install        # сборка, служба systemd, tailscale se
   пишет `/etc/systemd/system/drimvox.service` (от имени текущего пользователя, `Restart=on-failure`),
   включает и запускает службу, затем `tailscale serve --bg --https=443 http://127.0.0.1:4317`.
   В конце печатает адрес вида `https://<машина>.<tailnet>.ts.net` и код первого входа.
-  По желанию ставит Chromium для визуальных проверок (`npx playwright install --with-deps chromium`).
+  Ставит Chromium для браузера агента и визуальных проверок (`npx playwright install --with-deps chromium`), если на сервере ещё нет Chrome или Chromium; `DRIMVOX_CHROMIUM=0` — не ставить.
 - Обновление: `git pull && npm install && npm run server:install` (скрипт повторяемый).
 - Нужен Node 24 и `tailscale` с включённым HTTPS в админке Tailscale.
 

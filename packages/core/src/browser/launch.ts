@@ -23,8 +23,15 @@ export function findBrowser(): string | null {
   try {
     const dirs = readdirSync(cache).filter((d) => /^chromium-\d+$/.test(d)).sort().reverse();
     for (const d of dirs) {
-      const exe = process.platform === "win32" ? join(cache, d, "chrome-win", "chrome.exe") : process.platform === "darwin" ? join(cache, d, "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium") : join(cache, d, "chrome-linux", "chrome");
-      if (existsSync(exe)) return exe;
+      // Newer Playwright versions name the folder for the processor too (chrome-win64, chrome-linux64).
+      const exes =
+        process.platform === "win32"
+          ? [join(cache, d, "chrome-win", "chrome.exe"), join(cache, d, "chrome-win64", "chrome.exe")]
+          : process.platform === "darwin"
+            ? [join(cache, d, "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium"), join(cache, d, "chrome-mac-arm64", "Chromium.app", "Contents", "MacOS", "Chromium")]
+            : [join(cache, d, "chrome-linux", "chrome"), join(cache, d, "chrome-linux64", "chrome")];
+      const exe = exes.find((e) => existsSync(e));
+      if (exe) return exe;
     }
   } catch {
     // No cache.

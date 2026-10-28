@@ -1,6 +1,6 @@
 import { coreGitEnv } from "./git-env";
 import { attachContextMenu } from "./context-menu";
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell, utilityProcess, type UtilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -477,9 +477,11 @@ function registerIpc() {
 
 async function createWindow(view?: "local" | "local-images") {
   const dark = nativeTheme.shouldUseDarkColors;
+  // About 80% of the screen's width, as Claude Code opens (asked for); the height as before, within the screen.
+  const area = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
-    width: 1360,
-    height: 860,
+    width: Math.max(960, Math.min(area.width, Math.round(area.width * 0.8))),
+    height: Math.min(860, area.height),
     minWidth: 960,
     minHeight: 600,
     show: false,

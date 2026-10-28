@@ -3,7 +3,7 @@
 # Run from the Drimvox folder: npm run server:install. Safe to run again after `git pull` to update.
 #   DRIMVOX_PORT      port on 127.0.0.1 (4317)
 #   DRIMVOX_DATA_DIR  data folder (~/.local/share/drimvox)
-#   DRIMVOX_CHROMIUM  1 = install Chromium for visual checks without asking, 0 = skip
+#   DRIMVOX_CHROMIUM  0 = do not install Chromium (the agent's browser and visual checks need it; installed by default)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -74,13 +74,18 @@ if [ -n "$NAME" ]; then
   sudo tailscale serve --bg --https=443 "http://127.0.0.1:$PORT"
 fi
 
-CHROMIUM="${DRIMVOX_CHROMIUM:-}"
-if [ -z "$CHROMIUM" ] && [ -t 0 ]; then
-  read -r -p "Install Chromium so agents can look at the pages they build (about 300 MB)? [y/N] " answer
-  [[ "$answer" =~ ^[YyДд] ]] && CHROMIUM=1 || CHROMIUM=0
-fi
+# The agent's browser and its visual checks run in Chromium: installed unless the server already has Chrome or
+# Chromium, or DRIMVOX_CHROMIUM=0 says not to.
+CHROMIUM="${DRIMVOX_CHROMIUM:-1}"
+for exe in google-chrome google-chrome-stable chromium chromium-browser microsoft-edge; do
+  if command -v "$exe" >/dev/null 2>&1; then
+    echo "Found $exe: the agent's browser will use it."
+    [ -z "${DRIMVOX_CHROMIUM:-}" ] && CHROMIUM=0
+    break
+  fi
+done
 if [ "$CHROMIUM" = "1" ]; then
-  say "Installing Chromium for visual checks"
+  say "Installing Chromium for the agent's browser (about 300 MB)"
   npx playwright install --with-deps chromium
 fi
 
