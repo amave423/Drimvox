@@ -2,6 +2,8 @@ import { inParams, useApp } from "../context";
 import { Logo } from "./Logo";
 import { LAST_PROJECT_KEY } from "./projects/Workshop";
 import { WorkshopBar } from "./projects/WorkshopBar";
+import { BrowserPane, useBrowserState } from "./BrowserPane";
+import { useState } from "react";
 
 export function TopBar() {
   const { t, view, mode, navigate, chats, projects, tasks } = useApp();
@@ -32,6 +34,7 @@ export function TopBar() {
         )}
       </div>
       {view.kind === "project" && <WorkshopBar projectId={view.projectId} />}
+      <BrowserButton />
     </header>
   );
 }
@@ -62,5 +65,28 @@ function ModeSwitch() {
         </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * The agent's browser, at the top right like Claude's (asked for): a dot while it runs; a click opens its panel, where
+ * what the agent does is seen and a check can be passed by hand.
+ */
+function BrowserButton() {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  const state = useBrowserState();
+  return (
+    <>
+      <button type="button" className={`topbar-browser${open ? " is-on" : ""}`} aria-pressed={open} title={t("browser.title")} onClick={() => setOpen(!open)}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9M12 3c-2.5 2.6-3.8 5.6-3.8 9s1.3 6.4 3.8 9" />
+        </svg>
+        {t("browser.button")}
+        {state?.running && <span className="topbar-browser-dot" aria-label={t("browser.running")} />}
+      </button>
+      {open && <BrowserPane onClose={() => setOpen(false)} />}
+    </>
   );
 }

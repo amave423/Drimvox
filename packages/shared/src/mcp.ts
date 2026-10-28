@@ -47,3 +47,14 @@ export type McpStatus = { ok: true; tools: { name: string; description: string }
 /** The user's answer to a permission request; `always` remembers it for this tool of this server. */
 /** `server`: allow every tool of the call's MCP server from now on (seen: a browser server asked for each of its twenty tools). */
 export const approvalDecisionSchema = z.object({ allow: z.boolean(), always: z.boolean().default(false), server: z.boolean().default(false) }).strict();
+
+/** An address for the agent's browser; none opens an empty tab. */
+export const browserOpenSchema = z.object({ url: z.string().trim().max(4000).optional() }).strict();
+
+/** What the user does in the browser's panel, in the page's own pixels. */
+export const browserInputSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("mouse"), action: z.enum(["down", "up", "move"]), x: z.number(), y: z.number(), button: z.enum(["left", "right", "middle"]).optional(), clicks: z.number().int().min(1).max(3).optional() }),
+  z.object({ type: z.literal("wheel"), x: z.number(), y: z.number(), deltaX: z.number(), deltaY: z.number() }),
+  z.object({ type: z.literal("key"), key: z.string().max(20) }),
+  z.object({ type: z.literal("text"), text: z.string().max(2000) }),
+]);

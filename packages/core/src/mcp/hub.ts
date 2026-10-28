@@ -4,6 +4,7 @@ import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotoc
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { jsonSchema, tool, type ToolSet } from "ai";
 import type { McpRepo, McpServerConfig } from "./repo";
+import { playwrightArgs } from "../browser/agent-browser";
 
 interface McpTool {
   name: string;
@@ -52,7 +53,11 @@ const MAX_OUTPUT = 20_000;
 export class McpHub {
   private readonly connections = new Map<string, Connection>();
 
-  constructor(private readonly repo: McpRepo) {}
+  constructor(
+    private readonly repo: McpRepo,
+    /** The agent's own browser: the Playwright server drives it, Drimvox's panel shows it. */
+    private readonly browser?: { endpoint(): Promise<string>; outputDir: string },
+  ) {}
 
   async status(id: string): Promise<McpStatus> {
     try {
@@ -130,11 +135,18 @@ export class McpHub {
 
     const client = (async () => {
       const c = new Client({ name: "Drimvox", version: "1.0.0" });
+      // The Playwright server works in the agent's browser, which Drimvox's panel shows (asked for); without one on the
+      // computer it keeps its own.
+      let args = server.args;
+      if (this.browser && args.some((a) => a.includes("@playwright/mcp"))) {
+        const endpoint = await this.browser.endpoint().catch(() => null);
+        if (endpoint) args = playwrightArgs(args, endpoint, this.browser.outputDir);
+      }
       const transport =
         server.transport === "stdio"
           ? new StdioClientTransport({
               command: server.command!,
-              args: server.args,
+              args,
               // The server gets the usual system variables plus its own; nothing else of Drimvox's environment.
               env: { ...getDefaultEnvironment(), ...server.env },
               stderr: "ignore",

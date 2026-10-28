@@ -22,6 +22,8 @@ import { AuthStore } from "./auth/store";
 import { duckDuckGo, type PageReader, type PageShower, type WebAccess } from "./internet/web";
 import { Background } from "./agent/background";
 import { McpHub } from "./mcp/hub";
+import { AgentBrowser } from "./browser/agent-browser";
+import { browserRoutes } from "./routes/browser";
 import { McpRepo } from "./mcp/repo";
 import { MediaRepo } from "./media/repo";
 import { Studio } from "./media/studio";
@@ -128,7 +130,8 @@ export function createCore(o: AppOptions) {
   useLocalAudio(local.audio);
   const github = new GitHub(o.db, cipher, o.github);
   const mcpRepo = new McpRepo(o.db, cipher);
-  const mcp = new McpHub(mcpRepo);
+  const agentBrowser = new AgentBrowser({ profileDir: join(o.dataDir, "agent-browser") });
+  const mcp = new McpHub(mcpRepo, agentBrowser);
   const approvals = new ChatApprovals();
   const shots = new Shots(join(o.dataDir, "screenshots"));
   const visualKit = { background: new Background(), screenshot: o.screenshot ?? null, shots };
@@ -256,6 +259,7 @@ export function createCore(o: AppOptions) {
       }),
     )
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
+    .route("/browser", browserRoutes(agentBrowser))
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills"), o.skillSources ?? SKILL_SOURCES))
     .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), async (since) => spendingByModel(o.db, providers, since)))
@@ -288,6 +292,7 @@ export function createCore(o: AppOptions) {
       await runner.shutdown();
       visualKit.background.shutdown();
       await mcp.shutdown();
+      await agentBrowser.stop();
       local.close();
     },
   };

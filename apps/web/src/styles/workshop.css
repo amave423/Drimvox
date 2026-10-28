@@ -157,3 +157,21 @@
 .diff-toggle:hover { color: var(--fg); }
 .diff-caret { width: 12px; flex: none; }
 .diff-file.is-folded .diff-head { border-bottom: 0; }
+
+/* The agent's browser: a button at the top right with a dot while it runs, and its panel over the right of the window. */
+.topbar-browser { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--sheet); color: var(--muted); font-size: 13px; position: relative; }
+.topbar-browser:hover, .topbar-browser.is-on { color: var(--fg); border-color: var(--muted); }
+.topbar-browser-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.browser-pane { position: fixed; z-index: 40; top: var(--topbar-h); right: 0; bottom: 30px; width: min(780px, 60vw); display: flex; flex-direction: column; background: var(--sheet); border-left: 1px solid var(--line); box-shadow: var(--sheet-shadow); animation: pane-in 0.22s ease; }
+@keyframes pane-in { from { transform: translateX(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .browser-pane { animation: none; } }
+.browser-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.browser-bar .icon-button { width: 30px; height: 30px; font-size: 18px; line-height: 1; }
+.browser-address { flex: 1; min-width: 0; }
+.browser-address .field-input { width: 100%; height: 32px; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; }
+.browser-hint { margin: 0; padding: 6px 14px; font-size: 12.5px; border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.browser-view { flex: 1; min-height: 0; overflow: auto; background: var(--paper); outline: none; }
+.browser-view:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
+.browser-view img { display: block; width: 100%; height: auto; cursor: default; user-select: none; }
+.browser-empty { padding: 40px 24px; display: grid; gap: 12px; justify-items: start; max-width: 60ch; }
+.browser-empty p { margin: 0; }

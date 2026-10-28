@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openSection, paramsButton } from "./sections";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 
@@ -224,6 +226,43 @@ test("shows its own notification window with the chosen sound, and it goes away 
   await page.reload();
   await openSection(page, "Настройки");
   await expect(page.getByRole("radiogroup", { name: "Звук уведомлений" }).getByRole("radio", { name: "Колокольчик" })).toHaveAttribute("aria-checked", "true");
+});
+
+// Asked for: the agent's browser in a panel of Drimvox, like Claude's, not a window of its own; a check is passed in it.
+test("opens the agent's browser in a panel, where a page is clicked and typed into", async () => {
+  test.setTimeout(60_000);
+  const site = createServer((_, res) => {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(`<title>Проверка</title><body style="margin:0"><button style="position:absolute;left:0;top:0;width:400px;height:250px" onclick="document.title='Нажато'">Я не робот</button><input style="position:absolute;left:0;top:300px;width:300px" oninput="document.title='Введено: '+this.value"></body>`);
+  });
+  await new Promise<void>((r) => site.listen(0, "127.0.0.1", r));
+  try {
+    app = await launch();
+    const page = await app.firstWindow();
+    await expect(paramsButton(page)).toBeVisible();
+    await page.getByRole("button", { name: "Браузер", exact: true }).click();
+    const pane = page.getByRole("complementary", { name: "Браузер агента" });
+    await expect(pane).toContainText("не запущен");
+    await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${(site.address() as AddressInfo).port}/`);
+    await pane.getByLabel("Адрес").press("Enter");
+    const view = pane.locator(".browser-view img");
+    await expect(view).toBeVisible({ timeout: 20_000 });
+    await expect(pane.locator(".browser-hint")).toHaveText("Проверка", { timeout: 10_000 });
+    // A click on the picture is a click on the page.
+    const box = (await view.boundingBox())!;
+    await page.mouse.click(box.x + 40, box.y + 40);
+    await expect(pane.locator(".browser-hint")).toHaveText("Нажато", { timeout: 10_000 });
+    // Typing goes into the page.
+    const scale = box.width / (await view.evaluate((img: HTMLImageElement) => img.naturalWidth));
+    await page.mouse.click(box.x + 20 * scale, box.y + 310 * scale);
+    // Real keys: Playwright types letters off its layout without key events, as no keyboard does.
+    await page.keyboard.type("kedr");
+    await expect(pane.locator(".browser-hint")).toHaveText("Введено: kedr", { timeout: 10_000 });
+    await expect(page.locator(".topbar-browser-dot")).toBeVisible({ timeout: 10_000 });
+  } finally {
+    site.closeAllConnections();
+    await new Promise((r) => site.close(r));
+  }
 });
 
 // Asked for: reading answers aloud with Piper's voices instead of the system's.
