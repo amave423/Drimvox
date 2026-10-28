@@ -28,7 +28,7 @@ import { makeTitle } from "../chats/title";
 import { isCli } from "../cli/kinds";
 import type { ChatRepo } from "../chats/repo";
 import { mediaModel } from "../media/catalog";
-import { findModel } from "../providers/catalog";
+import { findModel, listModels } from "../providers/catalog";
 import type { ChatApprovals } from "../chats/approvals";
 import type { WebAccess } from "../internet/web";
 import type { McpHub } from "../mcp/hub";
@@ -329,7 +329,7 @@ export function chatRoutes(
                   kit: work.visualKit,
                   taskId: chat.id,
                   worktree: task.folder,
-                  vision: await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel),
+                  vision: await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel, listModels),
                   hooks: { onCall: (call) => void emit({ type: "tool", name: call.name, input: describeInput(call.input) }), onResult: () => {}, askApproval: async () => false },
                   onSpend: () => {},
                   event: () => {},
@@ -366,7 +366,7 @@ export function chatRoutes(
                     (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, purpose, signal })) !== false,
                   { list: () => chats.attachments.ofChat(chat.id), file: (id) => chats.attachments.file(id) },
                   // Pictures in the folder: the settings' vision model, else the chat's own when it sees them.
-                  await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel),
+                  await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel, listModels),
                 )
               : {}),
           },

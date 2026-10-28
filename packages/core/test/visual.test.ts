@@ -45,7 +45,8 @@ async function start(coder: FakeTurn[], eyes: string[], o: { spec?: boolean; vis
     key: KEY,
     models: [
       { id: "coder", architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
-      { id: "eyes", architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } },
+      // Without the setting no model of the provider sees: Drimvox would otherwise find this one by itself.
+      { id: "eyes", architecture: { input_modalities: o.visionSetting === false ? ["text"] : ["text", "image"], output_modalities: ["text"] } },
     ],
     respond: (body) =>
       body.model === "eyes"

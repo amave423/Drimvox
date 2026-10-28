@@ -99,6 +99,8 @@ export async function resolveVision(
   providers: { connection(id: string): Connection | null },
   task: { providerId: string | null; model: string },
   find: (conn: Connection, model: string) => Promise<ModelInfo | undefined>,
+  /** The provider's models, to find one that sees when the task's own does not. */
+  list?: (conn: Connection) => Promise<ModelInfo[]>,
 ): Promise<Vision | null> {
   if (setting) {
     const conn = providers.connection(setting.providerId);
@@ -107,5 +109,12 @@ export async function resolveVision(
   const conn = task.providerId ? providers.connection(task.providerId) : null;
   if (!conn) return null;
   const info = await find(conn, task.model);
-  return info?.vision ? { conn, model: task.model, price: info } : null;
+  if (info?.vision) return { conn, model: task.model, price: info };
+  // Seen live: DeepSeek V4 Pro built a whole service and nobody looked at its pages, while DeepSeek Flash on the same key
+  // sees pictures. The cheapest model of the same provider that sees and can be asked in text looks instead.
+  const models = list ? await list(conn).catch(() => []) : [];
+  const seeing = models
+    .filter((m) => m.vision === true && m.id !== task.model && !/image|video|tts|whisper|embed/i.test(m.id))
+    .sort((a, b) => (a.priceIn ?? Number.POSITIVE_INFINITY) - (b.priceIn ?? Number.POSITIVE_INFINITY))[0];
+  return seeing ? { conn, model: seeing.id, price: seeing } : null;
 }

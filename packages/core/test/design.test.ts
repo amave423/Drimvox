@@ -74,7 +74,8 @@ async function start(s: Script, o: { stages?: Record<string, boolean>; vision?: 
       { id: "coder", architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
       { id: "lead", architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
       { id: "judge", architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
-      { id: "eyes", architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } },
+      // Without vision no model of the provider sees: Drimvox would otherwise find this one by itself.
+      { id: "eyes", architecture: { input_modalities: o.vision === false ? ["text"] : ["text", "image"], output_modalities: ["text"] } },
     ],
     respond: (body) => {
       if (isAcceptor(body)) return q.acceptor.shift() ?? { text: "Done." };

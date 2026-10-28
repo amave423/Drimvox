@@ -6,7 +6,7 @@ import { ProjectWorkRepo } from "./work/repo";
 import { ProjectWork } from "./work/service";
 import { workRoutes } from "./routes/work";
 import { resolveVision } from "./visual/look";
-import { findModel } from "./providers/catalog";
+import { findModel, listModels } from "./providers/catalog";
 import { zValidator } from "@hono/zod-validator";
 import { settingsPatchSchema, speakSchema, speechText, type PresetId } from "@drimvox/shared";
 import { Hono } from "hono";
@@ -206,7 +206,7 @@ export function createCore(o: AppOptions) {
       idleTimeoutMs,
       plan: (projectId) => backlog.plan(projectId),
       month: () => monthUsage(o.db, chats),
-      vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel),
+      vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
     },
   });
   const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });

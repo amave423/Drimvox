@@ -2,7 +2,7 @@ import type { WebAccess } from "../internet/web";
 import { imageToolsFor } from "../media/agent-tool";
 import type { MediaRepo } from "../media/repo";
 import type { McpHub } from "../mcp/hub";
-import { findModel } from "../providers/catalog";
+import { findModel, listModels } from "../providers/catalog";
 import type { ProviderRepo } from "../providers/repo";
 import { resolveVision } from "../visual/look";
 import type { VisualKit } from "../visual/tools";
@@ -29,7 +29,7 @@ export function taskExtras(o: ExtrasOptions, taskId: string, ask: (command: stri
     web: o.web,
     skillsDir: o.skillsDir,
     visualKit: o.visualKit,
-    vision: (row) => resolveVision(o.visionModel(), o.providers, { providerId: row.provider_id, model: row.model }, findModel),
+    vision: (row) => resolveVision(o.visionModel(), o.providers, { providerId: row.provider_id, model: row.model }, findModel, listModels),
     mcpTools: (hooks) => o.mcp.toolsFor((call) => ask(`${call.server}: ${call.tool} ${JSON.stringify(call.input).slice(0, 500)}`, call.signal), hooks),
     imageTools: (row, hooks, onSpend, budgetLeft) =>
       imageToolsFor(o.imageModel(), o.providers, { worktree: row.worktree, taskId, media: o.media, hooks, budgetLeft, onSpend }),
