@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("drimvox", {
   openSkillsFolder: () => ipcRenderer.send("drimvox:open-skills"),
   notify: (notice: unknown) => ipcRenderer.send("drimvox:notify", notice),
   testNotify: (notice: unknown) => ipcRenderer.send("drimvox:notify-test", notice),
+  /** Where the browser panel's page box is; null when the panel closes. */
+  placeBrowser: (place: { x: number; y: number; width: number; height: number } | null) => ipcRenderer.send("drimvox:browser-place", place),
   focusAssist: (): Promise<number | null> => ipcRenderer.invoke("drimvox:focus-assist"),
   updateState: () => ipcRenderer.invoke("drimvox:update-state"),
   onUpdate: (listener: (state: unknown) => void) => {

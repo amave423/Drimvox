@@ -140,3 +140,35 @@ export function BrowserView({ frame, title, onInput }: { frame: BrowserFrameView
     </div>
   );
 }
+
+/**
+ * The desktop's page box (asked for: a browser exactly like Claude's): the agent's real tab is put over it by the app,
+ * so clicks, typing, scrolling and checks are the browser's own. The box tells where it is whenever it moves.
+ */
+export function EmbeddedView({ title }: { title: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    const place = window.drimvox?.placeBrowser;
+    if (!el || !place) return;
+    let last = "";
+    const tell = () => {
+      const r = el.getBoundingClientRect();
+      const now = { x: r.left, y: r.top, width: r.width, height: r.height };
+      const key = JSON.stringify(now);
+      if (key === last) return;
+      last = key;
+      place(now);
+    };
+    // The panel slides in and is dragged wider: its box is followed as long as it is open.
+    let frame = requestAnimationFrame(function follow() {
+      tell();
+      frame = requestAnimationFrame(follow);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      place(null);
+    };
+  }, []);
+  return <div className="browser-view is-embedded" ref={box} aria-label={title} />;
+}

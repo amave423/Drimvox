@@ -2,15 +2,20 @@ import { zValidator } from "@hono/zod-validator";
 import { browserInputSchema, browserOpenSchema, browserSizeSchema, browserTabSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import type { AgentBrowser, BrowserFrame, BrowserState } from "../browser/agent-browser";
+import { AgentBrowser, type BrowserFrame } from "../browser/agent-browser";
+import type { Browser } from "../browser/browser";
+import type { BrowserState } from "../browser/driver";
 
 /**
  * The agent's browser in Drimvox's panel (asked for: like Claude's browser, not a window of its own): its state, its
  * current tab as pictures while the panel is open, and the user's clicks, keys and addresses into it.
  */
-export function browserRoutes(browser: AgentBrowser) {
+export function browserRoutes(shared: Browser) {
+  const browser = shared.driver;
+  // Pictures only of Chrome without a window; the desktop's tab is in the window itself.
+  const pictures = browser instanceof AgentBrowser ? browser : null;
   return new Hono()
-    .get("/", (c) => c.json(browser.state(), 200))
+    .get("/", (c) => c.json({ ...shared.state(), embedded: !pictures }, 200))
     .get("/stream", (c) =>
       streamSSE(c, async (stream) => {
         let closed = false;
@@ -27,13 +32,21 @@ export function browserRoutes(browser: AgentBrowser) {
           }
           sending = false;
         };
-        const stop = browser.watch({
+        const tell = (s: BrowserState) => void stream.writeSSE({ event: "state", data: JSON.stringify(s) }).catch(() => (closed = true));
+        const unwatch = pictures?.watch({
           frame: (f) => {
             waiting = f;
             void flush();
           },
-          state: (s: BrowserState) => void stream.writeSSE({ event: "state", data: JSON.stringify(s) }).catch(() => (closed = true)),
+          state: () => {},
         });
+        // The state with what the agent waits for, the same with pictures or without.
+        const unlisten = shared.onState(tell);
+        tell(shared.state());
+        const stop = () => {
+          unwatch?.();
+          unlisten();
+        };
         await new Promise<void>((resolve) => stream.onAbort(resolve));
         closed = true;
         stop();
@@ -49,7 +62,7 @@ export function browserRoutes(browser: AgentBrowser) {
       return c.json(browser.state(), 200);
     })
     .post("/input", zValidator("json", browserInputSchema), async (c) => {
-      await browser.input(c.req.valid("json")).catch(() => {});
+      await pictures?.input(c.req.valid("json")).catch(() => {});
       return c.body(null, 204);
     })
     .post("/tab", zValidator("json", browserTabSchema), async (c) => {
@@ -71,7 +84,7 @@ export function browserRoutes(browser: AgentBrowser) {
     })
     .post("/size", zValidator("json", browserSizeSchema), async (c) => {
       const { width, height, scale } = c.req.valid("json");
-      await browser.resize(width, height, scale).catch(() => {});
+      await pictures?.resize(width, height, scale).catch(() => {});
       return c.body(null, 204);
     })
     .post("/back", async (c) => {
@@ -80,6 +93,11 @@ export function browserRoutes(browser: AgentBrowser) {
     })
     .post("/reload", async (c) => {
       await browser.reload().catch(() => {});
+      return c.body(null, 204);
+    })
+    // The user did what the agent asked in the browser (a captcha, a sign-in).
+    .post("/done", (c) => {
+      shared.done();
       return c.body(null, 204);
     });
 }

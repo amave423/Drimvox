@@ -23,6 +23,9 @@ import { duckDuckGo, type PageReader, type PageShower, type WebAccess } from "./
 import { Background } from "./agent/background";
 import { McpHub } from "./mcp/hub";
 import { AgentBrowser } from "./browser/agent-browser";
+import { Browser } from "./browser/browser";
+import { bingSearch, withSecondSearch } from "./internet/bing";
+import type { BrowserDriver } from "./browser/driver";
 import { browserRoutes } from "./routes/browser";
 import { McpRepo } from "./mcp/repo";
 import { MediaRepo } from "./media/repo";
@@ -95,6 +98,11 @@ export interface AppOptions {
   readPage?: PageReader;
   /** Shows a page to the user in a window, for a captcha or a sign-in they pass themselves (the desktop app only). */
   showPage?: PageShower;
+  /**
+   * The agent's browser: the desktop gives a tab inside its window; by default Chrome without a window, which the panel
+   * shows as pictures (the server).
+   */
+  browser?: BrowserDriver;
   /** How to start Claude Code, Codex and Gemini CLI instead of finding them on PATH; tests run a fake. */
   cliCommands?: Partial<Record<CliId, string[]>>;
   /** What "Check the proxy" opens through it; a small page that answers fast by default. */
@@ -130,8 +138,10 @@ export function createCore(o: AppOptions) {
   useLocalAudio(local.audio);
   const github = new GitHub(o.db, cipher, o.github);
   const mcpRepo = new McpRepo(o.db, cipher);
-  const agentBrowser = new AgentBrowser({ profileDir: join(o.dataDir, "agent-browser") });
-  const mcp = new McpHub(mcpRepo, agentBrowser);
+  const agentBrowser = o.browser ?? new AgentBrowser({ profileDir: join(o.dataDir, "agent-browser") });
+  const browser = new Browser(agentBrowser);
+  // The Playwright server can work in Chrome without a window; the desktop's tab inside the window has no address for it.
+  const mcp = new McpHub(mcpRepo, agentBrowser instanceof AgentBrowser ? agentBrowser : undefined);
   const approvals = new ChatApprovals();
   const shots = new Shots(join(o.dataDir, "screenshots"));
   const visualKit = { background: new Background(), screenshot: o.screenshot ?? null, shots };
@@ -144,13 +154,16 @@ export function createCore(o: AppOptions) {
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
   // Sites that draw with scripts (databases, shops) are read in the desktop's or the server's browser.
   // A search service's key, when the user set one, replaces the free search (seen live: DuckDuckGo blocked again and again).
-  const base = withSearchService(o.web ?? duckDuckGo, searchStore, searchUrls);
+  // Behind DuckDuckGo, Bing (asked for: the free search must not stop at one engine's limit).
+  const base = withSearchService(o.web ?? withSecondSearch(duckDuckGo, (q, s) => bingSearch(q, s)), searchStore, searchUrls);
   const reader = o.readPage;
   const shower = o.showPage;
   const web: WebAccess = {
     ...base,
     ...(base.render || !reader ? {} : { render: (url: string, steps?: Parameters<PageReader>[1]) => reader(url, steps) }),
     ...(base.show || !shower ? {} : { show: (url: string, reason: string) => shower(url, reason) }),
+    // A fake internet (tests) gets the real browser only when it is given one too.
+    ...(base.browser || (o.web && !o.browser) ? {} : { browser }),
   };
   const runner = new AgentRunner({
     tasks,
@@ -259,7 +272,7 @@ export function createCore(o: AppOptions) {
       }),
     )
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
-    .route("/browser", browserRoutes(agentBrowser))
+    .route("/browser", browserRoutes(browser))
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills"), o.skillSources ?? SKILL_SOURCES))
     .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), async (since) => spendingByModel(o.db, providers, since)))

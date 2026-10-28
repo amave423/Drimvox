@@ -172,7 +172,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
   };
   // The project's skills first: they win over shared ones of the same name.
   const skills = findSkills([...projectSkillRoots(row.worktree), { dir: ctx.skillsDir, scope: "shared" }]);
-  let ownTools: ToolSet = { ...webTools(ctx.web, hooks), ...skillTools(skills, row.worktree, hooks), ...(await ctx.mcpTools(hooks)) };
+  let ownTools: ToolSet = { ...webTools(ctx.web, hooks, { local: true }), ...skillTools(skills, row.worktree, hooks), ...(await ctx.mcpTools(hooks)) };
   if (mode === "write") {
     ownTools = { ...ownTools, ...(await ctx.imageTools(row, hooks, spend, () => row.budget_usd - cost)), ...visualTools(visual) };
   }

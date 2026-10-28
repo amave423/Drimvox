@@ -34,8 +34,8 @@ export const catalogEn: Record<keyof typeof catalogRu, string> = {
   "catalog.turnOff": "Switch off",
   "catalog.installing": "Installing…",
 
-  "catalog.e.playwright.about": "A real browser: open a site, click, fill in a form, take a screenshot.",
-  "catalog.e.playwright.details": "Microsoft's official Playwright server. The model drives a browser through the page's accessibility tree, seeing buttons and fields by their names, which is more precise than working from a picture. Good for checking your own site, going through a scenario or reading a page drawn by scripts.",
+  "catalog.e.playwright.about": "An addition to the built-in browser: screenshots and PDFs of pages, the console and requests, Firefox and Safari.",
+  "catalog.e.playwright.details": "Microsoft's official Playwright server. Drimvox already has a built-in browser: the agent opens pages, clicks and fills in forms itself, and you watch it in the Browser panel. Playwright is for more: saving a page as PDF, reading the console and network requests, checking a site in Firefox or Safari.",
   "catalog.e.playwright.can": "Open pages and follow links|Click, type, choose in lists|Take screenshots and save a page as PDF|Read the page's console and requests",
   "catalog.e.playwright.example": "Open my site on localhost:5173 and check that signing in works",
   "catalog.e.playwright.steps": "Opens localhost:5173|Types the email and the password|Clicks “Sign in”|Takes a screenshot",

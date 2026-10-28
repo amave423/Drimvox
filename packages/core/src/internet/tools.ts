@@ -1,12 +1,14 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
+import { browserTools } from "../browser/tools";
 import { pageStepsInput } from "../visual/steps";
 import { clipPage, isPublicAddress, type WebAccess } from "./web";
 
 /** What a model sees from the internet tools; also what the chat shows while it searches. */
 export interface WebCall {
   callId: string;
-  name: "web_search" | "open_page" | "browse_page" | "open_for_user";
+  /** web_search, open_page, browse_page, open_for_user or one of the browser's tools (browser_open…). */
+  name: string;
   input: string;
 }
 
@@ -18,23 +20,28 @@ export interface WebHooks {
 /** Seen live: a model met a site's bot check (a proof-of-work captcha) and started computing its answer to get through. */
 export const FAIR_USE_HINT =
   "Never try to get around captchas, bot checks, logins or blocks of a site yourself (no solving them, no imitating a person, no other mirrors to dodge a block). " +
-  "When you have open_for_user, open such a page for the user: they pass the check or sign in themselves, and you go on in the same browser. Otherwise say what blocks you and offer another way.";
+  "When you have browser_ask_user or open_for_user, hand such a page to the user: they pass the check or sign in themselves, and you go on in the same browser. Otherwise say what blocks you and offer another way.";
 
 export const WEB_HINT =
   "You can use the internet: web_search finds pages, open_page reads one. Use them for current facts (news, prices, " +
   "weather, versions, documentation) instead of guessing, and name the sources you used. When open_page shows little or " +
-  "\"Loading…\" (a site that draws with scripts: databases, shops, search forms), use browse_page if you have it: a real " +
-  "browser that can also type into a search field, press a button and wait before reading. Search sparingly: a few " +
+  "\"Loading…\" (a site that draws with scripts: databases, shops, search forms), use the browser if you have it " +
+  "(browser_open and the other browser_ tools, or browse_page): it runs the page's scripts, types into a search field and " +
+  "presses buttons. When web_search is limited, search in the browser instead. Search sparingly: a few " +
   "precise queries, then open the pages; when you know the site that has the answer, go to it directly. " +
   FAIR_USE_HINT;
 
-/** Search and page reading, free, through Drimvox itself; for any model that can call tools. */
-export function webTools(web: WebAccess, hooks: WebHooks = {}): ToolSet {
+/**
+ * Search and page reading, free, through Drimvox itself; for any model that can call tools. With the agent's browser
+ * the model also works in a real browser the user sees; `local` lets it open addresses on this computer (a project's
+ * agent checks the app it runs).
+ */
+export function webTools(web: WebAccess, hooks: WebHooks = {}, o: { local?: boolean } = {}): ToolSet {
   // Within one answer: a query asked again is answered from what was found (DuckDuckGo limits bursts), and a browser
   // call that failed twice exactly as it is is not tried a third time (seen: the same missing field, twelve times).
   const found = new Map<string, string>();
   const failed = new Map<string, number>();
-  const run = async (callId: string, name: WebCall["name"], input: string, work: () => Promise<string>) => {
+  const run = async (callId: string, name: string, input: string, work: () => Promise<string>) => {
     hooks.onCall?.({ callId, name, input });
     let ok = true;
     let output: string;
@@ -71,6 +78,8 @@ export function webTools(web: WebAccess, hooks: WebHooks = {}): ToolSet {
         }),
     }),
   };
+  // The agent's own browser replaces reading in a hidden window and showing a page in a window of its own.
+  if (web.browser?.driver.available()) return { ...tools, ...browserTools(web.browser, { local: !!o.local }, run) };
   const show = web.show;
   // The user passes a captcha or signs in themselves, in a window of the same browser the model reads pages with.
   if (show) {

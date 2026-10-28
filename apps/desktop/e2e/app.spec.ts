@@ -1,4 +1,4 @@
-import { _electron as electron, expect, test, type ElectronApplication } from "@playwright/test";
+import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -105,7 +105,7 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { drimvox?: object }).drimvox ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "getToken", "installUpdate", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "savePdf", "setTitleBar", "testNotify", "updateState"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "getToken", "installUpdate", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "placeBrowser", "savePdf", "setTitleBar", "testNotify", "updateState"] });
 });
 
 test("the catalog switches a ready skill on and off, and shows a server's details with the token it needs", async () => {
@@ -228,47 +228,45 @@ test("shows its own notification window with the chosen sound, and it goes away 
   await expect(page.getByRole("radiogroup", { name: "Звук уведомлений" }).getByRole("radio", { name: "Колокольчик" })).toHaveAttribute("aria-checked", "true");
 });
 
-// Asked for: the agent's browser in a panel of Drimvox, like Claude's, not a window of its own; a check is passed in it.
-test("opens the agent's browser in a panel, where a page is clicked and typed into", async () => {
+// Asked for: a browser exactly like Claude's: a real tab inside Drimvox's window, over the panel's page box, where a
+// check is passed as in any browser.
+test("opens the agent's browser as a real tab in the panel, where a page is clicked and typed into", async () => {
   test.setTimeout(60_000);
   const site = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     if (req.url === "/b") return res.end("<title>Вторая</title><h1>Вторая</h1>");
-    res.end(`<title>Проверка</title><body style="margin:0"><button style="position:absolute;left:0;top:0;width:400px;height:250px" onclick="document.title='Нажато'">Я не робот</button><input style="position:absolute;left:0;top:300px;width:300px" oninput="document.title='Введено: '+this.value"></body>`);
+    res.end(`<title>Проверка</title><body style="margin:0"><button style="width:400px;height:250px" onclick="document.title='Нажато'">Я не робот</button><input oninput="document.title='Введено: '+this.value"></body>`);
   });
   await new Promise<void>((r) => site.listen(0, "127.0.0.1", r));
+  const port = (site.address() as AddressInfo).port;
+  /** Where the window holds the agent's tab, by its address. */
+  const tabBounds = () =>
+    app!.evaluate(({ BrowserWindow }, port) => {
+      const views = BrowserWindow.getAllWindows()[0]!.contentView.children as unknown as { webContents?: { getURL(): string }; getBounds(): Electron.Rectangle }[];
+      return views.find((v) => v.webContents?.getURL().includes(`:${port}/`))?.getBounds() ?? null;
+    }, port);
   try {
     app = await launch();
     const page = await app.firstWindow();
     await expect(paramsButton(page)).toBeVisible();
     await page.getByRole("button", { name: "Браузер", exact: true }).click();
     const pane = page.getByRole("complementary", { name: "Браузер агента" });
-    await expect(pane).toContainText("не запущен");
+    await expect(pane).toContainText("закрыт");
     await pane.getByRole("button", { name: "Открыть браузер" }).click();
-    await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${(site.address() as AddressInfo).port}/`);
+    await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${port}/`);
     await pane.getByLabel("Адрес").press("Enter");
-    const view = pane.locator(".browser-view img");
-    await expect(view).toBeVisible({ timeout: 20_000 });
-    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Проверка", { timeout: 10_000 });
-    // A click on the picture is a click on the page.
-    const box = (await view.boundingBox())!;
-    await page.mouse.click(box.x + 40, box.y + 40);
+    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Проверка", { timeout: 20_000 });
+
+    // The tab lies exactly over the panel's page box: the page fills the panel, nothing squeezed or empty.
+    const box = (await pane.locator(".browser-view").boundingBox())!;
+    await expect.poll(async () => JSON.stringify(await tabBounds())).toBe(JSON.stringify({ x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) }));
+
+    // The tab is a page of its own, clicked and typed into as any page (Cyrillic too).
+    let tab: Page | undefined;
+    await expect.poll(() => (tab = app!.windows().find((w) => w.url().includes(`:${port}/`))) !== undefined).toBe(true);
+    await tab!.getByRole("button", { name: "Я не робот" }).click();
     await expect(pane.getByRole("tab", { selected: true })).toHaveText("Нажато", { timeout: 10_000 });
-    // Typing goes into the page.
-    // The page takes the panel's size: one picture pixel per screen pixel, no squeezing and no empty space (asked for).
-    await expect
-      .poll(() =>
-        view.evaluate((img: HTMLImageElement) => {
-          const shown = img.getBoundingClientRect().width;
-          return Math.min(Math.abs(img.naturalWidth - shown), Math.abs(img.naturalWidth / devicePixelRatio - shown));
-        }),
-      )
-      .toBeLessThan(2);
-    const filled = await pane.locator(".browser-view").evaluate((el) => el.getBoundingClientRect().height);
-    expect(Math.abs((await view.boundingBox())!.height - filled)).toBeLessThan(2);
-    await page.mouse.click(box.x + 20, box.y + 310);
-    // Letters in any layout arrive as text.
-    await page.keyboard.type("кедр");
+    await tab!.locator("input").pressSequentially("кедр");
     await expect(pane.getByRole("tab", { selected: true })).toHaveText("Введено: кедр", { timeout: 10_000 });
     await expect(page.locator(".topbar-browser-dot")).toBeVisible({ timeout: 10_000 });
 
@@ -276,14 +274,17 @@ test("opens the agent's browser in a panel, where a page is clicked and typed in
     const tabs = pane.getByRole("tablist", { name: "Вкладки" });
     await tabs.getByRole("button", { name: "Новая вкладка" }).click();
     await expect(tabs.getByRole("tab")).toHaveCount(2);
-    await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${(site.address() as AddressInfo).port}/b`);
+    await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${port}/b`);
     await pane.getByLabel("Адрес").press("Enter");
     await expect(pane.getByRole("tab", { selected: true })).toHaveText("Вторая", { timeout: 10_000 });
-    await expect(tabs.getByRole("tab", { name: "Вторая" })).toHaveAttribute("aria-selected", "true");
     await tabs.getByRole("tab", { name: "Введено: кедр" }).click();
     await expect(pane.getByRole("tab", { selected: true })).toHaveText("Введено: кедр", { timeout: 10_000 });
     await tabs.getByRole("button", { name: "Закрыть вкладку «Вторая»" }).click();
     await expect(tabs.getByRole("tab")).toHaveCount(1);
+
+    // The panel closed: the tab goes out of sight but stays, for the agent to work on.
+    await pane.getByRole("button", { name: "Закрыть", exact: true }).click();
+    await expect.poll(async () => (await tabBounds())?.x ?? 0).toBeLessThan(0);
   } finally {
     site.closeAllConnections();
     await new Promise((r) => site.close(r));

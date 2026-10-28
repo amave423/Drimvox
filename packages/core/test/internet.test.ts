@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isPublicAddress, makeDuckDuckGo, pageText, parseSearch } from "../src/internet/web";
+import { parseBing, withSecondSearch } from "../src/internet/bing";
+import { isPublicAddress, makeDuckDuckGo, pageText, parseSearch, type WebAccess } from "../src/internet/web";
 
 const DDG = `
 <div class="result results_links results_links_deep web-result">
@@ -18,6 +19,29 @@ describe("search results", () => {
       { title: "Weather in Moscow", url: "https://wttr.in/Moscow", snippet: "Forecast: +5 °C, cloudy & windy" },
       { title: "Direct link", url: "https://example.org/direct", snippet: "Second result" },
     ]);
+  });
+});
+
+const BING = `
+<li class="b_algo"><h2><a href="https://www.bing.com/ck/a?!&amp;&amp;p=x&amp;u=a1${Buffer.from("https://wttr.in/Moscow").toString("base64url")}&amp;ntb=1">Погода в <strong>Москве</strong></a></h2>
+<div class="b_caption"><p>+5&#176;C, облачно &amp; ветрено</p></div></li>
+<li class="b_algo"><h2><a href="https://example.org/direct">Direct</a></h2><p>Second</p></li>
+<li class="b_algo"><h2><a href="https://www.bing.com/images/search?q=x">Images</a></h2></li>`;
+
+// Asked for: the free search must not stop at DuckDuckGo's limit.
+describe("the second search", () => {
+  it("reads Bing's results, its hidden addresses turned back into real ones", () => {
+    expect(parseBing(BING)).toEqual([
+      { title: "Погода в Москве", url: "https://wttr.in/Moscow", snippet: "+5°C, облачно & ветрено" },
+      { title: "Direct", url: "https://example.org/direct", snippet: "Second" },
+    ]);
+  });
+
+  it("asks Bing when DuckDuckGo is limited, and gives DuckDuckGo's reason when both fail", async () => {
+    const limited: WebAccess = { search: async () => Promise.reject(new Error("Web search is temporarily limited.")), open: async () => ({ url: "", title: "", text: "" }) };
+    const found = [{ title: "B", url: "https://b.example/", snippet: "" }];
+    expect(await withSecondSearch(limited, async () => found).search("q")).toEqual(found);
+    await expect(withSecondSearch(limited, async () => Promise.reject(new Error("Bing answered 403"))).search("q")).rejects.toThrow(/temporarily limited/);
   });
 });
 

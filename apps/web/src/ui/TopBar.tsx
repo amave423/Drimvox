@@ -3,7 +3,8 @@ import { Logo } from "./Logo";
 import { LAST_PROJECT_KEY } from "./projects/Workshop";
 import { WorkshopBar } from "./projects/WorkshopBar";
 import { BrowserPane, useBrowserState } from "./BrowserPane";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { noticeLookNow } from "./NoticeSoundSetting";
 
 export function TopBar() {
   const { t, view, mode, navigate, chats, projects, tasks } = useApp();
@@ -73,9 +74,17 @@ function ModeSwitch() {
  * what the agent does is seen and a check can be passed by hand.
  */
 function BrowserButton() {
-  const { t } = useApp();
+  const { t, settings } = useApp();
   const [open, setOpen] = useState(false);
   const state = useBrowserState();
+  // The agent asks the user to pass a check or sign in: the panel opens by itself, and a notification comes if the
+  // window is elsewhere.
+  const asked = state?.waiting ?? null;
+  useEffect(() => {
+    if (!asked) return;
+    setOpen(true);
+    if (settings.notifications) window.drimvox?.notify?.({ ...noticeLookNow(settings), title: t("browser.waitingTitle"), body: asked });
+  }, [asked]);
   return (
     <>
       <button type="button" className={`topbar-browser${open ? " is-on" : ""}`} aria-pressed={open} title={t("browser.title")} onClick={() => setOpen(!open)}>

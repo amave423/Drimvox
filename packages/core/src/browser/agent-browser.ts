@@ -1,9 +1,11 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { keyPress, type BrowserDriver, type BrowserState } from "./driver";
 import { findBrowser, userAgent } from "./launch";
 
 export { findBrowser, playwrightArgs } from "./launch";
+export type { BrowserState, BrowserTab } from "./driver";
 
 /** One picture of the page the agent's browser shows, with the page's size in its own pixels. */
 export interface BrowserFrame {
@@ -12,22 +14,6 @@ export interface BrowserFrame {
   width: number;
   height: number;
   scale: number;
-}
-
-export interface BrowserTab {
-  id: string;
-  url: string;
-  title: string;
-}
-
-export interface BrowserState {
-  running: boolean;
-  /** The tab the panel shows. */
-  url: string;
-  title: string;
-  /** Every tab, in the order they were opened, and which one is shown (asked for: a switch between them). */
-  tabs: BrowserTab[];
-  active: string | null;
 }
 
 /** What the user does in the browser's panel, in the page's own pixels. */
@@ -41,29 +27,12 @@ type Listener = { frame(f: BrowserFrame): void; state(s: BrowserState): void };
 
 const WIDTH = 1280;
 const HEIGHT = 860;
-/** Keys that are not text, as the browser wants them. */
-const KEYS: Record<string, { code: string; vk: number }> = {
-  Enter: { code: "Enter", vk: 13 },
-  Backspace: { code: "Backspace", vk: 8 },
-  Tab: { code: "Tab", vk: 9 },
-  Escape: { code: "Escape", vk: 27 },
-  Delete: { code: "Delete", vk: 46 },
-  ArrowLeft: { code: "ArrowLeft", vk: 37 },
-  ArrowUp: { code: "ArrowUp", vk: 38 },
-  ArrowRight: { code: "ArrowRight", vk: 39 },
-  ArrowDown: { code: "ArrowDown", vk: 40 },
-  Home: { code: "Home", vk: 36 },
-  End: { code: "End", vk: 35 },
-  PageUp: { code: "PageUp", vk: 33 },
-  PageDown: { code: "PageDown", vk: 34 },
-};
-
 /**
  * The agent's own browser (asked for: not a window jumping in front, but a panel in Drimvox, like Claude's): Chrome or
  * Edge without a window, with a profile of its own that keeps sign-ins and passed checks. The Playwright server drives
  * it over the DevTools protocol; Drimvox's panel watches its current tab and lets the user click and type in it.
  */
-export class AgentBrowser {
+export class AgentBrowser implements BrowserDriver {
   private proc: ChildProcess | null = null;
   private starting: Promise<string> | null = null;
   private ws: WebSocket | null = null;
@@ -73,6 +42,7 @@ export class AgentBrowser {
   private active: string | null = null;
   private session: string | null = null;
   private readonly listeners = new Set<Listener>();
+  private readonly stateListeners = new Set<(s: BrowserState) => void>();
   private lastFrame: BrowserFrame | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
   /** The panel's size: the page takes it (asked for: a browser, not a picture of one squeezed into the panel). */
@@ -156,13 +126,26 @@ export class AgentBrowser {
       await this.send("Input.insertText", { text: e.text }, this.session);
     } else {
       // A named key, or a letter or digit with Ctrl and the like (a plain one comes as text).
-      const one = e.key.length === 1 ? e.key.toUpperCase() : "";
-      const k = KEYS[e.key] ?? (/^[A-Z]$/.test(one) ? { code: `Key${one}`, vk: one.charCodeAt(0) } : /^[0-9]$/.test(one) ? { code: `Digit${one}`, vk: one.charCodeAt(0) } : null);
-      if (!k) return;
-      const key = { key: e.key, code: k.code, windowsVirtualKeyCode: k.vk, modifiers: e.modifiers ?? 0 };
-      await this.send("Input.dispatchKeyEvent", { type: "keyDown", ...key, ...(e.key === "Enter" ? { text: "\r" } : {}) }, this.session);
-      await this.send("Input.dispatchKeyEvent", { type: "keyUp", ...key }, this.session);
+      const press = keyPress(e.key, e.modifiers ?? 0);
+      if (!press) return;
+      for (const event of press) await this.send("Input.dispatchKeyEvent", event, this.session);
     }
+  }
+
+  available(): boolean {
+    return !!(this.o.find ?? findBrowser)();
+  }
+
+  onState(listener: (s: BrowserState) => void): () => void {
+    this.stateListeners.add(listener);
+    return () => void this.stateListeners.delete(listener);
+  }
+
+  async command(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+    await this.endpoint();
+    await this.ensurePage();
+    if (!this.session) throw new Error("The browser has no tab");
+    return this.send(method, params, this.session);
   }
 
   /** Opens an address in the current tab; starts the browser first if needed. */
@@ -398,5 +381,6 @@ export class AgentBrowser {
   private broadcastState(): void {
     const s = this.state();
     for (const l of this.listeners) l.state(s);
+    for (const l of this.stateListeners) l(s);
   }
 }

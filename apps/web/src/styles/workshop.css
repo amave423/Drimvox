@@ -192,3 +192,7 @@
 .browser-tab-close:hover { background: var(--paper); color: var(--fg); }
 .browser-tab-new { flex: none; width: 28px; color: var(--muted); font-size: 18px; }
 .browser-tab-new:hover { color: var(--fg); }
+/* The agent waits for the user in the browser: a check to pass, a sign-in. */
+.browser-waiting { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--wait-soft); }
+.browser-waiting p { margin: 0; flex: 1; }
+.browser-view.is-embedded { background: var(--paper); }

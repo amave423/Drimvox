@@ -126,8 +126,12 @@ function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props
   if (item.kind === "approval") return <ApprovalCard approval={item} allowed={item.allowed} always={item.always} onAnswer={onAnswer} />;
 
   const input = item.input as Record<string, string | undefined>;
+  // The agent's browser: where it goes, what it types or asks, or the control's number.
+  const browsing = item.name.startsWith("browser_") ? (input.url ?? input.reason ?? input.text ?? input.option ?? input.key ?? input.direction ?? (input.ref !== undefined ? String(input.ref) : "")) : null;
   const target =
-    item.name === "run_command"
+    browsing !== null
+      ? browsing
+      : item.name === "run_command"
       ? input.command
       : item.name === "search"
         ? input.pattern
@@ -150,7 +154,7 @@ function FeedLine({ item, onAnswer, taskId }: { item: FeedItem; onAnswer?: Props
                     ? t("action.projectRoot")
                     : input.path;
   const mcp = item.name.includes("/");
-  const known = ["read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image", "web_search", "open_page", "use_skill", "read_skill_file", "start_background", "read_background", "stop_background", "look_at_page"].includes(
+  const known = ["browser_open", "browser_read", "browser_click", "browser_type", "browser_choose", "browser_press", "browser_scroll", "browser_back", "browser_tab", "browser_ask_user", "read_file", "list_files", "search", "write_file", "edit_file", "run_command", "generate_image", "web_search", "open_page", "use_skill", "read_skill_file", "start_background", "read_background", "stop_background", "look_at_page"].includes(
     item.name,
   );
   const label = mcp

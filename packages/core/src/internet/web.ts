@@ -1,4 +1,5 @@
 import type { PageAction } from "@drimvox/shared";
+import type { Browser } from "../browser/browser";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
@@ -28,6 +29,8 @@ export interface WebAccess {
    * the user passes themselves. Only the desktop app has it.
    */
   show?(url: string, reason: string, signal?: AbortSignal): Promise<Page>;
+  /** The agent's own browser, which the user sees in the panel: where there is one, it replaces render and show. */
+  browser?: Browser;
 }
 
 /** Shows a page to the user (WebAccess.show): what the desktop app gives the core. */
@@ -54,7 +57,8 @@ const SEARCH_GAP_MS = 1_500;
 const BACKOFF_MS = [5_000, 15_000];
 /** After the pauses did not help, how long searches answer "limited" without asking DuckDuckGo at all. */
 const COOLDOWN_MS = 120_000;
-const LIMITED = "Web search is temporarily limited by DuckDuckGo. Wait a minute before searching again, or go on with what you know.";
+const LIMITED =
+  "Web search is temporarily limited. If you have the browser, search there (browser_open https://www.bing.com/search?q=…); otherwise wait a minute before searching again, or go on with what you know.";
 
 export interface SearchClock {
   fetch: typeof fetch;

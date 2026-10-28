@@ -1,6 +1,6 @@
 /** Entry of the Electron utility process that runs the core. Same core runs headless in server mode. */
 import type { PageAction } from "@drimvox/shared";
-import { startServer, type RunningServer } from "@drimvox/core";
+import { RelayBrowser, startServer, type RunningServer } from "@drimvox/core";
 
 export interface InitMessage {
   type: "init";
@@ -17,11 +17,31 @@ export interface InitMessage {
 const pending = new Map<number, { resolve(data: { png?: string; page?: unknown }): void; reject(err: Error): void }>();
 let nextRequest = 1;
 let running: RunningServer | null = null;
-process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number; png?: string; page?: unknown; error?: string; console?: string[] } }) => {
+
+/** The agent's browser: tabs inside the window, which the main process holds. */
+const browserCalls = new Map<number, { resolve(v: unknown): void; reject(e: Error): void }>();
+const browser = new RelayBrowser(
+  (op, args) =>
+    new Promise((resolve, reject) => {
+      const id = nextRequest++;
+      browserCalls.set(id, { resolve, reject });
+      process.parentPort.postMessage({ type: "browser", id, op, args });
+    }),
+);
+
+process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number; png?: string; page?: unknown; error?: string; console?: string[]; result?: unknown; state?: unknown } }) => {
   // The app is closing: stop what the core started (agents, the Ollama it runs), then go.
   if (data?.type === "quit") {
     setTimeout(() => process.exit(0), 2_500).unref();
     void (running?.close() ?? Promise.resolve()).finally(() => process.exit(0));
+    return;
+  }
+  if (data?.type === "browser-state") return browser.update(data.state as Parameters<RelayBrowser["update"]>[0]);
+  if (data?.type === "browser-done" && typeof data.id === "number") {
+    const call = browserCalls.get(data.id);
+    browserCalls.delete(data.id);
+    if (data.error) call?.reject(new Error(data.error));
+    else call?.resolve(data.result);
     return;
   }
   if ((data?.type !== "screenshot-done" && data?.type !== "page-text-done") || typeof data.id !== "number") return;
@@ -75,6 +95,7 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     screenshot,
     readPage,
     showPage,
+    browser,
     // Tests pin the dollar rate instead of asking the Central Bank.
     usdRub: process.env.DRIMVOX_TEST_USD_RUB ? async () => Number(process.env.DRIMVOX_TEST_USD_RUB) : undefined,
     // Tests run a fake Claude Code, Codex or Gemini CLI: {"claude-code": ["node", "fake-cli.mjs", "claude"]}.

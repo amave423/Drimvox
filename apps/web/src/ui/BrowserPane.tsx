@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { authHeaders } from "../api";
 import { useApp } from "../context";
 import { CrossIcon } from "./SideChats";
-import { BrowserView, type BrowserFrameView } from "./BrowserView";
+import { BrowserView, EmbeddedView, type BrowserFrameView } from "./BrowserView";
 
 const WIDTH_KEY = "drimvox.browserWidth";
 const keptWidth = () => {
@@ -24,6 +24,8 @@ interface State {
   title: string;
   tabs: Tab[];
   active: string | null;
+  /** What the agent waits for the user to do in the browser (a check, a sign-in). */
+  waiting?: string | null;
 }
 
 /** A tab's name in the strip: its title, else its address without the scheme. */
@@ -42,7 +44,7 @@ export function useBrowserState(): State | null {
         .then((s) => live && setState(s))
         .catch(() => {});
     look();
-    const timer = setInterval(look, 5000);
+    const timer = setInterval(look, 3000);
     return () => {
       live = false;
       clearInterval(timer);
@@ -66,6 +68,8 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
   const [width, setWidth] = useState(keptWidth);
   const [wide, setWide] = useState(false);
   const dragging = useRef(false);
+  // The desktop puts the real tab over the page box; in a browser (the server) the page comes as pictures.
+  const embedded = !!window.drimvox?.placeBrowser;
 
   // The pictures come while the panel is open, as a stream of events.
   useEffect(() => {
@@ -182,8 +186,23 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
           </button>
         </div>
       )}
+      {state.waiting && (
+        // The agent waits for the user here: a check to pass, a sign-in (docs/specs/agent-browser.md).
+        <div className="browser-waiting" role="status">
+          <p>
+            <strong>{t("browser.waitingTitle")}</strong> {state.waiting}
+          </p>
+          <button type="button" className="btn btn-primary" onClick={() => void api.browser.done.$post().catch(() => null)}>
+            {t("browser.done")}
+          </button>
+        </div>
+      )}
       {state.running ? (
-        <BrowserView frame={frame} title={state.title || t("browser.title")} onInput={send} />
+        embedded ? (
+          <EmbeddedView title={state.title || t("browser.title")} />
+        ) : (
+          <BrowserView frame={frame} title={state.title || t("browser.title")} onInput={send} />
+        )
       ) : (
         <div className="browser-empty">
           <p>{t("browser.hint")}</p>

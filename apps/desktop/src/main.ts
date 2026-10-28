@@ -12,6 +12,7 @@ import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
 import { keepInTray, offerUpdate } from "./tray";
 import { noticeRequest, setupNotices, showNotice } from "./notices";
+import { AgentView, type Place } from "./agent-view";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
@@ -49,6 +50,11 @@ function ensureShortcut(): void {
 let core: UtilityProcess | null = null;
 let win: BrowserWindow | null = null;
 let origin = "";
+/** The agent's browser: its tabs live in the window; the core drives them by message. */
+const agentView = new AgentView(
+  () => win,
+  (state) => core?.postMessage({ type: "browser-state", state }),
+);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -147,7 +153,15 @@ function startCore(): Promise<number> {
       if (msg.type === "ready" && msg.port) resolve(msg.port);
       else reject(new Error(msg.error ?? "Ядро ответило непонятным сообщением"));
     });
-    child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number; actions?: PageAction[]; reason?: string }) => {
+    child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number; actions?: PageAction[]; reason?: string; op?: string; args?: unknown[] }) => {
+      if (msg.type === "browser" && typeof msg.id === "number" && typeof msg.op === "string") {
+        const id = msg.id;
+        agentView.call(msg.op, Array.isArray(msg.args) ? msg.args : []).then(
+          (result) => child.postMessage({ type: "browser-done", id, result: result ?? null }),
+          (err: unknown) => child.postMessage({ type: "browser-done", id, error: err instanceof Error ? err.message : String(err) }),
+        );
+        return;
+      }
       if ((msg.type !== "screenshot" && msg.type !== "page-text" && msg.type !== "show-page") || typeof msg.id !== "number" || typeof msg.url !== "string") return;
       const id = msg.id;
       if (msg.type === "show-page") {
@@ -431,6 +445,14 @@ function registerIpc() {
     void quiet().then((silent) => showNotice(origin, request, target, silent));
     // The taskbar button blinks too, until the window is in front again.
     win?.flashFrame(true);
+  });
+
+  // The panel's page box: the agent's tab is put over it, or out of sight when the panel closes.
+  ipcMain.on("drimvox:browser-place", (event, place: unknown) => {
+    if (!fromOurPage(event.senderFrame?.url)) return;
+    const p = place as Record<string, unknown> | null;
+    const ok = p && ["x", "y", "width", "height"].every((k) => typeof p[k] === "number" && Number.isFinite(p[k]));
+    agentView.setPlace(ok && (p.width as number) > 50 && (p.height as number) > 50 ? (p as Exclude<Place, null>) : null);
   });
 
   ipcMain.handle("drimvox:focus-assist", (event) => (fromOurPage(event.senderFrame?.url) ? focusAssist() : null));

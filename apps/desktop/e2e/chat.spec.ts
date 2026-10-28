@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider } from "../../../packages/core/test/fake-provider";
 import { newChat, openSection, paramsButton } from "./sections";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -493,4 +495,55 @@ test("an answer goes on live after coming back to the chat, with a spinner and t
   await expect(row.getByRole("img", { name: "Новый ответ" })).toBeVisible({ timeout: 20_000 });
   await row.getByRole("button", { name: /Длинно/ }).click();
   await expect(row.getByRole("img", { name: "Новый ответ" })).toHaveCount(0);
+});
+
+// Asked for: a browser like Claude's, which the agent drives itself with full access and the user sees; a check on the
+// way is handed to the user, who passes it in the panel.
+test("a chat works in the built-in browser by itself and hands a check to the user in the panel", async () => {
+  test.setTimeout(90_000);
+  const site = createServer((req, res) => {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    const q = new URL(req.url ?? "/", "http://x").searchParams.get("q");
+    res.end(q ? `<title>Найдено</title><p>Результаты для: ${q}</p>` : `<title>Поиск</title><form><input name="q" placeholder="Что ищем"><button>Найти</button></form>`);
+  });
+  await new Promise<void>((r) => site.listen(0, "127.0.0.1", r));
+  const url = `http://127.0.0.1:${(site.address() as AddressInfo).port}/`;
+  fake = await startFakeProvider({
+    key: KEY,
+    models,
+    script: [
+      { toolCalls: [{ name: "browser_open", args: { url } }] },
+      { toolCalls: [{ name: "browser_type", args: { ref: 1, text: "кедровые шишки", submit: true } }] },
+      { toolCalls: [{ name: "browser_ask_user", args: { reason: "Пройдите проверку «я не робот»" } }] },
+      { text: "Нашёл: кедровые шишки" },
+    ],
+  });
+  try {
+    const page = await launch({ DRIMVOX_TEST_BROWSER_LOCAL: "1" });
+    await connect(page);
+    await expect(page.getByText("Моделей: 1")).toBeVisible();
+    await startChat(page);
+    await page.locator(".composer").getByRole("button", { name: "Параметры", exact: true }).click();
+    await page.getByRole("dialog", { name: "Параметры" }).getByRole("button", { name: /^Интернет:/ }).click();
+    await page.getByRole("option", { name: /Поиск Drimvox/ }).click();
+    await page.keyboard.press("Escape");
+    await say(page, "Найди кедровые шишки");
+
+    // The panel opens by itself where the agent waits, and says what to do.
+    const pane = page.getByRole("complementary", { name: "Браузер агента" });
+    await expect(pane.getByRole("status")).toContainText("Пройдите проверку «я не робот»", { timeout: 30_000 });
+    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Найдено");
+    await pane.getByRole("button", { name: "Готово" }).click();
+    await expect(page.getByText("Нашёл: кедровые шишки")).toBeVisible({ timeout: 20_000 });
+    await expect(pane.getByRole("status")).toHaveCount(0);
+
+    // The model read the page with its controls numbered, and what the search found.
+    const sent = JSON.stringify(fake.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => r.body.messages));
+    expect(sent).toContain('[1 field \\"Что ищем\\"]');
+    expect(sent).toContain("Результаты для: кедровые шишки");
+    await expect(page.getByText("Печатает на странице: 1: кедровые шишки")).toBeAttached();
+  } finally {
+    site.closeAllConnections();
+    await new Promise((r) => site.close(r));
+  }
 });

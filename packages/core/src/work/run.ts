@@ -231,7 +231,7 @@ export class WorkRun {
     const files = { list: () => this.d.chats.attachments.ofChat(this.chatId), file: (id: string) => this.d.chats.attachments.file(id) };
     const own: ToolSet = {
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
-      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }),
+      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true }),
       ...skillTools(skills, this.folder, hooks),
       ...visualTools(
         {
