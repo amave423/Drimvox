@@ -127,6 +127,9 @@ export function App({ api, token, initialSettings, status }: Props) {
     sound: settings.notifySound,
     volume: settings.notifyVolume,
   };
+  // The app's own notices (an update downloaded, Drimvox left in the tray) come as the same cards.
+  const lookKey = JSON.stringify(noticeLook.current);
+  useEffect(() => window.drimvox?.noticeLook?.(JSON.parse(lookKey)), [lookKey]);
   /** In a browser: its own notification, with Drimvox's sound from the page. */
   const browserNotice = (title: string, body: string, tag: string, open: () => void) => {
     if (typeof Notification === "undefined" || Notification.permission !== "granted" || !document.hidden) return;

@@ -9,6 +9,7 @@ import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
 import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory } from "./memory";
 import { notesBlock } from "./notes";
+import { repairToolJson } from "./repair";
 import { Workspace } from "./workspace";
 
 export const MAX_STEPS = 60;
@@ -122,6 +123,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       system: system(),
       messages: i.messages,
       tools,
+      experimental_repairToolCall: repairToolJson,
       ...(i.only ? { activeTools: [i.only], toolChoice: "required" as const } : {}),
       // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
       providerOptions: i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : undefined,

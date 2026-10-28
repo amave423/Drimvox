@@ -7,12 +7,13 @@ contextBridge.exposeInMainWorld("drimvox", {
   savePdf: (name: string): Promise<string | null> => ipcRenderer.invoke("drimvox:save-pdf", name),
   openSkillsFolder: () => ipcRenderer.send("drimvox:open-skills"),
   notify: (notice: unknown) => ipcRenderer.send("drimvox:notify", notice),
+  /** How notifications look and sound now: the app's own notices (an update, the tray) follow it. */
+  noticeLook: (look: unknown) => ipcRenderer.send("drimvox:notice-look", look),
   testNotify: (notice: unknown) => ipcRenderer.send("drimvox:notify-test", notice),
   /** Where the browser panel's page box is; null when the panel closes. */
   placeBrowser: (place: { x: number; y: number; width: number; height: number } | null) => ipcRenderer.send("drimvox:browser-place", place),
   /** Takes the keyboard back from the agent's tab to Drimvox's own page. */
   focusPage: () => ipcRenderer.send("drimvox:focus-page"),
-  focusAssist: (): Promise<number | null> => ipcRenderer.invoke("drimvox:focus-assist"),
   updateState: () => ipcRenderer.invoke("drimvox:update-state"),
   onUpdate: (listener: (state: unknown) => void) => {
     const handler = (_event: unknown, state: unknown) => listener(state);

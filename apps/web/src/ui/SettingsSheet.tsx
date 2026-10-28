@@ -41,11 +41,6 @@ function initialPart(): SettingsPart {
 
 export function SettingsSheet() {
   const { t, settings, updateSettings, usdRub, status } = useApp();
-  // Windows' Focus Assist hides every app's notifications: said here, where notifications are switched on.
-  const [focusAssist, setFocusAssist] = useState(false);
-  useEffect(() => {
-    void window.drimvox?.focusAssist?.().then((profile) => setFocusAssist(profile === 1 || profile === 2));
-  }, []);
   const [state, setState] = useState<SaveState>("idle");
   const [toolsVersion, setToolsVersion] = useState(0);
   const [part, setPartState] = useState<SettingsPart>(initialPart);
@@ -108,7 +103,6 @@ export function SettingsSheet() {
               {t("settings.notificationsTest")}
             </button>
           )}
-          {focusAssist && <p className="note is-pencil">{t("settings.focusAssist")}</p>}
         </Setting>
         <NoticeSoundSetting save={save} />
         <Setting id="developer-label" title={t("settings.developerTitle")} about={t("settings.developerHint")}>

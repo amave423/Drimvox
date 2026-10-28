@@ -28,6 +28,16 @@ interface State {
   waiting?: string | null;
 }
 
+/** The panel's width within the window: never narrower than a page needs, never over the whole of it. */
+const fitWidth = (w: number) => Math.round(Math.min(Math.max(w, 420), window.innerWidth - 80));
+const keepWidth = (w: number) => {
+  try {
+    localStorage.setItem(WIDTH_KEY, String(w));
+  } catch {
+    // Kept for this visit only.
+  }
+};
+
 /**
  * What the address field opens: an address as is (https:// added), anything else as a search (asked for: typing a
  * search into it, as in any browser).
@@ -132,10 +142,10 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
 
   return (
     <aside className={`browser-pane${wide ? " is-wide" : ""}`} aria-label={t("browser.title")} style={wide || !width ? undefined : { width }}>
-      {/* The panel's left edge: dragged, it widens or narrows the panel. */}
+      {/* The panel's slider (asked for: as the side panels have): dragged, it widens or narrows the panel; its grip
+          takes the arrow keys too. */}
       <div
-        className="browser-edge"
-        aria-hidden
+        className="workshop-split browser-edge"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           dragging.current = true;
@@ -144,18 +154,34 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
         }}
         onPointerMove={(e) => {
           if (!dragging.current) return;
-          setWidth(Math.min(Math.max(window.innerWidth - e.clientX, 420), window.innerWidth - 80));
+          setWidth(fitWidth(window.innerWidth - e.clientX));
         }}
         onPointerUp={() => {
           dragging.current = false;
           setResizing(false);
-          try {
-            localStorage.setItem(WIDTH_KEY, String(width));
-          } catch {
-            // Kept for this visit only.
-          }
+          keepWidth(width);
         }}
-      />
+      >
+        <button
+          type="button"
+          className="workshop-grip"
+          aria-label={t("browser.width")}
+          title={t("browser.width")}
+          onKeyDown={(e) => {
+            const step = e.key === "ArrowLeft" ? 40 : e.key === "ArrowRight" ? -40 : 0;
+            if (!step) return;
+            e.preventDefault();
+            setWide(false);
+            const next = fitWidth((width || (e.currentTarget.closest(".browser-pane") as HTMLElement).offsetWidth) + step);
+            setWidth(next);
+            keepWidth(next);
+          }}
+        >
+          <span aria-hidden />
+          <span aria-hidden />
+          <span aria-hidden />
+        </button>
+      </div>
       <header className="browser-bar">
         <button type="button" className="icon-button" aria-label={t("browser.back")} title={t("browser.back")} onClick={() => void api.browser.back.$post().catch(() => null)}>
           ‹

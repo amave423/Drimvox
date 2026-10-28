@@ -11,10 +11,10 @@ interface DrimvoxBridge {
   testNotify(notice: NoticeRequest): void;
   /** Desktop: the agent's real browser tab is put over this box of the window; null takes it out of sight. */
   placeBrowser?(place: { x: number; y: number; width: number; height: number } | null): void;
+  /** How notifications look and sound now, for the app's own notices (an update, the tray). */
+  noticeLook?(look: Omit<NoticeRequest, "title" | "body">): void;
   /** Desktop: the keyboard back from the agent's tab to this page. */
   focusPage?(): void;
-  /** Windows' Focus Assist: 0 off, 1 priority only, 2 alarms only; null where it cannot be told. */
-  focusAssist?(): Promise<number | null>;
   /** Where updating stands: checking, the latest, a newer version coming or ready, or what went wrong. */
   updateState(): Promise<UpdateState | null>;
   onUpdate(listener: (state: UpdateState) => void): () => void;
@@ -41,10 +41,9 @@ interface NoticeRequest {
   volume: number;
 }
 
-/** A notification as its window gets it: with its id, and silent while Windows' Focus Assist is on. */
+/** A notification as its window gets it: with its id. */
 interface DrimvoxNotice extends NoticeRequest {
   id: string;
-  silent: boolean;
 }
 
 /** The notifications window's own bridge (apps/desktop/src/notice-preload.ts). */

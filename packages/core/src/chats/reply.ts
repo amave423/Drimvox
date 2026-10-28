@@ -11,6 +11,7 @@ import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai";
 import { cliReply } from "../cli/chat";
 import { isCli } from "../cli/kinds";
 import { FAIR_USE_HINT, WEB_HINT, webTools } from "../internet/tools";
+import { repairToolJson } from "../agent/repair";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";
@@ -180,6 +181,7 @@ export async function reply(i: ReplyInput): Promise<void> {
           thinkingOptions(i.conn.preset, i.thinking ?? "auto"),
         ),
         maxRetries: 1,
+        experimental_repairToolCall: repairToolJson,
         abortSignal: AbortSignal.any([i.signal, silence.signal]),
         onError: () => {},
       });

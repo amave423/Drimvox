@@ -97,6 +97,10 @@ export function enterPhase(ctx: PassContext, id: string, phase: TaskPhase): void
  * One model pass in the task's current step, then Drimvox's own decision about what comes next.
  * Returns the message that starts the next pass, or null when the task now waits or is done.
  */
+/** An interviewer whose ask_questions could not be read is asked once to call it again, not taken for "nothing to ask". */
+export const QUESTIONS_UNREADABLE =
+  "Your ask_questions call could not be read: its input was not valid JSON. Call ask_questions again with the same questions, as valid JSON (shorter descriptions help).";
+
 /** An interviewer that wrote its questions as text is asked once to ask them with the tool. */
 export const QUESTIONS_AS_TEXT =
   "You wrote your questions as text: the user cannot answer them there. Call ask_questions with them (each with short options and the recommended one), or ask_questions with an empty list if there is nothing to ask.";
@@ -143,6 +147,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
   /** What the model said in this pass: questions written as text, or nothing at all. */
   let said = "";
   let called = false;
+  /** ask_questions was called but failed (its input could not be read). */
+  let askFailed = false;
   let cost = row.cost_usd;
   let input = row.input_tokens;
   let output = row.output_tokens;
@@ -231,6 +237,12 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
       if (ctx.closed()) return;
       messages.push(...step.messages);
       if (step.messages.some((m) => m.role === "tool")) called = true;
+      for (const m of step.messages) {
+        if (m.role !== "tool") continue;
+        for (const part of m.content) {
+          if (part.type === "tool-result" && part.toolName === "ask_questions" && part.output.type.startsWith("error")) askFailed = true;
+        }
+      }
       cost += step.costUsd;
       input += step.inputTokens;
       output += step.outputTokens;
@@ -273,6 +285,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
       ctx.event("questions", { questions: asked.questions, understood: asked.understood, unknown: asked.unknown, round: row.interview_round + 1 });
       return finish(ctx, "waiting", "questions");
     }
+    // Seen live: the questions' JSON was broken, the call failed, and the interview was skipped for the plan.
+    if (!asked && askFailed && !messages.some((m) => m.role === "user" && m.content === QUESTIONS_UNREADABLE)) return QUESTIONS_UNREADABLE;
     // Questions written as text instead of ask_questions (seen live: they were lost and the plan came without them).
     if (!asked && said.includes("?") && !messages.some((m) => m.role === "user" && m.content === QUESTIONS_AS_TEXT)) return QUESTIONS_AS_TEXT;
     if (row.kind === "plan") {

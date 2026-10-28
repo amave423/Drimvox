@@ -1,4 +1,4 @@
-import { app, Menu, nativeImage, Notification, Tray, type BrowserWindow } from "electron";
+import { app, Menu, nativeImage, Tray, type BrowserWindow } from "electron";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -6,6 +6,12 @@ let tray: Tray | null = null;
 let menuTexts: { open: string; quit: string } | null = null;
 let showWindow: (() => void) | null = null;
 let update: { label: string; install: () => void } | null = null;
+/** Drimvox's own notification card (notices.ts), as every other notification comes (asked for: none of Windows' plain ones). */
+let notify: (title: string, body: string) => void = () => {};
+
+export function notifyWith(show: (title: string, body: string) => void): void {
+  notify = show;
+}
 
 /** The tray's menu: open, restart into a downloaded update when there is one, quit. */
 function rebuildMenu(): void {
@@ -24,7 +30,7 @@ function rebuildMenu(): void {
 export function offerUpdate(label: string, title: string, body: string, install: () => void): void {
   update = { label, install };
   rebuildMenu();
-  if (Notification.isSupported()) new Notification({ title, body }).show();
+  notify(title, body);
 }
 
 /** The app's icon: packed next to the app, or in the build folder while developing. */
@@ -66,7 +72,7 @@ export function keepInTray(win: () => BrowserWindow | null, quitting: () => bool
       } catch {
         // Said again next time.
       }
-      if (Notification.isSupported()) new Notification({ title: texts.hidden, body: texts.hiddenBody }).show();
+      notify(texts.hidden, texts.hiddenBody);
     });
   };
 }

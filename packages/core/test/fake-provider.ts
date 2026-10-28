@@ -17,7 +17,8 @@ export interface FakeChunk {
 /** One model reply in a scripted conversation: some text and/or tool calls. */
 export interface FakeTurn {
   text?: string;
-  toolCalls?: { name: string; args: Record<string, unknown> }[];
+  /** `raw` sends the arguments as they are, broken JSON too (seen live from DeepSeek). */
+  toolCalls?: { name: string; args: Record<string, unknown>; raw?: string }[];
   usage?: FakeUsage;
   /** Wait before answering, ms. */
   delayMs?: number;
@@ -144,7 +145,7 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
           const toolCalls = (turn.toolCalls ?? []).map((call, index) => ({
             id: `call_${scriptIndex}_${index}`,
             type: "function",
-            function: { name: call.name, arguments: JSON.stringify(call.args) },
+            function: { name: call.name, arguments: call.raw ?? JSON.stringify(call.args) },
           }));
           return json(200, {
             id: "c",
@@ -159,7 +160,7 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
         if (turn.text) res.write(chunk({ role: "assistant", content: turn.text }));
         (turn.toolCalls ?? []).forEach((call, index) => {
           const id = `call_${scriptIndex}_${index}`;
-          res.write(chunk({ tool_calls: [{ index, id, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) } }] }));
+          res.write(chunk({ tool_calls: [{ index, id, type: "function", function: { name: call.name, arguments: call.raw ?? JSON.stringify(call.args) } }] }));
         });
         const usage = turn.usage ?? { prompt_tokens: 100, completion_tokens: 20 };
         const finish = turn.toolCalls?.length ? "tool_calls" : (turn.finishReason ?? "stop");

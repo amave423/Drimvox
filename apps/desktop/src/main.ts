@@ -1,7 +1,6 @@
 import { coreGitEnv } from "./git-env";
 import { attachContextMenu } from "./context-menu";
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, screen, session, shell, utilityProcess, type UtilityProcess } from "electron";
-import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -10,8 +9,8 @@ import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, ty
 import { INSTALLER_ID } from "./installer-id";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
-import { keepInTray, offerUpdate } from "./tray";
-import { noticeRequest, setupNotices, showNotice } from "./notices";
+import { keepInTray, notifyWith, offerUpdate } from "./tray";
+import { noticeRequest, setupNotices, showNotice, type NoticeRequest } from "./notices";
 import { AgentView } from "./agent-view";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
@@ -421,6 +420,21 @@ function registerIpc() {
     else if (target.chatId) win.webContents.send("drimvox:open-chat", target.chatId);
   });
 
+  // How the cards look and sound, as the window last said: the app's own notices (an update, the tray) look the same.
+  let look: Omit<NoticeRequest, "title" | "body"> = { dark: nativeTheme.shouldUseDarkColors, mode: "projects", locale: app.getLocale().startsWith("ru") ? "ru" : "en", sound: "drop", volume: 0.6 };
+  ipcMain.on("drimvox:notice-look", (event, value: unknown) => {
+    if (!fromOurPage(event.senderFrame?.url)) return;
+    const request = noticeRequest({ ...(value as object), title: "", body: "" });
+    if (request) look = { dark: request.dark, mode: request.mode, locale: request.locale, sound: request.sound, volume: request.volume };
+  });
+  notifyWith((title, body) => {
+    if (process.env.DRIMVOX_TEST_UNFOCUSED === "1") {
+      ((globalThis as { drimvoxNotices?: unknown[] }).drimvoxNotices ??= []).push({ title, body, click: () => {} });
+      return;
+    }
+    void showNotice(origin, { ...look, title, body }, {});
+  });
+
   ipcMain.on("drimvox:notify", (event, notice: unknown) => {
     if (!fromOurPage(event.senderFrame?.url)) return;
     const request = noticeRequest(notice);
@@ -442,7 +456,7 @@ function registerIpc() {
       shown.push({ title: request.title, body: request.body, taskId: target.taskId ?? "", projectId: target.projectId ?? "", chatId: target.chatId ?? "", click });
       return;
     }
-    void quiet().then((silent) => showNotice(origin, request, target, silent));
+    void showNotice(origin, request, target);
     // The taskbar button blinks too, until the window is in front again.
     win?.flashFrame(true);
   });
@@ -464,13 +478,11 @@ function registerIpc() {
     event.sender.focus();
   });
 
-  ipcMain.handle("drimvox:focus-assist", (event) => (fromOurPage(event.senderFrame?.url) ? focusAssist() : null));
-
   // Settings: one notification now, whatever window is in front, to see and hear how they come.
   ipcMain.on("drimvox:notify-test", (event, notice: unknown) => {
     if (!fromOurPage(event.senderFrame?.url)) return;
     const request = noticeRequest(notice);
-    if (request) void quiet().then((silent) => showNotice(origin, request, {}, silent));
+    if (request) void showNotice(origin, request, {});
   });
 
   const hex = /^#[0-9a-f]{6}$/i;
@@ -550,31 +562,3 @@ app.on("before-quit", (event) => {
   child.postMessage({ type: "quit" });
   setTimeout(() => child.kill(), 3_000).unref();
 });
-
-/**
- * Windows' Focus Assist: 0 off, 1 priority only, 2 alarms only (seen: "alarms only" sent every notification to the
- * action centre without a banner or a sound, and it looked like Drimvox's fault). Read from the shell's own state with
- * PowerShell; null elsewhere or when it cannot be read.
- */
-function focusAssist(): Promise<number | null> {
-  if (process.env.DRIMVOX_TEST_FOCUS_ASSIST) return Promise.resolve(Number(process.env.DRIMVOX_TEST_FOCUS_ASSIST));
-  if (process.platform !== "win32") return Promise.resolve(null);
-  const script = [
-    `Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class Wnf { [DllImport("ntdll.dll")] public static extern int NtQueryWnfStateData(ref ulong n, IntPtr t, IntPtr s, out uint c, byte[] b, ref uint z); }'`,
-    "$n = [UInt64]'0xd83063ea3bf1c75'; $b = New-Object byte[] 4; $z = [uint32]4; $c = [uint32]0",
-    "if ([Wnf]::NtQueryWnfStateData([ref]$n, [IntPtr]::Zero, [IntPtr]::Zero, [ref]$c, $b, [ref]$z) -eq 0) { [BitConverter]::ToInt32($b, 0) }",
-  ].join("; ");
-  return new Promise((resolve) => {
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 10_000 }, (err, out) => {
-      const value = Number(String(out).trim());
-      resolve(err || !Number.isInteger(value) ? null : value);
-    });
-  });
-}
-
-/** Focus Assist on: notifications come without a sound. Asked at most once a minute (it starts PowerShell). */
-let quietAsked: { at: number; value: Promise<boolean> } | null = null;
-function quiet(): Promise<boolean> {
-  if (!quietAsked || Date.now() - quietAsked.at > 60_000) quietAsked = { at: Date.now(), value: focusAssist().then((p) => p === 1 || p === 2) };
-  return quietAsked.value;
-}

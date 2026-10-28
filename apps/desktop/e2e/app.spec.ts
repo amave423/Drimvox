@@ -76,15 +76,6 @@ test("opens with a working core and remembers theme and language", async () => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });
 
-// Seen: notifications went straight to the action centre without a sound, all of them: Focus Assist was on ("alarms
-// only"). The settings say so next to the notifications.
-test("says when Windows hides notifications by Focus Assist", async () => {
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_FOCUS_ASSIST: "2" } });
-  const page = await app.firstWindow();
-  await openSection(page, "Настройки");
-  await expect(page.getByText(/Фокусировка внимания/)).toBeVisible();
-});
-
 test("the core refuses callers that do not have the token", async () => {
   app = await launch();
   const page = await app.firstWindow();
@@ -105,7 +96,7 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { drimvox?: object }).drimvox ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "focusPage", "getToken", "installUpdate", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "placeBrowser", "savePdf", "setTitleBar", "testNotify", "updateState"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusPage", "getToken", "installUpdate", "noticeLook", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "placeBrowser", "savePdf", "setTitleBar", "testNotify", "updateState"] });
 });
 
 test("the catalog switches a ready skill on and off, and shows a server's details with the token it needs", async () => {
@@ -167,12 +158,16 @@ test("closing the window keeps Drimvox working in the tray, and it shows the win
   app = await launch();
   const page = await app.firstWindow();
   await expect(paramsButton(page)).toBeVisible();
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
-  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))).toEqual([false]);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().endsWith("#notice"))!.close());
+  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().endsWith("#notice"))!.isVisible())).toBe(false);
+  // Said with Drimvox's own card, not one of Windows' plain notifications (asked for).
+  await expect.poll(() => app!.windows().some((w) => w.url().endsWith("#notice"))).toBe(true);
+  const notice = app.windows().find((w) => w.url().endsWith("#notice"))!;
+  await expect(notice.getByText("Drimvox работает в фоне")).toBeVisible();
   // The core still answers: the app did not quit.
   expect(await page.evaluate(async () => (await fetch("/api/health")).ok)).toBe(true);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show());
-  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isVisible())).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().endsWith("#notice"))!.show());
+  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().endsWith("#notice"))!.isVisible())).toBe(true);
 });
 
 // Asked for: one "Parameters" button; the parameters a page of their own, sections on the right, a way back, the mode kept.
@@ -272,6 +267,11 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
     const wider = (await pane.locator(".browser-view").boundingBox())!;
     expect(wider.width).toBeGreaterThan(box.width + 100);
     await expect.poll(async () => (await tabBounds())?.width).toBe(Math.round(wider.width));
+    // Its grip is a slider for the keyboard too.
+    const grip = pane.getByRole("button", { name: /Ширина браузера/ });
+    await expect(grip).toBeVisible();
+    await grip.press("ArrowLeft");
+    await expect.poll(async () => (await pane.locator(".browser-view").boundingBox())!.width).toBeGreaterThan(wider.width + 30);
 
     // The tab is a page of its own, clicked and typed into as any page (Cyrillic too).
     let tab: Page | undefined;

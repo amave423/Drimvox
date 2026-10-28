@@ -61,8 +61,12 @@ export function setupNotices(open: (target: NoticeTarget) => void): void {
   });
 }
 
-/** Shows one notification; `silent` while Windows' Focus Assist asks for quiet. */
-export async function showNotice(origin: string, request: NoticeRequest, target: NoticeTarget, silent: boolean): Promise<void> {
+/**
+ * Shows one notification, with its sound. Windows' Focus Assist is not followed: these are Drimvox's own windows, which
+ * it does not hide, and its automatic rules (a full-screen app) turned it on unseen (seen: the settings said it was on
+ * while the user had it off).
+ */
+export async function showNotice(origin: string, request: NoticeRequest, target: NoticeTarget): Promise<void> {
   if (!win) create(origin);
   await loaded;
   if (!win) return;
@@ -70,7 +74,7 @@ export async function showNotice(origin: string, request: NoticeRequest, target:
   targets.set(id, target);
   // A click is looked up by its id for a while; old ones are forgotten.
   if (targets.size > 50) targets.delete(targets.keys().next().value!);
-  win.webContents.send("drimvox:notice", { ...request, id, silent });
+  win.webContents.send("drimvox:notice", { ...request, id });
 }
 
 function create(origin: string): void {

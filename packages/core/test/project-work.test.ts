@@ -107,6 +107,33 @@ describe("work on a project", () => {
     expect(JSON.stringify(requestsOf("asker").at(-1)!.body.messages)).toContain("You wrote your questions as text");
   });
 
+  // Seen live: DeepSeek wrote its questions with one "}" too many; the call failed and the interview was skipped.
+  const QUESTIONS = { questions: [{ id: "look", question: "Какой стиль?", options: [{ label: "Тёплый" }, { label: "Строгий" }] }], understood: "Сайт", unknown: [] };
+  async function interviewOf(s: Awaited<ReturnType<typeof setup>>) {
+    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, { task: "Сайт", models: { interview: s.ref("asker"), plan: s.ref("asker"), work: s.ref("asker"), strong: null } });
+    const work = await until(s.project.id, (w) => !!w.planTaskId);
+    let task: any;
+    for (let i = 0; i < 200; i++) {
+      task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
+      if (task.status !== "running") break;
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    return task;
+  }
+
+  it("reads questions whose JSON has a bracket too many", async () => {
+    const extra = JSON.stringify(QUESTIONS).replace(/\]\}$/, "}]}");
+    const s = await setup({ asker: [{ toolCalls: [{ name: "ask_questions", args: {}, raw: extra }] }] });
+    expect(await interviewOf(s)).toMatchObject({ status: "waiting", statusReason: "questions" });
+    expect(requestsOf("asker")).toHaveLength(1);
+  });
+
+  it("asks again for questions it cannot read, instead of skipping the interview", async () => {
+    const s = await setup({ asker: [{ toolCalls: [{ name: "ask_questions", args: {}, raw: '{"questions": [{"id": look}]' }] }, call("ask_questions", QUESTIONS)] });
+    expect(await interviewOf(s)).toMatchObject({ status: "waiting", statusReason: "questions" });
+    expect(JSON.stringify(requestsOf("asker").at(-1)!.body.messages)).toContain("could not be read");
+  });
+
   // Seen live: a plan model answered with nothing through a reseller, and "no plan" did not say why.
   it("says a model that answers with nothing answered with nothing", async () => {
     const s = await setup({ asker: [noQuestions], planner: [{ text: "" }, { text: "" }] });

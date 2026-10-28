@@ -24,7 +24,7 @@ export function NoticeStack({ bridge }: { bridge: NoticeBridge }) {
         root.dataset.theme = notice.dark ? "dark" : "light";
         root.dataset.mode = notice.mode;
         root.lang = notice.locale;
-        if (!notice.silent) playSound(notice.sound, notice.volume);
+        playSound(notice.sound, notice.volume);
         setList((now) => [...now, notice].slice(-MOST));
       }),
     [bridge],
