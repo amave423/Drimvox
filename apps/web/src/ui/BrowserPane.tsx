@@ -8,11 +8,21 @@ interface Frame {
   width: number;
   height: number;
 }
+interface Tab {
+  id: string;
+  url: string;
+  title: string;
+}
 interface State {
   running: boolean;
   url: string;
   title: string;
+  tabs: Tab[];
+  active: string | null;
 }
+
+/** A tab's name in the strip: its title, else its address without the scheme. */
+const tabName = (tab: Tab, blank: string) => tab.title.trim() || (tab.url === "about:blank" ? blank : tab.url.replace(/^https?:\/\//, ""));
 
 /** Keys that are not text, passed on as keys; the rest of what is typed goes as text. */
 const KEYS = new Set(["Enter", "Backspace", "Tab", "Escape", "Delete", "ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
@@ -47,7 +57,7 @@ export function useBrowserState(): State | null {
 export function BrowserPane({ onClose }: { onClose(): void }) {
   const { api, t, token } = useApp();
   const [frame, setFrame] = useState<Frame | null>(null);
-  const [state, setState] = useState<State>({ running: false, url: "", title: "" });
+  const [state, setState] = useState<State>({ running: false, url: "", title: "", tabs: [], active: null });
   const [address, setAddress] = useState("");
   const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -167,6 +177,30 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
           <CrossIcon />
         </button>
       </header>
+      {state.running && state.tabs.length > 0 && (
+        // The agent may open several tabs: all of them, the shown one marked (asked for: a switch between them).
+        <div className="browser-tabs" role="tablist" aria-label={t("browser.tabs")}>
+          {state.tabs.map((tab) => (
+            <div key={tab.id} className={`browser-tab${tab.id === state.active ? " is-on" : ""}`}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab.id === state.active}
+                title={tab.url}
+                onClick={() => void api.browser.tab.$post({ json: { id: tab.id } }).catch(() => null)}
+              >
+                {tabName(tab, t("browser.blank"))}
+              </button>
+              <button type="button" className="browser-tab-close" aria-label={t("browser.closeTab", { name: tabName(tab, t("browser.blank")) })} onClick={() => void api.browser.tab.close.$post({ json: { id: tab.id } }).catch(() => null)}>
+                ×
+              </button>
+            </div>
+          ))}
+          <button type="button" className="browser-tab-new" aria-label={t("browser.newTab")} title={t("browser.newTab")} onClick={() => void api.browser.tab.new.$post({ json: {} }).catch(() => null)}>
+            +
+          </button>
+        </div>
+      )}
       <p className="browser-hint muted">{state.title ? state.title : t("browser.hint")}</p>
       <div className="browser-view" tabIndex={0} onKeyDown={key} aria-label={t("browser.view")}>
         {state.running && frame ? (

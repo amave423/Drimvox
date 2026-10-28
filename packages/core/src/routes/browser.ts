@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { browserInputSchema, browserOpenSchema } from "@drimvox/shared";
+import { browserInputSchema, browserOpenSchema, browserTabSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { AgentBrowser, BrowserFrame, BrowserState } from "../browser/agent-browser";
@@ -51,6 +51,23 @@ export function browserRoutes(browser: AgentBrowser) {
     .post("/input", zValidator("json", browserInputSchema), async (c) => {
       await browser.input(c.req.valid("json")).catch(() => {});
       return c.body(null, 204);
+    })
+    .post("/tab", zValidator("json", browserTabSchema), async (c) => {
+      await browser.select(c.req.valid("json").id).catch(() => {});
+      return c.json(browser.state(), 200);
+    })
+    .post("/tab/close", zValidator("json", browserTabSchema), async (c) => {
+      await browser.close(c.req.valid("json").id).catch(() => {});
+      return c.body(null, 204);
+    })
+    .post("/tab/new", zValidator("json", browserOpenSchema), async (c) => {
+      const { url } = c.req.valid("json");
+      try {
+        await browser.newTab(url ?? "about:blank");
+      } catch (err) {
+        return c.json({ error: { code: "no_browser" as const, detail: err instanceof Error ? err.message : String(err) } }, 409);
+      }
+      return c.json(browser.state(), 200);
     })
     .post("/back", async (c) => {
       await browser.back().catch(() => {});

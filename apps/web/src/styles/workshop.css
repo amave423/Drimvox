@@ -175,3 +175,14 @@
 .browser-view img { display: block; width: 100%; height: auto; cursor: default; user-select: none; }
 .browser-empty { padding: 40px 24px; display: grid; gap: 12px; justify-items: start; max-width: 60ch; }
 .browser-empty p { margin: 0; }
+/* The browser's tabs: a strip that scrolls sideways, the shown one raised. */
+.browser-tabs { display: flex; align-items: stretch; gap: 2px; padding: 6px 10px 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--paper); scrollbar-width: thin; }
+.browser-tab { flex: 0 1 200px; min-width: 90px; display: flex; align-items: center; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; }
+.browser-tab > button:first-child { flex: 1; min-width: 0; padding: 6px 4px 6px 10px; text-align: left; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.browser-tab.is-on { background: var(--sheet); border-color: var(--line); margin-bottom: -1px; }
+.browser-tab.is-on > button:first-child { color: var(--fg); }
+.browser-tab:hover > button:first-child { color: var(--fg); }
+.browser-tab-close { flex: none; width: 22px; height: 22px; margin-right: 4px; border-radius: 50%; color: var(--muted); font-size: 15px; line-height: 1; }
+.browser-tab-close:hover { background: var(--paper); color: var(--fg); }
+.browser-tab-new { flex: none; width: 28px; color: var(--muted); font-size: 18px; }
+.browser-tab-new:hover { color: var(--fg); }

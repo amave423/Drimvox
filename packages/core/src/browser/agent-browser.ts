@@ -9,10 +9,20 @@ export interface BrowserFrame {
   height: number;
 }
 
-export interface BrowserState {
-  running: boolean;
+export interface BrowserTab {
+  id: string;
   url: string;
   title: string;
+}
+
+export interface BrowserState {
+  running: boolean;
+  /** The tab the panel shows. */
+  url: string;
+  title: string;
+  /** Every tab, in the order they were opened, and which one is shown (asked for: a switch between them). */
+  tabs: BrowserTab[];
+  active: string | null;
 }
 
 /** What the user does in the browser's panel, in the page's own pixels. */
@@ -143,7 +153,13 @@ export class AgentBrowser {
 
   state(): BrowserState {
     const page = this.pages.find((p) => p.id === this.active);
-    return { running: !!this.proc && !!this.ws, url: page?.url ?? "", title: page?.title ?? "" };
+    return {
+      running: !!this.proc && !!this.ws,
+      url: page?.url ?? "",
+      title: page?.title ?? "",
+      tabs: this.pages.map((p) => ({ ...p })),
+      active: this.active,
+    };
   }
 
   /** Pictures of the current tab while someone watches; returns the way to stop watching. */
@@ -188,6 +204,26 @@ export class AgentBrowser {
     await this.endpoint();
     await this.ensurePage();
     if (this.session) await this.send("Page.navigate", { url }, this.session);
+  }
+
+  /** A new tab, shown at once. */
+  async newTab(url = "about:blank"): Promise<void> {
+    await this.endpoint();
+    const { targetId } = (await this.send("Target.createTarget", { url })) as { targetId: string };
+    await this.follow(targetId);
+  }
+
+  /** Shows another tab in the panel and brings it to the front of the browser. */
+  async select(id: string): Promise<void> {
+    if (!this.pages.some((p) => p.id === id)) return;
+    await this.send("Target.activateTarget", { targetId: id }).catch(() => {});
+    await this.follow(id);
+    await this.refresh();
+  }
+
+  async close(id: string): Promise<void> {
+    if (!this.pages.some((p) => p.id === id)) return;
+    await this.send("Target.closeTarget", { targetId: id });
   }
 
   async back(): Promise<void> {

@@ -58,3 +58,6 @@ export const browserInputSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("key"), key: z.string().max(20) }),
   z.object({ type: z.literal("text"), text: z.string().max(2000) }),
 ]);
+
+/** One of the agent's browser's tabs. */
+export const browserTabSchema = z.object({ id: z.string().min(1).max(200) }).strict();

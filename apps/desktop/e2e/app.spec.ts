@@ -231,8 +231,9 @@ test("shows its own notification window with the chosen sound, and it goes away 
 // Asked for: the agent's browser in a panel of Drimvox, like Claude's, not a window of its own; a check is passed in it.
 test("opens the agent's browser in a panel, where a page is clicked and typed into", async () => {
   test.setTimeout(60_000);
-  const site = createServer((_, res) => {
+  const site = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    if (req.url === "/b") return res.end("<title>Вторая</title><h1>Вторая</h1>");
     res.end(`<title>Проверка</title><body style="margin:0"><button style="position:absolute;left:0;top:0;width:400px;height:250px" onclick="document.title='Нажато'">Я не робот</button><input style="position:absolute;left:0;top:300px;width:300px" oninput="document.title='Введено: '+this.value"></body>`);
   });
   await new Promise<void>((r) => site.listen(0, "127.0.0.1", r));
@@ -259,6 +260,19 @@ test("opens the agent's browser in a panel, where a page is clicked and typed in
     await page.keyboard.type("kedr");
     await expect(pane.locator(".browser-hint")).toHaveText("Введено: kedr", { timeout: 10_000 });
     await expect(page.locator(".topbar-browser-dot")).toBeVisible({ timeout: 10_000 });
+
+    // Several tabs: a new one, then back to the first, and the second closed (asked for: a switch between them).
+    const tabs = pane.getByRole("tablist", { name: "Вкладки" });
+    await tabs.getByRole("button", { name: "Новая вкладка" }).click();
+    await expect(tabs.getByRole("tab")).toHaveCount(2);
+    await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${(site.address() as AddressInfo).port}/b`);
+    await pane.getByLabel("Адрес").press("Enter");
+    await expect(pane.locator(".browser-hint")).toHaveText("Вторая", { timeout: 10_000 });
+    await expect(tabs.getByRole("tab", { name: "Вторая" })).toHaveAttribute("aria-selected", "true");
+    await tabs.getByRole("tab", { name: "Введено: kedr" }).click();
+    await expect(pane.locator(".browser-hint")).toHaveText("Введено: kedr", { timeout: 10_000 });
+    await tabs.getByRole("button", { name: "Закрыть вкладку «Вторая»" }).click();
+    await expect(tabs.getByRole("tab")).toHaveCount(1);
   } finally {
     site.closeAllConnections();
     await new Promise((r) => site.close(r));
