@@ -54,6 +54,8 @@ export interface WorkShot {
 export interface ProjectWorkView {
   projectId: string;
   status: ProjectWorkStatus;
+  /** The interview or the plan stopped on an error or by the user: nothing runs until it is tried again. */
+  planStalled: boolean;
   reason: ProjectWorkReason | null;
   /** Details of an error that stopped the run. */
   detail: string | null;

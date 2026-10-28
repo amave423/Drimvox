@@ -52,6 +52,8 @@ export class ProjectWork {
     return {
       projectId,
       status: row?.status ?? "idle",
+      // Seen: a plan that failed left its project "working" in the sidebar for good.
+      planStalled: row?.status === "planning" && !!row.planTaskId && ["failed", "stopped"].includes(this.o.runner.view(row.planTaskId)?.status ?? ""),
       reason: row?.reason ?? null,
       detail: row?.detail ?? null,
       models: row?.models ?? null,

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BASE, auth, createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
-import { HEADLESS_PLAYWRIGHT, TRUST_PLAYWRIGHT } from "../src/db";
+import { HEADLESS_DEVTOOLS, HEADLESS_PLAYWRIGHT, TRUST_PLAYWRIGHT } from "../src/db";
 import { needsAsking } from "../src/mcp/hub";
 
 const NL = String.fromCharCode(10);
@@ -71,6 +71,15 @@ describe("servers", () => {
     expect(args(shown)).toEqual(["-y", "@playwright/mcp@latest", "--headless"]);
     expect(args(headed)).toEqual(["-y", "@playwright/mcp@latest", "--headed"]);
     expect(args(other)).toEqual(["-y", "some-server"]);
+  });
+
+  // Seen: a Chrome window opened on the desktop while the agent worked in Drimvox's own browser.
+  it("moves a Chrome DevTools server already added out of sight, once", async () => {
+    const id = (await (await env.call("POST", "/api/mcp", { name: "Chrome DevTools", command: "npx", args: ["-y", "chrome-devtools-mcp@latest", "--no-usage-statistics"] })).json()).id as string;
+    env.db.sql.exec(HEADLESS_DEVTOOLS);
+    env.db.sql.exec(HEADLESS_DEVTOOLS);
+    const args = JSON.parse((env.db.sql.prepare("select args from mcp_servers where id = ?").get(id) as { args: string }).args);
+    expect(args).toEqual(["-y", "chrome-devtools-mcp@latest", "--no-usage-statistics", "--headless"]);
   });
 
   it("switches a server off and deletes it", async () => {

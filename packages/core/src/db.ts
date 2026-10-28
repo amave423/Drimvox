@@ -8,6 +8,13 @@ import { DatabaseSync } from "node:sqlite";
 export const HEADLESS_PLAYWRIGHT = `update mcp_servers set args = json_insert(args, '$[#]', '--headless'), updated_at = cast(unixepoch('subsec') * 1000 as integer)
   where args like '%@playwright/mcp%' and args not like '%--headless%' and args not like '%--headed%';`;
 
+/**
+ * The Chrome DevTools server without a window of its own (seen: a Chrome window opened on the desktop while the agent
+ * worked in Drimvox's own browser).
+ */
+export const HEADLESS_DEVTOOLS = `update mcp_servers set args = json_insert(args, '$[#]', '--headless'), updated_at = cast(unixepoch('subsec') * 1000 as integer)
+  where args like '%chrome-devtools-mcp%' and args not like '%--headless%';`;
+
 /** The Playwright server works only in its own browser, without the user's sign-ins: it asks about nothing. */
 export const TRUST_PLAYWRIGHT = `update mcp_servers set trust = 'trusted' where args like '%@playwright/mcp%';`;
 
@@ -266,6 +273,7 @@ const migrations: string[] = [
   HEADLESS_PLAYWRIGHT,
   // How much a server is trusted: a new one asks only about what changes something.
   `alter table mcp_servers add column trust text not null default 'changes'; ${TRUST_PLAYWRIGHT}`,
+  HEADLESS_DEVTOOLS,
 ];
 
 export interface Database {

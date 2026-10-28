@@ -40,6 +40,19 @@ export const MAX_ATTEMPTS = 3;
 /** A task goes past the step limit this many times before it asks; the budget limits it anyway. */
 export const MAX_STEP_ROUNDS = 3;
 
+/** A provider that is busy for a moment is tried again this many times, this far apart, before the task fails. */
+const TRANSIENT = new Set(["overloaded", "rate_limited", "unreachable"]);
+const MAX_RETRIES = 3;
+const RETRY_MS = [5_000, 15_000, 30_000];
+/** Tries in a row per task; a pass that ends without an error clears it. */
+const retries = new Map<string, number>();
+/** Said to the model after a pause: the conversation goes on where the provider broke it off. */
+export const GO_ON = "The provider failed for a moment; go on where you stopped.";
+/** Tests wait less. */
+export function setRetryDelays(ms: number[]): void {
+  RETRY_MS.splice(0, RETRY_MS.length, ...ms);
+}
+
 /** What a pass needs from the runner: storage, notifications and the user's settings. */
 export interface PassContext {
   tasks: TaskRepo;
@@ -99,7 +112,7 @@ export function enterPhase(ctx: PassContext, id: string, phase: TaskPhase): void
  */
 /** An interviewer whose ask_questions could not be read is asked once to call it again, not taken for "nothing to ask". */
 export const QUESTIONS_UNREADABLE =
-  "Your ask_questions call could not be read: its input was not valid JSON. Call ask_questions again with the same questions, as valid JSON (shorter descriptions help).";
+  "Your ask_questions call could not be read. Call ask_questions again with the same questions, as valid JSON that fits its schema (shorter descriptions help).";
 
 /** An interviewer that wrote its questions as text is asked once to ask them with the tool. */
 export const QUESTIONS_AS_TEXT =
@@ -147,8 +160,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
   /** What the model said in this pass: questions written as text, or nothing at all. */
   let said = "";
   let called = false;
-  /** ask_questions was called but failed (its input could not be read). */
-  let askFailed = false;
+  /** Why ask_questions failed when it was called and its input could not be read; null when it did not fail. */
+  let askFailed: string | null = null;
   let cost = row.cost_usd;
   let input = row.input_tokens;
   let output = row.output_tokens;
@@ -240,7 +253,9 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
       for (const m of step.messages) {
         if (m.role !== "tool") continue;
         for (const part of m.content) {
-          if (part.type === "tool-result" && part.toolName === "ask_questions" && part.output.type.startsWith("error")) askFailed = true;
+          if (part.type === "tool-result" && part.toolName === "ask_questions" && part.output.type.startsWith("error")) {
+            askFailed = String((part.output as { value?: unknown }).value ?? "").slice(0, 1500) || "unreadable";
+          }
         }
       }
       cost += step.costUsd;
@@ -256,7 +271,23 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
   if (ctx.closed()) return null;
 
   if (outcome.kind === "stopped") return finish(ctx, "stopped", "user");
-  if (outcome.kind === "error") return finish(ctx, "failed", outcome.error.code, outcome.error.detail);
+  if (outcome.kind === "error") {
+    // Seen live: "The service is temporarily busy" ended a plan for good; a moment later it would have worked.
+    const tries = retries.get(id) ?? 0;
+    if (TRANSIENT.has(outcome.error.code) && tries < MAX_RETRIES) {
+      retries.set(id, tries + 1);
+      ctx.event("text", { text: `The provider is busy (${outcome.error.detail ?? outcome.error.code}); Drimvox tries again in ${Math.round(RETRY_MS[tries]! / 1000)} s.` });
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, RETRY_MS[tries]);
+        ctx.signal.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
+      });
+      if (ctx.signal.aborted) return finish(ctx, "stopped", "user");
+      return GO_ON;
+    }
+    retries.delete(id);
+    return finish(ctx, "failed", outcome.error.code, outcome.error.detail);
+  }
+  retries.delete(id);
   // The step limit means nothing to the user: the stops worth making are the spec and the stages, and the budget limits money.
   if (outcome.kind === "steps" && row.step_rounds < MAX_STEP_ROUNDS) {
     const next = await pastStepLimit(ctx, id, ctx.tasks.row(id)!, MAX_STEPS);
@@ -286,7 +317,9 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
       return finish(ctx, "waiting", "questions");
     }
     // Seen live: the questions' JSON was broken, the call failed, and the interview was skipped for the plan.
-    if (!asked && askFailed && !messages.some((m) => m.role === "user" && m.content === QUESTIONS_UNREADABLE)) return QUESTIONS_UNREADABLE;
+    if (!asked && askFailed && !messages.some((m) => m.role === "user" && typeof m.content === "string" && m.content.startsWith(QUESTIONS_UNREADABLE))) {
+      return `${QUESTIONS_UNREADABLE}\n\nWhat was wrong:\n${askFailed}`;
+    }
     // Questions written as text instead of ask_questions (seen live: they were lost and the plan came without them).
     if (!asked && said.includes("?") && !messages.some((m) => m.role === "user" && m.content === QUESTIONS_AS_TEXT)) return QUESTIONS_AS_TEXT;
     if (row.kind === "plan") {

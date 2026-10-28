@@ -202,6 +202,7 @@ export function createCore(o: AppOptions) {
       visualKit,
       web,
       skillsDir: join(o.dataDir, "skills"),
+      mcp,
       idleTimeoutMs,
       plan: (projectId) => backlog.plan(projectId),
       month: () => monthUsage(o.db, chats),

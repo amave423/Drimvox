@@ -146,7 +146,8 @@ export function SideProjects() {
 function WorkLine({ work }: { work: ProjectWorkView | null }) {
   const { t } = useApp();
   if (!work || work.status === "idle") return null;
-  const tone = work.status === "running" || work.status === "planning" ? (work.waitingApproval ? "wait" : "run") : work.status === "done" ? "ok" : "wait";
+  // A plan that stopped on an error waits for the user, it does not run.
+  const tone = work.status === "running" || (work.status === "planning" && !work.planStalled) ? (work.waitingApproval ? "wait" : "run") : work.status === "done" ? "ok" : "wait";
   const done = work.checklist.filter((i) => i.done).length;
   const total = work.checklist.length;
   return (

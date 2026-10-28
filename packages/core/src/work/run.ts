@@ -1,4 +1,5 @@
 import type { ActivityEntry, ChecklistItem, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
+import type { McpAsk, McpHooks } from "../mcp/hub";
 import { compactHistory } from "./compact";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
@@ -42,6 +43,8 @@ export interface RunDeps {
   visualKit: VisualKit;
   web: WebAccess;
   skillsDir: string;
+  /** Tools of the user's MCP servers; their questions come into the project's conversation. */
+  mcp?: { toolsFor(ask: McpAsk, hooks: McpHooks): Promise<ToolSet> };
   idleTimeoutMs: number;
   plan(projectId: string): ProjectPlan | null;
   /** This month's spending against the app's budget. */
@@ -229,7 +232,15 @@ export class WorkRun {
     const vision = await this.d.vision(conn, model);
     const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]);
     const files = { list: () => this.d.chats.attachments.ofChat(this.chatId), file: (id: string) => this.d.chats.attachments.file(id) };
+    // The user's MCP servers work in the run too (seen: four were switched on and the run had none of them).
+    const mcpTools = this.d.mcp
+      ? await this.d.mcp.toolsFor((call) => this.d.approvals.ask(this.chatId, emit, call), {
+          onCall: (call) => onCall(call.name, describeCall(call.input)),
+          onResult: () => {},
+        })
+      : {};
     const own: ToolSet = {
+      ...mcpTools,
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
       ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true }),
       ...skillTools(skills, this.folder, hooks),

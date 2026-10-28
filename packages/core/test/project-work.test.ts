@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { git, makeRepo } from "./git-repo";
+import { setRetryDelays } from "../src/agent/pass";
 
 // docs/specs/project-work.md: an interview, a plan, "Go", then one long run of the agent with its own checklist.
 vi.setConfig({ testTimeout: 30_000 });
@@ -134,6 +135,33 @@ describe("work on a project", () => {
     expect(JSON.stringify(requestsOf("asker").at(-1)!.body.messages)).toContain("could not be read");
   });
 
+  // Seen live: Opus sent what is still open as one sentence; the call failed on its type and the interview was skipped.
+  it("takes what is still open written as one sentence", async () => {
+    const s = await setup({ asker: [call("ask_questions", { ...QUESTIONS, unknown: "Стиль сайта и цены доставки" })] });
+    expect(await interviewOf(s)).toMatchObject({ status: "waiting", statusReason: "questions" });
+    expect(requestsOf("asker")).toHaveLength(1);
+  });
+
+  // Seen live: "The service is temporarily busy" ended a plan for good; a moment later it would have worked.
+  it("tries a busy provider again a moment later instead of failing the interview", async () => {
+    setRetryDelays([10, 10, 10]);
+    const busy = { fail: { status: 400, message: "The service is temporarily busy. Please retry in a few seconds." } };
+    const s = await setup({ asker: [busy, busy, call("ask_questions", QUESTIONS)] });
+    expect(await interviewOf(s)).toMatchObject({ status: "waiting", statusReason: "questions" });
+    expect(requestsOf("asker")).toHaveLength(3);
+    setRetryDelays([5_000, 15_000, 30_000]);
+  });
+
+  // Seen: a plan that failed left its project "working" in the sidebar for good.
+  it("says a plan that failed for good has stalled", async () => {
+    setRetryDelays([10, 10, 10]);
+    const broken = { fail: { status: 400, message: "Bad request" } };
+    const s = await setup({ asker: [broken] });
+    expect(await interviewOf(s)).toMatchObject({ status: "failed" });
+    expect(await workOf(s.project.id)).toMatchObject({ status: "planning", planStalled: true });
+    setRetryDelays([5_000, 15_000, 30_000]);
+  });
+
   // Seen live: a plan model answered with nothing through a reseller, and "no plan" did not say why.
   it("says a model that answers with nothing answered with nothing", async () => {
     const s = await setup({ asker: [noQuestions], planner: [{ text: "" }, { text: "" }] });
@@ -198,6 +226,28 @@ describe("work on a project", () => {
     expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
     // The plan's task is over once the work started.
     expect((await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json()).statusReason).toBe("started");
+  });
+
+  // Seen: four MCP servers were switched on and the project's run had none of them (only the interview did).
+  it("gives the run the tools of the user's MCP servers", async () => {
+    const server = fileURLToPath(new URL("./mcp-server.mjs", import.meta.url));
+    await env.call("POST", "/api/mcp", { name: "demo", command: process.execPath, args: [server], trust: "trusted" });
+    const s = await setup({
+      coder: [
+        noQuestions,
+        writePlan,
+        call("mcp_demo_echo", { text: "кедр" }),
+        call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
+        call("finish_work", { report: "Готово." }),
+        { text: "Готово." },
+      ],
+    });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "done");
+    const sent = requestsOf("coder").at(-1)!.body;
+    expect(sent.tools.map((t: any) => t.function.name)).toContain("mcp_demo_echo");
+    expect(JSON.stringify(sent.messages)).toContain("echo: кедр");
   });
 
   it("takes a message the user writes while it works into the next answer, and goes on", async () => {

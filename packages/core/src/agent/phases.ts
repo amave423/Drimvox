@@ -129,7 +129,14 @@ export function interviewTools(onRound: (round: InterviewRound) => void): ToolSe
       inputSchema: z.object({
         questions: z.array(questionSchema).max(6),
         understood: z.string().max(4000).default("").describe("What you understood so far, 2-4 sentences in the user's language"),
-        unknown: z.array(z.string().min(1).max(500)).max(20).default([]).describe("What is still open"),
+        // Seen live: Opus sent what is open as one sentence, the call failed and the interview was skipped.
+        unknown: z
+          .preprocess(
+            (v) => (typeof v === "string" ? v.split(/\n+/).map((x) => x.replace(/^[-•*\d.)\s]+/, "").trim().slice(0, 500)).filter(Boolean).slice(0, 20) : Array.isArray(v) ? v.slice(0, 20) : v),
+            z.array(z.string().min(1).max(500)).max(20),
+          )
+          .default([])
+          .describe("What is still open"),
       }),
       execute: async ({ questions, understood, unknown }) => {
         onRound({

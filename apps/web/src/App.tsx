@@ -167,7 +167,7 @@ export function App({ api, token, initialSettings, status }: Props) {
   // An open workshop asks for a fresh look when its work changes: the sidebar's checklist follows it at once.
   const [worksAsked, setWorksAsked] = useState(0);
   const reloadWorks = useCallback(() => setWorksAsked((n) => n + 1), []);
-  const working = works.some((w) => w.status === "running" || w.status === "planning");
+  const working = works.some((w) => w.status === "running" || (w.status === "planning" && !w.planStalled));
   useEffect(() => {
     const look = async () => {
       const next = await api.work.$get().then((r) => ok<ProjectWorkView[]>(r)).catch(() => null);
