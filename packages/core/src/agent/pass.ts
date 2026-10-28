@@ -97,6 +97,10 @@ export function enterPhase(ctx: PassContext, id: string, phase: TaskPhase): void
  * One model pass in the task's current step, then Drimvox's own decision about what comes next.
  * Returns the message that starts the next pass, or null when the task now waits or is done.
  */
+/** An interviewer that wrote its questions as text is asked once to ask them with the tool. */
+export const QUESTIONS_AS_TEXT =
+  "You wrote your questions as text: the user cannot answer them there. Call ask_questions with them (each with short options and the recommended one), or ask_questions with an empty list if there is nothing to ask.";
+
 export async function runPass(ctx: PassContext, id: string, userText: string, fromDrimvox = false): Promise<string | null> {
   const row = ctx.tasks.row(id)!;
   const phase = row.phase;
@@ -136,6 +140,9 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
     stopTools = [...(stopTools ?? []), "answer"];
   }
 
+  /** What the model said in this pass: questions written as text, or nothing at all. */
+  let said = "";
+  let called = false;
   let cost = row.cost_usd;
   let input = row.input_tokens;
   let output = row.output_tokens;
@@ -216,10 +223,14 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
     budgetUsd: row.budget_usd,
     signal: ctx.signal,
     idleTimeoutMs: ctx.idleTimeoutMs,
-    onText: (text) => ctx.event("text", { text }),
+    onText: (text) => {
+      said += text;
+      ctx.event("text", { text });
+    },
     onStep: (step) => {
       if (ctx.closed()) return;
       messages.push(...step.messages);
+      if (step.messages.some((m) => m.role === "tool")) called = true;
       cost += step.costUsd;
       input += step.inputTokens;
       output += step.outputTokens;
@@ -262,6 +273,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
       ctx.event("questions", { questions: asked.questions, understood: asked.understood, unknown: asked.unknown, round: row.interview_round + 1 });
       return finish(ctx, "waiting", "questions");
     }
+    // Questions written as text instead of ask_questions (seen live: they were lost and the plan came without them).
+    if (!asked && said.includes("?") && !messages.some((m) => m.role === "user" && m.content === QUESTIONS_AS_TEXT)) return QUESTIONS_AS_TEXT;
     if (row.kind === "plan") {
       enterPhase(ctx, id, "list");
       toPlanStep(ctx, id, row);
@@ -302,12 +315,12 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
     return null;
   }
 
-  if (phase === "list") return savePlan(ctx, id, row, written as ProjectPlan | null, messages);
+  if (phase === "list") return savePlan(ctx, id, row, written as ProjectPlan | null, messages, !said.trim() && !called);
 
   if (phase === "spec") {
     if (!proposed) {
       // One reminder; a model that still writes no spec will not start writing one.
-      if (messages.some((m) => m.role === "user" && m.content === SPEC_REMINDER)) return finish(ctx, "failed", "no_spec");
+      if (messages.some((m) => m.role === "user" && m.content === SPEC_REMINDER)) return finish(ctx, "failed", !said.trim() && !called ? "empty_answer" : "no_spec");
       return SPEC_REMINDER;
     }
     ctx.tasks.update(id, {

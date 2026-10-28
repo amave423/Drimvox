@@ -310,6 +310,8 @@ export const providerErrorCodes = [
   "rate_limited",
   "model_not_found",
   "provider_error",
+  /** The provider answered, but not in a form that could be read (often: tools through a reseller). */
+  "bad_response",
   "unreachable",
   "timeout",
   "no_key",

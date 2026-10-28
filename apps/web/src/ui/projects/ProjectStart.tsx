@@ -1,5 +1,5 @@
 import type { ModelRef, TaskView } from "@drimvox/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { rememberLastModel, type ModelChoice } from "../../lib/lastModel";
@@ -17,14 +17,40 @@ const ref = (c: ModelChoice): ModelRef => ({ providerId: c.providerId, model: c.
 /** Ready starts for common projects: their names and the task each puts in the box. */
 const TEMPLATES = ["landing", "shop", "bot", "api", "dashboard", "portfolio"] as const;
 
+/** What was typed and picked before leaving (asked for: a visit to the parameters lost it), per project. */
+interface Draft {
+  text: string;
+  models: Record<Role, ModelChoice | null>;
+  strong: ModelChoice | null;
+  split: boolean;
+}
+const draftKey = (projectId: string) => `drimvox.projectStart.${projectId}`;
+
+function readDraft(projectId: string): Draft | null {
+  try {
+    const kept = localStorage.getItem(draftKey(projectId));
+    return kept ? (JSON.parse(kept) as Draft) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function ProjectStart({ projectId, initial, onStarted }: { projectId: string; initial: ModelChoice | null; onStarted(task: TaskView): void }) {
   const { api, t } = useApp();
-  const [text, setText] = useState("");
-  const [models, setModels] = useState<Record<Role, ModelChoice | null>>({ interview: initial, plan: initial, work: initial });
-  const [strong, setStrong] = useState<ModelChoice | null>(null);
-  const [addingStrong, setAddingStrong] = useState(false);
+  const [kept] = useState(() => readDraft(projectId));
+  const [text, setText] = useState(kept?.text ?? "");
+  const [models, setModels] = useState<Record<Role, ModelChoice | null>>(kept?.models ?? { interview: initial, plan: initial, work: initial });
+  const [strong, setStrong] = useState<ModelChoice | null>(kept?.strong ?? null);
+  const [addingStrong, setAddingStrong] = useState(!!kept?.strong);
   // One model for the three stages unless asked otherwise (seen: three identical buttons in a row said one thing thrice).
-  const [split, setSplit] = useState(false);
+  const [split, setSplit] = useState(kept?.split ?? false);
+  useEffect(() => {
+    try {
+      localStorage.setItem(draftKey(projectId), JSON.stringify({ text, models, strong, split } satisfies Draft));
+    } catch {
+      // Kept for this visit only.
+    }
+  }, [projectId, text, models, strong, split]);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const ready = ROLES.every((r) => models[r]) && !!text.trim();
@@ -43,12 +69,18 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
     const body = (await res?.json().catch(() => null)) as (TaskView & { error?: { code?: string } }) | null;
     if (!res?.ok || !body) return setFailed(body?.error?.code ?? "unknown");
     rememberLastModel(models.work!);
+    try {
+      localStorage.removeItem(draftKey(projectId));
+    } catch {
+      // Nothing kept.
+    }
     onStarted(body);
   }
 
-  // One choice fills the roles still on the default, so a single model needs a single pick.
+  // Each stage its own pick once they are told apart (seen: the first pick overwrote the other two); one model for all is
+  // the single picker's.
   function choose(role: Role, choice: ModelChoice) {
-    setModels((m) => (role === "interview" && m.plan === m.interview && m.work === m.interview ? { interview: choice, plan: choice, work: choice } : { ...m, [role]: choice }));
+    setModels((m) => ({ ...m, [role]: choice }));
   }
 
   return (

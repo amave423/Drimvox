@@ -69,41 +69,55 @@ export type Pane = ReturnType<typeof usePaneWidth>;
  */
 export function PaneSplit({ split, label, controls }: { split: Pane; label: { open: MessageKey; closed: MessageKey }; controls: string }) {
   const { t } = useApp();
-  const start = useRef<{ x: number; moved: boolean } | null>(null);
+  const start = useRef<{ x: number; moved: boolean; grip: boolean } | null>(null);
+  // Where the grip stands along the strip: where it was last taken (asked for: anywhere, not only in the middle).
+  const [gripY, setGripY] = useState<number | null>(null);
   const open = split.width > 0;
   // The arrow towards the pane widens it.
   const wider = split.shape.side === "right" ? "ArrowLeft" : "ArrowRight";
   const narrower = split.shape.side === "right" ? "ArrowRight" : "ArrowLeft";
+  const follow = (strip: HTMLElement, y: number) => {
+    const box = strip.getBoundingClientRect();
+    setGripY(Math.min(Math.max(y - box.top, 28), box.height - 28));
+  };
   return (
-    <div className={`workshop-split${open ? "" : " is-closed"}`}>
+    // The whole strip takes the pointer: taken anywhere, it drags, and the grip comes to where it was taken; a click on
+    // the grip itself, without dragging, opens or folds the pane.
+    <div
+      className={`workshop-split${open ? "" : " is-closed"}`}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const grip = (e.target as HTMLElement).closest(".workshop-grip") !== null;
+        start.current = { x: e.clientX, moved: false, grip };
+        follow(e.currentTarget, e.clientY);
+      }}
+      onPointerMove={(e) => {
+        if (!start.current) return;
+        follow(e.currentTarget, e.clientY);
+        if (!start.current.moved && Math.abs(e.clientX - start.current.x) < 4) return;
+        if (!start.current.moved) split.setDragging(true);
+        start.current.moved = true;
+        split.set(split.fit(split.widthAt(e.clientX)));
+      }}
+      onPointerUp={() => {
+        const taken = start.current;
+        start.current = null;
+        split.setDragging(false);
+        if (taken?.grip && !taken.moved) split.toggle();
+      }}
+      onPointerCancel={() => {
+        start.current = null;
+        split.setDragging(false);
+      }}
+    >
       <button
         type="button"
         className="workshop-grip"
+        style={gripY === null ? undefined : { top: gripY }}
         aria-label={t(open ? label.open : label.closed)}
         aria-expanded={open}
         aria-controls={controls}
         title={t("workshop.gripHint")}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          start.current = { x: e.clientX, moved: false };
-        }}
-        onPointerMove={(e) => {
-          if (!start.current) return;
-          if (!start.current.moved && Math.abs(e.clientX - start.current.x) < 4) return;
-          if (!start.current.moved) split.setDragging(true);
-          start.current.moved = true;
-          split.set(split.fit(split.widthAt(e.clientX)));
-        }}
-        onPointerUp={() => {
-          const moved = start.current?.moved;
-          start.current = null;
-          split.setDragging(false);
-          if (!moved) split.toggle();
-        }}
-        onPointerCancel={() => {
-          start.current = null;
-          split.setDragging(false);
-        }}
         onClick={(e) => {
           // A keyboard's Enter or Space: pointer clicks are handled on the way up.
           if (e.detail === 0) split.toggle();

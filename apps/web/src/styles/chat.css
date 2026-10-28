@@ -58,6 +58,8 @@
 .composer {
   container-type: inline-size;
   position: sticky; bottom: 0;
+  /* Above the chat's margin: the model list opening from here reaches over it (seen: "Delete chat" over the list). */
+  z-index: 4;
   display: grid; gap: 8px;
   padding: 12px 0 16px; background: var(--sheet);
 }

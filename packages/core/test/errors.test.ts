@@ -12,6 +12,12 @@ describe("describeError", () => {
     expect(describeError(failure(403, "inkling:free is only available on agentic harnesses")).code).toBe("forbidden");
   });
 
+  // Seen live: a reseller's answer for a model with tools could not be read, and the user saw only "provider error".
+  it("tells an answer that came but could not be read", () => {
+    expect(describeError(failure(200, "Failed to process successful response")).code).toBe("bad_response");
+    expect(describeError(new Error("Type validation failed: Value: {}")).code).toBe("bad_response");
+  });
+
   it("tells an overloaded model from a broken one", () => {
     expect(describeError(failure(503, "Upstream error from Nvidia: Service temporarily overloaded")).code).toBe("overloaded");
     expect(describeError(failure(529, "Overloaded")).code).toBe("overloaded");

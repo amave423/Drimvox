@@ -44,7 +44,10 @@ async function launch(script: FakeTurn[], sees = false): Promise<Page> {
   const queue = [...script];
   fake = await startFakeProvider({
     key: KEY,
-    models: [{ id: "coder", name: "Coder", supported_parameters: ["tools"], ...(sees ? { architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } } : {}) }],
+    models: [
+      { id: "coder", name: "Coder", supported_parameters: ["tools"], ...(sees ? { architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } } : {}) },
+      { id: "planner", name: "Planner", supported_parameters: ["tools"] },
+    ],
     // A model that sees answers the look at a screenshot itself; the rest follows the script.
     respond: (body) => (sees && JSON.stringify(body.messages).includes("data:image/png;base64,") && !body.tools ? { text: "Да, видно." } : (queue.shift() ?? { text: "Готово." })),
   });
@@ -56,7 +59,7 @@ async function launch(script: FakeTurn[], sees = false): Promise<Page> {
   await page.getByLabel("Адрес API").fill(fake.baseUrl);
   await page.getByLabel("Ключ API, если нужен").fill(KEY);
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
-  await expect(page.getByText("Моделей: 1")).toBeVisible();
+  await expect(page.getByText("Моделей: 2")).toBeVisible();
   return page;
 }
 
@@ -96,6 +99,17 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(models).toContainText("Работа");
   await expect(models.getByRole("button", { name: /Coder/ })).toHaveCount(3);
   await expect(models.getByRole("button", { name: "Выбери модель" })).toHaveCount(0);
+  // Told apart, each stage keeps its own pick (seen: the first pick overwrote the other two).
+  await models.getByRole("button", { name: /Coder/ }).first().click();
+  await page.getByRole("option", { name: /Planner/ }).click();
+  await expect(models.getByRole("button", { name: /Planner/ })).toHaveCount(1);
+  await expect(models.getByRole("button", { name: /Coder/ })).toHaveCount(2);
+  // What was typed and picked stays through a visit to the parameters (seen: it was gone).
+  await page.locator(".side-nav").getByRole("button", { name: "Параметры", exact: true }).click();
+  await page.getByRole("button", { name: "Назад" }).click();
+  await expect(page.getByLabel("Что сделать?")).toHaveValue("Сайт лесопилки");
+  await expect(models.getByRole("button", { name: /Planner/ })).toHaveCount(1);
+  await expect(models.getByRole("button", { name: /Coder/ })).toHaveCount(2);
   await page.getByRole("button", { name: "Начать опрос" }).click();
 
   // The plan comes right under the interview: read it, then "Go".
@@ -131,7 +145,17 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(result.locator(".work-report")).toContainText("Каталог готов");
   await result.getByRole("tab", { name: "Изменения" }).click();
   await expect(result.locator(".diff")).toContainText("index.html");
+  // The handle is taken anywhere along its strip, and the grip comes to where it was taken (asked for).
+  const strip = page.locator(".workshop-body > .workshop-split");
+  const box = (await strip.boundingBox())!;
+  const before = (await page.locator("#workshop-result").boundingBox())!.width;
+  await page.mouse.move(box.x + box.width / 2, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 120, box.y + 120, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(async () => (await page.locator("#workshop-result").boundingBox())!.width).toBeGreaterThan(before + 60);
   const grip = page.getByRole("button", { name: "Скрыть панель результата" });
+  expect(Math.abs((await grip.boundingBox())!.y + 22 - (box.y + 120))).toBeLessThan(10);
   await expect(grip).toHaveAttribute("aria-expanded", "true");
   await grip.click();
   await expect(result).toBeHidden();

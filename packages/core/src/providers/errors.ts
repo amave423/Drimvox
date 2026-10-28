@@ -48,6 +48,9 @@ export function detailFromBody(body: unknown): string | undefined {
   return undefined;
 }
 
+/** The SDK's words for an answer it received but could not read. */
+const UNREADABLE = /Failed to process successful response|Invalid JSON response|Type validation failed/i;
+
 export function describeError(err: unknown): ProviderError {
   if (err instanceof ProviderFailure) return err.info;
   // After its retries the SDK wraps the provider's last answer: that answer is what to explain.
@@ -55,8 +58,11 @@ export function describeError(err: unknown): ProviderError {
   if (APICallError.isInstance(err)) {
     if (err.statusCode === undefined) return withDetail("unreachable", causeText(err.cause) ?? err.message);
     const detail = detailFromBody(err.data ?? err.responseBody) ?? err.message;
+    // A 200 whose body could not be read as an answer: the provider speaks another dialect for this model.
+    if (err.statusCode < 300) return withDetail("bad_response", detail);
     return withDetail(REGION.test(detail) ? "region" : NO_FREE_TIER.test(detail) ? "no_free_tier" : codeForStatus(err.statusCode), detail);
   }
+  if (err instanceof Error && UNREADABLE.test(err.message)) return withDetail("bad_response", err.message);
   if (err instanceof TypeError) return withDetail("unreachable", causeText(err.cause) ?? err.message);
   if (err instanceof Error && err.name === "TimeoutError") return withDetail("unreachable", "timeout");
   return withDetail("unknown", err instanceof Error ? err.message : String(err));

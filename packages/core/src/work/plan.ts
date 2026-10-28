@@ -94,10 +94,11 @@ export function planTools(onPlan: (plan: ProjectPlan) => void): ToolSet {
 const clip = (text: string, max: number) => (text.trim().length > max ? `${text.trim().slice(0, max - 1).trimEnd()}…` : text.trim());
 
 /** Keeps the plan; the task waits for "Go" or for the user's corrections. */
-export function savePlan(ctx: PassContext, id: string, row: TaskRow, plan: ProjectPlan | null, messages: ModelMessage[]): string | null {
+export function savePlan(ctx: PassContext, id: string, row: TaskRow, plan: ProjectPlan | null, messages: ModelMessage[], empty = false): string | null {
   if (!plan) {
-    // One reminder; a model that still writes nothing will not write it now.
-    if (messages.some((m) => m.role === "user" && m.content === PLAN_REMINDER)) return finish(ctx, "failed", "no_spec");
+    // One reminder; a model that still writes nothing will not write it now. One that said nothing at all is told
+    // apart (seen live: a model answered empty through a reseller, and "no plan" did not say why).
+    if (messages.some((m) => m.role === "user" && m.content === PLAN_REMINDER)) return finish(ctx, "failed", empty ? "empty_answer" : "no_spec");
     return PLAN_REMINDER;
   }
   ctx.backlog.setPlan(row.project_id, plan);

@@ -89,6 +89,8 @@
 .workshop-body.is-dragging { transition: none; user-select: none; cursor: col-resize; }
 @media (prefers-reduced-motion: reduce) { .workshop-body { transition: none; } }
 .workshop-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: auto; }
+/* Each stage keeps its full height and the column scrolls (seen: a long interview could not be scrolled to its end). */
+.workshop-main > :not(.workshop-feed) { flex-shrink: 0; }
 .workshop-tabs { flex: none; padding: 0 18px; }
 .workshop-tabs .tabs { margin-top: 0; }
 .workshop-tabs .tab { padding: 10px 12px; font-size: 13.5px; }
@@ -101,7 +103,7 @@
 .workshop-main > .sheet.is-embedded { border: 0; box-shadow: none; border-radius: 0; max-width: none; grid-template-columns: minmax(0, 1fr); }
 
 /* The handle: a slim strip with a small grip; drag it to set the width, to the edge to fold the panel away. */
-.workshop-split { width: 12px; position: relative; border-left: 1px solid var(--line); background: var(--paper); }
+.workshop-split { width: 12px; position: relative; cursor: col-resize; touch-action: none; border-left: 1px solid var(--line); background: var(--paper); }
 .workshop-split.is-closed { border-left-color: var(--line); }
 .workshop-grip { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 10px; height: 44px; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: var(--sheet); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: col-resize; touch-action: none; }
 .workshop-grip span { width: 4px; height: 1.5px; border-radius: 1px; background: var(--muted); }

@@ -85,3 +85,34 @@
     --muted: #a3a196;
   }
 }
+
+/* Paper is light whatever the window's theme (seen: a chat saved as a PDF in the dark theme came out dark, framed in
+   black). The light theme's values again, over the dark ones, for print only. */
+@page { margin: 14mm 12mm; background: #ffffff; }
+@media print {
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: light;
+    --bg: #ffffff;
+    --paper: #f4f4f0;
+    --sheet: #ffffff;
+    --line: #d6d7cf;
+    --fg: #22211e;
+    --muted: #5f5e57;
+    --ink: #2b4c7e;
+    --ink-soft: #dde6f4;
+    --pencil: #b3261e;
+    --pencil-soft: #f6dedb;
+    --ok: #2f6b45;
+    --ok-soft: #dcebe0;
+    --wait: #9a6200;
+    --wait-soft: #f3e5c8;
+    --choice: var(--fg);
+    --on-choice: var(--sheet);
+  }
+  /* The page's margins take the root's colour: white, not the desk's. */
+  html,
+  body {
+    background: #ffffff !important;
+  }
+}

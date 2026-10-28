@@ -91,6 +91,36 @@ describe("work on a project", () => {
     expect(task).toMatchObject({ kind: "plan", status: "waiting", statusReason: "plan_ready" });
   });
 
+  // Seen live: an interviewer wrote its questions as text; they were lost and the plan came without them.
+  it("asks an interviewer that wrote its questions as text to ask them properly", async () => {
+    const asks = call("ask_questions", { questions: [{ id: "look", question: "Какой стиль?", options: [{ label: "Тёплый" }, { label: "Строгий" }] }], understood: "Сайт", unknown: [] });
+    const s = await setup({ asker: [{ text: "Уточню: какой стиль вам ближе — тёплый или строгий?" }, asks] });
+    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, { task: "Сайт", models: { interview: s.ref("asker"), plan: s.ref("asker"), work: s.ref("asker"), strong: null } });
+    const work = await until(s.project.id, (w) => !!w.planTaskId);
+    let task: any;
+    for (let i = 0; i < 200; i++) {
+      task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
+      if (task.status !== "running") break;
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    expect(task).toMatchObject({ status: "waiting", statusReason: "questions" });
+    expect(JSON.stringify(requestsOf("asker").at(-1)!.body.messages)).toContain("You wrote your questions as text");
+  });
+
+  // Seen live: a plan model answered with nothing through a reseller, and "no plan" did not say why.
+  it("says a model that answers with nothing answered with nothing", async () => {
+    const s = await setup({ asker: [noQuestions], planner: [{ text: "" }, { text: "" }] });
+    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, { task: "Сайт", models: { interview: s.ref("asker"), plan: s.ref("planner"), work: s.ref("asker"), strong: null } });
+    const work = await until(s.project.id, (w) => !!w.planTaskId);
+    let task: any;
+    for (let i = 0; i < 300; i++) {
+      task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
+      if (task.status === "failed") break;
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    expect(task).toMatchObject({ status: "failed", statusReason: "empty_answer" });
+  });
+
   // Seen live: the plan was thin even from a strong model; the user wants the pages, the technology and the look in it.
   it("keeps the plan's pages with what is on them and the technical decisions with their reasons", async () => {
     const full = {
@@ -384,8 +414,8 @@ describe("work on a project", () => {
     expect(w.report).toBe("Готово.");
     await env.call("POST", `/api/projects/${project.id}/work/site/stop`);
     for (let i = 0; i < 50 && (await fetch(url).then(() => true, () => false)); i++) await new Promise((r) => setTimeout(r, 100));
-    // The folder is free once the process is gone.
-    await new Promise((r) => setTimeout(r, 300));
+    // The folder is free once both processes (the review's and the started site) are gone: Windows lets go of it late.
+    await new Promise((r) => setTimeout(r, 1500));
   });
 
   it("offers the project's skills in the run, and the agent can open one", async () => {
