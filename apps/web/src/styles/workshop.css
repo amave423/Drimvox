@@ -195,4 +195,5 @@
 /* The agent waits for the user in the browser: a check to pass, a sign-in. */
 .browser-waiting { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--wait-soft); }
 .browser-waiting p { margin: 0; flex: 1; }
-.browser-view.is-embedded { background: var(--paper); }
+/* The tab leaves the panel's edge free, to be taken and dragged. */
+.browser-view.is-embedded { background: var(--paper); margin-left: 5px; }

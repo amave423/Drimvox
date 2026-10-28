@@ -28,6 +28,19 @@ interface State {
   waiting?: string | null;
 }
 
+/**
+ * What the address field opens: an address as is (https:// added), anything else as a search (asked for: typing a
+ * search into it, as in any browser).
+ */
+export function addressOf(text: string, locale: "ru" | "en"): string {
+  const typed = text.trim();
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(typed) || /^about:/i.test(typed)) return typed;
+  if (!/\s/.test(typed) && /^(localhost|[\w-]+(\.[\w-]+)+|\d{1,3}(\.\d{1,3}){3})(:\d+)?(\/.*)?$/i.test(typed)) {
+    return `${/^(localhost|127\.|\d{1,3}(\.\d{1,3}){3})/.test(typed) ? "http" : "https"}://${typed}`;
+  }
+  return locale === "ru" ? `https://yandex.ru/search/?text=${encodeURIComponent(typed)}` : `https://www.bing.com/search?q=${encodeURIComponent(typed)}`;
+}
+
 /** A tab's name in the strip: its title, else its address without the scheme. */
 const tabName = (tab: Tab, blank: string) => tab.title.trim() || (tab.url === "about:blank" ? blank : tab.url.replace(/^https?:\/\//, ""));
 
@@ -59,7 +72,8 @@ export function useBrowserState(): State | null {
  * robot" check is passed right here. The panel is widened by its edge or opened over the whole window.
  */
 export function BrowserPane({ onClose }: { onClose(): void }) {
-  const { api, t, token } = useApp();
+  const { api, t, token, settings } = useApp();
+  const locale = settings.locale;
   const [frame, setFrame] = useState<BrowserFrameView | null>(null);
   const [state, setState] = useState<State>({ running: false, url: "", title: "", tabs: [], active: null });
   const [address, setAddress] = useState("");
@@ -68,6 +82,8 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
   const [width, setWidth] = useState(keptWidth);
   const [wide, setWide] = useState(false);
   const dragging = useRef(false);
+  const [resizing, setResizing] = useState(false);
+  const addressField = useRef<HTMLInputElement>(null);
   // The desktop puts the real tab over the page box; in a browser (the server) the page comes as pictures.
   const embedded = !!window.drimvox?.placeBrowser;
 
@@ -108,8 +124,10 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
   };
   async function open(url?: string) {
     setFailed(false);
-    const res = await api.browser.open.$post({ json: url ? { url: /^[a-z]+:/i.test(url) ? url : `https://${url}` } : {} }).catch(() => null);
+    const res = await api.browser.open.$post({ json: url ? { url: addressOf(url, locale) } : {} }).catch(() => null);
     if (!res?.ok) setFailed(true);
+    // A new empty browser: the address is where one types first.
+    else if (!url) setTimeout(() => addressField.current?.focus(), 50);
   }
 
   return (
@@ -121,6 +139,7 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           dragging.current = true;
+          setResizing(true);
           setWide(false);
         }}
         onPointerMove={(e) => {
@@ -129,6 +148,7 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
         }}
         onPointerUp={() => {
           dragging.current = false;
+          setResizing(false);
           try {
             localStorage.setItem(WIDTH_KEY, String(width));
           } catch {
@@ -152,6 +172,7 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
           }}
         >
           <input
+            ref={addressField}
             className="field-input mono"
             aria-label={t("browser.address")}
             placeholder={t("browser.addressHint")}
@@ -199,7 +220,7 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
       )}
       {state.running ? (
         embedded ? (
-          <EmbeddedView title={state.title || t("browser.title")} />
+          <EmbeddedView title={state.title || t("browser.title")} paused={resizing} />
         ) : (
           <BrowserView frame={frame} title={state.title || t("browser.title")} onInput={send} />
         )

@@ -105,7 +105,7 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { drimvox?: object }).drimvox ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "getToken", "installUpdate", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "placeBrowser", "savePdf", "setTitleBar", "testNotify", "updateState"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusAssist", "focusPage", "getToken", "installUpdate", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "placeBrowser", "savePdf", "setTitleBar", "testNotify", "updateState"] });
 });
 
 test("the catalog switches a ready skill on and off, and shows a server's details with the token it needs", async () => {
@@ -253,13 +253,25 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
     const pane = page.getByRole("complementary", { name: "Браузер агента" });
     await expect(pane).toContainText("закрыт");
     await pane.getByRole("button", { name: "Открыть браузер" }).click();
-    await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${port}/`);
+    // A new browser: the address is ready for typing; an address without its scheme opens as one.
+    await expect(pane.getByLabel("Адрес")).toBeFocused();
+    await pane.getByLabel("Адрес").fill(`127.0.0.1:${port}/`);
     await pane.getByLabel("Адрес").press("Enter");
     await expect(pane.getByRole("tab", { selected: true })).toHaveText("Проверка", { timeout: 20_000 });
 
     // The tab lies exactly over the panel's page box: the page fills the panel, nothing squeezed or empty.
     const box = (await pane.locator(".browser-view").boundingBox())!;
     await expect.poll(async () => JSON.stringify(await tabBounds())).toBe(JSON.stringify({ x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) }));
+
+    // The panel's edge stays free of the tab: dragged, it widens the panel, and the tab follows.
+    const edge = (await pane.locator(".browser-edge").boundingBox())!;
+    await page.mouse.move(edge.x + edge.width / 2, edge.y + edge.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(edge.x - 150, edge.y + edge.height / 2, { steps: 5 });
+    await page.mouse.up();
+    const wider = (await pane.locator(".browser-view").boundingBox())!;
+    expect(wider.width).toBeGreaterThan(box.width + 100);
+    await expect.poll(async () => (await tabBounds())?.width).toBe(Math.round(wider.width));
 
     // The tab is a page of its own, clicked and typed into as any page (Cyrillic too).
     let tab: Page | undefined;
@@ -269,6 +281,25 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
     await tab!.locator("input").pressSequentially("кедр");
     await expect(pane.getByRole("tab", { selected: true })).toHaveText("Введено: кедр", { timeout: 10_000 });
     await expect(page.locator(".topbar-browser-dot")).toBeVisible({ timeout: 10_000 });
+
+    // Seen: once the tab had the keyboard, nothing could be typed into the address. A press on Drimvox's page takes it back.
+    const focused = () =>
+      app!.evaluate(({ BrowserWindow }, port) => {
+        const w = BrowserWindow.getAllWindows()[0]!;
+        const views = w.contentView.children as unknown as { webContents?: Electron.WebContents }[];
+        const tab = views.find((v) => v.webContents?.getURL().includes(`:${port}/`))!.webContents!;
+        return { page: w.webContents.isFocused(), tab: tab.isFocused() };
+      }, port);
+    await app.evaluate(({ BrowserWindow }, port) => {
+      const w = BrowserWindow.getAllWindows()[0]!;
+      w.show();
+      w.focus();
+      const views = w.contentView.children as unknown as { webContents?: Electron.WebContents }[];
+      views.find((v) => v.webContents?.getURL().includes(`:${port}/`))!.webContents!.focus();
+    }, port);
+    await expect.poll(focused).toEqual({ page: false, tab: true });
+    await pane.getByLabel("Адрес").click();
+    await expect.poll(focused).toEqual({ page: true, tab: false });
 
     // Several tabs: a new one, then back to the first, and the second closed (asked for: a switch between them).
     const tabs = pane.getByRole("tablist", { name: "Вкладки" });
@@ -294,7 +325,8 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
 // Asked for: the window opens about 80% of the screen wide, as Claude Code does; the height stays.
 test("opens the window about 80% of the screen wide", async () => {
   app = await launch();
-  await app.firstWindow();
+  // The app is up before it is closed again.
+  await expect(paramsButton(await app.firstWindow())).toBeVisible();
   const { win, area } = await app.evaluate(({ BrowserWindow, screen }) => ({ win: BrowserWindow.getAllWindows()[0]!.getBounds(), area: screen.getPrimaryDisplay().workAreaSize }));
   expect(Math.abs(win.width - Math.max(960, Math.round(area.width * 0.8)))).toBeLessThanOrEqual(2);
   // A few pixels either way: the display scale rounds the window frame.

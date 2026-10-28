@@ -12,7 +12,7 @@ import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
 import { keepInTray, offerUpdate } from "./tray";
 import { noticeRequest, setupNotices, showNotice } from "./notices";
-import { AgentView, type Place } from "./agent-view";
+import { AgentView } from "./agent-view";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
@@ -452,7 +452,16 @@ function registerIpc() {
     if (!fromOurPage(event.senderFrame?.url)) return;
     const p = place as Record<string, unknown> | null;
     const ok = p && ["x", "y", "width", "height"].every((k) => typeof p[k] === "number" && Number.isFinite(p[k]));
-    agentView.setPlace(ok && (p.width as number) > 50 && (p.height as number) > 50 ? (p as Exclude<Place, null>) : null);
+    // The page's pixels are the window's only at 100% zoom.
+    const zoom = event.sender.getZoomFactor();
+    const at = ok ? { x: (p.x as number) * zoom, y: (p.y as number) * zoom, width: (p.width as number) * zoom, height: (p.height as number) * zoom } : null;
+    agentView.setPlace(at && at.width > 50 && at.height > 50 ? at : null);
+  });
+  // A click on Drimvox's own page takes the keyboard back from the agent's tab (seen: after the tab was shown, nothing
+  // could be typed into the address or anywhere else).
+  ipcMain.on("drimvox:focus-page", (event) => {
+    if (!fromOurPage(event.senderFrame?.url) || event.sender.isFocused()) return;
+    event.sender.focus();
   });
 
   ipcMain.handle("drimvox:focus-assist", (event) => (fromOurPage(event.senderFrame?.url) ? focusAssist() : null));

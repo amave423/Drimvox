@@ -145,12 +145,23 @@ export function BrowserView({ frame, title, onInput }: { frame: BrowserFrameView
  * The desktop's page box (asked for: a browser exactly like Claude's): the agent's real tab is put over it by the app,
  * so clicks, typing, scrolling and checks are the browser's own. The box tells where it is whenever it moves.
  */
-export function EmbeddedView({ title }: { title: string }) {
+export function EmbeddedView({ title, paused }: { title: string; paused: boolean }) {
   const box = useRef<HTMLDivElement>(null);
+  // A press anywhere on Drimvox's own page takes the keyboard back from the tab.
+  useEffect(() => {
+    const take = () => window.drimvox?.focusPage?.();
+    document.addEventListener("pointerdown", take, true);
+    return () => document.removeEventListener("pointerdown", take, true);
+  }, []);
   useEffect(() => {
     const el = box.current;
     const place = window.drimvox?.placeBrowser;
     if (!el || !place) return;
+    // The panel's edge is dragged: the tab steps aside, or it would take the pointer over it.
+    if (paused) {
+      place(null);
+      return;
+    }
     let last = "";
     const tell = () => {
       const r = el.getBoundingClientRect();
@@ -169,6 +180,6 @@ export function EmbeddedView({ title }: { title: string }) {
       cancelAnimationFrame(frame);
       place(null);
     };
-  }, []);
+  }, [paused]);
   return <div className="browser-view is-embedded" ref={box} aria-label={title} />;
 }

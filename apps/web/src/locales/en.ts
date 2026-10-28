@@ -1212,7 +1212,7 @@ export const en: Record<keyof typeof ru, string> = {
   "browser.back": "Back",
   "browser.reload": "Reload",
   "browser.address": "Address",
-  "browser.addressHint": "Page address",
+  "browser.addressHint": "Address or search",
   "browser.view": "The page: click and type here",
   "browser.hint": "This is the browser the agent uses. You can click and type here — for example, to pass a \"not a robot\" check.",
   "browser.loading": "Opening the page…",

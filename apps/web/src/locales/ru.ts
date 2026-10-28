@@ -1212,7 +1212,7 @@ export const ru = {
   "browser.back": "Назад",
   "browser.reload": "Обновить",
   "browser.address": "Адрес",
-  "browser.addressHint": "Адрес страницы",
+  "browser.addressHint": "Адрес или поиск",
   "browser.view": "Страница: нажимайте и печатайте здесь",
   "browser.hint": "Здесь виден браузер, которым пользуется агент. Можно нажимать и печатать — например, пройти проверку «я не робот».",
   "browser.loading": "Открываю страницу…",

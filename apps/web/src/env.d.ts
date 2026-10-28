@@ -11,6 +11,8 @@ interface DrimvoxBridge {
   testNotify(notice: NoticeRequest): void;
   /** Desktop: the agent's real browser tab is put over this box of the window; null takes it out of sight. */
   placeBrowser?(place: { x: number; y: number; width: number; height: number } | null): void;
+  /** Desktop: the keyboard back from the agent's tab to this page. */
+  focusPage?(): void;
   /** Windows' Focus Assist: 0 off, 1 priority only, 2 alarms only; null where it cannot be told. */
   focusAssist?(): Promise<number | null>;
   /** Where updating stands: checking, the latest, a newer version coming or ready, or what went wrong. */
