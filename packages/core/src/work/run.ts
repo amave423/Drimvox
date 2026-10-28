@@ -1,5 +1,6 @@
 import type { ActivityEntry, ChecklistItem, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { McpAsk, McpHooks } from "../mcp/hub";
+import { reviewProjectCode, reviewWorkMessage } from "./code-review";
 import { compactHistory } from "./compact";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
@@ -77,6 +78,8 @@ export class WorkRun {
   /** Skills the agent opened in this run, and whether it was reminded of the others before finishing. */
   private readonly skillsOpened = new Set<string>();
   private skillsNudged = false;
+  /** Whether the code was reviewed in this run: once, before it is done. */
+  private codeReviewed = false;
   private designReviewed = false;
   /** Actions since the checklist was last updated. */
   private sinceChecklist = 0;
@@ -274,6 +277,30 @@ export class WorkRun {
         finish: (report, start) => {
           this.finished = true;
           this.d.repo.update(this.projectId, { report, site: start });
+        },
+        codeReview: async () => {
+          if (this.codeReviewed) return null;
+          this.codeReviewed = true;
+          // The working model reviews, in a fresh conversation with only this to do (asked for: no expensive model for it).
+          const row = this.row();
+          const ref = row.models?.work ?? null;
+          const reviewer = ref ? this.d.providers.connection(ref.providerId) : null;
+          if (!ref || !reviewer) return null;
+          onCall("code_review", ref.model);
+          const issues = await reviewProjectCode({
+            conn: reviewer,
+            model: ref.model,
+            price: await findModel(reviewer, ref.model),
+            folder: this.folder,
+            plan,
+            skills,
+            ownTools: pick(own, ["start_background", "read_background", "stop_background"]),
+            signal: this.controller.signal,
+            idleTimeoutMs: this.d.idleTimeoutMs,
+            hooks,
+            onSpend: (usd) => (cost += usd),
+          }).catch(() => null);
+          return issues ? reviewWorkMessage(issues) : null;
         },
         skillsLeft: () => {
           if (this.skillsNudged) return null;

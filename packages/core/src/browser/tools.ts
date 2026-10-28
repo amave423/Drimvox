@@ -13,7 +13,9 @@ export const BROWSER_HINT =
   "asks to prove a person is there (a captcha, a bot check) or needs the user's sign-in, call browser_ask_user and wait: " +
   "the user does it in the panel. Never try to pass such a check yourself. browser_look shows you the page as a picture, " +
   "at a phone's or a desktop's width, in the state your actions left it: never install Playwright, Puppeteer or another " +
-  "browser into a project, and never write scripts that take screenshots.";
+  "browser into a project, and never write scripts that take screenshots. Check pages and scenarios in this browser, " +
+  "which the user watches; browser servers among your tools (Chrome DevTools, Playwright) are for what it cannot do: " +
+  "the console, network requests, performance.";
 
 /** Looks at pages per answer; the next answer may look again. */
 export const MAX_BROWSER_LOOKS = 12;

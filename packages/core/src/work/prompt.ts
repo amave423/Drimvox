@@ -62,6 +62,9 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean): string
     canLook
       ? "  start the interface and look at its pages with look_at_page on a desktop width and a phone width (390); go through the\n  main scenarios as a person would (add to cart, order, sign in): open the page with browser_open, act with browser_click\n  and browser_type, and look at the state it reached with browser_look. Never install Playwright or another browser into\n  the project and never write screenshot scripts: these tools do it."
       : "  start the interface and request its pages to make sure they answer.",
+    // Seen live: a team board let anyone listen to any board over WebSocket; the tests covered only the HTTP routes.
+    "- When the project has accounts, roles or anyone's private data, write a test for every way in (pages and API,",
+    "  real-time channels, files, invitations) proving that someone without the right is refused.",
     "- Never commit or push: git stays the user's.",
     "- Keep the project's notes current with update_notes: commands, decisions, what is done.",
     "- Do the work, then stop: no endless polishing. Look at each page once on each width, again only after a real fix.",

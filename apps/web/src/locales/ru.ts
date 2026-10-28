@@ -1357,6 +1357,7 @@ export const ru = {
   "folder.tool.make_picture": "Рисует: {input}",
   "folder.tool.make_clip": "Снимает ролик: {input}",
   "folder.tool.open_for_user": "Ждёт тебя в окне: {input}",
+  "folder.tool.code_review": "Проверяет код на безопасность ({input})",
   "folder.tool.design_review": "Drimvox проверяет дизайн на компьютере и телефоне",
   "folder.tool.look_at_image": "Смотрит картинку {input}",
   "folder.tool.use_skill": "Открывает навык {input}",

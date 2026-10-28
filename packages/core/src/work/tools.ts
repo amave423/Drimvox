@@ -11,6 +11,8 @@ export interface WorkToolHooks {
   finish(report: string, start: { command: string; url: string } | null): void;
   /** Before it is done, once: Drimvox's look at the result; notes for a round of polish, or null to finish. */
   review(start: { command: string; url: string } | null): Promise<string | null>;
+  /** Before it is done, once: another model reads the code for security and access problems; the fixes to make, or null. */
+  codeReview?(): Promise<string | null>;
   /** Before it is done, once: the skills the agent has not opened, which may be meant for this moment; null when none. */
   skillsLeft?(): string | null;
   onCall(name: string, input: string): void;
@@ -69,6 +71,9 @@ export function workTools(h: WorkToolHooks): ToolSet {
         // Seen live: three skills were switched on and only one was ever opened, at the very start.
         const skills = h.skillsLeft?.();
         if (skills) return skills;
+        // Seen live: a team board let anyone listen to any board over WebSocket; the coder's own tests never looked there.
+        const fixes = await h.codeReview?.();
+        if (fixes) return fixes;
         const site = start ? { command: clip(start.command, 500), url: start.url.trim() } : null;
         const polish = await h.review(site);
         if (polish) return polish;

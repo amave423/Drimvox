@@ -44,7 +44,9 @@ async function setup(queues: Record<string, FakeTurn[]>, models: Record<string, 
   fake = await startFakeProvider({
     key: KEY,
     models: [...models, ...Object.keys(queues).filter((id) => !models.some((m) => m.id === id)).map((id) => ({ id, supported_parameters: ["tools"] }))],
-    respond: (body) => queues[body.model]?.shift() ?? { text: "Готово." },
+    // The code reviewer before the end answers from its own queue, "nothing found" by default.
+    respond: (body) =>
+      isReviewer(body) ? (queues.reviewer?.shift() ?? call("report_review", { issues: [], summary: "Проблем нет." })) : (queues[body.model]?.shift() ?? { text: "Готово." }),
   });
   const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
   const project = await (await env.call("POST", "/api/projects", { path: folder })).json();
@@ -78,7 +80,8 @@ async function planned(s: Awaited<ReturnType<typeof setup>>, models: { interview
   return until(s.project.id, (w) => w.status === "ready");
 }
 
-const requestsOf = (model: string) => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === model);
+const isReviewer = (body: any) => /You are the code reviewer/.test(JSON.stringify(body.messages?.[0]?.content ?? ""));
+const requestsOf = (model: string) => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === model && !isReviewer(r.body));
 
 describe("work on a project", () => {
   it("ends the interview with a plan by the plan's model: its steps are the first checklist, its checks real commands", async () => {
@@ -293,7 +296,9 @@ describe("work on a project", () => {
     expect(during.workedMs).toBeGreaterThan(0);
     expect(during.spentUsd).toBeCloseTo(0.102, 3);
     const done = await until(s.project.id, (w) => w.status === "done");
-    expect(done.spentUsd).toBeCloseTo(during.spentUsd, 3);
+    // The code review before the end costs a little too.
+    expect(done.spentUsd).toBeGreaterThanOrEqual(during.spentUsd);
+    expect(done.spentUsd).toBeLessThan(during.spentUsd + 0.01);
   });
 
   it("asks without waiting: the question is kept and the work goes on", async () => {
@@ -464,6 +469,7 @@ describe("work on a project", () => {
           reviews.push(JSON.stringify(body.messages));
           return { text: "POLISH\n- Иконки категорий — эмодзи: заменить на линейные SVG\n- На телефоне суммы налезают на названия: перенести суммы на новую строку" };
         }
+        if (isReviewer(body)) return call("report_review", { issues: [], summary: "Проблем нет." });
         return queue.shift() ?? { text: "Готово." };
       },
     });
@@ -524,6 +530,32 @@ describe("work on a project", () => {
     expect(sent).toContain("Before you finish: these skills are ready and you have not opened them.");
     expect(sent).toContain("verify: Use when about to claim work is complete");
     expect(sent).toContain("Run the checks first.");
+  });
+
+  // Seen live: a team board let anyone listen to any board over WebSocket; the coder's own tests never looked there.
+  it("has the code reviewed once before it is done, by the working model, with the user's security skills", async () => {
+    mkdirSync(join(folder, ".drimvox", "skills", "owasp"), { recursive: true });
+    writeFileSync(join(folder, ".drimvox", "skills", "owasp", "SKILL.md"), ["---", "name: owasp", "description: Security review checklist", "---", "Check every real-time channel.", ""].join("\n"));
+    const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
+    const finishing = call("finish_work", { report: "Готово." });
+    const issue = { severity: "high", where: "src/ws.ts", problem: "Anyone can subscribe to any board", fix: "Check team membership on connect" };
+    const s = await setup({
+      // Finishing: first the skill not opened yet, then the review's problems, then done.
+      coder: [noQuestions, writePlan, done, finishing, call("use_skill", { name: "owasp" }), finishing, call("write_file", { path: "ws.js", content: "// checked\n" }), finishing],
+      reviewer: [call("report_review", { issues: [issue, { ...issue, severity: "low", problem: "Naming" }], summary: "One hole." })],
+    });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "done");
+    const reviews = fake!.requests.filter((r) => r.path === "/v1/chat/completions" && isReviewer(r.body));
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0]!.body.model).toBe("coder");
+    expect(JSON.stringify(reviews[0]!.body.messages[0])).toContain("Check every real-time channel.");
+    const sent = JSON.stringify(requestsOf("coder").at(-1)!.body.messages);
+    expect(sent).toContain("A code reviewer read the project");
+    expect(sent).toContain("Anyone can subscribe to any board");
+    // Low ones are not worth a round of fixes.
+    expect(sent).not.toContain("Naming");
   });
 
   it("is done by Claude Code itself in the project's folder when the working model is on a subscription", async () => {
