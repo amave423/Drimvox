@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { browserInputSchema, browserOpenSchema, browserTabSchema } from "@drimvox/shared";
+import { browserInputSchema, browserOpenSchema, browserSizeSchema, browserTabSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { AgentBrowser, BrowserFrame, BrowserState } from "../browser/agent-browser";
@@ -68,6 +68,11 @@ export function browserRoutes(browser: AgentBrowser) {
         return c.json({ error: { code: "no_browser" as const, detail: err instanceof Error ? err.message : String(err) } }, 409);
       }
       return c.json(browser.state(), 200);
+    })
+    .post("/size", zValidator("json", browserSizeSchema), async (c) => {
+      const { width, height, scale } = c.req.valid("json");
+      await browser.resize(width, height, scale).catch(() => {});
+      return c.body(null, 204);
     })
     .post("/back", async (c) => {
       await browser.back().catch(() => {});

@@ -1202,6 +1202,8 @@ export const ru = {
   "browser.blank": "Новая вкладка",
   "browser.closeTab": "Закрыть вкладку «{name}»",
   "browser.newTab": "Новая вкладка",
+  "browser.wide": "Развернуть на всё окно",
+  "browser.narrow": "Свернуть в панель",
   "browser.button": "Браузер",
   "browser.title": "Браузер агента",
   "browser.running": "Браузер агента работает",

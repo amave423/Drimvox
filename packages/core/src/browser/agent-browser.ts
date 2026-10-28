@@ -1,12 +1,17 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { findBrowser, userAgent } from "./launch";
+
+export { findBrowser, playwrightArgs } from "./launch";
 
 /** One picture of the page the agent's browser shows, with the page's size in its own pixels. */
 export interface BrowserFrame {
   data: string;
+  /** The page's size in its own (CSS) pixels; the picture is `scale` times larger, for a dense screen. */
   width: number;
   height: number;
+  scale: number;
 }
 
 export interface BrowserTab {
@@ -27,9 +32,9 @@ export interface BrowserState {
 
 /** What the user does in the browser's panel, in the page's own pixels. */
 export type BrowserInput =
-  | { type: "mouse"; action: "down" | "up" | "move"; x: number; y: number; button?: "left" | "right" | "middle"; clicks?: number }
+  | { type: "mouse"; action: "down" | "up" | "move"; x: number; y: number; button?: "left" | "right" | "middle"; clicks?: number; buttons?: number }
   | { type: "wheel"; x: number; y: number; deltaX: number; deltaY: number }
-  | { type: "key"; key: string }
+  | { type: "key"; key: string; modifiers?: number }
   | { type: "text"; text: string };
 
 type Listener = { frame(f: BrowserFrame): void; state(s: BrowserState): void };
@@ -53,52 +58,6 @@ const KEYS: Record<string, { code: string; vk: number }> = {
   PageDown: { code: "PageDown", vk: 34 },
 };
 
-/** Chrome or Edge on this computer, or the Chromium Playwright downloaded; null when there is none. */
-export function findBrowser(): string | null {
-  const env = process.env;
-  const candidates =
-    process.platform === "win32"
-      ? [
-          join(env.PROGRAMFILES ?? "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe"),
-          join(env["PROGRAMFILES(X86)"] ?? "C:\\Program Files (x86)", "Google", "Chrome", "Application", "chrome.exe"),
-          join(env.LOCALAPPDATA ?? "", "Google", "Chrome", "Application", "chrome.exe"),
-          join(env["PROGRAMFILES(X86)"] ?? "C:\\Program Files (x86)", "Microsoft", "Edge", "Application", "msedge.exe"),
-          join(env.PROGRAMFILES ?? "C:\\Program Files", "Microsoft", "Edge", "Application", "msedge.exe"),
-        ]
-      : process.platform === "darwin"
-        ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"]
-        : ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/microsoft-edge", "/snap/bin/chromium"];
-  const found = candidates.find((p) => p && existsSync(p));
-  if (found) return found;
-  // Playwright's own Chromium, when the browser server has downloaded it.
-  const cache = process.platform === "win32" ? join(env.LOCALAPPDATA ?? "", "ms-playwright") : join(env.HOME ?? "", process.platform === "darwin" ? "Library/Caches/ms-playwright" : ".cache/ms-playwright");
-  try {
-    const dirs = readdirSync(cache).filter((d) => /^chromium-\d+$/.test(d)).sort().reverse();
-    for (const d of dirs) {
-      const exe = process.platform === "win32" ? join(cache, d, "chrome-win", "chrome.exe") : process.platform === "darwin" ? join(cache, d, "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium") : join(cache, d, "chrome-linux", "chrome");
-      if (existsSync(exe)) return exe;
-    }
-  } catch {
-    // No cache.
-  }
-  return null;
-}
-
-/**
- * A user agent without "Headless" in it (sites turn such visitors away): the version from the folder next to the
- * browser, as Chrome and Edge install themselves on Windows; none where it cannot be told.
- */
-function userAgent(exe: string): string | null {
-  try {
-    const version = readdirSync(dirname(exe)).find((d) => /^\d+\.\d+\.\d+\.\d+$/.test(d));
-    if (!version) return null;
-    const edge = /msedge/i.test(exe);
-    return `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36${edge ? ` Edg/${version}` : ""}`;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The agent's own browser (asked for: not a window jumping in front, but a panel in Drimvox, like Claude's): Chrome or
  * Edge without a window, with a profile of its own that keeps sign-ins and passed checks. The Playwright server drives
@@ -116,6 +75,8 @@ export class AgentBrowser {
   private readonly listeners = new Set<Listener>();
   private lastFrame: BrowserFrame | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
+  /** The panel's size: the page takes it (asked for: a browser, not a picture of one squeezed into the panel). */
+  private size = { width: WIDTH, height: HEIGHT, scale: 1 };
 
   constructor(private readonly o: { profileDir: string; find?: () => string | null }) {}
 
@@ -185,15 +146,20 @@ export class AgentBrowser {
     if (!this.session) return;
     if (e.type === "mouse") {
       const type = e.action === "down" ? "mousePressed" : e.action === "up" ? "mouseReleased" : "mouseMoved";
-      await this.send("Input.dispatchMouseEvent", { type, x: e.x, y: e.y, button: e.action === "move" ? "none" : (e.button ?? "left"), clickCount: e.action === "move" ? 0 : (e.clicks ?? 1) }, this.session);
+      // A move with a button held is a drag or a selection: the browser is told which button.
+      const held = e.action === "move" && (e.buttons ?? 0) > 0;
+      const button = e.action === "move" ? (held ? (e.buttons! & 1 ? "left" : e.buttons! & 2 ? "right" : "middle") : "none") : (e.button ?? "left");
+      await this.send("Input.dispatchMouseEvent", { type, x: e.x, y: e.y, button, buttons: e.buttons ?? (e.action === "down" ? 1 : 0), clickCount: e.action === "move" ? 0 : (e.clicks ?? 1) }, this.session);
     } else if (e.type === "wheel") {
       await this.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: e.x, y: e.y, deltaX: e.deltaX, deltaY: e.deltaY }, this.session);
     } else if (e.type === "text") {
       await this.send("Input.insertText", { text: e.text }, this.session);
     } else {
-      const k = KEYS[e.key];
+      // A named key, or a letter or digit with Ctrl and the like (a plain one comes as text).
+      const one = e.key.length === 1 ? e.key.toUpperCase() : "";
+      const k = KEYS[e.key] ?? (/^[A-Z]$/.test(one) ? { code: `Key${one}`, vk: one.charCodeAt(0) } : /^[0-9]$/.test(one) ? { code: `Digit${one}`, vk: one.charCodeAt(0) } : null);
       if (!k) return;
-      const key = { key: e.key, code: k.code, windowsVirtualKeyCode: k.vk };
+      const key = { key: e.key, code: k.code, windowsVirtualKeyCode: k.vk, modifiers: e.modifiers ?? 0 };
       await this.send("Input.dispatchKeyEvent", { type: "keyDown", ...key, ...(e.key === "Enter" ? { text: "\r" } : {}) }, this.session);
       await this.send("Input.dispatchKeyEvent", { type: "keyUp", ...key }, this.session);
     }
@@ -204,6 +170,20 @@ export class AgentBrowser {
     await this.endpoint();
     await this.ensurePage();
     if (this.session) await this.send("Page.navigate", { url }, this.session);
+  }
+
+  /** The page takes the panel's size, in CSS pixels, with the screen's density for sharp pictures. */
+  async resize(width: number, height: number, scale: number): Promise<void> {
+    const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi);
+    this.size = { width: Math.round(clamp(width, 320, 3840)), height: Math.round(clamp(height, 200, 2400)), scale: clamp(scale, 1, 3) };
+    await this.applySize();
+  }
+
+  /** A value from the shown tab's page. */
+  async evaluate(expression: string): Promise<unknown> {
+    if (!this.session) return undefined;
+    const r = (await this.send("Runtime.evaluate", { expression, returnByValue: true }, this.session)) as { result?: { value?: unknown } };
+    return r.result?.value;
   }
 
   /** A new tab, shown at once. */
@@ -336,7 +316,7 @@ export class AgentBrowser {
       void this.refresh();
     } else if (m.method === "Page.screencastFrame" && m.sessionId === this.session) {
       const meta = params.metadata as { deviceWidth: number; deviceHeight: number };
-      this.lastFrame = { data: params.data as string, width: meta.deviceWidth, height: meta.deviceHeight };
+      this.lastFrame = { data: params.data as string, width: meta.deviceWidth, height: meta.deviceHeight, scale: this.size.scale };
       for (const l of this.listeners) l.frame(this.lastFrame);
       void this.send("Page.screencastFrameAck", { sessionId: params.sessionId }, this.session).catch(() => {});
     }
@@ -368,6 +348,7 @@ export class AgentBrowser {
       if (this.active !== targetId) return;
       this.session = sessionId;
       await this.send("Page.enable", {}, sessionId);
+      await this.applySize();
       if (this.listeners.size) await this.show();
     } catch {
       // The tab went away meanwhile.
@@ -387,7 +368,27 @@ export class AgentBrowser {
     if (!this.ws) return;
     await this.ensurePage().catch(() => {});
     if (!this.session) return;
-    await this.send("Page.startScreencast", { format: "jpeg", quality: 70, maxWidth: WIDTH, maxHeight: HEIGHT, everyNthFrame: 1 }, this.session).catch(() => {});
+    const { width, height, scale } = this.size;
+    await this.send("Page.startScreencast", { format: "jpeg", quality: 80, maxWidth: Math.round(width * scale), maxHeight: Math.round(height * scale), everyNthFrame: 1 }, this.session).catch(() => {});
+  }
+
+  /** The shown tab's window and page at the panel's size; the pictures follow it. */
+  private async applySize(): Promise<void> {
+    const session = this.session;
+    const target = this.active;
+    if (!session || !target) return;
+    const { width, height, scale } = this.size;
+    try {
+      const { windowId } = (await this.send("Browser.getWindowForTarget", { targetId: target })) as { windowId: number };
+      await this.send("Browser.setWindowBounds", { windowId, bounds: { width, height } });
+    } catch {
+      // Some builds keep the window's size; the page's own size below is what counts.
+    }
+    await this.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: false }, session).catch(() => {});
+    if (this.listeners.size) {
+      await this.send("Page.stopScreencast", {}, session).catch(() => {});
+      await this.show();
+    }
   }
 
   private async hide(): Promise<void> {
@@ -398,25 +399,4 @@ export class AgentBrowser {
     const s = this.state();
     for (const l of this.listeners) l.state(s);
   }
-}
-
-/**
- * The Playwright server's command pointed at the agent's browser: its own browser options taken out, the DevTools
- * address put in.
- */
-export function playwrightArgs(args: string[], endpoint: string, outputDir?: string): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    if (a === "--headless" || a === "--headed" || a === "--isolated") continue;
-    if (a === "--cdp-endpoint" || a === "--browser" || a === "--user-data-dir" || (outputDir && a === "--output-dir")) {
-      i++;
-      continue;
-    }
-    if (/^--(cdp-endpoint|browser|user-data-dir)=/.test(a) || (outputDir && a.startsWith("--output-dir="))) continue;
-    out.push(a);
-  }
-  // Its page snapshots go to Drimvox's data, not to whatever folder the app was started in (seen: a folder of them in
-  // the sources).
-  return [...out, "--cdp-endpoint", endpoint, ...(outputDir ? ["--output-dir", outputDir] : [])];
 }

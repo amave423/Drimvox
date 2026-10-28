@@ -162,21 +162,27 @@
 .topbar-browser { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--sheet); color: var(--muted); font-size: 13px; position: relative; }
 .topbar-browser:hover, .topbar-browser.is-on { color: var(--fg); border-color: var(--muted); }
 .topbar-browser-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
-.browser-pane { position: fixed; z-index: 40; top: var(--topbar-h); right: 0; bottom: 30px; width: min(780px, 60vw); display: flex; flex-direction: column; background: var(--sheet); border-left: 1px solid var(--line); box-shadow: var(--sheet-shadow); animation: pane-in 0.22s ease; }
+.browser-pane { position: fixed; z-index: 40; top: var(--topbar-h); right: 0; bottom: 30px; width: min(1000px, 66vw); max-width: calc(100vw - 80px); display: flex; flex-direction: column; background: var(--sheet); border-left: 1px solid var(--line); box-shadow: var(--sheet-shadow); animation: pane-in 0.22s ease; }
 @keyframes pane-in { from { transform: translateX(24px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .browser-pane { animation: none; } }
 .browser-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 .browser-bar .icon-button { width: 30px; height: 30px; font-size: 18px; line-height: 1; }
 .browser-address { flex: 1; min-width: 0; }
 .browser-address .field-input { width: 100%; height: 32px; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; }
-.browser-hint { margin: 0; padding: 6px 14px; font-size: 12.5px; border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.browser-view { flex: 1; min-height: 0; overflow: auto; background: var(--paper); outline: none; }
-.browser-view:focus-visible { box-shadow: inset 0 0 0 2px var(--ink); }
-.browser-view img { display: block; width: 100%; height: auto; cursor: default; user-select: none; }
+.browser-pane.is-wide { left: 0; width: auto; max-width: none; }
+/* The left edge: taken and dragged, it widens or narrows the panel. */
+.browser-edge { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 1; touch-action: none; }
+.browser-pane.is-wide .browser-edge { display: none; }
+/* The page fills the box one to one: the agent's browser takes the box's size. */
+.browser-view { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--sheet); }
+.browser-view img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: default; user-select: none; touch-action: none; }
+.browser-view:focus-within { box-shadow: inset 0 0 0 2px var(--ink-soft); }
+/* Where typing goes before it is passed to the page: out of sight. */
+.browser-keys { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; resize: none; border: 0; padding: 0; pointer-events: none; }
 .browser-empty { padding: 40px 24px; display: grid; gap: 12px; justify-items: start; max-width: 60ch; }
 .browser-empty p { margin: 0; }
 /* The browser's tabs: a strip that scrolls sideways, the shown one raised. */
-.browser-tabs { display: flex; align-items: stretch; gap: 2px; padding: 6px 10px 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--paper); scrollbar-width: thin; }
+.browser-tabs { flex: none; display: flex; align-items: stretch; gap: 2px; padding: 6px 10px 0; overflow-x: auto; overflow-y: hidden; border-bottom: 1px solid var(--line); background: var(--paper); scrollbar-width: thin; }
 .browser-tab { flex: 0 1 200px; min-width: 90px; display: flex; align-items: center; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; }
 .browser-tab > button:first-child { flex: 1; min-width: 0; padding: 6px 4px 6px 10px; text-align: left; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .browser-tab.is-on { background: var(--sheet); border-color: var(--line); margin-bottom: -1px; }

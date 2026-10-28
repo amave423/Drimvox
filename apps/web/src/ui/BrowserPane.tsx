@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authHeaders } from "../api";
 import { useApp } from "../context";
 import { CrossIcon } from "./SideChats";
+import { BrowserView, type BrowserFrameView } from "./BrowserView";
 
-interface Frame {
-  data: string;
-  width: number;
-  height: number;
-}
+const WIDTH_KEY = "drimvox.browserWidth";
+const keptWidth = () => {
+  try {
+    return Number(localStorage.getItem(WIDTH_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+};
+
 interface Tab {
   id: string;
   url: string;
@@ -23,9 +28,6 @@ interface State {
 
 /** A tab's name in the strip: its title, else its address without the scheme. */
 const tabName = (tab: Tab, blank: string) => tab.title.trim() || (tab.url === "about:blank" ? blank : tab.url.replace(/^https?:\/\//, ""));
-
-/** Keys that are not text, passed on as keys; the rest of what is typed goes as text. */
-const KEYS = new Set(["Enter", "Backspace", "Tab", "Escape", "Delete", "ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 
 /** The browser's state, kept fresh: whether the agent's browser runs, for the dot on the button. */
 export function useBrowserState(): State | null {
@@ -50,19 +52,20 @@ export function useBrowserState(): State | null {
 }
 
 /**
- * The agent's browser in a panel of Drimvox (asked for: like Claude's, not a window jumping in front): its current tab
- * as it is now, an address to open, back and reload; clicks, scrolling and typing go into the page, so a "not a
- * robot" check is passed right here.
+ * The agent's browser in a panel of Drimvox (asked for: like Claude's, a browser and not a picture of one): its tabs,
+ * an address, back and reload, and the page at the panel's own size, to click, drag, scroll and type in — a "not a
+ * robot" check is passed right here. The panel is widened by its edge or opened over the whole window.
  */
 export function BrowserPane({ onClose }: { onClose(): void }) {
   const { api, t, token } = useApp();
-  const [frame, setFrame] = useState<Frame | null>(null);
+  const [frame, setFrame] = useState<BrowserFrameView | null>(null);
   const [state, setState] = useState<State>({ running: false, url: "", title: "", tabs: [], active: null });
   const [address, setAddress] = useState("");
   const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState(false);
-  const picture = useRef<HTMLImageElement>(null);
-  const lastMove = useRef(0);
+  const [width, setWidth] = useState(keptWidth);
+  const [wide, setWide] = useState(false);
+  const dragging = useRef(false);
 
   // The pictures come while the panel is open, as a stream of events.
   useEffect(() => {
@@ -82,7 +85,7 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
           const event = lines.find((l) => l.startsWith("event: "))?.slice(7);
           const data = lines.find((l) => l.startsWith("data: "))?.slice(6);
           if (!data) continue;
-          if (event === "frame") setFrame(JSON.parse(data) as Frame);
+          if (event === "frame") setFrame(JSON.parse(data) as BrowserFrameView);
           if (event === "state") setState(JSON.parse(data) as State);
         }
       }
@@ -99,47 +102,6 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
   const send = (input: unknown) => {
     queue.current = queue.current.then(() => api.browser.input.$post({ json: input as never }).catch(() => null));
   };
-  /** Where on the page the pointer is, in the page's own pixels. */
-  const at = (e: { clientX: number; clientY: number }) => {
-    const box = picture.current?.getBoundingClientRect();
-    if (!box || !frame) return null;
-    return { x: ((e.clientX - box.left) * frame.width) / box.width, y: ((e.clientY - box.top) * frame.height) / box.height };
-  };
-  const mouse = (action: "down" | "up" | "move", e: MouseEvent) => {
-    const p = at(e);
-    if (!p) return;
-    if (action === "move") {
-      // Moves are thinned out: a check may watch the pointer, but not every pixel of it.
-      if (Date.now() - lastMove.current < 60) return;
-      lastMove.current = Date.now();
-    }
-    send({ type: "mouse", action, ...p, button: e.button === 2 ? "right" : e.button === 1 ? "middle" : "left", clicks: e.detail > 0 ? Math.min(e.detail, 3) : 1 });
-  };
-  // Wheel events are taken over (the panel itself does not scroll under them).
-  useEffect(() => {
-    const el = picture.current;
-    if (!el) return;
-    const wheel = (e: WheelEvent) => {
-      const p = at(e);
-      if (!p) return;
-      e.preventDefault();
-      send({ type: "wheel", ...p, deltaX: e.deltaX, deltaY: e.deltaY });
-    };
-    el.addEventListener("wheel", wheel, { passive: false });
-    return () => el.removeEventListener("wheel", wheel);
-  });
-  const key = (e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
-      e.preventDefault();
-      void navigator.clipboard.readText().then((text) => text && send({ type: "text", text }));
-      return;
-    }
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (KEYS.has(e.key)) send({ type: "key", key: e.key });
-    else if (e.key.length === 1) send({ type: "text", text: e.key });
-    else return;
-    e.preventDefault();
-  };
   async function open(url?: string) {
     setFailed(false);
     const res = await api.browser.open.$post({ json: url ? { url: /^[a-z]+:/i.test(url) ? url : `https://${url}` } : {} }).catch(() => null);
@@ -147,7 +109,29 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
   }
 
   return (
-    <aside className="browser-pane" aria-label={t("browser.title")}>
+    <aside className={`browser-pane${wide ? " is-wide" : ""}`} aria-label={t("browser.title")} style={wide || !width ? undefined : { width }}>
+      {/* The panel's left edge: dragged, it widens or narrows the panel. */}
+      <div
+        className="browser-edge"
+        aria-hidden
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          dragging.current = true;
+          setWide(false);
+        }}
+        onPointerMove={(e) => {
+          if (!dragging.current) return;
+          setWidth(Math.min(Math.max(window.innerWidth - e.clientX, 420), window.innerWidth - 80));
+        }}
+        onPointerUp={() => {
+          dragging.current = false;
+          try {
+            localStorage.setItem(WIDTH_KEY, String(width));
+          } catch {
+            // Kept for this visit only.
+          }
+        }}
+      />
       <header className="browser-bar">
         <button type="button" className="icon-button" aria-label={t("browser.back")} title={t("browser.back")} onClick={() => void api.browser.back.$post().catch(() => null)}>
           ‹
@@ -173,6 +157,9 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
             onChange={(e) => setAddress(e.target.value)}
           />
         </form>
+        <button type="button" className="icon-button" aria-pressed={wide} aria-label={t(wide ? "browser.narrow" : "browser.wide")} title={t(wide ? "browser.narrow" : "browser.wide")} onClick={() => setWide(!wide)}>
+          {wide ? "⤡" : "⤢"}
+        </button>
         <button type="button" className="icon-button" aria-label={t("viewer.close")} title={t("viewer.close")} onClick={onClose}>
           <CrossIcon />
         </button>
@@ -182,13 +169,7 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
         <div className="browser-tabs" role="tablist" aria-label={t("browser.tabs")}>
           {state.tabs.map((tab) => (
             <div key={tab.id} className={`browser-tab${tab.id === state.active ? " is-on" : ""}`}>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab.id === state.active}
-                title={tab.url}
-                onClick={() => void api.browser.tab.$post({ json: { id: tab.id } }).catch(() => null)}
-              >
+              <button type="button" role="tab" aria-selected={tab.id === state.active} title={tab.url} onClick={() => void api.browser.tab.$post({ json: { id: tab.id } }).catch(() => null)}>
                 {tabName(tab, t("browser.blank"))}
               </button>
               <button type="button" className="browser-tab-close" aria-label={t("browser.closeTab", { name: tabName(tab, t("browser.blank")) })} onClick={() => void api.browser.tab.close.$post({ json: { id: tab.id } }).catch(() => null)}>
@@ -201,34 +182,18 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
           </button>
         </div>
       )}
-      <p className="browser-hint muted">{state.title ? state.title : t("browser.hint")}</p>
-      <div className="browser-view" tabIndex={0} onKeyDown={key} aria-label={t("browser.view")}>
-        {state.running && frame ? (
-          <img
-            ref={picture}
-            src={`data:image/jpeg;base64,${frame.data}`}
-            alt={state.title || t("browser.title")}
-            draggable={false}
-            onMouseDown={(e) => {
-              e.currentTarget.parentElement?.focus();
-              mouse("down", e);
-            }}
-            onMouseUp={(e) => mouse("up", e)}
-            onMouseMove={(e) => mouse("move", e)}
-            onContextMenu={(e) => e.preventDefault()}
-          />
-        ) : (
-          <div className="browser-empty">
-            <p>{t(state.running ? "browser.loading" : "browser.notRunning")}</p>
-            {!state.running && (
-              <button type="button" className="btn" onClick={() => void open()}>
-                {t("browser.start")}
-              </button>
-            )}
-            {failed && <p className="error-note">{t("browser.noBrowser")}</p>}
-          </div>
-        )}
-      </div>
+      {state.running ? (
+        <BrowserView frame={frame} title={state.title || t("browser.title")} onInput={send} />
+      ) : (
+        <div className="browser-empty">
+          <p>{t("browser.hint")}</p>
+          <p className="muted">{t("browser.notRunning")}</p>
+          <button type="button" className="btn" onClick={() => void open()}>
+            {t("browser.start")}
+          </button>
+          {failed && <p className="error-note">{t("browser.noBrowser")}</p>}
+        </div>
+      )}
     </aside>
   );
 }

@@ -53,11 +53,24 @@ export const browserOpenSchema = z.object({ url: z.string().trim().max(4000).opt
 
 /** What the user does in the browser's panel, in the page's own pixels. */
 export const browserInputSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("mouse"), action: z.enum(["down", "up", "move"]), x: z.number(), y: z.number(), button: z.enum(["left", "right", "middle"]).optional(), clicks: z.number().int().min(1).max(3).optional() }),
+  z.object({
+    type: z.literal("mouse"),
+    action: z.enum(["down", "up", "move"]),
+    x: z.number(),
+    y: z.number(),
+    button: z.enum(["left", "right", "middle"]).optional(),
+    clicks: z.number().int().min(1).max(3).optional(),
+    /** Buttons held while moving: a drag, a selection. */
+    buttons: z.number().int().min(0).max(7).optional(),
+  }),
   z.object({ type: z.literal("wheel"), x: z.number(), y: z.number(), deltaX: z.number(), deltaY: z.number() }),
-  z.object({ type: z.literal("key"), key: z.string().max(20) }),
+  /** `modifiers`: 1 Alt, 2 Ctrl, 4 Meta, 8 Shift — Ctrl+A, Ctrl+C and the like. */
+  z.object({ type: z.literal("key"), key: z.string().max(20), modifiers: z.number().int().min(0).max(15).optional() }),
   z.object({ type: z.literal("text"), text: z.string().max(2000) }),
 ]);
 
 /** One of the agent's browser's tabs. */
 export const browserTabSchema = z.object({ id: z.string().min(1).max(200) }).strict();
+
+/** The panel's size, in CSS pixels, and the screen's density: the agent's browser takes it. */
+export const browserSizeSchema = z.object({ width: z.number().min(100).max(4000), height: z.number().min(100).max(3000), scale: z.number().min(1).max(3) }).strict();

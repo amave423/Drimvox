@@ -1202,6 +1202,8 @@ export const en: Record<keyof typeof ru, string> = {
   "browser.blank": "New tab",
   "browser.closeTab": "Close the tab “{name}”",
   "browser.newTab": "New tab",
+  "browser.wide": "Open over the whole window",
+  "browser.narrow": "Back to a panel",
   "browser.button": "Browser",
   "browser.title": "The agent's browser",
   "browser.running": "The agent's browser is running",

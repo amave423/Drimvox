@@ -70,6 +70,58 @@ describe("the agent's browser", () => {
     40_000,
   );
 
+  // Asked for: a browser, not a picture of one squeezed into the panel: the page takes the panel's own size.
+  it.skipIf(!findBrowser())(
+    "takes the panel's size: the page's window and the pictures are as large as the panel, sharp on a dense screen",
+    async () => {
+      profile = mkdtempSync(join(tmpdir(), "drimvox-browser-"));
+      browser = new AgentBrowser({ profileDir: profile });
+      const frames: BrowserFrame[] = [];
+      const stop = browser.watch({ frame: (f) => frames.push(f), state: () => {} });
+      await browser.open("about:blank");
+      await browser.resize(700, 520, 2);
+      for (let i = 0; i < 100 && !frames.some((f) => f.width === 700 && f.height === 520); i++) await new Promise((r) => setTimeout(r, 100));
+      const last = frames.at(-1)!;
+      expect({ width: last.width, height: last.height, scale: last.scale }).toEqual({ width: 700, height: 520, scale: 2 });
+      expect(await browser.evaluate("JSON.stringify([innerWidth, innerHeight, devicePixelRatio])")).toBe("[700,520,2]");
+      stop();
+    },
+    40_000,
+  );
+
+  // A "not a robot" box lives in a frame from another site: the user's click must reach inside it.
+  it.skipIf(!findBrowser())(
+    "takes a click inside a frame from another site, as a check's box is",
+    async () => {
+      const inner = createServer((_, res) => {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(`<body style="margin:0"><label style="display:block;width:300px;height:65px"><input type="checkbox" style="width:24px;height:24px;margin:20px" onchange="parent.postMessage('checked','*')"> Я не робот</label></body>`);
+      });
+      await new Promise<void>((r) => inner.listen(0, "127.0.0.1", r));
+      site = createServer((_, res) => {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        // "localhost" and "127.0.0.1" are different sites to the browser.
+        res.end(`<title>Ждёт</title><body style="margin:0"><iframe src="http://localhost:${(inner.address() as AddressInfo).port}/" style="position:absolute;left:100px;top:100px;width:300px;height:65px;border:0"></iframe><script>addEventListener('message', (e) => { if (e.data === 'checked') document.title = 'Пройдено'; })</script></body>`);
+      });
+      await new Promise<void>((r) => site!.listen(0, "127.0.0.1", r));
+      profile = mkdtempSync(join(tmpdir(), "drimvox-browser-"));
+      browser = new AgentBrowser({ profileDir: profile });
+      const stop = browser.watch({ frame: () => {}, state: () => {} });
+      await browser.open(`http://127.0.0.1:${(site.address() as AddressInfo).port}/`);
+      for (let i = 0; i < 100 && browser.state().title !== "Ждёт"; i++) await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 500));
+      // The box: 20 px in, at the frame's 100, 100.
+      await browser.input({ type: "mouse", action: "down", x: 132, y: 132 });
+      await browser.input({ type: "mouse", action: "up", x: 132, y: 132 });
+      for (let i = 0; i < 100 && browser.state().title !== "Пройдено"; i++) await new Promise((r) => setTimeout(r, 100));
+      expect(browser.state().title).toBe("Пройдено");
+      stop();
+      inner.closeAllConnections();
+      await new Promise((r) => inner.close(r));
+    },
+    40_000,
+  );
+
   // Asked for: the agent may open several tabs; the panel shows them all and switches between them.
   it.skipIf(!findBrowser())(
     "lists its tabs, switches the panel between them, opens and closes one",

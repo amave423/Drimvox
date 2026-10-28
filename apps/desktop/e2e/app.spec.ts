@@ -244,21 +244,32 @@ test("opens the agent's browser in a panel, where a page is clicked and typed in
     await page.getByRole("button", { name: "Браузер", exact: true }).click();
     const pane = page.getByRole("complementary", { name: "Браузер агента" });
     await expect(pane).toContainText("не запущен");
+    await pane.getByRole("button", { name: "Открыть браузер" }).click();
     await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${(site.address() as AddressInfo).port}/`);
     await pane.getByLabel("Адрес").press("Enter");
     const view = pane.locator(".browser-view img");
     await expect(view).toBeVisible({ timeout: 20_000 });
-    await expect(pane.locator(".browser-hint")).toHaveText("Проверка", { timeout: 10_000 });
+    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Проверка", { timeout: 10_000 });
     // A click on the picture is a click on the page.
     const box = (await view.boundingBox())!;
     await page.mouse.click(box.x + 40, box.y + 40);
-    await expect(pane.locator(".browser-hint")).toHaveText("Нажато", { timeout: 10_000 });
+    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Нажато", { timeout: 10_000 });
     // Typing goes into the page.
-    const scale = box.width / (await view.evaluate((img: HTMLImageElement) => img.naturalWidth));
-    await page.mouse.click(box.x + 20 * scale, box.y + 310 * scale);
-    // Real keys: Playwright types letters off its layout without key events, as no keyboard does.
-    await page.keyboard.type("kedr");
-    await expect(pane.locator(".browser-hint")).toHaveText("Введено: kedr", { timeout: 10_000 });
+    // The page takes the panel's size: one picture pixel per screen pixel, no squeezing and no empty space (asked for).
+    await expect
+      .poll(() =>
+        view.evaluate((img: HTMLImageElement) => {
+          const shown = img.getBoundingClientRect().width;
+          return Math.min(Math.abs(img.naturalWidth - shown), Math.abs(img.naturalWidth / devicePixelRatio - shown));
+        }),
+      )
+      .toBeLessThan(2);
+    const filled = await pane.locator(".browser-view").evaluate((el) => el.getBoundingClientRect().height);
+    expect(Math.abs((await view.boundingBox())!.height - filled)).toBeLessThan(2);
+    await page.mouse.click(box.x + 20, box.y + 310);
+    // Letters in any layout arrive as text.
+    await page.keyboard.type("кедр");
+    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Введено: кедр", { timeout: 10_000 });
     await expect(page.locator(".topbar-browser-dot")).toBeVisible({ timeout: 10_000 });
 
     // Several tabs: a new one, then back to the first, and the second closed (asked for: a switch between them).
@@ -267,10 +278,10 @@ test("opens the agent's browser in a panel, where a page is clicked and typed in
     await expect(tabs.getByRole("tab")).toHaveCount(2);
     await pane.getByLabel("Адрес").fill(`http://127.0.0.1:${(site.address() as AddressInfo).port}/b`);
     await pane.getByLabel("Адрес").press("Enter");
-    await expect(pane.locator(".browser-hint")).toHaveText("Вторая", { timeout: 10_000 });
+    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Вторая", { timeout: 10_000 });
     await expect(tabs.getByRole("tab", { name: "Вторая" })).toHaveAttribute("aria-selected", "true");
-    await tabs.getByRole("tab", { name: "Введено: kedr" }).click();
-    await expect(pane.locator(".browser-hint")).toHaveText("Введено: kedr", { timeout: 10_000 });
+    await tabs.getByRole("tab", { name: "Введено: кедр" }).click();
+    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Введено: кедр", { timeout: 10_000 });
     await tabs.getByRole("button", { name: "Закрыть вкладку «Вторая»" }).click();
     await expect(tabs.getByRole("tab")).toHaveCount(1);
   } finally {
