@@ -25,6 +25,8 @@ test.afterEach(async () => {
   rmSync(userData, { recursive: true, force: true });
 });
 
+const NL = String.fromCharCode(10);
+
 async function launch(chunks: FakeChunk[], delayMs = 0, script?: FakeTurn[]): Promise<Page> {
   fake = await startFakeProvider({ key: KEY, models, chunks, delayMs, ...(script ? { script } : {}) });
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_SAVE_PDF: join(userData, "chat.pdf") } });
@@ -191,6 +193,21 @@ test("a code block has a copy button", async () => {
 });
 
 // Asked for: export a chat, as Markdown and as a PDF of what the window shows.
+// Asked for: a long line of code went off the page of a saved PDF; paper does not scroll, so code wraps there.
+test("on paper long code wraps and nothing runs past the page", async () => {
+  const line = "const total = items.filter((item) => item.available && item.price > minimalPrice).map((item) => ({ ...item, delivery: costFor(item.weight, customer.city) })).reduce((sum, item) => sum + item.price, 0);";
+  const page = await launch([{ text: "Вот:" + NL + NL + "```js" + NL + line + NL + "```" + NL + NL + "Длинное `слово_без_пробелов_которое_никак_не_помещается_в_одну_строку_листа_бумаги_формата_а4`." }]);
+  await ask(page, "Код");
+  await expect(page.locator(".code-block")).toContainText("costFor");
+  await page.emulateMedia({ media: "print" });
+  await page.setViewportSize({ width: 718, height: 1000 });
+  const overflow = await page.evaluate(() =>
+    [...document.querySelectorAll(".md pre, .md code, .code-block")].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.className || el.tagName),
+  );
+  expect(overflow).toEqual([]);
+  expect(await page.locator(".msg-assistant").evaluate((el) => getComputedStyle(el).display)).toBe("block");
+});
+
 test("a chat is saved as Markdown and as a PDF", async () => {
   const page = await launch([{ text: "Ответ с **жирным** текстом" }]);
   await ask(page, "Привет");

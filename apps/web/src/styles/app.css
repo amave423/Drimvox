@@ -205,6 +205,15 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
   html, body, .shell, .desk { background: var(--sheet) !important; }
   .sheet { box-shadow: none !important; border: 0 !important; border-radius: 0 !important; margin: 0 !important; max-width: none !important; animation: none !important; }
   * { animation: none !important; }
+  /* Paper does not scroll (asked for: long code went off the page): code wraps, long words break, tables fit. */
+  pre, pre code, .code-block, .code-block pre, .code-block code { white-space: pre-wrap !important; overflow: visible !important; overflow-wrap: anywhere !important; max-height: none !important; }
+  .md code { overflow-wrap: anywhere; white-space: pre-wrap; }
+  .md table { table-layout: fixed; width: 100% !important; max-width: 100%; }
+  .md th, .md td { overflow-wrap: anywhere; }
+  .md, .msg, .msg-assistant { height: auto !important; max-height: none !important; overflow: visible !important; contain: none !important; content-visibility: visible !important; }
+  /* Grids split across pages badly in Chromium (seen: the tokens line over the last line of an answer on page two). */
+  .messages, .msg-assistant { display: block !important; }
+  .messages > * + *, .msg-assistant > * + * { margin-top: 10px; }
 }
 
 /* The start page, as in the chat apps: a greeting and a box to ask in, in the middle of the sheet. */
