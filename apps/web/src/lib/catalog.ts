@@ -68,7 +68,6 @@ const glyph = {
   bug: "M8 8a4 4 0 0 1 8 0v6a4 4 0 0 1-8 0zM12 10v8M4 12h4M16 12h4M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2",
   bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z",
   plan: "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
-  check: "M4 12l5 5L20 6",
   doc: "M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6",
   table: "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14",
   slides: "M3 4h18v12H3zM12 16v4M8 20h8M7 12l3-3 2 2 4-4",
@@ -77,6 +76,10 @@ const glyph = {
   palette: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   canvas: "M4 4h16v13H4zM4 14l4-4 3 3 3-3 6 6M8 20h8",
   tool: "M14 7a4 4 0 0 0-5.5 5.2L3 17.7 6.3 21l5.5-5.5A4 4 0 0 0 17 10l-2.5 2.5-2.9-.6-.6-2.9z",
+  // Marks for the entries that used to borrow another card's glyph; catalog.test.ts keeps every mark unique.
+  wand: "M3 21l4-4M12 3l2.5 2.5L19 9l-3.5-3.5L12 3zM12 9l6 6M18 15l3 3",
+  gear: "M12 3a9 9 0 0 1 9 9 9 9 0 0 1-1.5 4.9L16 21h-8l-3.5-4.1A9 9 0 0 1 3 12a9 9 0 0 1 9-9zm0 3a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+  cycles: "M12 4a8 8 0 0 0-4 14.9V17a10 10 0 0 1 8 0v-2.1A8 8 0 0 0 12 4zm0 16a8 8 0 0 0 4-14.9V7a10 10 0 0 1-8 0v2.1A8 8 0 0 0 12 20z",
 };
 const drawn = (path: string): CatalogLogo => ({ path, stroke: true });
 const brand = (icon: { path: string }): CatalogLogo => ({ path: icon.path });
@@ -104,12 +107,12 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "skill", id: "algorithmic-art", vendor: "Anthropic", category: "design", logo: drawn(glyph.art), link: "https://github.com/anthropics/skills/tree/main/skills/algorithmic-art", license: "Apache-2.0", skill: "algorithmic-art", source: anthropic("algorithmic-art") },
   { kind: "skill", id: "webapp-testing", vendor: "Anthropic", category: "web", logo: drawn(glyph.test), link: "https://github.com/anthropics/skills/tree/main/skills/webapp-testing", license: "Apache-2.0", skill: "webapp-testing", source: anthropic("webapp-testing") },
   { kind: "skill", id: "mcp-builder", vendor: "Anthropic", category: "code", logo: drawn(glyph.tool), link: "https://github.com/anthropics/skills/tree/main/skills/mcp-builder", license: "Apache-2.0", skill: "mcp-builder", source: anthropic("mcp-builder") },
-  { kind: "skill", id: "skill-creator", vendor: "Anthropic", category: "code", logo: drawn(glyph.sparkles), link: "https://github.com/anthropics/skills/tree/main/skills/skill-creator", license: "Apache-2.0", skill: "skill-creator", source: anthropic("skill-creator") },
-  { kind: "skill", id: "tdd", vendor: "obra/superpowers", category: "code", logo: drawn(glyph.check), link: "https://github.com/obra/superpowers/tree/main/skills/test-driven-development", license: "MIT", skill: "test-driven-development", source: superpowers("test-driven-development") },
+  { kind: "skill", id: "skill-creator", vendor: "Anthropic", category: "code", logo: drawn(glyph.wand), link: "https://github.com/anthropics/skills/tree/main/skills/skill-creator", license: "Apache-2.0", skill: "skill-creator", source: anthropic("skill-creator") },
+  { kind: "skill", id: "tdd", vendor: "obra/superpowers", category: "code", logo: drawn(glyph.cycles), link: "https://github.com/obra/superpowers/tree/main/skills/test-driven-development", license: "MIT", skill: "test-driven-development", source: superpowers("test-driven-development") },
   { kind: "skill", id: "debugging", vendor: "obra/superpowers", category: "code", logo: drawn(glyph.bug), link: "https://github.com/obra/superpowers/tree/main/skills/systematic-debugging", license: "MIT", skill: "systematic-debugging", source: superpowers("systematic-debugging") },
   { kind: "skill", id: "brainstorming", vendor: "obra/superpowers", category: "code", logo: drawn(glyph.bulb), link: "https://github.com/obra/superpowers/tree/main/skills/brainstorming", license: "MIT", skill: "brainstorming", source: superpowers("brainstorming") },
   { kind: "skill", id: "writing-plans", vendor: "obra/superpowers", category: "code", logo: drawn(glyph.plan), link: "https://github.com/obra/superpowers/tree/main/skills/writing-plans", license: "MIT", skill: "writing-plans", source: superpowers("writing-plans") },
-  { kind: "skill", id: "verification", vendor: "obra/superpowers", category: "code", logo: drawn(glyph.check), link: "https://github.com/obra/superpowers/tree/main/skills/verification-before-completion", license: "MIT", skill: "verification-before-completion", source: superpowers("verification-before-completion") },
+  { kind: "skill", id: "verification", vendor: "obra/superpowers", category: "code", logo: drawn(glyph.gear), link: "https://github.com/obra/superpowers/tree/main/skills/verification-before-completion", license: "MIT", skill: "verification-before-completion", source: superpowers("verification-before-completion") },
   { kind: "skill", id: "docx", vendor: "Drimvox", category: "docs", logo: drawn(glyph.doc), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "docx", source: { kind: "builtin", id: "docx" } },
   { kind: "skill", id: "xlsx", vendor: "Drimvox", category: "docs", logo: drawn(glyph.table), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "xlsx", source: { kind: "builtin", id: "xlsx" } },
   { kind: "skill", id: "pptx", vendor: "Drimvox", category: "docs", logo: drawn(glyph.slides), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "pptx", source: { kind: "builtin", id: "pptx" } },
