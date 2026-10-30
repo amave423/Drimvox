@@ -20,15 +20,16 @@ function clientOf(c: Context): string {
 }
 
 /**
- * Behind `tailscale serve` the browser speaks HTTPS even though the core hears plain HTTP. The server listens on
- * 127.0.0.1 only, so a request under any other name came through that HTTPS proxy.
+ * Whether the browser really spoke HTTPS. Behind `tailscale serve` it does while the core hears plain HTTP, and
+ * Tailscale says so in X-Forwarded-Proto; otherwise the scheme of the request itself decides.
  */
 function overHttps(c: Context): boolean {
-  const url = new URL(c.req.url);
-  return c.req.header("X-Forwarded-Proto") === "https" || url.protocol === "https:" || !LOOPBACK.has(url.hostname);
+  // Only what the browser actually travelled over counts. A plain http:// to the server's own hostname is not https,
+  // and marking the cookie secure there made it vanish: the login answer came back, the page refreshed, and it
+  // asked for the password again, because the session cookie was never sent (seen: the server's own log showed the
+  // requests, the browser just did not carry the cookie).
+  return c.req.header("X-Forwarded-Proto") === "https" || new URL(c.req.url).protocol === "https:";
 }
-const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
-
 function startSession(c: Context, store: AuthStore): void {
   setCookie(c, SESSION_COOKIE, store.openSession(), {
     httpOnly: true,

@@ -59,7 +59,7 @@ export interface TestEnv {
 }
 
 /** `setupCode` turns on the server's password sign-in instead of the desktop's token. */
-export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
+export function createTestEnv(o: { setupCode?: string; allowedHosts?: string[] } = {}): TestEnv {
   const dir = mkdtempSync(join(tmpdir(), "drimvox-core-"));
   const secretKey = randomBytes(32);
   let idleTimeoutMs: number | undefined;
@@ -113,6 +113,8 @@ export function createTestEnv(o: { setupCode?: string } = {}): TestEnv {
       local,
       github,
       ...(o.setupCode ? { password: { setupCode: o.setupCode } } : {}),
+      // The server's own names stay the default; a test of a laptop's server adds the name it is reached by.
+      ...(o.allowedHosts ? { allowedHosts: o.allowedHosts } : {}),
     };
     if (webDir) return createCore({ ...options, webDir });
     core ??= createCore(options);

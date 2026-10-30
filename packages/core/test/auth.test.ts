@@ -61,6 +61,23 @@ describe("password sign-in", () => {
     expect(res.headers.get("set-cookie")).toMatch(/Secure/i);
   });
 
+  // Seen on a laptop's server: a plain http:// to the server's own name got a Secure cookie, the browser dropped it,
+  // and the page kept asking for the password it had just taken — accepted, refreshed, empty again.
+  it("leaves the cookie sendable over plain http under a name that is not localhost", async () => {
+    const lan = createTestEnv({ setupCode: CODE, allowedHosts: ["192.168.1.50"] });
+    try {
+      const res = await lan.app().request("http://192.168.1.50:3000/api/auth/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: PASSWORD, code: CODE }),
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("set-cookie")).not.toMatch(/Secure/i);
+    } finally {
+      await lan.closeAsync();
+    }
+  });
+
   it("signs in and out", async () => {
     await setUp();
     expect((await send("POST", "/api/auth/login", { password: "wrong password" })).status).toBe(401);
