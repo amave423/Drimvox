@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { authHeaders } from "../api";
+import { addressOf } from "../lib/address";
 import { useApp } from "../context";
 import { CrossIcon } from "./SideChats";
 import { BrowserView, EmbeddedView, type BrowserFrameView } from "./BrowserView";
@@ -37,19 +38,6 @@ const keepWidth = (w: number) => {
     // Kept for this visit only.
   }
 };
-
-/**
- * What the address field opens: an address as is (https:// added), anything else as a search (asked for: typing a
- * search into it, as in any browser).
- */
-export function addressOf(text: string, locale: "ru" | "en"): string {
-  const typed = text.trim();
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(typed) || /^about:/i.test(typed)) return typed;
-  if (!/\s/.test(typed) && /^(localhost|[\w-]+(\.[\w-]+)+|\d{1,3}(\.\d{1,3}){3})(:\d+)?(\/.*)?$/i.test(typed)) {
-    return `${/^(localhost|127\.|\d{1,3}(\.\d{1,3}){3})/.test(typed) ? "http" : "https"}://${typed}`;
-  }
-  return locale === "ru" ? `https://yandex.ru/search/?text=${encodeURIComponent(typed)}` : `https://www.bing.com/search?q=${encodeURIComponent(typed)}`;
-}
 
 /** A tab's name in the strip: its title, else its address without the scheme. */
 const tabName = (tab: Tab, blank: string) => tab.title.trim() || (tab.url === "about:blank" ? blank : tab.url.replace(/^https?:\/\//, ""));
@@ -134,7 +122,7 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
   };
   async function open(url?: string) {
     setFailed(false);
-    const res = await api.browser.open.$post({ json: url ? { url: addressOf(url, locale) } : {} }).catch(() => null);
+    const res = await api.browser.open.$post({ json: url ? { url: addressOf(url, locale, settings.searchEngine) } : {} }).catch(() => null);
     if (!res?.ok) setFailed(true);
     // A new empty browser: the address is where one types first.
     else if (!url) setTimeout(() => addressField.current?.focus(), 50);

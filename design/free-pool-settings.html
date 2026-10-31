@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Цепочки в параметрах</title>
+<link rel="stylesheet" href="project-modes.css">
+<link rel="stylesheet" href="extra.css">
+<style>
+  .params { display: grid; grid-template-columns: 210px minmax(0, 1fr); height: 680px; background: var(--bg); }
+  .pnav { padding: 14px 10px; border-right: 1px solid var(--line); display: grid; gap: 2px; align-content: start; font-size: 14px; }
+  .pnav .back { color: var(--muted); padding: 4px 8px 12px; }
+  .pnav div { padding: 7px 10px; border-radius: 8px; }
+  .pnav .on { background: var(--sheet); box-shadow: 0 1px 0 var(--line); }
+  .psheet { margin: 14px; background: var(--sheet); box-shadow: var(--shadow); padding: 20px 24px; overflow: auto; display: grid; gap: 14px; align-content: start; }
+  .psheet h2 { margin: 0; font: 600 24px var(--serif); }
+  .ptabs { display: flex; gap: 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .ptabs span { padding-bottom: 8px; color: var(--muted); }
+  .ptabs .on { color: var(--fg); border-bottom: 2px solid var(--fg); }
+  .inner { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; }
+  .acc { border: 1px solid var(--line); border-radius: 12px; }
+  .acc > b { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 14px; font-size: 14.5px; }
+  .acc > b small { color: var(--muted); font-weight: 400; font-size: 12.5px; display: block; }
+  .acc > div { border-top: 1px solid var(--line); padding: 12px 14px; display: grid; gap: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .ccard { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; background: var(--sheet); }
+  .ccard b { font-size: 15px; }
+  .dots { display: flex; gap: 4px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
+  .dots i.w { background: var(--wait); }
+  .dots i.o { background: var(--pencil); }
+  .ccard.new { border-style: dashed; color: var(--ink); place-content: center; min-height: 120px; text-align: center; }
+  .drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 470px; background: var(--sheet); border-left: 1px solid var(--line); box-shadow: -20px 0 40px -30px rgba(0,0,0,.4); padding: 18px 20px; display: grid; gap: 12px; align-content: start; overflow: auto; }
+  .rel { position: relative; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Цепочки бесплатных моделей в параметрах</h1>
+  <p class="lede">За основу взят вариант C (цепочка с правилами), каждая цепочка настраивается сама по себе, и их может быть сколько угодно. Цепочки живут в «Параметрах» на отдельной вкладке. Меню разделов — слева, как вы просили. Ниже три способа уложить их на странице и как цепочки выглядят в выборе модели.</p>
+
+  <div class="switch">
+    <button class="on" data-s="a">A. Список и редактор рядом</button>
+    <button data-s="b">B. Раскрывающиеся карточки</button>
+    <button data-s="c">C. Плитки и панель сбоку</button>
+    <button data-s="p">В выборе модели</button>
+  </div>
+
+  <section class="screen on" id="a">
+    <div class="about"><b>A. Список и редактор рядом.</b> Слева на вкладке все цепочки (ваши и «Авто»), справа выбранная: порядок моделей и правила.
+      <ul><li>Быстро переходить между цепочками.</li><li>Минус: на узком окне редактор становится тесным.</li></ul></div>
+    <div class="win"><div class="params">
+      <div class="pnav"><span class="back">‹ Назад</span><div class="on">Настройки</div><div>Ключи и модели</div><div>Локальные модели</div><div>Галерея</div><div>Справка</div></div>
+      <div class="psheet">
+        <h2>Настройки</h2>
+        <div class="ptabs"><span>Общие</span><span>Модели</span><span class="on">Цепочки</span><span>Интернет</span><span>MCP</span><span>Скиллы</span></div>
+        <div class="inner">
+          <div class="chains">
+            <div class="chain-row"><b>Авто: для кода</b><small>собирает Drimvox</small></div>
+            <div class="chain-row"><b>Авто: для чата</b><small>собирает Drimvox</small></div>
+            <div class="chain-row on"><b>Мой код бесплатно</b><small>4 модели · отвечает GLM</small></div>
+            <div class="chain-row"><b>Быстрые ответы</b><small>3 модели</small></div>
+            <div class="add-link">+ Новая цепочка</div>
+          </div>
+          <div style="display:grid;gap:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">Мой код бесплатно</b><span><span class="btn">Переименовать</span> <span class="btn pencil">Удалить</span></span></div>
+            <div class="chain">
+              <div class="link"><span class="grip">⋮⋮</span><span class="num">1</span><span>DeepSeek V4.1 Flash Free<small>Beatapi</small></span><span class="st wait">отдыхает 12 мин</span></div>
+              <div class="link"><span class="grip">⋮⋮</span><span class="num">2</span><span>GLM 5.3 Flash<small>Z.AI</small></span><span class="st ok">отвечает</span></div>
+              <div class="link"><span class="grip">⋮⋮</span><span class="num">3</span><span>Qwen3 Coder<small>OpenRouter :free</small></span><span class="st ok">отвечает</span></div>
+              <div class="add-link">+ Добавить бесплатную модель</div>
+            </div>
+            <div class="card"><h5>Правила</h5><div class="cols">
+              <div class="rules"><div class="radios"><div class="radio on"><i></i><span>Порядок как в списке</span></div><div class="radio"><i></i><span>Лучшие первыми</span></div></div><span class="toggle on"><i></i>Только с инструментами</span></div>
+              <div class="rules"><span class="toggle on"><i></i>Дальше при лимите (429)</span><span class="toggle on"><i></i>Дальше при ошибке</span><span class="toggle on"><i></i>Дальше, если молчит 20 с</span></div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="screen" id="b">
+    <div class="about"><b>B. Раскрывающиеся карточки.</b> Цепочки одна под другой; свёрнутая показывает модели строкой и состояние, раскрытая — порядок и правила целиком.
+      <ul><li>Видно все цепочки сразу, удобно и на узком окне.</li><li>Минус: длинная страница, если цепочек много.</li></ul></div>
+    <div class="win"><div class="params">
+      <div class="pnav"><span class="back">‹ Назад</span><div class="on">Настройки</div><div>Ключи и модели</div><div>Локальные модели</div><div>Галерея</div><div>Справка</div></div>
+      <div class="psheet">
+        <h2>Настройки</h2>
+        <div class="ptabs"><span>Общие</span><span>Модели</span><span class="on">Цепочки</span><span>Интернет</span><span>MCP</span><span>Скиллы</span></div>
+        <div style="display:flex;justify-content:space-between"><p class="note">Цепочка — это модель для выбора в чате и проекте. Если модель занята, отвечает следующая.</p><span class="btn primary">+ Новая цепочка</span></div>
+        <div class="acc"><b><span>Авто: для кода<small>Drimvox собирает сам · сейчас 9 моделей</small></span><span class="dots"><i></i><i></i><i></i><i class="w"></i></span><span>▸</span></b></div>
+        <div class="acc"><b><span>Мой код бесплатно<small>Beatapi → Z.AI → OpenRouter</small></span><span class="dots"><i class="w"></i><i></i><i></i></span><span>▾</span></b>
+          <div>
+            <div class="chain">
+              <div class="link"><span class="grip">⋮⋮</span><span class="num">1</span><span>DeepSeek V4.1 Flash Free<small>Beatapi</small></span><span class="st wait">отдыхает 12 мин</span></div>
+              <div class="link"><span class="grip">⋮⋮</span><span class="num">2</span><span>GLM 5.3 Flash<small>Z.AI</small></span><span class="st ok">отвечает</span></div>
+              <div class="add-link">+ Добавить бесплатную модель</div>
+            </div>
+            <div class="cols"><div class="rules"><span class="toggle on"><i></i>Дальше при лимите (429)</span><span class="toggle on"><i></i>Дальше, если молчит 20 с</span></div><div class="rules"><div class="field"><span>Порядок</span><div class="input select">Как в списке</div></div></div></div>
+          </div>
+        </div>
+        <div class="acc"><b><span>Быстрые ответы<small>Cerebras → Groq → SambaNova</small></span><span class="dots"><i></i><i class="o"></i><i></i></span><span>▸</span></b></div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="screen" id="c">
+    <div class="about"><b>C. Плитки и панель сбоку.</b> Цепочки плитками: имя, точки состояния моделей, кто отвечает сейчас. Нажатие открывает панель справа с порядком и правилами.
+      <ul><li>Самый наглядный обзор: что работает, видно сразу.</li><li>Минус: чтобы что-то поменять, открывается панель.</li></ul></div>
+    <div class="win"><div class="params">
+      <div class="pnav"><span class="back">‹ Назад</span><div class="on">Настройки</div><div>Ключи и модели</div><div>Локальные модели</div><div>Галерея</div><div>Справка</div></div>
+      <div class="psheet rel">
+        <h2>Настройки</h2>
+        <div class="ptabs"><span>Общие</span><span>Модели</span><span class="on">Цепочки</span><span>Интернет</span><span>MCP</span><span>Скиллы</span></div>
+        <div class="grid" style="max-width:520px">
+          <div class="ccard"><b>Авто: для кода</b><span class="dots"><i></i><i></i><i class="w"></i></span><span class="note">отвечает Qwen3 Coder</span></div>
+          <div class="ccard" style="border-color:var(--ink)"><b>Мой код бесплатно</b><span class="dots"><i class="w"></i><i></i><i></i></span><span class="note">отвечает GLM 5.3 Flash</span></div>
+          <div class="ccard"><b>Быстрые ответы</b><span class="dots"><i></i><i class="o"></i><i></i></span><span class="note">отвечает Cerebras</span></div>
+          <div class="ccard new">+ Новая цепочка</div>
+        </div>
+        <div class="drawer">
+          <div style="display:flex;justify-content:space-between"><b style="font-size:17px">Мой код бесплатно</b><span>✕</span></div>
+          <div class="chain">
+            <div class="link"><span class="grip">⋮⋮</span><span class="num">1</span><span>DeepSeek V4.1 Flash Free<small>Beatapi</small></span><span class="st wait">отдыхает</span></div>
+            <div class="link"><span class="grip">⋮⋮</span><span class="num">2</span><span>GLM 5.3 Flash<small>Z.AI</small></span><span class="st ok">отвечает</span></div>
+            <div class="add-link">+ Добавить</div>
+          </div>
+          <div class="rules"><span class="toggle on"><i></i>Дальше при лимите (429)</span><span class="toggle on"><i></i>Дальше при ошибке</span><span class="toggle on"><i></i>Дальше, если молчит 20 с</span><div class="field"><span>Занятая отдыхает</span><div class="input select">до сброса лимита</div></div></div>
+          <span class="btn pencil" style="justify-self:start">Удалить цепочку</span>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="screen" id="p">
+    <div class="about"><b>В выборе модели</b> — вкладка «Цепочки» рядом с «Избранным». Там все ваши цепочки и «Авто»: под именем — порядок моделей, справа — сколько сейчас отвечает. Цепочку выбирают как обычную модель; в ответе пишется, какая модель ответила. Внизу ссылка «Настроить цепочки» ведёт в параметры.</div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span class="on">Чат</span><span>Проекты</span></span></div>
+      <div class="body" style="grid-template-columns: minmax(0,1fr) 420px">
+        <main class="main"><div class="sheet">
+          <div class="msg-u">Как ускорить загрузку главной?</div>
+          <div><div class="who">⛓ Мой код бесплатно → glm-5.3-flash</div>Главное — картинки: переведите их в WebP…<div class="msgline">DeepSeek V4.1 Flash Free упёрлась в лимит, ответила GLM 5.3 Flash.</div></div>
+        </div><div class="composer"><div class="ph">Сообщение</div><div class="row"><span class="btn">⛓ Мой код бесплатно ▾</span><span class="btn primary">Отправить</span></div></div></main>
+        <aside class="right" style="background:transparent;border:0;padding:14px">
+          <div class="picker">
+            <div class="tabs"><span>★ Избранное</span><span class="on">⛓ Цепочки</span><span>Beatapi</span><span>Z.AI</span><span>…</span></div>
+            <div class="opt"><span>Авто: для кода<small>Drimvox собирает сам</small></span><span class="st ok">7 из 9</span></div>
+            <div class="opt"><span>Авто: для чата<small>Drimvox собирает сам</small></span><span class="st ok">12 из 14</span></div>
+            <div class="opt on"><span>Мой код бесплатно<small>Beatapi → Z.AI → OpenRouter</small></span><span class="st ok">2 из 3</span></div>
+            <div class="opt"><span>Быстрые ответы<small>Cerebras → Groq → SambaNova</small></span><span class="st wait">1 из 3</span></div>
+            <div class="add-link">Настроить цепочки ›</div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+  for (const b of document.querySelectorAll(".switch button")) {
+    b.addEventListener("click", () => {
+      for (const x of document.querySelectorAll(".switch button")) x.classList.toggle("on", x === b);
+      for (const s of document.querySelectorAll(".screen")) s.classList.toggle("on", s.id === b.dataset.s);
+    });
+  }
+</script>
+</body>
+</html>

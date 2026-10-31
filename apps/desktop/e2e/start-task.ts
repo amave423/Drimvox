@@ -41,7 +41,7 @@ export async function startTask(page: Page, s: Start): Promise<void> {
 export async function addProject(page: Page, kind: "new" | "existing" = "new"): Promise<void> {
   await page.getByRole("button", { name: "+ Проект" }).click();
   const dialog = page.getByRole("dialog", { name: "Какой это проект?" });
-  await dialog.getByRole("radio", { name: kind === "new" ? /^С нуля/ : /^Готовый проект/ }).click();
+  await dialog.getByRole("radio", { name: kind === "new" ? /^Новый проект/ : /^Существующий проект/ }).click();
   await dialog.getByRole("button", { name: "Продолжить" }).click();
   await expect(dialog).toHaveCount(0);
 }

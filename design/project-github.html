@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Git и GitHub в проекте</title>
+<link rel="stylesheet" href="project-modes.css">
+<link rel="stylesheet" href="extra.css">
+</head>
+<body>
+<div class="page">
+  <h1>Git и GitHub в проекте</h1>
+  <p class="lede">Сейчас в проекте одна кнопка «коммит», и непонятно, что и куда уходит. Три способа сделать это гибко. Во всех видно: какой репозиторий, какая ветка, какие файлы попадут в коммит и с каким сообщением.</p>
+
+  <div class="switch">
+    <button class="on" data-s="a">A. Карточка в «Проекте»</button>
+    <button data-s="b">B. Вкладка «Git»</button>
+    <button data-s="c">C. Правила для агента</button>
+  </div>
+
+  <section class="screen on" id="a">
+    <div class="about"><b>A. Карточка в «Проекте» + окно сохранения.</b> Настройки — в карточке справа. «Сохранить в git…» открывает окно: галочки у файлов, сообщение (агент предлагает), ветка, и сразу ли отправить на GitHub.
+      <ul><li>Просто и всё в одном месте.</li><li>Минус: истории коммитов нет, только последний.</li></ul></div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span>Чат</span><span class="on">Проекты</span></span></div>
+      <div class="body" style="grid-template-columns: minmax(0,1fr) 380px">
+        <main class="main">
+          <div class="add" style="height:auto;flex:1;background:transparent">
+            <div class="dialog" style="width:min(560px,100%)">
+              <h2>Сохранить в git</h2>
+              <div class="path">pilorama-site · ветка main · 3 изменения</div>
+              <div class="files">
+                <div class="file on"><span class="box"></span><b class="m">M</b>src/cart.js</div>
+                <div class="file on"><span class="box"></span><b>A</b>src/cart.test.js</div>
+                <div class="file"><span class="box"></span><b class="m">M</b>.env.local <span class="note">— похоже на секреты, не отмечено</span></div>
+              </div>
+              <div class="field" style="margin-top:14px"><span>Сообщение (предложил агент, можно поправить)</span><div class="input">Fix cart total after removing an item</div></div>
+              <div class="cols" style="margin-top:12px">
+                <div class="field"><span>Ветка</span><div class="input select">main</div></div>
+                <div class="field"><span>После коммита</span><div class="input select">Отправить на GitHub</div></div>
+              </div>
+              <div class="actions"><span class="btn">Отмена</span><span class="btn primary">Сохранить 2 файла</span></div>
+            </div>
+          </div>
+        </main>
+        <aside class="right">
+          <div class="tabs"><span class="on">Проект</span><span>Изменения · 3</span><span>Результат</span></div>
+          <div class="pane">
+            <div class="card"><h5>Git и GitHub</h5>
+              <div class="kv"><span>Репозиторий</span><span class="mono">amave423/pilorama</span><span>Ветка</span><span class="mono">main ▾</span><span>Не сохранено</span><span>3 файла</span><span>Последний коммит</span><span>вчера, «Add catalog»</span></div>
+              <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap"><span class="btn primary">Сохранить в git…</span><span class="btn">Отправить</span><span class="btn">Новая ветка</span></div>
+            </div>
+            <div class="card"><h5>Как сохранять работу агента</h5>
+              <div class="radios">
+                <div class="radio on"><i></i><span>Сам, кнопкой<small>агент не коммитит, вы решаете</small></span></div>
+                <div class="radio"><i></i><span>После каждой задачи<small>одним коммитом с сообщением агента</small></span></div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="b">
+    <div class="about"><b>B. Отдельная вкладка «Git» справа</b> (как в VS Code): сверху поле сообщения и кнопка, ниже изменения с галочками, ветки, история коммитов, отправка и pull request.
+      <ul><li>Всё про git видно сразу, есть история и откат.</li><li>Минус: ещё одна вкладка, больше кнопок.</li></ul></div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span>Чат</span><span class="on">Проекты</span></span></div>
+      <div class="body" style="grid-template-columns: minmax(0,1fr) 400px">
+        <main class="main"><div class="sheet"><div class="msg-u">Почини сумму в корзине.</div><div><div class="who">deepseek-v4-pro</div>Поправил пересчёт и добавил тест.<div class="acts">▸ Действия: 6</div></div></div></main>
+        <aside class="right">
+          <div class="tabs"><span>Проект</span><span class="on">Git · 3</span><span>Результат</span></div>
+          <div class="pane">
+            <div class="cols" style="grid-template-columns:1fr auto;align-items:end"><div class="field"><span>Ветка</span><div class="input select">fix/cart-total</div></div><span class="btn">+ ветка</span></div>
+            <div class="field"><span>Сообщение</span><div class="input">Fix cart total after removing an item</div></div>
+            <div style="display:flex;gap:6px"><span class="btn primary">Коммит</span><span class="btn">Коммит и отправить</span></div>
+            <div class="files">
+              <div class="file on"><span class="box"></span><b class="m">M</b>src/cart.js</div>
+              <div class="file on"><span class="box"></span><b>A</b>src/cart.test.js</div>
+              <div class="file"><span class="box"></span><b class="d">D</b>old/legacy.js</div>
+            </div>
+            <div class="card"><h5>История</h5>
+              <div class="commits">
+                <div class="commit"><span class="mono">a41c2e</span><span>Add catalog</span><span class="note">вчера</span></div>
+                <div class="commit"><span class="mono">9f3c7b</span><span>Start</span><span class="note">2 дня</span></div>
+              </div>
+            </div>
+            <div class="card"><h5>GitHub · amave423/pilorama</h5><p class="note">Ветка fix/cart-total не отправлена.</p><div style="margin-top:8px;display:flex;gap:6px"><span class="btn">Отправить</span><span class="btn">Открыть pull request</span></div></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="c">
+    <div class="about"><b>C. Правила для агента.</b> Вы один раз говорите, как работать с git, — дальше агент делает это сам: своя ветка на задачу, коммит по пунктам плана, pull request в конце. Вам остаётся принять или отклонить.
+      <ul><li>Меньше всего ручной работы, история аккуратная.</li><li>Минус: агент сам пишет в git, нужно доверие (main он не трогает).</li></ul></div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span>Чат</span><span class="on">Проекты</span></span></div>
+      <div class="body" style="grid-template-columns: minmax(0,1fr) 400px">
+        <main class="main"><div class="sheet">
+          <div class="msg-u">Добавь оплату картой.</div>
+          <div><div class="who">deepseek-v4-pro</div>Работаю в ветке <span class="mono">drimvox/card-payment</span>.<div class="acts">▸ Коммит «Add payment form» · 2 файла</div>Форма готова, подключаю проверку.<div class="acts">▸ Коммит «Validate card number» · 1 файл</div>Готово. Открыл pull request #12 — посмотрите и примите.</div>
+        </div></main>
+        <aside class="right">
+          <div class="tabs"><span class="on">Проект</span><span>Изменения</span><span>Результат</span></div>
+          <div class="pane">
+            <div class="card"><h5>Git: как работает агент</h5>
+              <div class="rules">
+                <div class="field"><span>Куда пишет</span><div class="input select">Своя ветка на задачу (drimvox/…)</div></div>
+                <div class="field"><span>Когда коммитит</span><div class="input select">После каждого пункта плана</div></div>
+                <div class="field"><span>Сообщения</span><div class="input select">Коротко, по-английски</div></div>
+                <span class="toggle on"><i></i>Отправлять ветку на GitHub</span>
+                <span class="toggle on"><i></i>Открывать pull request в конце</span>
+                <span class="toggle"><i></i>Можно писать прямо в main</span>
+              </div>
+            </div>
+            <div class="card"><h5>Pull request #12</h5><p class="note">drimvox/card-payment → main · 2 коммита · проверки прошли</p><div style="margin-top:8px;display:flex;gap:6px"><span class="btn primary">Принять</span><span class="btn">Открыть на GitHub</span><span class="btn pencil">Отклонить</span></div></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+  for (const b of document.querySelectorAll(".switch button")) {
+    b.addEventListener("click", () => {
+      for (const x of document.querySelectorAll(".switch button")) x.classList.toggle("on", x === b);
+      for (const s of document.querySelectorAll(".screen")) s.classList.toggle("on", s.id === b.dataset.s);
+    });
+  }
+</script>
+</body>
+</html>

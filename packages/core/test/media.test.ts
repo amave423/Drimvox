@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestEnv, readEvents, type TestEnv } from "./env";
@@ -296,6 +296,20 @@ describe("pictures made by an agent", () => {
     await env.call("POST", `/api/tasks/${id}/approvals/${waiting.pendingApproval.id}`, { allow: false });
     await waitTask(id, (t) => t.status === "done_empty");
     expect(fake!.requests.some((r) => r.path === "/v1/images")).toBe(false);
+  });
+
+  // Asked whether the project's agent has every tool: it had no picture tool; now it draws right into the project folder.
+  it("draws a picture in a project's run, straight into the project's folder", async () => {
+    const id = await start({ script: [draw, { text: "Логотип готов." }] });
+    await env.call("PATCH", "/api/settings", { imageModel: { providerId: id, model: "img/cheap" } });
+    const project = await (await env.call("POST", "/api/projects", { path: repo, kind: "existing" })).json();
+    await env.call("POST", `/api/projects/${project.id}/work/chat`, { content: "Нарисуй логотип", model: { providerId: id, model: "coder" } });
+    for (let i = 0; i < 400; i++) {
+      const w = await (await env.call("GET", `/api/projects/${project.id}/work`)).json();
+      if (w.status === "done") break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(readFileSync(join(repo, "assets/logo.png"))).toEqual(PNG);
   });
 
   it("has no picture tool without a model for it in the settings", async () => {

@@ -41,6 +41,7 @@ import { skillRoutes } from "./routes/skills";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { localRoutes } from "./routes/local";
+import { imageToolsFor } from "./media/agent-tool";
 import { forgetCliProxy } from "./local/cliproxy-leftovers";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
@@ -231,6 +232,7 @@ export function createCore(o: AppOptions) {
       plan: (projectId) => backlog.plan(projectId),
       month: () => monthUsage(o.db, chats),
       vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
+      imageTools: (worktree, taskId, hooks, onSpend, budgetLeft) => imageToolsFor(readSettings(o.db).imageModel, providers, { worktree, taskId, media, hooks, budgetLeft, onSpend }),
     },
   });
   const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });

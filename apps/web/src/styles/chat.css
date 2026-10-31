@@ -148,7 +148,7 @@
 .picker-panel.is-above { top: auto; bottom: calc(100% + 6px); }
 
 /* The margin follows the reader down a long conversation. */
-.chat-margin { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 140px); overflow-y: auto; }
+.chat-margin { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 140px); overflow-y: auto; overflow-x: hidden; min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .margin-action { justify-self: start; font-size: 13.5px; }
 .delete-confirm .actions { margin-top: 8px; }
 /* Internet switch: a pill like the model picker; ink when the model may go online. */
@@ -335,9 +335,10 @@
 .msg-rail:hover .msg-rail-mark, .msg-rail:focus-within .msg-rail-mark { height: 26px; }
 @media (prefers-reduced-motion: reduce) { .msg-rail-line { transition: none; } }
 /* The chat's own messages in its margin, always open, one line each. */
-.msg-jump { display: grid; gap: 4px; margin-top: 14px; font-size: 13px; }
-.msg-jump ol { list-style: none; margin: 0; padding: 0 0 0 8px; border-left: 2px solid var(--line); display: grid; max-height: 40vh; overflow-y: auto; }
-.msg-jump button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 3px 6px; border-radius: 6px; color: var(--muted); font: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.msg-jump { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; min-width: 0; margin-top: 14px; font-size: 13px; }
+.msg-jump ol { list-style: none; margin: 0; padding: 0 0 0 8px; border-left: 2px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr); max-height: 40vh; overflow-y: auto; overflow-x: hidden; }
+.msg-jump li { min-width: 0; }
+.msg-jump button { display: block; box-sizing: border-box; width: 100%; max-width: 100%; text-align: left; border: 0; background: none; padding: 3px 6px; border-radius: 6px; color: var(--muted); font: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .msg-jump button:hover, .msg-jump button:focus-visible { color: var(--fg); background: var(--paper); }
 .msg-jump button.is-on { color: var(--ink); }
 @media print { .msg-rail, .msg-jump { display: none; } }

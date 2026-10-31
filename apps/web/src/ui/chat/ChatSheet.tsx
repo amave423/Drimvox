@@ -577,7 +577,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                                 control: (
                                   <span className="director-row">
                                     <Toggle checked={settings.folderAutoApprove} onChange={(on) => void updateSettings({ folderAutoApprove: on })}>
-                                      {t("approval.auto")}
+                                      <span className="visually-hidden">{t("approval.modeLabel")}</span>
                                     </Toggle>
                                     <Hint text={t("approval.autoHint")} />
                                   </span>

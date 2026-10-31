@@ -111,11 +111,8 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(page.getByLabel("Что сделать?")).toHaveValue("Сайт лесопилки");
   await expect(models.getByRole("button", { name: /Planner/ })).toHaveCount(1);
   await expect(models.getByRole("button", { name: /Coder/ })).toHaveCount(2);
-  // Asked for: a small task in an existing project skips the interview; switched back, the interview it is.
-  const quick = page.getByRole("switch", { name: "Небольшая задача в готовом проекте" });
-  await quick.check({ force: true });
-  await expect(page.getByRole("button", { name: "Составить план" })).toBeVisible();
-  await quick.uncheck({ force: true });
+  // Small tasks go to an existing project now: no switch for them here (asked for).
+  await expect(page.getByRole("switch")).toHaveCount(0);
   await page.getByRole("button", { name: "Начать опрос" }).click();
 
   // The plan comes right under the interview: read it, then "Go".
@@ -210,8 +207,8 @@ test("a ready project: asked on adding, talked to as in a chat, its plan on the 
   await page.getByRole("button", { name: "+ Проект" }).click();
   const dialog = page.getByRole("dialog", { name: "Какой это проект?" });
   // The folder has a README: Drimvox guesses a ready project and picks it.
-  await expect(dialog).toContainText("похоже на готовый проект");
-  await expect(dialog.getByRole("radio", { name: /^Готовый проект/ })).toHaveAttribute("aria-checked", "true");
+  await expect(dialog).toContainText("похоже на существующий проект");
+  await expect(dialog.getByRole("radio", { name: /^Существующий проект/ })).toHaveAttribute("aria-checked", "true");
   await dialog.getByRole("button", { name: "Продолжить" }).click();
 
   await expect(page.getByRole("heading", { name: "Что сделать в проекте?" })).toBeVisible();
@@ -228,7 +225,7 @@ test("a ready project: asked on adding, talked to as in a chat, its plan on the 
   await expect(page.getByRole("tab", { name: "Ход работы" })).toHaveCount(0);
   const result = page.getByRole("complementary", { name: "Результат" });
   await expect(result.getByRole("tab").first()).toHaveText("Проект");
-  await expect(result.getByRole("button", { name: "Готовый проект" })).toHaveAttribute("aria-pressed", "true");
+  await expect(result.getByRole("button", { name: "Существующий проект" })).toHaveAttribute("aria-pressed", "true");
   await expect(result.getByRole("button", { name: "Убрать из Drimvox…" })).toBeVisible();
   // The next message goes on in the same conversation, still with a model to pick under the box.
   await expect(page.locator(".workshop-feed .composer-bar").getByRole("button", { name: /coder/i })).toBeVisible();

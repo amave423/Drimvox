@@ -1,4 +1,4 @@
-import { currencies, locales, themes, type SettingsPatch } from "@drimvox/shared";
+import { currencies, locales, searchEngines, themes, type SettingsPatch } from "@drimvox/shared";
 import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../context";
 import { shownSign } from "../lib/format";
@@ -174,6 +174,14 @@ export function SettingsSheet() {
     ),
     internet: (
       <>
+        <Setting id="engine-label" title={t("settings.searchEngine")} about={t("settings.searchEngineAbout")}>
+          <Segmented
+            labelledBy="engine-label"
+            value={settings.searchEngine}
+            options={searchEngines.map((v) => ({ value: v, label: t(`settings.searchEngine.${v}`) }))}
+            onChange={(searchEngine) => save({ searchEngine })}
+          />
+        </Setting>
         <SearchSection />
         <ProxySection />
       </>

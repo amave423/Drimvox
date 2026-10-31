@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Цепочки бесплатных моделей</title>
+<link rel="stylesheet" href="project-modes.css">
+<link rel="stylesheet" href="extra.css">
+</head>
+<body>
+<div class="page">
+  <h1>Цепочки бесплатных моделей</h1>
+  <p class="lede">Цепочка — это модель для выбора в чате и проекте. Под ней стоит список бесплатных моделей по порядку. Если первая упёрлась в лимит, перегружена или молчит, отвечает следующая, а занятая отдыхает до сброса лимита. Есть «Авто» — Drimvox собирает цепочку сам. Можно собрать и свою.</p>
+
+  <div class="switch">
+    <button class="on" data-s="a">A. Страница «Цепочки»</button>
+    <button data-s="b">B. Прямо в выборе модели</button>
+    <button data-s="c">C. Цепочка с правилами</button>
+  </div>
+
+  <section class="screen on" id="a">
+    <div class="about"><b>A. Отдельная страница «Цепочки»</b> в «Ключах и моделях». Слева ваши цепочки и «Авто», справа порядок моделей: перетаскивание, состояние каждой, «+ модель». В выборе модели цепочка видна как одна модель.
+      <ul><li>Понятно и наглядно, легко менять порядок.</li><li>Минус: чтобы собрать цепочку, нужно уйти со страницы чата.</li></ul></div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span class="on">Чат</span><span>Проекты</span></span></div>
+      <div class="wide">
+        <aside class="side">
+          <h4>Цепочки <a href="#">+ Цепочка</a></h4>
+          <div class="chains">
+            <div class="chain-row"><b>Авто: для кода</b><small>собирает Drimvox · 9 моделей</small></div>
+            <div class="chain-row"><b>Авто: для чата</b><small>собирает Drimvox · 14 моделей</small></div>
+            <div class="chain-row on"><b>Мой код бесплатно</b><small>4 модели · сейчас отвечает GLM 5.3 Flash</small></div>
+            <div class="chain-row"><b>Быстрые ответы</b><small>3 модели</small></div>
+          </div>
+        </aside>
+        <main class="main">
+          <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0;font:600 22px var(--serif)">Мой код бесплатно</h2><span class="btn">Переименовать</span></div>
+          <p class="note">Только модели с инструментами — цепочку можно дать агенту в проекте.</p>
+          <div class="chain">
+            <div class="link"><span class="grip">⋮⋮</span><span class="num">1</span><span>DeepSeek V4.1 Flash Free<small>Beatapi</small></span><span class="st wait">лимит до 14:20</span></div>
+            <div class="link"><span class="grip">⋮⋮</span><span class="num">2</span><span>GLM 5.3 Flash<small>Z.AI</small></span><span class="st ok">отвечает · 1,8 с</span></div>
+            <div class="link"><span class="grip">⋮⋮</span><span class="num">3</span><span>Qwen3 Coder<small>OpenRouter :free</small></span><span class="st ok">отвечает · 3,1 с</span></div>
+            <div class="link"><span class="grip">⋮⋮</span><span class="num">4</span><span>Llama 4 Maverick<small>Groq</small></span><span class="st off">перегружена</span></div>
+            <div class="add-link">+ Добавить бесплатную модель</div>
+          </div>
+          <div class="card"><h5>Кто отвечал</h5><div class="log"><div><span class="mono">14:02</span><span>DeepSeek V4.1 Flash Free → лимит (429), перешли на GLM 5.3 Flash</span></div><div><span class="mono">14:05</span><span>GLM 5.3 Flash ответила за 1,8 с</span></div></div></div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="b">
+    <div class="about"><b>B. Прямо в выборе модели</b> — вкладка «Цепочки» рядом с «Избранным». Там же собрать новую: отметить модели галочками, порядок — по порядку отметок. Под ответом пишется, какая модель ответила.
+      <ul><li>Не надо никуда уходить, всё в одном окне.</li><li>Минус: в маленьком окне тесно, порядок менять неудобно.</li></ul></div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span class="on">Чат</span><span>Проекты</span></span></div>
+      <div class="body" style="grid-template-columns: minmax(0,1fr) 420px">
+        <main class="main"><div class="sheet">
+          <div class="msg-u">Как ускорить загрузку главной?</div>
+          <div><div class="who">Мой код бесплатно → glm-5.3-flash</div>Главное — картинки: переведите их в WebP и задайте размеры…<div class="msgline">Первая модель упёрлась в лимит, ответила вторая в цепочке.</div></div>
+        </div><div class="composer"><div class="ph">Сообщение</div><div class="row"><span class="btn">⛓ Мой код бесплатно</span><span class="btn primary">Отправить</span></div></div></main>
+        <aside class="right" style="background:transparent;border:0;padding:14px">
+          <div class="picker">
+            <div class="tabs"><span>★ Избранное</span><span class="on">Цепочки</span><span>Beatapi</span><span>Z.AI</span></div>
+            <div class="opt"><span>Авто: для кода<small>Drimvox собирает сам</small></span><span class="st ok">готова</span></div>
+            <div class="opt on"><span>Мой код бесплатно<small>Beatapi → Z.AI → OpenRouter → Groq</small></span><span class="st ok">2 из 4</span></div>
+            <div class="opt"><span>Быстрые ответы<small>Cerebras → Groq → SambaNova</small></span><span class="st wait">1 из 3</span></div>
+            <div class="add-link">+ Новая цепочка: отметьте модели по порядку</div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="c">
+    <div class="about"><b>C. Цепочка с правилами.</b> Как A, но у каждой цепочки свои правила: порядок ручной или «лучшие первыми» (по качеству и тому, как модели отвечали у вас), когда переходить к следующей, сколько ждать, сколько отдыхает занятая.
+      <ul><li>Максимум контроля.</li><li>Минус: больше настроек — разумные значения стоят по умолчанию.</li></ul></div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span class="on">Чат</span><span>Проекты</span></span></div>
+      <div class="wide">
+        <aside class="side">
+          <h4>Цепочки <a href="#">+ Цепочка</a></h4>
+          <div class="chains"><div class="chain-row"><b>Авто: для кода</b><small>собирает Drimvox</small></div><div class="chain-row on"><b>Мой код бесплатно</b><small>4 модели</small></div></div>
+        </aside>
+        <main class="main">
+          <h2 style="margin:0;font:600 22px var(--serif)">Мой код бесплатно</h2>
+          <div class="cols">
+            <div class="chain">
+              <div class="link"><span class="grip">⋮⋮</span><span class="num">1</span><span>DeepSeek V4.1 Flash Free<small>Beatapi</small></span><span class="st wait">отдыхает 12 мин</span></div>
+              <div class="link"><span class="grip">⋮⋮</span><span class="num">2</span><span>GLM 5.3 Flash<small>Z.AI</small></span><span class="st ok">отвечает</span></div>
+              <div class="link"><span class="grip">⋮⋮</span><span class="num">3</span><span>Qwen3 Coder<small>OpenRouter :free</small></span><span class="st ok">отвечает</span></div>
+              <div class="add-link">+ Добавить бесплатную модель</div>
+            </div>
+            <div class="card"><h5>Правила</h5>
+              <div class="rules">
+                <div class="radios"><div class="radio on"><i></i><span>Порядок как в списке</span></div><div class="radio"><i></i><span>Лучшие первыми<small>по качеству и тому, как отвечали у вас</small></span></div></div>
+                <span class="toggle on"><i></i>Дальше при лимите (429)</span>
+                <span class="toggle on"><i></i>Дальше при ошибке сервера</span>
+                <span class="toggle on"><i></i>Дальше, если молчит 20 с</span>
+                <span class="toggle"><i></i>Только модели с инструментами</span>
+                <div class="field"><span>Занятая отдыхает</span><div class="input select">до сброса лимита (или 15 мин)</div></div>
+                <div class="field"><span>Если все заняты</span><div class="input select">Сказать и подождать первую освободившуюся</div></div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+  for (const b of document.querySelectorAll(".switch button")) {
+    b.addEventListener("click", () => {
+      for (const x of document.querySelectorAll(".switch button")) x.classList.toggle("on", x === b);
+      for (const s of document.querySelectorAll(".screen")) s.classList.toggle("on", s.id === b.dataset.s);
+    });
+  }
+</script>
+</body>
+</html>

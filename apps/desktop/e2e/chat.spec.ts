@@ -369,7 +369,7 @@ test("keeps the model picker and chat actions within reach in a long chat", asyn
   await connect(page);
   await startChat(page);
   for (const n of [1, 2, 3]) {
-    await say(page, `Вопрос ${n}`);
+    await say(page, n === 3 ? `Вопрос 3 ${"с очень длинным текстом ".repeat(12)}` : `Вопрос ${n}`);
     await expect(page.getByText(/^Токены:/)).toHaveCount(n);
   }
 
@@ -379,7 +379,10 @@ test("keeps the model picker and chat actions within reach in a long chat", asyn
   // One's own messages are listed under deleting the chat, open, and a click brings one into view (asked for: the
   // marks at the edge folded up after a click).
   const own = page.getByRole("navigation", { name: "Ваши сообщения" });
-  await expect(own.getByRole("button")).toHaveText(["Вопрос 1", "Вопрос 2", "Вопрос 3"]);
+  await expect(own.getByRole("button")).toHaveText(["Вопрос 1", "Вопрос 2", /^Вопрос 3 с очень длинным/]);
+  // A long one shows its start only: no sideways scroll in the margin (seen).
+  expect(await page.locator(".chat-margin").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await own.locator("ol").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await own.getByRole("button", { name: "Вопрос 1" }).click();
   await expect(page.locator(".msg-user-wrap").first()).toBeInViewport();
   await expect(own.getByRole("button", { name: "Вопрос 1" })).toHaveAttribute("aria-current", "true");

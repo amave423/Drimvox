@@ -5,6 +5,9 @@ export const themes = ["system", "light", "dark"] as const;
 export const locales = ["ru", "en"] as const;
 export const currencies = ["RUB", "USD"] as const;
 /** The notification sounds, made by Drimvox itself from tones (apps/web/src/lib/sounds.ts): no recordings, no licences. */
+/** What the browser's address field searches with; "auto": Yandex in Russian, Bing in English (as it was). */
+export const searchEngines = ["auto", "google", "yandex", "duckduckgo", "bing"] as const;
+export type SearchEngine = (typeof searchEngines)[number];
 export const noticeSounds = ["drop", "chime", "soft", "pop", "off"] as const;
 
 export const settingsSchema = z.object({
@@ -39,6 +42,8 @@ export const settingsSchema = z.object({
   /** A chat with a connected folder runs its commands without asking (asked for: a switch, auto or by hand). */
   folderAutoApprove: z.boolean(),
   /** Models the user starred: the picker's "Favourites" tab, across providers. */
+  /** The browser's address field searches with it (asked for: a choice instead of Yandex alone). */
+  searchEngine: z.enum(searchEngines),
   favoriteModels: z.array(z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) })).max(100),
 });
 
@@ -50,4 +55,4 @@ export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 export type Currency = Settings["currency"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, folderAutoApprove: false, favoriteModels: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null };
+export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, folderAutoApprove: false, favoriteModels: [], searchEngine: "auto", monthlyBudgetUsd: null, voiceModel: null, speechVoice: null };

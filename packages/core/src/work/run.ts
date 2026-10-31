@@ -54,6 +54,8 @@ export interface RunDeps {
   /** This month's spending against the app's budget. */
   month(): MonthUsage;
   vision(conn: Connection, model: string): Promise<Vision | null>;
+  /** The picture tool when the settings name an image model: it draws straight into the project's folder. */
+  imageTools?(folder: string, owner: string, hooks: Omit<ToolHooks, "onFinish">, onSpend: (usd: number) => void, budgetLeft: () => number): Promise<ToolSet>;
   /** The run ended (done, paused or stopped): notifications, the sidebar. */
   ended(projectId: string): void;
 }
@@ -253,8 +255,13 @@ export class WorkRun {
           onResult: () => {},
         })
       : {};
+    const spentNow = this.spent();
+    const imageTools = this.d.imageTools
+      ? await this.d.imageTools(this.folder, this.chatId, hooks, (usd) => (cost += usd), () => (this.chatMode ? Number.POSITIVE_INFINITY : this.row().budgetUsd - spentNow - cost))
+      : {};
     const own: ToolSet = {
       ...mcpTools,
+      ...imageTools,
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
       ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true, vision, onSpend: (usd) => (cost += usd) }),
       ...skillTools(skills, this.folder, hooks),
