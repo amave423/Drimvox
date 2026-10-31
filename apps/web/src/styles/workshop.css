@@ -162,7 +162,9 @@
 .topbar-browser { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--sheet); color: var(--muted); font-size: 13px; position: relative; }
 .topbar-browser:hover, .topbar-browser.is-on { color: var(--fg); border-color: var(--muted); }
 .topbar-browser-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
-.browser-pane { position: fixed; z-index: 40; top: var(--topbar-h); right: 0; bottom: 30px; width: min(1000px, 66vw); max-width: calc(100vw - 80px); display: flex; flex-direction: column; background: var(--sheet); border-left: 1px solid var(--line); box-shadow: var(--sheet-shadow); animation: pane-in 0.22s ease; }
+/* The pane sits inside the top bar, which drags the window: without no-drag the whole page was a handle for moving
+   the window, and Windows took every click on the agent's tab for itself (seen: a page that did not react at all). */
+.browser-pane { -webkit-app-region: no-drag; position: fixed; z-index: 40; top: var(--topbar-h); right: 0; bottom: 30px; width: min(1000px, 66vw); max-width: calc(100vw - 80px); display: flex; flex-direction: column; background: var(--sheet); border-left: 1px solid var(--line); box-shadow: var(--sheet-shadow); animation: pane-in 0.22s ease; }
 @keyframes pane-in { from { transform: translateX(24px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .browser-pane { animation: none; } }
 .browser-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }

@@ -41,7 +41,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
   -webkit-app-region: drag;
   user-select: none;
 }
-.topbar button { -webkit-app-region: no-drag; }
+.topbar button, .topbar input, .topbar select, .topbar textarea, .topbar a, .topbar [role="dialog"] { -webkit-app-region: no-drag; }
 /* The mark and the name in the interface font: the app's sign, not a heading of the sheet. */
 /* Seen: the place looked higher than the name: boxes were centred, letters were not. Now both stand on one baseline. */
 .topbar-title { display: flex; align-items: baseline; gap: 18px; min-width: 0; }

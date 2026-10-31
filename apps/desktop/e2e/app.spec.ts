@@ -254,6 +254,9 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
     await pane.getByLabel("Адрес").press("Enter");
     await expect(pane.getByRole("tab", { selected: true })).toHaveText("Проверка", { timeout: 20_000 });
 
+    // Seen: the pane sat inside the top bar that drags the window, and Windows took every real click on the tab for a
+    // drag. Synthetic clicks below go around that, so the region itself is checked.
+    expect(await pane.locator(".browser-view").evaluate((el) => getComputedStyle(el).getPropertyValue("-webkit-app-region"))).toBe("no-drag");
     // The tab lies exactly over the panel's page box: the page fills the panel, nothing squeezed or empty.
     const box = (await pane.locator(".browser-view").boundingBox())!;
     await expect.poll(async () => JSON.stringify(await tabBounds())).toBe(JSON.stringify({ x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) }));
