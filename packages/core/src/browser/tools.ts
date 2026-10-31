@@ -2,6 +2,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { clipPage, isPublicAddress } from "../internet/web";
 import type { Browser } from "./browser";
+import { devtoolsTools, watchScript } from "./devtools";
 import { keyPress } from "./driver";
 import { chooseScript, focusScript, placeScript, READ_SCRIPT } from "./page-scripts";
 
@@ -14,8 +15,10 @@ export const BROWSER_HINT =
   "the user does it in the panel. Never try to pass such a check yourself. browser_look shows you the page as a picture, " +
   "at a phone's or a desktop's width, in the state your actions left it: never install Playwright, Puppeteer or another " +
   "browser into a project, and never write scripts that take screenshots. Check pages and scenarios in this browser, " +
-  "which the user watches; browser servers among your tools (Chrome DevTools, Playwright) are for what it cannot do: " +
-  "the console, network requests, performance.";
+  "which the user watches. It has DevTools built in: browser_console (the console and errors), browser_network " +
+  "(requests), browser_eval (a script in the page), browser_emulate (a phone, a slow network, dark mode), " +
+  "browser_performance (load speed), browser_audit (accessibility), browser_hover, browser_wait, and in a project " +
+  "browser_upload (a file into a form) and browser_pdf.";
 
 /** Looks at pages per answer; the next answer may look again. */
 export const MAX_BROWSER_LOOKS = 12;
@@ -37,7 +40,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Asks a model that sees pictures about one: what browser_look needs; absent, there is no browser_look. */
 export type See = (png: Buffer, question: string, signal?: AbortSignal) => Promise<string>;
 
-export function browserTools(browser: Browser, o: { local: boolean; see?: See }, run: ToolRun): ToolSet {
+export function browserTools(browser: Browser, o: { local: boolean; see?: See; folder?: string }, run: ToolRun): ToolSet {
   const d = browser.driver;
   let looks = 0;
 
@@ -62,8 +65,19 @@ export function browserTools(browser: Browser, o: { local: boolean; see?: See },
     await sleep(300);
   }
 
+  /** The page's console, errors and requests are kept from its first script on, in every tab (devtools.ts). */
+  const watched = new Set<string>();
+  async function watch(): Promise<void> {
+    const tab = browser.state().active ?? "";
+    if (watched.has(tab)) return;
+    watched.add(tab);
+    await d.command("Page.addScriptToEvaluateOnNewDocument", { source: watchScript(false) }).catch(() => watched.delete(tab));
+  }
+
   async function read(signal?: AbortSignal): Promise<string> {
     await settle(signal);
+    // A page opened before the watch began gets it now: what it does from here on is seen.
+    await evaluate(watchScript(true)).catch(() => {});
     const page = JSON.parse(String(await evaluate(READ_SCRIPT))) as { url: string; title: string; text: string; below: number };
     const s = browser.state();
     const tabs =
@@ -129,6 +143,7 @@ export function browserTools(browser: Browser, o: { local: boolean; see?: See },
   const ref = z.number().int().min(1).describe("The control's number from the last read, as in [3 button …]");
 
   return {
+    ...devtoolsTools(browser, { folder: o.folder }, run, read),
     browser_open: tool({
       description: "Open an address in the browser and read the page. new_tab keeps the current page in its own tab.",
       inputSchema: z.object({ url: z.string().url().max(2000), new_tab: z.boolean().optional() }),
@@ -137,6 +152,9 @@ export function browserTools(browser: Browser, o: { local: boolean; see?: See },
           checkAddress(url);
           if (new_tab) await d.newTab(url);
           else await d.open(url);
+          // After the tab exists (the desktop's waits for its first page): the next loads are watched from their first
+          // script, this one from the read below on.
+          await watch().catch(() => {});
           return read(x.abortSignal);
         }),
     }),

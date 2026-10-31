@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
+import { Dropdown } from "../Dropdown";
 import { Toggle } from "../Toggle";
 
 /**
@@ -47,16 +48,15 @@ export function ProjectGitCard({ project, busy }: { project: ProjectView; busy: 
 
   if (!rules) return null;
   const select = <K extends "target" | "commit" | "messages">(key: K, values: readonly ProjectGitRules[K][], label: MessageKey) => (
-    <label className="field">
+    <div className="field">
       <span>{t(label)}</span>
-      <select className="field-input" value={rules[key]} onChange={(e) => void save({ [key]: e.target.value } as Partial<ProjectGitRules>)}>
-        {values.map((v) => (
-          <option key={v} value={v}>
-            {t(`git.${key}.${v}` as MessageKey)}
-          </option>
-        ))}
-      </select>
-    </label>
+      <Dropdown<ProjectGitRules[K]>
+        label={t(label)}
+        value={rules[key]}
+        options={values.map((v) => ({ value: v, label: t(`git.${key}.${v}` as MessageKey) }))}
+        onChange={(v) => void save({ [key]: v } as Partial<ProjectGitRules>)}
+      />
+    </div>
   );
   const off = rules.commit === "never";
 

@@ -129,16 +129,14 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
 
   // The details show what using it looks like.
   await page.getByRole("tab", { name: "Серверы MCP" }).click();
-  await expect(cards).toHaveCount(13);
-  for (const name of ["Playwright", "Chrome DevTools", "Context7", "GitHub", "Figma"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  // Playwright and Chrome DevTools are built into the agent's browser now, not offered as servers (asked for).
+  await expect(cards).toHaveCount(11);
+  for (const name of ["Exa", "Context7", "GitHub", "Figma"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  for (const name of ["Playwright", "Chrome DevTools"]) await expect(page.locator(".catalog-grid")).not.toContainText(name);
   await cards.first().getByRole("button", { name: "Подробнее" }).click();
-  const playwright = page.getByRole("dialog", { name: "Playwright" });
-  await expect(playwright.getByRole("figure", { name: "Как это выглядит" })).toContainText("проверь, что форма входа работает");
-  await expect(playwright).toContainText("Microsoft · лицензия Apache-2.0");
-  // Before a server is switched on, what it may do without asking is said and chosen (asked for): the browser works
-  // in its own window without the user's sign-ins, so it asks nothing.
-  await expect(playwright.getByRole("radio", { name: "Без вопросов" })).toHaveAttribute("aria-checked", "true");
-  await expect(playwright).toContainText("будет делать всё без вопросов");
+  const exa = page.getByRole("dialog", { name: "Exa" });
+  await expect(exa.getByRole("figure", { name: "Как это выглядит" })).toContainText("сравнения векторных баз данных");
+  await expect(exa).toContainText("Exa Labs · лицензия MIT");
   await page.keyboard.press("Escape");
 
   // GitHub needs a token: switching it on asks for one in its window; Escape closes the window, nothing is added.

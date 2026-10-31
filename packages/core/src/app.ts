@@ -45,6 +45,7 @@ import { imageToolsFor } from "./media/agent-tool";
 import { forgetCliProxy } from "./local/cliproxy-leftovers";
 import { ProjectGit } from "./work/project-git";
 import { Chains } from "./providers/chains";
+import { FreeWatch } from "./providers/free-watch";
 import { chainRoutes } from "./routes/chains";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
@@ -142,7 +143,10 @@ export function createCore(o: AppOptions) {
   const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
   // Chains of free models answer as models of their own provider (docs/specs/model-chains.md).
-  const chains = new Chains(o.db, providers);
+  // Free models kept between starts and asked a word in the background (docs/specs/model-chains.md).
+  const freeWatch = new FreeWatch(o.db, providers);
+  if (!o.web) freeWatch.start();
+  const chains = new Chains(o.db, providers, freeWatch);
   providers.setChains(chains);
   void local.connectIfServed().catch(() => {});
   // CLIProxyAPI is gone (asked for: Drimvox does it all itself): what an earlier version left is cleared once.
@@ -319,7 +323,7 @@ export function createCore(o: AppOptions) {
     .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), async (since) => spendingByModel(o.db, providers, since)))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
-    .route("/chains", chainRoutes(chains))
+    .route("/chains", chainRoutes(chains, freeWatch))
     .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo, projectGit))
     .route("/tasks", taskRoutes(tasks, runner, shots, backlogService))
     .route("/github", githubRoutes(github, projects))
@@ -342,6 +346,8 @@ export function createCore(o: AppOptions) {
     /** Server mode: nobody can sign in until the first password is set with the setup code. */
     needsPassword: () => !!o.password && !auth.passwordSet(),
     shutdown: async () => {
+      // First and at once: a test closes the database right after asking for this, without waiting.
+      freeWatch.stop();
       studio.shutdown();
       await projectWork.shutdown();
       await runner.shutdown();

@@ -279,7 +279,7 @@ export class WorkRun {
       ...mcpTools,
       ...imageTools,
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
-      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true, vision, onSpend: (usd) => (cost += usd) }),
+      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true, vision, onSpend: (usd) => (cost += usd), folder: this.folder }),
       ...skillTools(skills, this.folder, hooks),
       ...visualTools(
         {

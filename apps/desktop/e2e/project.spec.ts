@@ -227,12 +227,17 @@ test("a ready project: asked on adding, talked to as in a chat, its plan on the 
   const result = page.getByRole("complementary", { name: "Результат" });
   await expect(result.getByRole("tab").first()).toHaveText("Проект");
   await expect(result.getByRole("button", { name: "Существующий проект" })).toHaveAttribute("aria-pressed", "true");
-  await expect(result.getByRole("button", { name: "Убрать из Drimvox…" })).toBeVisible();
+  // Removing is in the sidebar's "⋯" only (asked for: the frame in the project tab went).
+  await expect(result.getByRole("button", { name: "Убрать из Drimvox…" })).toHaveCount(0);
   // Git by the project's rules: the agent's branch, accepted into main from the project's tab.
   const rules = result.getByRole("region", { name: "Git: как работает агент" });
-  await expect(rules.getByLabel("Куда пишет")).toHaveValue("task-branch");
-  await expect(rules.getByLabel("Когда коммитит")).toHaveValue("per-item");
-  await expect(rules.getByLabel("Сообщения")).toHaveValue("history");
+  await expect(rules.getByRole("button", { name: "Куда пишет" })).toHaveText(/Своя ветка на задачу/);
+  await expect(rules.getByRole("button", { name: "Когда коммитит" })).toHaveText(/После каждого пункта плана/);
+  // The lists are Drimvox's own, not the browser's square ones (asked for).
+  await rules.getByRole("button", { name: "Сообщения" }).click();
+  await expect(rules.getByRole("listbox", { name: "Сообщения" }).getByRole("option")).toHaveCount(4);
+  await rules.getByRole("option", { name: "Коротко, по-русски" }).click();
+  await expect(rules.getByRole("button", { name: "Сообщения" })).toHaveText(/Коротко, по-русски/);
   const branch = result.getByRole("region", { name: "Ветка агента" });
   await expect(branch).toContainText("→ main");
   await branch.getByRole("button", { name: "Принять" }).click();

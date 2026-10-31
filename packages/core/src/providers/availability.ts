@@ -80,20 +80,20 @@ export async function checkFree(conn: Connection, models: ModelInfo[]): Promise<
 }
 
 /** One word from the model. Null when the answer says nothing about the model (a wrong key, a blocked country). */
-async function probe(conn: Connection, model: string): Promise<Availability | null> {
+export async function probe(conn: Connection, model: string, words = 16): Promise<Availability | null> {
   try {
     const res =
       conn.preset === "google"
         ? await conn.fetch(`${conn.baseUrl}/models/${model}:generateContent`, {
             method: "POST",
             headers: { "content-type": "application/json", "x-goog-api-key": conn.apiKey ?? "" },
-            body: JSON.stringify({ contents: [{ parts: [{ text: "Hi" }] }], generationConfig: { maxOutputTokens: 1 } }),
+            body: JSON.stringify({ contents: [{ parts: [{ text: "Hi" }] }], generationConfig: { maxOutputTokens: Math.min(words, 1) } }),
             signal: AbortSignal.timeout(PROBE_MS),
           })
         : await conn.fetch(`${conn.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(conn.apiKey ? { authorization: `Bearer ${conn.apiKey}` } : {}) },
-            body: JSON.stringify({ model, messages: [{ role: "user", content: "Hi" }], max_tokens: 16, stream: false }),
+            body: JSON.stringify({ model, messages: [{ role: "user", content: "Hi" }], max_tokens: words, stream: false }),
             signal: AbortSignal.timeout(PROBE_MS),
           });
     const body = await res.text().catch(() => "");

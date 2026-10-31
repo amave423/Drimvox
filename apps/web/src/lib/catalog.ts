@@ -1,5 +1,5 @@
 import type { McpServerView, SkillView, McpTrust } from "@drimvox/shared";
-import { siAnthropic, siFigma, siGithub, siGooglechrome, siNotion, siShadcnui, siSupabase, siUpstash } from "simple-icons";
+import { siAnthropic, siFigma, siGithub, siNotion, siShadcnui, siSupabase, siUpstash } from "simple-icons";
 
 /** What the card is about: the catalog's filter. */
 export type CatalogCategory = "web" | "code" | "design" | "docs";
@@ -85,9 +85,7 @@ const drawn = (path: string): CatalogLogo => ({ path, stroke: true });
 const brand = (icon: { path: string }): CatalogLogo => ({ path: icon.path });
 
 export const CATALOG: CatalogEntry[] = [
-  // Servers: what they open to the model.
-  { kind: "mcp", id: "playwright", name: "Playwright", vendor: "Microsoft", category: "web", logo: drawn(glyph.browser), link: "https://github.com/microsoft/playwright-mcp", license: "Apache-2.0", server: npx("@playwright/mcp@latest", "--headless"), trust: "trusted", matches: (s) => hasArg(s, "@playwright/mcp") },
-  { kind: "mcp", id: "chrome-devtools", name: "Chrome DevTools", vendor: "Google", category: "web", logo: brand(siGooglechrome), link: "https://github.com/ChromeDevTools/chrome-devtools-mcp", license: "Apache-2.0", server: npx("chrome-devtools-mcp@latest", "--no-usage-statistics", "--headless"), matches: (s) => hasArg(s, "chrome-devtools-mcp") },
+  // Servers: what they open to the model. Playwright and Chrome DevTools are built into the agent's browser now (asked for).
   { kind: "mcp", id: "exa", name: "Exa", vendor: "Exa Labs", category: "web", logo: drawn(glyph.search), link: "https://github.com/exa-labs/exa-mcp-server", license: "MIT", server: { url: "https://mcp.exa.ai/mcp" }, matches: (s) => (s.url ?? "").includes("mcp.exa.ai") },
   { kind: "mcp", id: "firecrawl", name: "Firecrawl", vendor: "Mendable", category: "web", logo: drawn(glyph.flame), link: "https://github.com/firecrawl/firecrawl-mcp-server", license: "MIT", server: npx("firecrawl-mcp"), secret: { env: "FIRECRAWL_API_KEY", helpUrl: "https://www.firecrawl.dev/app/api-keys" }, matches: (s) => hasArg(s, "firecrawl-mcp") },
   { kind: "mcp", id: "context7", name: "Context7", vendor: "Upstash", category: "code", logo: brand(siUpstash), link: "https://github.com/upstash/context7", license: "MIT", server: npx("@upstash/context7-mcp@latest"), matches: (s) => hasArg(s, "context7") },

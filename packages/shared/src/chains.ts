@@ -29,6 +29,13 @@ export const modelChainsSchema = z.array(modelChainSchema).max(50);
 
 export const newChain = (id: string, name: string): ModelChain => ({ id, name, models: [], order: "list", onLimit: true, onError: true, timeoutS: 20, toolsOnly: false });
 
+/** What the background check found of a free model: asked now, answers (in ms), busy, gone, or not asked yet. */
+export interface FreeCheck {
+  state: "unknown" | "checking" | "ok" | "busy" | "gone";
+  ms: number | null;
+  at: number | null;
+}
+
 export interface ChainMember {
   providerId: string;
   model: string;
@@ -37,6 +44,7 @@ export interface ChainMember {
   /** ok: answered last time or not tried; resting: hit its limit or failed, rests until `until`. */
   state: "ok" | "resting";
   until: number | null;
+  check: FreeCheck;
 }
 
 export interface ChainView extends ModelChain {

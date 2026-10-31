@@ -93,15 +93,11 @@ function ProjectPart({ project, onNew, busy }: { project: ProjectView; onNew?: (
       <ProjectSkills projectId={project.id} />
       {project.gitState === "ready" && <ProjectGitCard project={project} busy={busy} />}
       {project.gitState === "ready" && <GithubPublish project={project} />}
-      <RemoveProject project={project} />
     </div>
   );
 }
 
-/**
- * Leaving Drimvox, set apart at the end of the project's tab (asked for: it was hard to find); the folder stays. The
- * sidebar's "⋯" leads here too.
- */
+/** Leaving Drimvox from the sidebar's "⋯", confirmed under the project (asked for: in one place only); the folder stays. */
 export function RemoveProject({ project, onDone, asked = false }: { project: ProjectView; onDone?: () => void; asked?: boolean }) {
   const { api, t, navigate, reloadProjects, reloadTasks } = useApp();
   const [confirm, setConfirm] = useState(asked);

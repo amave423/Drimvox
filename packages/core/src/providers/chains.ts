@@ -1,9 +1,9 @@
 import type { LanguageModelV4, LanguageModelV4CallOptions, LanguageModelV4StreamPart } from "@ai-sdk/provider";
-import { autoChainIds, modelChainsSchema, type ChainView, type ModelChain, type ModelInfo, type ModelRef } from "@drimvox/shared";
+import { autoChainIds, modelChainsSchema, type ChainView, type FreeCheck, type ModelChain, type ModelInfo, type ModelRef } from "@drimvox/shared";
 import { APICallError } from "ai";
 import type { Database } from "../db";
 import { isCli } from "../cli/kinds";
-import { listModels } from "./catalog";
+import type { FreeModel, FreeWatch } from "./free-watch";
 import { languageModel } from "./model";
 import type { Connection, ProviderRepo } from "./repo";
 
@@ -19,7 +19,6 @@ const AUTO: Record<(typeof autoChainIds)[number], { name: string; toolsOnly: boo
 };
 
 const keyOf = (m: ModelRef) => `${m.providerId}|${m.model}`;
-const isFree = (m: ModelInfo) => m.freeTier === true || (m.priceIn === 0 && m.priceOut === 0);
 
 /** A call that went wrong in a way the next model may not: a limit, a server error, silence. */
 class Pass extends Error {
@@ -46,6 +45,7 @@ export class Chains {
   constructor(
     private readonly db: Database,
     private readonly providers: ProviderRepo,
+    private readonly watch: FreeWatch,
   ) {}
 
   /** The user's chains. */
@@ -60,22 +60,17 @@ export class Chains {
     this.db.sql.prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value").run(KEY, JSON.stringify(chains));
   }
 
-  /** The free models a chain can be made of, for the settings' "Add a model". */
-  async free(): Promise<{ providerId: string; model: string; name: string; providerName: string; tools: boolean | null }[]> {
-    return (await this.freeModels()).map((f) => ({ ...f.ref, name: f.info.name, providerName: f.providerName, tools: f.info.tools }));
+  /** The free models a chain can be made of, for the settings' "Add a model", with what the background check found. */
+  async free(): Promise<(FreeModel & { check: FreeCheck })[]> {
+    return (await this.freeModels()).map((m) => ({ ...m, check: this.watch.check(m) }));
   }
 
-  /** Every free model of every provider, with what the catalog knows of it. */
-  private async freeModels(): Promise<{ ref: ModelRef; info: ModelInfo; providerName: string }[]> {
-    const all = await Promise.all(
-      this.providers.list().map(async (p) => {
-        const conn = this.providers.connection(p.id);
-        if (!conn || isCli(conn.preset) || conn.preset === "sdcpp" || conn.preset === "whispercpp") return [];
-        const models = await listModels(conn).catch(() => [] as ModelInfo[]);
-        return models.filter((m) => isFree(m) && m.available !== "gone").map((info) => ({ ref: { providerId: p.id, model: info.id }, info, providerName: p.name }));
-      }),
-    );
-    return all.flat();
+  /** The kept list at once; only the very first time (nothing kept yet) waits for the providers, a few seconds each. */
+  private async freeModels(): Promise<FreeModel[]> {
+    const kept = this.watch.list();
+    if (kept.length) return kept;
+    await this.watch.refresh();
+    return this.watch.list();
   }
 
   private async chain(id: string): Promise<ModelChain | null> {
@@ -83,16 +78,19 @@ export class Chains {
     if (!auto) return this.own().find((c) => c.id === id) ?? null;
     const free = await this.freeModels();
     // Models that call tools first (they also talk), then the ones the catalog says nothing about; local ones last.
-    const picked = free.filter((f) => (auto.toolsOnly ? f.info.tools === true : f.info.tools !== false || !auto.toolsOnly));
-    const local = (f: (typeof free)[number]) => (this.providers.connection(f.ref.providerId)?.preset === "ollama" ? 1 : 0);
-    picked.sort((a, b) => local(a) - local(b) || Number(b.info.tools === true) - Number(a.info.tools === true) || (b.info.contextLength ?? 0) - (a.info.contextLength ?? 0));
-    return { id, name: auto.name, models: picked.slice(0, 20).map((f) => f.ref), order: "best", onLimit: true, onError: true, timeoutS: 30, toolsOnly: auto.toolsOnly };
+    // Models the background check found gone are left out; those that answered come first, the fastest first; local ones last.
+    const picked = free.filter((f) => (auto.toolsOnly ? f.tools === true : true) && this.watch.check(f).state !== "gone");
+    const local = (f: FreeModel) => (this.providers.connection(f.providerId)?.preset === "ollama" ? 1 : 0);
+    const answers = (f: FreeModel) => (this.watch.check(f).state === "ok" ? 0 : 1);
+    const speed = (f: FreeModel) => this.watch.check(f).ms ?? 60_000;
+    picked.sort((a, b) => local(a) - local(b) || answers(a) - answers(b) || Number(b.tools === true) - Number(a.tools === true) || speed(a) - speed(b));
+    return { id, name: auto.name, models: picked.slice(0, 20).map((f) => ({ providerId: f.providerId, model: f.model })), order: "best", onLimit: true, onError: true, timeoutS: 30, toolsOnly: auto.toolsOnly };
   }
 
   /** Every chain with its models' names and state, for the settings and the model picker. */
   async views(): Promise<ChainView[]> {
     const free = await this.freeModels();
-    const names = new Map(free.map((f) => [keyOf(f.ref), f]));
+    const names = new Map(free.map((f) => [keyOf(f), f]));
     const chains = [...(await Promise.all(autoChainIds.map((id) => this.chain(id)))).filter((c): c is ModelChain => !!c), ...this.own()];
     return chains.map((c) => ({
       ...c,
@@ -102,10 +100,11 @@ export class Chains {
         const until = this.resting.get(keyOf(m)) ?? null;
         return {
           ...m,
-          name: known?.info.name ?? m.model,
+          name: known?.name ?? m.model,
           providerName: known?.providerName ?? this.providers.get(m.providerId)?.name ?? "?",
           state: until && until > Date.now() ? ("resting" as const) : ("ok" as const),
           until: until && until > Date.now() ? until : null,
+          check: this.watch.check(m),
         };
       }),
       answered: this.answered.get(c.id) ?? null,
@@ -136,6 +135,7 @@ export class Chains {
 
   private note(chainId: string, ref: ModelRef, ok: boolean, ms: number, restUntil = 0): void {
     const k = keyOf(ref);
+    this.watch.note(ref, ok, ms);
     const r = this.record.get(k) ?? { ok: 0, failed: 0, ms };
     this.record.set(k, ok ? { ok: r.ok + 1, failed: r.failed, ms } : { ok: r.ok, failed: r.failed + 1, ms: r.ms });
     if (ok) {

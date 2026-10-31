@@ -39,7 +39,7 @@ export const WEB_HINT =
  * the model also works in a real browser the user sees; `local` lets it open addresses on this computer (a project's
  * agent checks the app it runs).
  */
-export function webTools(web: WebAccess, hooks: WebHooks = {}, o: { local?: boolean; vision?: Vision | null; onSpend?(usd: number): void } = {}): ToolSet {
+export function webTools(web: WebAccess, hooks: WebHooks = {}, o: { local?: boolean; vision?: Vision | null; onSpend?(usd: number): void; folder?: string } = {}): ToolSet {
   // Within one answer: a query asked again is answered from what was found (DuckDuckGo limits bursts), and a browser
   // call that failed twice exactly as it is is not tried a third time (seen: the same missing field, twelve times).
   const found = new Map<string, string>();
@@ -91,7 +91,7 @@ export function webTools(web: WebAccess, hooks: WebHooks = {}, o: { local?: bool
           return r.text;
         }
       : undefined;
-    return { ...tools, ...browserTools(web.browser, { local: !!o.local, see }, run) };
+    return { ...tools, ...browserTools(web.browser, { local: !!o.local, see, folder: o.folder }, run) };
   }
   const show = web.show;
   // The user passes a captcha or signs in themselves, in a window of the same browser the model reads pages with.

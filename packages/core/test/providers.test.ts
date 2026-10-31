@@ -39,7 +39,7 @@ describe("connecting providers", () => {
 
   // Asked for: more popular providers as cards; each fills its own address and asks for a key.
   it("connects the popular OpenAI-style providers by their cards", async () => {
-    for (const id of ["groq", "cerebras", "mistral", "together", "fireworks", "zai", "moonshot", "qwen", "minimax", "huggingface", "sambanova", "opencode"] as const) {
+    for (const id of ["groq", "cerebras", "mistral", "together", "fireworks", "zai", "moonshot", "qwen", "minimax", "huggingface", "sambanova", "opencode", "deepinfra", "novita", "chutes", "nebius", "hyperbolic", "cohere", "featherless", "nscale", "requesty", "aimlapi", "siliconflow", "inferencenet", "vercel", "baseten", "llama", "inception"] as const) {
       expect(presets[id]).toMatchObject({ keyRequired: true, editableUrl: false });
       expect(presets[id].baseUrl).toMatch(/^https:\/\//);
       expect(presets[id].keyUrl).toMatch(/^https:\/\//);
@@ -47,6 +47,12 @@ describe("connecting providers", () => {
       const made = await (await env.call("POST", "/api/providers", { preset: id, apiKey: KEY })).json();
       expect(made).toMatchObject({ preset: id, name: presets[id].name, baseUrl: presets[id].baseUrl });
     }
+  });
+
+  // Pollinations answers without a key (a key only raises its limits).
+  it("connects Pollinations without a key", async () => {
+    expect(presets.pollinations.keyRequired).toBe(false);
+    expect((await env.call("POST", "/api/providers", { preset: "pollinations" })).status).toBe(201);
   });
 
   it("never returns the key", async () => {

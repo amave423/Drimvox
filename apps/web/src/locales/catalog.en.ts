@@ -34,19 +34,7 @@ export const catalogEn: Record<keyof typeof catalogRu, string> = {
   "catalog.turnOff": "Switch off",
   "catalog.installing": "Installing…",
 
-  "catalog.e.playwright.about": "An addition to the built-in browser: screenshots and PDFs of pages, the console and requests, Firefox and Safari.",
-  "catalog.e.playwright.details": "Microsoft's official Playwright server. Drimvox already has a built-in browser: the agent opens pages, clicks and fills in forms itself, and you watch it in the Browser panel. Playwright is for more: saving a page as PDF, reading the console and network requests, checking a site in Firefox or Safari.",
-  "catalog.e.playwright.can": "Open pages and follow links|Click, type, choose in lists|Take screenshots and save a page as PDF|Read the page's console and requests",
-  "catalog.e.playwright.example": "Open my site on localhost:5173 and check that signing in works",
-  "catalog.e.playwright.steps": "Opens localhost:5173|Types the email and the password|Clicks “Sign in”|Takes a screenshot",
-  "catalog.e.playwright.result": "Signing in works: “Sign in” opens the account page, no errors in the console.",
 
-  "catalog.e.chrome-devtools.about": "Chrome's developer tools: speed, network, console, performance.",
-  "catalog.e.chrome-devtools.details": "The Chrome DevTools team's official server, by Google. It starts Chrome and gives the model what a developer sees in DevTools: network requests, console errors, performance traces and Core Web Vitals. Good for finding why a page is slow or where a request fails.",
-  "catalog.e.chrome-devtools.can": "Record and analyse performance|Look at network requests and responses|Read console errors|Emulate a slow network and a phone",
-  "catalog.e.chrome-devtools.example": "Why does my home page load so slowly?",
-  "catalog.e.chrome-devtools.steps": "Opens the page in Chrome|Records the load|Looks at the heaviest requests|Checks LCP and blocking scripts",
-  "catalog.e.chrome-devtools.result": "The home page takes 4.8 s: the hero picture weighs 3.2 MB and fonts block rendering. I suggest compressing it and loading later.",
 
   "catalog.e.exa.about": "Search made for models: precise answers and the pages' content.",
   "catalog.e.exa.details": "Exa's search server. It searches by meaning, not only words, and gives the found pages' text, code from GitHub and documentation at once. Works without a key on the free amount, through Exa's server.",

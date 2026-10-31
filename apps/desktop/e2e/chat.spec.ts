@@ -177,7 +177,7 @@ test("a chain of free models: made in the settings, picked on its tab, the next 
   await expect(list.getByRole("button", { name: /Моя цепочка 1/ })).toHaveAttribute("aria-current", "true");
   for (const model of ["A Busy", "B Works"]) {
     await page.getByRole("button", { name: "+ Добавить бесплатную модель" }).click();
-    await page.getByLabel("+ Добавить бесплатную модель").selectOption({ label: `Тестовый / ${model}` });
+    await page.getByRole("option", { name: new RegExp(`Тестовый / ${model}`) }).click();
   }
   await expect(page.locator(".chain-link")).toHaveCount(2);
   await expect(page.locator(".chain-link").first()).toContainText("A Busy");
@@ -199,7 +199,8 @@ test("a chain of free models: made in the settings, picked on its tab, the next 
   await page.getByRole("tab", { name: "Цепочки" }).click();
   await page.getByRole("navigation", { name: "Цепочки бесплатных моделей" }).getByRole("button", { name: /Моя цепочка 1/ }).click();
   await expect(page.locator(".chain-link").first()).toContainText("отдыхает до");
-  await expect(page.locator(".chain-link").nth(1)).toContainText("отвечает");
+  // The one that answered shows how fast, in a short mark.
+  await expect(page.locator(".chain-link").nth(1).locator(".chain-state")).toHaveText(/^\d+,\d с$/);
 });
 
 test("thinks in a small window, then draws formulas, a chart and highlighted code", async () => {

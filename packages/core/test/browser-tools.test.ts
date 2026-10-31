@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -92,6 +92,62 @@ describe("the agent's browser tools", () => {
       expect(calls[0]).toBe(`browser_open ${url}`);
     },
     60_000,
+  );
+
+  // Asked for: Chrome DevTools and Playwright built in, so their MCP servers can go.
+  it.skipIf(!findBrowser())(
+    "has DevTools built in: console, requests, a script, a phone and a slow network, speed, accessibility, hover, wait, a file and a PDF",
+    async () => {
+      site = createServer((req, res) => {
+        const path = (req.url ?? "/").split("?")[0]!;
+        if (path === "/api") {
+          res.writeHead(500, { "content-type": "application/json" });
+          return res.end("{}");
+        }
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(`<title>Стенд</title><img src="/pic.png">
+          <button id="b" onmouseover="document.getElementById('tip').hidden=false">Меню</button><p id="tip" hidden>Подсказка открыта</p>
+          <input type="file" id="f" onchange="document.title='Файл: '+this.files[0].name">
+          <script>console.warn("осторожно"); fetch("/api").catch(() => {}); setTimeout(() => { const p = document.createElement("p"); p.textContent = "Готово позже"; document.body.append(p); }, 800); setTimeout(() => { throw new Error("сломалось") }, 50);</script>`);
+      });
+      await new Promise<void>((r) => site!.listen(0, "127.0.0.1", r));
+      const url = `http://127.0.0.1:${(site.address() as AddressInfo).port}/`;
+      profile = mkdtempSync(join(tmpdir(), "drimvox-devtools-"));
+      const folder = mkdtempSync(join(tmpdir(), "drimvox-devtools-folder-"));
+      writeFileSync(join(folder, "photo.txt"), "файл");
+      driver = new AgentBrowser({ profileDir: profile });
+      const browser = new Browser(driver);
+      const run: ToolRun = async (_id, _name, _input, work) => work();
+      const tools = browserTools(browser, { local: true, folder }, run);
+      const call = (name: string, input: unknown) => (tools[name]!.execute as (i: unknown, o: unknown) => Promise<string>)(input, { toolCallId: name, messages: [] });
+
+      // The tab's first page is watched from its first read on; opened again, from its very first script.
+      await call("browser_open", { url });
+      expect(await call("browser_console", {})).toContain("open it again with browser_open");
+      await call("browser_open", { url });
+      expect(await call("browser_wait", { text: "Готово позже" })).toContain("Готово позже");
+      const consoleText = await call("browser_console", { errors_only: true });
+      expect(consoleText).toContain("[warn] осторожно");
+      expect(consoleText).toContain("сломалось");
+      expect(await call("browser_network", { failed_only: true })).toMatch(/GET .*\/api → 500/);
+      expect(await call("browser_eval", { script: "return document.title + ' ' + (1 + 2)" })).toBe('"Стенд 3"');
+      expect(await call("browser_audit", {})).toContain("Image without alt");
+      const read = await call("browser_read", {});
+      const button = Number(/\[(\d+) button "Меню"\]/.exec(read)![1]);
+      expect(await call("browser_hover", { ref: button })).toContain("Подсказка открыта");
+      const field = Number(/\[(\d+) [^\]]*file/i.exec(read)?.[1] ?? button + 1);
+      expect(await call("browser_upload", { ref: field, paths: ["photo.txt"] })).toContain("Файл: photo.txt");
+      await expect(call("browser_upload", { ref: field, paths: ["../outside.txt"] })).rejects.toThrow(/inside the project folder/);
+      expect(await call("browser_pdf", { path: "docs/page" })).toContain("docs/page.pdf");
+      expect(readFileSync(join(folder, "docs/page.pdf")).subarray(0, 4).toString()).toBe("%PDF");
+      await call("browser_emulate", { device: "phone", network: "fast-3g", color_scheme: "dark" });
+      const phone = (await driver.command("Runtime.evaluate", { expression: "[screen.width, matchMedia('(prefers-color-scheme: dark)').matches]", returnByValue: true })) as { result: { value: [number, boolean] } };
+      expect(phone.result.value).toEqual([390, true]);
+      await call("browser_emulate", { device: "desktop", network: "none" });
+      expect(await call("browser_performance", {})).toMatch(/Largest content \(LCP\): \d+ ms/);
+      rmSync(folder, { recursive: true, force: true });
+    },
+    90_000,
   );
 
   it("keeps a chat to the public internet; a project's agent may open its own app on this computer", async () => {

@@ -1,6 +1,8 @@
-import { newChain, type ChainView, type ModelChain } from "@drimvox/shared";
+import { newChain, type ChainMember, type ChainView, type FreeCheck, type ModelChain } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../context";
+import type { MessageKey } from "../i18n";
+import { Dropdown } from "./Dropdown";
 import { Toggle } from "./Toggle";
 
 interface Free {
@@ -9,6 +11,19 @@ interface Free {
   name: string;
   providerName: string;
   tools: boolean | null;
+  flat: boolean;
+  check: FreeCheck;
+}
+
+/** A model's state in a word or two: resting after a limit, being asked, answering (how fast), busy, gone. */
+function stateOf(m: { check: FreeCheck } & Partial<Pick<ChainMember, "state" | "until">>, t: (k: MessageKey, v?: Record<string, string | number>) => string): { text: string; tone: string } {
+  if (m.state === "resting" && m.until) return { text: t("chains.resting", { time: new Date(m.until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }), tone: "wait" };
+  const c = m.check;
+  if (c.state === "checking") return { text: t("chains.checking"), tone: "muted" };
+  if (c.state === "ok") return { text: c.ms !== null ? t("chains.okMs", { s: (c.ms / 1000).toFixed(1).replace(".", ",") }) : t("chains.ok"), tone: "ok" };
+  if (c.state === "busy") return { text: t("chains.busy"), tone: "wait" };
+  if (c.state === "gone") return { text: t("chains.gone"), tone: "off" };
+  return { text: t("chains.unknown"), tone: "muted" };
 }
 
 const plain = (c: ChainView): ModelChain => ({ id: c.id, name: c.name, models: c.models, order: c.order, onLimit: c.onLimit, onError: c.onError, timeoutS: c.timeoutS, toolsOnly: c.toolsOnly });
@@ -22,21 +37,37 @@ export function ChainsSection() {
   const [chains, setChains] = useState<ChainView[] | null>(null);
   const [free, setFree] = useState<Free[]>([]);
   const [chosen, setChosen] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
   const [dragged, setDragged] = useState<number | null>(null);
+  const [polls, setPolls] = useState(0);
 
-  useEffect(() => {
+  const load = () => {
     void api.chains
       .$get()
       .then((r) => r.json())
       .then((list) => setChains(list as ChainView[]))
-      .catch(() => setChains([]));
+      .catch(() => setChains((c) => c ?? []));
     void api.chains.free
       .$get()
       .then((r) => r.json())
       .then((list) => setFree(list as Free[]))
       .catch(() => {});
-  }, [api]);
+  };
+  useEffect(load, [api]);
+  // While models are being asked, their states come in every two seconds (a minute at most).
+  const asking = free.some((f) => f.check.state === "checking");
+  useEffect(() => {
+    if (!asking && polls === 0) return;
+    if (polls > 30) return setPolls(0);
+    const timer = setTimeout(() => {
+      load();
+      setPolls((n) => (asking ? n + 1 : 0));
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [asking, polls]);
+  async function checkNow() {
+    await api.chains.check.$post().catch(() => null);
+    setPolls(1);
+  }
 
   if (!chains) return <p className="muted">{t("model.loading")}</p>;
   const current = chains.find((c) => c.id === chosen) ?? chains.find((c) => !c.auto) ?? chains[0];
@@ -62,11 +93,20 @@ export function ChainsSection() {
     models.splice(to, 0, m!);
     change({ models });
   };
-  const offered = free.filter((f) => current && !current.models.some((m) => m.providerId === f.providerId && m.model === f.model) && (!current.toolsOnly || f.tools === true));
+  // Those that answer first, the fastest first; those found not answering are not offered (seen: 40 of NVIDIA's 61).
+  const rank = { ok: 0, unknown: 1, checking: 1, busy: 2, gone: 3 } as const;
+  const offered = free
+    .filter((f) => current && f.check.state !== "gone" && !current.models.some((m) => m.providerId === f.providerId && m.model === f.model) && (!current.toolsOnly || f.tools === true))
+    .sort((a, b) => rank[a.check.state] - rank[b.check.state] || (a.check.ms ?? 1e9) - (b.check.ms ?? 1e9));
 
   return (
     <div className="chains">
-      <p className="setting-about">{t("chains.lede")}</p>
+      <div className="chains-top">
+        <p className="setting-about">{t("chains.lede")}</p>
+        <button type="button" className="btn" disabled={asking} onClick={() => void checkNow()}>
+          {asking ? t("chains.checkingAll") : t("chains.checkNow")}
+        </button>
+      </div>
       <div className="chains-body">
         <nav className="chains-list" aria-label={t("chains.title")}>
           {chains.map((c) => (
@@ -121,9 +161,7 @@ export function ChainsSection() {
                     {m.name}
                     <small className="muted">{m.providerName}</small>
                   </span>
-                  <span className={`chain-state${m.state === "resting" ? " is-resting" : ""}`}>
-                    {m.state === "resting" && m.until ? t("chains.resting", { time: new Date(m.until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : t("chains.ok")}
-                  </span>
+                  <span className={`chain-state is-${stateOf(m, t).tone}`}>{stateOf(m, t).text}</span>
                   {!current.auto && (
                     <span className="chain-moves">
                       <button type="button" className="icon-button" aria-label={t("chains.up", { model: m.name })} disabled={i === 0} onClick={() => move(i, i - 1)}>
@@ -141,32 +179,19 @@ export function ChainsSection() {
               ))}
             </ol>
             {current.members.length === 0 && <p className="muted">{t("chains.empty")}</p>}
-            {!current.auto &&
-              (adding ? (
-                <select
-                  className="field-input"
-                  aria-label={t("chains.add")}
-                  autoFocus
-                  value=""
-                  onBlur={() => setAdding(false)}
-                  onChange={(e) => {
-                    const f = offered[Number(e.target.value)];
-                    setAdding(false);
-                    if (f) change({ models: [...current.models, { providerId: f.providerId, model: f.model }] });
-                  }}
-                >
-                  <option value="">{offered.length ? t("chains.pick") : t("chains.noFree")}</option>
-                  {offered.map((f, i) => (
-                    <option key={`${f.providerId}/${f.model}`} value={i}>
-                      {f.providerName} / {f.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <button type="button" className="chain-add" onClick={() => setAdding(true)}>
-                  {t("chains.add")}
-                </button>
-              ))}
+            {!current.auto && (
+              <Dropdown<string>
+                label={t("chains.add")}
+                value={null}
+                placeholder={offered.length ? t("chains.add") : t("chains.noFree")}
+                search={t("model.search")}
+                options={offered.map((f, i) => ({ value: String(i), label: `${f.providerName} / ${f.name}`, hint: `${stateOf(f, t).text}${f.flat ? ` · ${t("chains.flat")}` : ""}` }))}
+                onChange={(v) => {
+                  const f = offered[Number(v)];
+                  if (f) change({ models: [...current.models, { providerId: f.providerId, model: f.model }] });
+                }}
+              />
+            )}
             {!current.auto && (
               <div className="chain-rules">
                 <h3 className="setting-h">{t("chains.rules")}</h3>

@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestEnv, readEvents, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider } from "./fake-provider";
@@ -86,5 +88,48 @@ describe("chains of free models", () => {
     const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
     expect(saved.messages.at(-1).status).toBe("error");
     expect(fake!.requests.some((r) => r.body?.model === "second-free")).toBe(false);
+  });
+
+  // Seen: one provider that never answered held the chains' tabs for 30-40 seconds.
+  it("opens at once from the kept list while a slow provider is waited for a few seconds at most", { timeout: 30_000 }, async () => {
+    const id = await setup(() => ({ text: "Да" }));
+    const hang = createServer(() => {});
+    await new Promise<void>((r) => hang.listen(0, "127.0.0.1", r));
+    try {
+      await env.call("POST", "/api/providers", { preset: "custom", name: "Slow", baseUrl: `http://127.0.0.1:${(hang.address() as AddressInfo).port}/v1`, apiKey: "k" });
+      let started = Date.now();
+      const first = await (await env.call("GET", "/api/chains/free")).json();
+      expect(Date.now() - started).toBeLessThan(12_000);
+      expect(first.map((m: any) => m.model).sort()).toEqual(["first-free", "second-free"]);
+      started = Date.now();
+      await env.call("GET", "/api/chains");
+      expect(Date.now() - started).toBeLessThan(1_000);
+      expect(first.every((m: any) => m.providerId === id)).toBe(true);
+    } finally {
+      hang.closeAllConnections();
+      await new Promise((r) => hang.close(r));
+    }
+  });
+
+  it("asks the free models a word on request and shows each one's state; a flat-fee provider's models are free too", async () => {
+    const id = await setup((model) => (model === "first-free" ? { fail: { status: 429, message: "Busy" } } : { text: "Да" }));
+    const flat = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Flat", baseUrl: fake!.baseUrl, apiKey: KEY })).json();
+    expect((await env.call("PATCH", `/api/providers/${flat.id}`, { flat: true })).status).toBe(200);
+    expect((await env.call("POST", "/api/chains/check")).status).toBe(202);
+    let free: any[] = [];
+    for (let i = 0; i < 100; i++) {
+      free = await (await env.call("GET", "/api/chains/free")).json();
+      if (free.length && free.every((m) => m.check.state !== "checking" && m.check.state !== "unknown")) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    const of = (pid: string, model: string) => free.find((m) => m.providerId === pid && m.model === model);
+    expect(of(id, "first-free").check.state).toBe("busy");
+    expect(of(id, "second-free").check).toMatchObject({ state: "ok", ms: expect.any(Number) });
+    // The flat provider's paid model is free to Drimvox: it is offered and checked like the free ones.
+    expect(of(flat.id, "paid")).toMatchObject({ flat: true });
+    // The probe asks for one word only.
+    const probes = fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body?.stream === false);
+    expect(probes.length).toBeGreaterThan(0);
+    expect(probes.every((r) => r.body.max_tokens === 1)).toBe(true);
   });
 });

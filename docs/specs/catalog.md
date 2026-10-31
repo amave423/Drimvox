@@ -17,9 +17,9 @@ Drimvox: просьба, действия, ответ), «Что умеет», �
 Логотипы — из Simple Icons (CC0), одним цветом; у кого логотипа там нет, — простой значок Drimvox, без подделки чужого
 бренда. Тексты карточек — `apps/web/src/locales/catalog.{ru,en}.ts`.
 
-## Серверы MCP (13)
+## Серверы MCP (11)
 
-Playwright (Microsoft), Chrome DevTools (Google), Exa (без ключа), Firecrawl (ключ), Context7, GitHub (токен в
+Playwright и Chrome DevTools убраны: их возможности встроены в браузер агента (`agent-browser.md`, попросили). Exa (без ключа), Firecrawl (ключ), Context7, GitHub (токен в
 заголовке), Supabase (токен), Memory и Sequential Thinking (эталонные серверы MCP), shadcn/ui, 21st.dev Magic (ключ),
 Figma (Framelink, токен), Notion (токен). Ключ передаётся в переменной окружения или заголовке, хранится зашифрованным.
 

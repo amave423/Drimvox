@@ -105,6 +105,10 @@ Drimvox не продаёт доступ к нейросетям: он рабо�
 | Mistral, Z.AI (GLM), Kimi, Qwen, MiniMax | Модели этих компаний напрямую; у Mistral и Z.AI есть бесплатное | [Mistral](https://console.mistral.ai/api-keys), [Z.AI](https://z.ai/manage-apikey/apikey-list), [Kimi](https://platform.moonshot.ai/console/api-keys), [Qwen](https://modelstudio.console.alibabacloud.com/), [MiniMax](https://platform.minimax.io/) |
 | Together AI, Fireworks AI, Hugging Face | Сотни открытых моделей по одному ключу | [Together](https://api.together.ai/settings/api-keys), [Fireworks](https://fireworks.ai/account/api-keys), [Hugging Face](https://huggingface.co/settings/tokens) |
 | OpenCode Zen | Модели, отобранные для кода, несколько бесплатных | [opencode.ai/auth](https://opencode.ai/auth) |
+| DeepInfra, Novita, Chutes, Nebius, Hyperbolic, Nscale, Inference.net, SiliconFlow, Baseten | Открытые модели дёшево, у многих стартовые кредиты или бесплатные модели | ключ — в кабинете сервиса (ссылка на карточке) |
+| Requesty, AI/ML API, Vercel AI Gateway | Шлюзы ко многим провайдерам по одному ключу | ключ — в кабинете сервиса |
+| Cohere, Llama API (Meta), Inception, Featherless | Модели этих компаний напрямую; Featherless — по подписке, без оплаты за токены | ключ — в кабинете сервиса |
+| Pollinations | Бесплатные модели без ключа | ключ не нужен |
 | OpenAI-совместимый | Любой сервис с API в формате OpenAI | адрес и ключ — у сервиса |
 
 Бесплатные модели в списке идут первыми; Drimvox проверяет, что они действительно отвечают, и прячет неработающие.

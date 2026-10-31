@@ -333,13 +333,12 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
               {/* One line each (asked for: the models of a chain took too much room). */}
               <ul className="picker-list chain-list" role="listbox" aria-label={t("chains.tab")}>
                 {(chainList ?? []).map((c) => {
-                  const awake = c.members.filter((m) => m.state === "ok").length;
+                  const awake = c.members.filter((m) => m.state === "ok" && m.check.state !== "busy" && m.check.state !== "gone").length;
                   return (
                     <li key={c.id} role="option" className="picker-item" aria-selected={value?.providerId === CHAIN_PROVIDER_ID && value?.model === c.id}>
                       <button
                         type="button"
                         disabled={c.members.length === 0}
-                        title={c.members.map((m) => `${m.providerName} / ${m.name}`).join(" → ")}
                         onClick={() => {
                           onChange({ providerId: CHAIN_PROVIDER_ID, model: c.id, kind: "text" });
                           setOpen(false);
