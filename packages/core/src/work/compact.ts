@@ -21,7 +21,7 @@ const cut = (text: string, keep: number) => (text.length > keep + NOTE.length ? 
  * Tool outputs and long arguments (a written file's text) older than the last `keepWhole` messages are trimmed; the
  * words of the user and of the agent, and what each step did, stay. Returns how many characters were cut.
  */
-export function compactHistory(messages: ModelMessage[], keepWhole = KEEP_WHOLE): number {
+export function compactHistory(messages: ModelMessage[], keepWhole = KEEP_WHOLE, outputKept = OUTPUT_KEPT): number {
   let saved = 0;
   const end = Math.max(0, messages.length - keepWhole);
   for (let i = 0; i < end; i++) {
@@ -31,14 +31,14 @@ export function compactHistory(messages: ModelMessage[], keepWhole = KEEP_WHOLE)
       if (part.type === "tool-result" && !KEPT_WHOLE.has(String(part.toolName))) {
         const output = part.output as { type?: string; value?: unknown } | undefined;
         if (output && (output.type === "text" || output.type === "error-text") && typeof output.value === "string") {
-          const short = cut(output.value, OUTPUT_KEPT);
+          const short = cut(output.value, outputKept);
           saved += output.value.length - short.length;
           output.value = short;
         } else if (output && (output.type === "json" || output.type === "error-json")) {
           const text = JSON.stringify(output.value);
-          if (text.length > OUTPUT_KEPT + NOTE.length) {
-            saved += text.length - OUTPUT_KEPT;
-            part.output = { type: "text", value: cut(text, OUTPUT_KEPT) };
+          if (text.length > outputKept + NOTE.length) {
+            saved += text.length - outputKept;
+            part.output = { type: "text", value: cut(text, outputKept) };
           }
         }
       }

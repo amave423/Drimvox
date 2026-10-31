@@ -9,6 +9,7 @@ import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
 import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory } from "./memory";
 import { notesBlock } from "./notes";
+import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { repairToolJson } from "./repair";
 import { Workspace } from "./workspace";
 
@@ -148,6 +149,12 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
             running--;
             resetClock();
           }
+        }
+        // Within one pass every step resent every file and output read before (seen in the user's runs: 3 million input
+        // tokens per answer). Older outputs go shortened, on a copy; the newest steps and the skills stay whole.
+        if (sent.length > KEEP_WHOLE) {
+          sent = structuredClone(sent);
+          compactHistory(sent);
         }
         const note = i.remind?.();
         if (note) sent = [...sent, { role: "user", content: note }];

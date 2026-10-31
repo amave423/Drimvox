@@ -12,6 +12,7 @@ import { cliReply } from "../cli/chat";
 import { isCli } from "../cli/kinds";
 import { FAIR_USE_HINT, WEB_HINT, webTools } from "../internet/tools";
 import { repairToolJson } from "../agent/repair";
+import { compactHistory } from "../work/compact";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";
@@ -82,6 +83,23 @@ export interface ReplyInput {
  * Saves the user's message, streams the model's answer to `emit`, then saves the answer
  * with its usage and cost. Provider errors end up on the answer, not as exceptions.
  */
+/** The newest messages of an answer sent whole: the pages and files the model is working with now. */
+const KEEP_WHOLE = 16;
+/** What is left of an older page, file or command output: enough to remember what it was and its gist. */
+const OUTPUT_KEPT = 2_000;
+
+/**
+ * Within one answer every step used to resend every page and file read before (seen in the user's chats: one answer
+ * with 22 pages took 1.2 million input tokens). The older outputs are shortened on a copy; the model's own words and
+ * what each step did stay whole, and the newest steps are sent as they are.
+ */
+function shortened(messages: ModelMessage[]): ModelMessage[] {
+  if (messages.length <= KEEP_WHOLE) return messages;
+  const copy = structuredClone(messages);
+  compactHistory(copy, KEEP_WHOLE, OUTPUT_KEPT);
+  return copy;
+}
+
 export async function reply(i: ReplyInput): Promise<void> {
   if (isCli(i.conn.preset) && i.cliDir) return cliReply(i, i.cliDir, FORMAT_HINT);
   const added = i.chats.addMessage({ chatId: i.chatId, role: "user", content: i.content, status: "done", ...(i.edit ? { parentId: i.edit.parentId } : {}) });
@@ -167,7 +185,8 @@ export async function reply(i: ReplyInput): Promise<void> {
               // Long work in a folder: once the answer nears the model's context, its older part becomes a summary. The
               // last step is for the summary (seen live: all 40 steps went on tools, the answer came empty).
               prepareStep: async (o: { stepNumber: number; messages: ModelMessage[] }) => {
-                const base: { messages?: ModelMessage[] } = memory ? await memory(o) : {};
+                const kept: { messages?: ModelMessage[] } = memory ? await memory(o) : {};
+                const base = { messages: shortened(kept.messages ?? o.messages) };
                 if (o.stepNumber < steps - 1) return base;
                 lastStep = true;
                 return { ...base, toolChoice: "none" as const, messages: [...(base.messages ?? o.messages), { role: "user" as const, content: LAST_STEP }] };
