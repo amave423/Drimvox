@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проекты: готовый или с нуля</title>
+<link rel="stylesheet" href="project-modes.css">
+</head>
+<body>
+<div class="page">
+  <h1>Проекты: готовый или с нуля</h1>
+  <p class="lede">При добавлении проекта Drimvox спрашивает, какой он. С нуля — как сейчас: опрос, план, долгая работа. Готовый — как чат с подключённой папкой, но с проектными инструментами: агент сам ведёт план, справа первым идёт «Проект», удаление — в меню «⋯» у проекта.</p>
+
+  <div class="switch">
+    <button class="on" data-s="add">0. Добавление проекта</button>
+    <button data-s="a">A. Чат проекта</button>
+    <button data-s="b">B. Разговоры проекта</button>
+    <button data-s="c">C. План над чатом</button>
+  </div>
+
+  <section class="screen on" id="add">
+    <div class="about">Вопрос задаётся один раз, сразу после выбора папки. Drimvox смотрит в неё и подсказывает ответ, решаете вы. Позже тип можно поменять во вкладке «Проект».</div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span>Чат</span><span class="on">Проекты</span></span></div>
+      <div class="add">
+        <div class="dialog">
+          <h2>Какой это проект?</h2>
+          <div class="path">C:\Users\Артём\Desktop\pilorama-site</div>
+          <div class="kinds">
+            <div class="kind">
+              <h3>С нуля</h3>
+              <p>Пустая папка или идея. Агент расспросит, напишет план и сделает всё сам.</p>
+              <ul><li>опрос и дизайн</li><li>итоговый план → «Поехали»</li><li>долгая работа с отчётом</li></ul>
+            </div>
+            <div class="kind on">
+              <h3>Готовый проект</h3>
+              <p>Код уже есть. Пишете агенту, что исправить или добавить, — как в чате.</p>
+              <ul><li>сразу к делу, без опроса</li><li>агент ведёт план слева</li><li>видно ход мыслей и действия</li></ul>
+            </div>
+          </div>
+          <div class="guess">В папке 214 файлов и package.json — похоже на готовый проект.</div>
+          <div class="actions"><span class="btn">Отмена</span><span class="btn primary">Продолжить</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="a">
+    <div class="about"><b>A. Чат проекта.</b> Один разговор на проект, как в чате. План агента — под проектом слева, обновляется сам. Справа «Проект · Изменения · Результат».
+      <ul><li>Проще всего: ничего нового учить не надо.</li><li>Минус: история одной длинной лентой; старое можно скрыть кнопкой «Начать с чистого листа».</li></ul>
+    </div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span>Чат</span><span class="on">Проекты</span></span>
+        <span class="state"><span class="pill run">Работает · 4 мин</span><span class="pill">0,12 $</span><span class="btn">Стоп</span></span></div>
+      <div class="body">
+        <aside class="side">
+          <h4>Проекты <a href="#">+ Проект</a></h4>
+          <div class="proj on"><span class="name">pilorama-site <span class="badge ex">готовый</span><small>План 2 из 5</small></span><span class="dots">⋯</span>
+            <div class="menu"><div>Переименовать</div><div>Открыть папку</div><div>Тип: с нуля / готовый</div><div class="danger">Убрать из Drimvox…</div></div>
+          </div>
+          <div class="plan"><div class="t"><span>План агента</span><span>2/5</span></div>
+            <div class="item done"><span class="box"></span>Найти, где ломается корзина</div>
+            <div class="item done"><span class="box"></span>Поправить пересчёт суммы</div>
+            <div class="item now"><span class="box"></span>Проверить на телефоне</div>
+            <div class="item"><span class="box"></span>Тест на пустую корзину</div>
+            <div class="item"><span class="box"></span>Отчёт</div>
+            <div class="bar"><i></i></div></div>
+          <div class="proj" style="margin-top:14px"><span class="name">kanban <span class="badge">с нуля</span><small>Готово</small></span></div>
+        </aside>
+        <main class="main">
+          <div class="sheet">
+            <div class="msg-u">На телефоне корзина считает сумму неправильно, когда удаляешь товар. Почини.</div>
+            <div><div class="who">deepseek-v4-pro</div>
+              Сначала посмотрю, как устроена корзина и где считается сумма.
+              <div class="acts">▸ Действия: 3 · читает cart.js, ищет «total»</div>
+              Сумма пересчитывается только при добавлении, при удалении — нет. Составлю план и поправлю.
+              <div class="acts">▸ Обновляет план · правит cart.js</div>
+              Исправил. Теперь проверю на ширине телефона во встроенном браузере.
+              <div class="acts">▸ Открывает localhost:5173 · смотрит на 390 px</div>
+            </div>
+          </div>
+          <div class="composer"><div class="ph">Напишите агенту…</div><div class="row"><span class="btn">DeepSeek V4 Pro</span><span class="btn">Параметры</span><span class="btn primary">Отправить</span></div></div>
+        </main>
+        <aside class="right">
+          <div class="tabs"><span class="on">Проект</span><span>Изменения · 2</span><span>Результат</span></div>
+          <div class="pane">
+            <div class="card"><h5>pilorama-site</h5><div class="kv"><span>Папка</span><span class="mono">Desktop\pilorama-site</span><span>Запуск</span><span class="mono">npm run dev</span><span>Тип</span><span>Готовый проект</span></div></div>
+            <div class="card"><h5>Git и GitHub</h5><div class="kv"><span>Ветка</span><span class="mono">main</span><span>Не сохранено</span><span>2 файла</span><span>GitHub</span><span>amave423/pilorama</span></div><div style="margin-top:8px;display:flex;gap:6px"><span class="btn">Сохранить в git…</span><span class="btn">Отправить на GitHub</span></div></div>
+            <div class="danger-zone"><p>Убрать проект из Drimvox. Папка и файлы на диске останутся.</p><span class="btn pencil">Убрать проект…</span></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="b">
+    <div class="about"><b>B. Разговоры проекта.</b> Под проектом — список разговоров: «починить корзину», «добавить оплату». У каждого свой план и свои изменения.
+      <ul><li>Удобно, когда задач много и они разные.</li><li>Минус: на один уровень сложнее; агент между разговорами помнит проект через заметки AGENTS.md.</li></ul>
+    </div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span>Чат</span><span class="on">Проекты</span></span><span class="state"><span class="pill">Ждёт вас</span></span></div>
+      <div class="body">
+        <aside class="side">
+          <h4>Проекты <a href="#">+ Проект</a></h4>
+          <div class="proj on"><span class="name">pilorama-site <span class="badge ex">готовый</span></span><span class="dots">⋯</span></div>
+          <div style="margin:6px 0 0 10px">
+            <div class="thread on"><span>Починить корзину</span><small>2/5</small></div>
+            <div class="thread"><span>Добавить оплату картой</span><small>готово</small></div>
+            <div class="thread"><span>Ускорить главную</span><small>вчера</small></div>
+            <div class="thread" style="color:var(--ink)">+ Новый разговор</div>
+          </div>
+          <div class="plan"><div class="t"><span>План разговора</span><span>2/5</span></div>
+            <div class="item done"><span class="box"></span>Найти ошибку</div>
+            <div class="item done"><span class="box"></span>Поправить сумму</div>
+            <div class="item now"><span class="box"></span>Проверить на телефоне</div>
+            <div class="item"><span class="box"></span>Тест</div><div class="bar"><i></i></div></div>
+        </aside>
+        <main class="main">
+          <div class="sheet">
+            <div class="msg-u">На телефоне корзина неправильно считает сумму. Почини.</div>
+            <div><div class="who">deepseek-v4-pro</div>Нашёл: при удалении товара сумма не пересчитывается.<div class="acts">▸ Действия: 4 · cart.js</div>Вопрос: скидку по промокоду тоже пересчитывать при удалении? Пока считаю, что да, и продолжаю.</div>
+          </div>
+          <div class="composer"><div class="ph">Ответьте или напишите новое…</div><div class="row"><span class="btn">DeepSeek V4 Pro</span><span class="btn">Параметры</span><span class="btn primary">Отправить</span></div></div>
+        </main>
+        <aside class="right">
+          <div class="tabs"><span class="on">Проект</span><span>Изменения</span><span>Результат</span></div>
+          <div class="pane"><div class="card"><h5>pilorama-site</h5><div class="kv"><span>Разговоров</span><span>3</span><span>Запуск</span><span class="mono">npm run dev</span></div></div><div class="danger-zone"><p>Папка на диске останется.</p><span class="btn pencil">Убрать проект…</span></div></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="c">
+    <div class="about"><b>C. План над чатом.</b> Слева только проекты. План агента — полоса над разговором с прогрессом, разворачивается по клику.
+      <ul><li>План всегда перед глазами, слева просторно.</li><li>Минус: план занимает место над перепиской.</li></ul>
+    </div>
+    <div class="win">
+      <div class="top"><span class="logo"><span class="mark"></span>Drimvox</span><span class="modes"><span>Чат</span><span class="on">Проекты</span></span><span class="state"><span class="pill run">Работает</span><span class="btn">Стоп</span></span></div>
+      <div class="body">
+        <aside class="side">
+          <h4>Проекты <a href="#">+ Проект</a></h4>
+          <div class="proj on"><span class="name">pilorama-site <span class="badge ex">готовый</span><small>Работает · 2/5</small></span><span class="dots">⋯</span></div>
+          <div class="proj"><span class="name">kanban <span class="badge">с нуля</span><small>Готово</small></span></div>
+        </aside>
+        <main class="main">
+          <div class="planstrip"><div class="row"><b>План агента · 2 из 5</b><span style="color:var(--ink)">Сейчас: проверить на телефоне ▾</span></div><div class="bar"><i></i></div></div>
+          <div class="sheet" style="margin-top:10px">
+            <div class="msg-u">Почини сумму в корзине на телефоне.</div>
+            <div><div class="who">deepseek-v4-pro</div>Смотрю, где считается сумма.<div class="acts">▸ Действия: 3</div>Поправил пересчёт. Проверяю в браузере на 390 px.<div class="acts">▸ Открывает localhost:5173</div></div>
+          </div>
+          <div class="composer"><div class="ph">Напишите агенту…</div><div class="row"><span class="btn">DeepSeek V4 Pro</span><span class="btn primary">Отправить</span></div></div>
+        </main>
+        <aside class="right">
+          <div class="tabs"><span class="on">Проект</span><span>Изменения</span><span>Результат</span></div>
+          <div class="pane"><div class="card"><h5>pilorama-site</h5><div class="kv"><span>Тип</span><span>Готовый</span><span>Запуск</span><span class="mono">npm run dev</span></div></div></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+  for (const b of document.querySelectorAll(".switch button")) {
+    b.addEventListener("click", () => {
+      for (const x of document.querySelectorAll(".switch button")) x.classList.toggle("on", x === b);
+      for (const s of document.querySelectorAll(".screen")) s.classList.toggle("on", s.id === b.dataset.s);
+    });
+  }
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "../../../packages/core/test/fake-provider";
 import { openSection, paramsButton } from "./sections";
+import { addProject } from "./start-task";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 const KEY = "good-key";
@@ -77,7 +78,7 @@ test("a project: the interview, the plan with Go, the agent works alone with its
 
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
 
-  await page.getByRole("button", { name: "+ Проект" }).click();
+  await addProject(page);
   // No task list, no points, no order: what to make and who does what.
   await expect(page.getByRole("checkbox")).toHaveCount(0);
   await page.getByLabel("Что сделать?").fill("Сайт лесопилки");
@@ -147,6 +148,9 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await page.getByRole("tab", { name: "Ход работы" }).click();
   // The result panel: the report and the folder's changes; the handle beside it folds it away and brings it back.
   const result = page.getByRole("complementary", { name: "Результат" });
+  // The project comes first in the panel (asked for), what came of the work last.
+  await expect(result.getByRole("tab").first()).toHaveText("Проект");
+  await result.getByRole("tab", { name: "Результат" }).click();
   await expect(result.locator(".work-report")).toContainText("Каталог готов");
   await result.getByRole("tab", { name: "Изменения" }).click();
   await expect(result.locator(".diff")).toContainText("index.html");
@@ -187,6 +191,57 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   // Nothing to accept, and git stays the user's.
   expect(execFileSync("git", ["log", "--oneline"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);
   expect(fake!.requests.some((r) => JSON.stringify(r.body?.messages ?? []).includes("Сделай заголовок крупнее"))).toBe(true);
+  // An answer closes the question's note over the box (seen: it stayed after the reply).
+  await page.locator(".side-project").first().click();
+  await expect(page.locator(".work-questions-note")).toContainText("Нужна доставка?");
+  await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").fill("Доставка нужна");
+  await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").press("Enter");
+  await expect(page.locator(".work-questions-note")).toHaveCount(0);
+});
+
+// Asked for: a ready project works like the chat (no interview, no plan to approve) with the agent's plan on the left;
+// the project comes first on the right, and removing it is at hand in the sidebar's "⋯".
+test("a ready project: asked on adding, talked to as in a chat, its plan on the left, removed from the sidebar", async () => {
+  const page = await launch([
+    call("update_checklist", { items: [{ text: "Прочитать README", done: true }, { text: "Ответить", done: false }] }),
+    { text: "Это сайт лесопилки." },
+  ]);
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await page.getByRole("button", { name: "+ Проект" }).click();
+  const dialog = page.getByRole("dialog", { name: "Какой это проект?" });
+  // The folder has a README: Drimvox guesses a ready project and picks it.
+  await expect(dialog).toContainText("похоже на готовый проект");
+  await expect(dialog.getByRole("radio", { name: /^Готовый проект/ })).toHaveAttribute("aria-checked", "true");
+  await dialog.getByRole("button", { name: "Продолжить" }).click();
+
+  await expect(page.getByRole("heading", { name: "Что сделать в проекте?" })).toBeVisible();
+  await expect(page.getByLabel("Что сделать?")).toHaveCount(0);
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("option", { name: /Coder/ }).click();
+  await page.getByPlaceholder("Вопрос или задача по проекту").fill("Что это за проект?");
+  await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
+
+  await expect(page.locator(".timeline .msg-user")).toContainText("Что это за проект?");
+  await expect(page.locator(".timeline")).toContainText("Это сайт лесопилки.", { timeout: 30_000 });
+  await expect(page.getByRole("list", { name: "План агента" })).toContainText("Прочитать README");
+  // No plan or questions tabs: the conversation is the whole middle.
+  await expect(page.getByRole("tab", { name: "Ход работы" })).toHaveCount(0);
+  const result = page.getByRole("complementary", { name: "Результат" });
+  await expect(result.getByRole("tab").first()).toHaveText("Проект");
+  await expect(result.getByRole("button", { name: "Готовый проект" })).toHaveAttribute("aria-pressed", "true");
+  await expect(result.getByRole("button", { name: "Убрать из Drimvox…" })).toBeVisible();
+  // The next message goes on in the same conversation, still with a model to pick under the box.
+  await expect(page.locator(".workshop-feed .composer-bar").getByRole("button", { name: /coder/i })).toBeVisible();
+
+  // The open project shows its "⋯" without hovering.
+  const menu = page.getByRole("button", { name: /Действия с проектом/ });
+  await expect(menu).toBeVisible();
+  await menu.click();
+  await page.getByRole("menuitem", { name: "Убрать из Drimvox…" }).click();
+  await page.locator(".side-projects .danger-zone").getByRole("button", { name: "Убрать проект из Drimvox" }).click();
+  await expect(page.getByRole("heading", { name: "Над чем поработаем?" })).toBeVisible();
+  await expect(page.locator(".side-project")).toHaveCount(0);
+  expect(readFileSync(join(repo, "README.md"), "utf8")).toContain("Лесопилка");
 });
 
 // Asked for: many screenshots are gone through with a switch, not opened and closed one by one; the result panel has none
@@ -215,7 +270,7 @@ test("a run's screenshots: a switch in the timeline, none in the result panel; c
       true,
     );
     await page.getByRole("button", { name: "Проекты", exact: true }).click();
-    await page.getByRole("button", { name: "+ Проект" }).click();
+    await addProject(page);
     await page.getByLabel("Что сделать?").fill("Две страницы");
     await page.getByRole("group", { name: "Модели" }).getByRole("button", { name: "Выбери модель" }).first().click();
     await page.getByRole("option", { name: /Coder/ }).click();
@@ -238,6 +293,7 @@ test("a run's screenshots: a switch in the timeline, none in the result panel; c
 
     // The result panel shows what came of the work, not the screenshots: they stay in the timeline.
     const result = page.getByRole("complementary", { name: "Результат" });
+    await result.getByRole("tab", { name: "Результат" }).click();
     await expect(result.locator(".work-report")).toContainText("Готово.");
     await expect(result.locator("img")).toHaveCount(0);
 

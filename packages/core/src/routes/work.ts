@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { projectPlanReviseSchema, projectPlanStartSchema, projectWorkMessageSchema, projectWorkStartSchema, projectWorkUpdateSchema } from "@drimvox/shared";
+import { projectPlanReviseSchema, projectPlanStartSchema, projectWorkChatSchema, projectWorkMessageSchema, projectWorkStartSchema, projectWorkUpdateSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { readFile } from "node:fs/promises";
 import type { ProjectRepo } from "../agent/repo";
@@ -57,6 +57,17 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
       if (!projects.get(id)) return c.json(notFound, 404);
       try {
         return c.json(work.message(id, c.req.valid("json").content), 200);
+      } catch (err) {
+        return c.json(refused(err), 409);
+      }
+    })
+    .post("/:id/work/chat", zValidator("json", projectWorkChatSchema), (c) => {
+      const id = c.req.param("id");
+      if (!projects.get(id)) return c.json(notFound, 404);
+      const { content, model } = c.req.valid("json");
+      if (!providers.get(model.providerId)) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
+      try {
+        return c.json(work.chat(id, content, model), 200);
       } catch (err) {
         return c.json(refused(err), 409);
       }

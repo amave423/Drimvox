@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import { useApp } from "../../context";
 import { authHeaders } from "../../api";
 import { formatTokens, formatUsd } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
 import { SubscriptionLimits } from "../providers/SubscriptionLimits";
 import { ModelNote } from "./ModelNote";
+import { MessageJump } from "./MessageRail";
 
 interface Answer {
   costUsd: number | null;
@@ -12,17 +13,21 @@ interface Answer {
   outputTokens: number | null;
 }
 
-/** The chat's margin: the model, what is left of a subscription, what the chat cost, and deleting it. */
+/** The chat's margin: the model, what is left of a subscription, what the chat cost, deleting it and the user's messages to jump to. */
 export function ChatMargin({
   choice,
   answers,
   chat,
   onDelete,
+  own,
+  list,
 }: {
   choice: ModelChoice | null;
   answers: Answer[];
   chat: { id: string; title: string | null } | null;
   onDelete: (() => void) | null;
+  own: string[];
+  list: RefObject<HTMLDivElement | null>;
 }) {
   const { t, settings, providers, token } = useApp();
   const [saved, setSaved] = useState<string | null>(null);
@@ -109,6 +114,7 @@ export function ChatMargin({
             {t("chat.delete")}
           </button>
         ))}
+      <MessageJump texts={own} list={list} />
     </aside>
   );
 }

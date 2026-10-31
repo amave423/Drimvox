@@ -25,7 +25,7 @@ describe("spending by model", () => {
     const chats = (await (await env.call("GET", "/api/usage/models?since=0")).json())[0].costUsd;
 
     // A project's interview spent on the same model, kept apart from the chats (seen: it was missing from the list).
-    env.db.sql.prepare("insert into projects values ('p', 'p', 'C:/p', 1)").run();
+    env.db.sql.prepare("insert into projects (id, name, path, created_at) values ('p', 'p', 'C:/p', 1)").run();
     env.db.sql
       .prepare(
         "insert into tasks (id, project_id, title, task, provider_id, model, status, branch, worktree, base_commit, budget_usd, created_at, updated_at) values ('t', 'p', 't', 't', ?, 'vendor/big', 'done', 'b', 'w', 'c', 1, 1, 1)",

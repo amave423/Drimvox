@@ -1,4 +1,4 @@
-import { startTask } from "./start-task";
+import { startTask, addProject } from "./start-task";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -83,7 +83,7 @@ async function launch(): Promise<Page> {
 test("a team: plan review with a removed subtask, the board, a subtask sheet, one review", async () => {
   const page = await launch();
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
-  await page.getByRole("button", { name: "+ Проект" }).click();
+  await addProject(page);
   await expect(page.locator(".topbar .crumb")).toHaveText(/drimvox-repo-/);
   await startTask(page, {
     task: "Добавь модули sub и mul",

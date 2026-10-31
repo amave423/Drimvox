@@ -1,8 +1,9 @@
 import type { ProjectWorkView } from "@drimvox/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "../context";
 import type { MessageKey } from "../i18n";
-import { PencilIcon, showStart } from "./SideChats";
+import { showStart } from "./SideChats";
+import { RemoveProject } from "./projects/WorkshopResult";
 import { AddProject } from "./projects/AddProject";
 import { StatusDot } from "./tasks/StatusDot";
 
@@ -17,6 +18,27 @@ export function SideProjects() {
   // A project is called by its folder until the user names it (asked for: renaming like chats).
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
+  // The "⋯" of a project: renaming, its kind, leaving Drimvox (asked for: removing a project was hard to find).
+  const [menu, setMenu] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: Event) => {
+      if (!(e.target as Element).closest?.(".side-menu, .side-menu-button")) setMenu(null);
+    };
+    const escape = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    document.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [menu]);
+  async function setKind(id: string, kind: "new" | "existing") {
+    setMenu(null);
+    await api.projects[":id"].$patch({ param: { id }, json: { kind } }).catch(() => null);
+    await reloadProjects();
+  }
   async function rename(id: string) {
     const next = name.trim();
     setRenaming(null);
@@ -29,6 +51,8 @@ export function SideProjects() {
   const currentTask = view.kind === "task" ? view.taskId : undefined;
 
   const current = works.find((w) => w.projectId === currentProject);
+  // A ready project's checklist is the agent's plan for what it was asked last.
+  const plainTalk = projects.find((p) => p.id === currentProject)?.kind === "existing";
   // The item being worked on: the first one not done yet.
   const now = current?.status === "running" ? current.checklist.findIndex((i) => !i.done) : -1;
 
@@ -75,21 +99,47 @@ export function SideProjects() {
                       <span className="side-item-title">{project.name}</span>
                       <WorkLine work={work} />
                     </button>
-                    <span className="side-chat-actions">
+                    <span className={`side-chat-actions${menu === project.id ? " is-open" : ""}`}>
                       <button
-                        className="icon-button"
-                        aria-label={t("side.renameProject", { name: project.name })}
-                        title={t("side.renameProjectLabel")}
-                        onClick={() => {
-                          setName(project.name);
-                          setRenaming(project.id);
-                        }}
+                        className="icon-button side-menu-button"
+                        aria-label={t("side.projectMenu", { name: project.name })}
+                        aria-haspopup="menu"
+                        aria-expanded={menu === project.id}
+                        onClick={() => setMenu(menu === project.id ? null : project.id)}
                       >
-                        <PencilIcon />
+                        <span aria-hidden>⋯</span>
                       </button>
                     </span>
+                    {menu === project.id && (
+                      <div className="side-menu" role="menu" aria-label={t("side.projectMenu", { name: project.name })}>
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            setMenu(null);
+                            setName(project.name);
+                            setRenaming(project.id);
+                          }}
+                        >
+                          {t("side.renameProjectLabel")}
+                        </button>
+                        <button role="menuitem" onClick={() => void setKind(project.id, project.kind === "existing" ? "new" : "existing")}>
+                          {t(project.kind === "existing" ? "side.makeNew" : "side.makeExisting")}
+                        </button>
+                        <button
+                          role="menuitem"
+                          className="is-pencil"
+                          onClick={() => {
+                            setMenu(null);
+                            setRemoving(project.id);
+                          }}
+                        >
+                          {t("project.removeAsk")}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
+                {removing === project.id && <RemoveProject project={project} asked onDone={() => setRemoving(null)} />}
                 {(open.length > 0 || talks.length > 0) && (
                   <ul className="side-sublist">
                     {talks.map((chat) => (
@@ -124,8 +174,8 @@ export function SideProjects() {
       )}
       {current && current.checklist.length > 0 && (
         <>
-          <h2 className="side-h side-checklist-h">{t("projectWork.checklist")}</h2>
-          <ul className="checklist side-checklist" aria-label={t("projectWork.checklist")}>
+          <h2 className="side-h side-checklist-h">{t(plainTalk ? "projectWork.agentPlan" : "projectWork.checklist")}</h2>
+          <ul className="checklist side-checklist" aria-label={t(plainTalk ? "projectWork.agentPlan" : "projectWork.checklist")}>
             {current.checklist.map((item, n) => (
               <li key={n} className={item.done ? "is-done" : n === now ? "is-now" : undefined}>
                 <span className="check-mark" aria-hidden>

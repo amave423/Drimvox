@@ -33,7 +33,12 @@
 .task-row:hover .task-row-title { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .task-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-row .mono { text-align: right; font-size: 12.5px; }
-.project-remove { margin-top: 28px; }
+.project-kind-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; }
+.project-kind-switch .segmented button { padding: 4px 12px; font-size: 13px; }
+/* Leaving Drimvox, set apart at the end of the project's tab. */
+.danger-zone { margin-top: 20px; padding: 12px 14px; border: 1px solid var(--pencil-soft); border-radius: 12px; display: grid; gap: 8px; justify-items: start; }
+.danger-zone p { margin: 0; font-size: 13.5px; }
+.danger-zone .actions { flex-wrap: wrap; align-items: center; }
 
 /* Task */
 .task-head { display: grid; gap: 8px; margin-bottom: 14px; }

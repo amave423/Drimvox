@@ -37,6 +37,18 @@ describe("connecting providers", () => {
     });
   });
 
+  // Asked for: more popular providers as cards; each fills its own address and asks for a key.
+  it("connects the popular OpenAI-style providers by their cards", async () => {
+    for (const id of ["groq", "cerebras", "mistral", "together", "fireworks", "zai", "moonshot", "qwen", "minimax", "huggingface", "sambanova", "opencode"] as const) {
+      expect(presets[id]).toMatchObject({ keyRequired: true, editableUrl: false });
+      expect(presets[id].baseUrl).toMatch(/^https:\/\//);
+      expect(presets[id].keyUrl).toMatch(/^https:\/\//);
+      expect((await env.call("POST", "/api/providers", { preset: id })).status).toBe(400);
+      const made = await (await env.call("POST", "/api/providers", { preset: id, apiKey: KEY })).json();
+      expect(made).toMatchObject({ preset: id, name: presets[id].name, baseUrl: presets[id].baseUrl });
+    }
+  });
+
   it("never returns the key", async () => {
     await addCustom();
     const created = await env.call("POST", "/api/providers", { preset: "openrouter", apiKey: KEY });

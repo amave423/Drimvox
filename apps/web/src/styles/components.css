@@ -114,6 +114,13 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .side-project-row { position: relative; }
 .side-project-row .side-item { padding-right: 36px; }
 .side-project-row:hover .side-chat-actions, .side-project-row:focus-within .side-chat-actions { display: inline-flex; }
+/* The open project always shows its "⋯": what to do with a project is found without hunting (asked for). */
+.side-project-row:has(.side-project.is-on) .side-chat-actions, .side-chat-actions.is-open { display: inline-flex; }
+.side-menu { position: absolute; right: 4px; top: calc(100% - 2px); z-index: 20; min-width: 200px; display: grid; padding: 4px; background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--sheet-shadow); }
+.side-menu button { text-align: left; padding: 7px 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13.5px; color: var(--fg); cursor: pointer; }
+.side-menu button:hover, .side-menu button:focus-visible { background: var(--paper); }
+.side-menu button.is-pencil { color: var(--pencil); border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; margin-top: 2px; }
+.side-projects .danger-zone { margin: 6px 0 8px; }
 /* While asking "delete?" the row stays lit like on hover, so the two icons sit on its own background. */
 .side-chat:has(.side-chat-actions.is-shown) .side-item { background: var(--sheet); }
 .icon-button.is-pencil { color: var(--pencil); }

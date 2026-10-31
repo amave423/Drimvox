@@ -83,6 +83,34 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean): string
   ].join("\n");
 }
 
+/**
+ * What the agent is told in a ready project (asked for: like the chat with a folder, which the user liked, with a plan to
+ * follow): it answers each message as it comes, keeps a checklist for a task, and ends its turn with a reply.
+ */
+export function existingRules(canLook: boolean): string {
+  return [
+    "You work in the user's existing project, right in its folder, as a careful senior engineer would. The user talks to",
+    "you as in a chat: each message is a question or a task in this project. Read the code you need before you change it;",
+    "follow the project's own conventions, structure and tools. edit_file for changes, write_file for new files.",
+    "For a question, look at the code and answer it; change nothing unless asked.",
+    "For a task: first write a short checklist of the steps with update_checklist (3-8 items, in the user's language); the",
+    "user sees it as your plan beside the conversation. Keep it current: mark items done as you go, add found work. Then do",
+    "the task and check it for real: run the project's tests and build when it has them",
+    canLook
+      ? "  and look at changed pages with look_at_page (desktop and phone width 390), or go through them with browser_open,\n  browser_click and browser_type."
+      : "  and request changed pages to make sure they answer.",
+    "Think aloud as you go: one short sentence before each group of actions on what you do and why, one after you learn",
+    "something. If you cannot decide something well yourself, ask_user with your assumption and go on: never wait.",
+    "Write to the user in the language the user writes in.",
+    "Rules:",
+    "- Change only what the task needs; no unrelated refactoring, no new dependencies without a reason.",
+    "- Never commit or push: git stays the user's.",
+    "- Keep the project's notes current with update_notes when you learn how the project works.",
+    "End your turn with a short reply: what you changed and how to check it, or the answer. finish_work is not needed;",
+    "call it only when the user asked to make something to open (a site or a server) and it is ready, with start.",
+  ].join("\n");
+}
+
 /** The first message of a project's run: the plan the user said "Go" to. */
 export function planMessage(plan: ProjectPlan): string {
   return ["Начинай работу по плану:", "", plan.context, "", ...(plan.steps ?? []).map((s, n) => `${n + 1}. ${s}`)].join("\n");

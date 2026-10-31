@@ -98,6 +98,10 @@
 .workshop-scroll { max-width: 900px; width: 100%; }
 .workshop-feed { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .workshop-feed[hidden] { display: none; }
+/* A ready project before its first message: a few words on top, the box at the bottom, as in a new chat. */
+.workshop-main > .workshop-ready { flex: 1; flex-shrink: 1; }
+.workshop-ready { display: flex; flex-direction: column; justify-content: space-between; gap: 16px; padding: 20px 24px 14px; max-width: 900px; width: 100%; }
+.workshop-ready-intro p { margin: 4px 0 0; max-width: 70ch; }
 /* The interview in the workshop: the task's words are the heading, kept to two lines (seen: three lines of a large serif). */
 .sheet.is-embedded .task-head h1 { font-size: 20px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .workshop-main > .sheet.is-embedded { border: 0; box-shadow: none; border-radius: 0; max-width: none; grid-template-columns: minmax(0, 1fr); }
@@ -203,16 +207,17 @@
 .browser-view.is-embedded { background: var(--paper); }
 /* A small task or a new project: the switch over the task box, with what it means. */
 .project-kind { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
-/* Subscriptions through CLIProxyAPI: switches, accounts, sign-in, limits with their bars. */
-.subs { display: grid; gap: 10px; }
-.subs-h { margin: 12px 0 0; font-size: 16px; }
-.subs-switches { display: grid; gap: 6px; }
-.subs-logins { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.subs-login { display: grid; gap: 6px; }
-.subs-limits { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
-.subs-limit { display: grid; grid-template-columns: minmax(90px, 160px) 1fr auto; align-items: center; gap: 10px; }
-.subs-bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
-.subs-bar > span { display: block; height: 100%; background: var(--ok); }
-.subs-bar > span.is-full { background: var(--pencil); }
-.subs-limit-left { font-size: 13px; white-space: nowrap; }
-@media (max-width: 600px) { .subs-limit { grid-template-columns: 1fr; } }
+
+/* Adding a project: ready or from scratch, asked once with Drimvox's guess (docs/specs/project-work.md). */
+.kind-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: var(--overlay); -webkit-app-region: no-drag; }
+.kind-dialog { width: min(720px, 100%); background: var(--sheet); box-shadow: var(--sheet-shadow); border-radius: 14px; padding: 24px 26px; display: grid; gap: 14px; }
+.kind-dialog .sheet-h { margin: 0; }
+.kind-path { margin: -8px 0 0; overflow-wrap: anywhere; }
+.kind-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.kind-option { display: grid; gap: 4px; align-content: start; text-align: left; padding: 14px 16px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--sheet); color: var(--fg); font: inherit; cursor: pointer; }
+.kind-option strong { font-size: 16px; }
+.kind-option:hover { border-color: var(--muted); }
+.kind-option.is-on { border-color: var(--ink); background: var(--ink-soft); }
+.kind-guess { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--ink-soft); color: var(--ink); font-size: 13.5px; }
+.kind-dialog .actions { justify-content: flex-end; }
+@media (max-width: 640px) { .kind-options { grid-template-columns: 1fr; } }

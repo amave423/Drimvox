@@ -101,9 +101,14 @@ Drimvox не продаёт доступ к нейросетям: он рабо�
 | Google Gemini | Бесплатный дневной лимит на Flash, Flash-Lite и Gemma | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
 | NVIDIA NIM | Бесплатные кредиты на открытые модели | [build.nvidia.com](https://build.nvidia.com/settings/api-keys) |
 | Anthropic, OpenAI, xAI | Claude, GPT, Grok напрямую | [Anthropic](https://console.anthropic.com/settings/keys), [OpenAI](https://platform.openai.com/api-keys), [xAI](https://console.x.ai/) |
+| Groq, Cerebras, SambaNova | Очень быстрые открытые модели, бесплатный тариф с лимитами | [Groq](https://console.groq.com/keys), [Cerebras](https://cloud.cerebras.ai/), [SambaNova](https://cloud.sambanova.ai/apis) |
+| Mistral, Z.AI (GLM), Kimi, Qwen, MiniMax | Модели этих компаний напрямую; у Mistral и Z.AI есть бесплатное | [Mistral](https://console.mistral.ai/api-keys), [Z.AI](https://z.ai/manage-apikey/apikey-list), [Kimi](https://platform.moonshot.ai/console/api-keys), [Qwen](https://modelstudio.console.alibabacloud.com/), [MiniMax](https://platform.minimax.io/) |
+| Together AI, Fireworks AI, Hugging Face | Сотни открытых моделей по одному ключу | [Together](https://api.together.ai/settings/api-keys), [Fireworks](https://fireworks.ai/account/api-keys), [Hugging Face](https://huggingface.co/settings/tokens) |
+| OpenCode Zen | Модели, отобранные для кода, несколько бесплатных | [opencode.ai/auth](https://opencode.ai/auth) |
 | OpenAI-совместимый | Любой сервис с API в формате OpenAI | адрес и ключ — у сервиса |
 
 Бесплатные модели в списке идут первыми; Drimvox проверяет, что они действительно отвечают, и прячет неработающие.
+Бесплатной считается и модель без цены в списке, если её название кончается на `-free` или `:free`.
 Если провайдер не работает из твоей страны, Drimvox так и скажет — тогда нужен [прокси](#прокси).
 
 ### По подписке

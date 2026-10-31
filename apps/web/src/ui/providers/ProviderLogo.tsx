@@ -1,6 +1,6 @@
 import type { PresetId } from "@drimvox/shared";
 import { useBrandFill } from "../BrandFill";
-import { siAnthropic, siClaude, siDeepseek, siGoogle, siGooglegemini, siLmstudio, siNvidia, siOllama, siOpenrouter, siX } from "simple-icons";
+import { siAnthropic, siClaude, siDeepseek, siGoogle, siGooglegemini, siHuggingface, siKimi, siLmstudio, siMinimax, siMistralai, siNvidia, siOllama, siOpencode, siOpenrouter, siQwen, siX } from "simple-icons";
 
 /** A provider's mark, in the app's violet-to-blue as the catalog's (seen: the providers had none, the MCP servers had theirs). */
 const marks: Partial<Record<PresetId, string>> = {
@@ -14,6 +14,12 @@ const marks: Partial<Record<PresetId, string>> = {
   nvidia: siNvidia.path,
   ollama: siOllama.path,
   lmstudio: siLmstudio.path,
+  mistral: siMistralai.path,
+  moonshot: siKimi.path,
+  qwen: siQwen.path,
+  minimax: siMinimax.path,
+  huggingface: siHuggingface.path,
+  opencode: siOpencode.path,
 };
 
 /** The mark on a tile; a provider without one (OpenAI's is not in the free icon set, a custom server) shows its initial. */

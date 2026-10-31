@@ -34,6 +34,7 @@ export function HomeSheet() {
               </button>
             </div>
             {project.failed && <p className="error-note">{t("project.addFailed")}</p>}
+            {project.dialog}
           </>
         ) : (
           <>

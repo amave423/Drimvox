@@ -2,6 +2,7 @@ import type { AcceptanceReport, DesignBrief, DesignReview, Milestone, Requiremen
 import { MAX_INTERVIEW_ROUNDS } from "./phases";
 import type {
   ModelRef,
+  ProjectKind,
   PlannedSubtask,
   ProjectView,
   Question,
@@ -23,6 +24,7 @@ interface ProjectRow {
   id: string;
   name: string;
   path: string;
+  kind: ProjectKind;
   created_at: number;
 }
 
@@ -102,10 +104,15 @@ export class ProjectRepo {
     return row ? toProject(row) : null;
   }
 
-  create(name: string, path: string): Omit<ProjectView, "gitState"> {
-    const row: ProjectRow = { id: randomUUID(), name, path, created_at: Date.now() };
-    this.db.sql.prepare("insert into projects values (:id, :name, :path, :created_at)").run({ ...row });
+  create(name: string, path: string, kind: ProjectKind = "new"): Omit<ProjectView, "gitState"> {
+    const row: ProjectRow = { id: randomUUID(), name, path, kind, created_at: Date.now() };
+    this.db.sql.prepare("insert into projects (id, name, path, kind, created_at) values (:id, :name, :path, :kind, :created_at)").run({ ...row });
     return toProject(row);
+  }
+
+  setKind(id: string, kind: ProjectKind): Omit<ProjectView, "gitState"> | null {
+    this.db.sql.prepare("update projects set kind = ? where id = ?").run(kind, id);
+    return this.get(id);
   }
 
   rename(id: string, name: string): Omit<ProjectView, "gitState"> | null {
@@ -289,7 +296,7 @@ export class TaskRepo {
 }
 
 function toProject(row: ProjectRow): Omit<ProjectView, "gitState"> {
-  return { id: row.id, name: row.name, path: row.path, createdAt: row.created_at };
+  return { id: row.id, name: row.name, path: row.path, kind: row.kind, createdAt: row.created_at };
 }
 
 export function toSubtaskCard(row: TaskRow): SubtaskCard {

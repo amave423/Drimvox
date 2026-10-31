@@ -1,4 +1,4 @@
-import type { ActivityEntry, ProjectModels, ProjectWorkView, TaskView } from "@drimvox/shared";
+import type { ActivityEntry, ModelRef, ProjectModels, ProjectWorkView, TaskView } from "@drimvox/shared";
 import type { ProjectRepo } from "../agent/repo";
 import type { AgentRunner } from "../agent/runner";
 import { isRepoRoot } from "../agent/git";
@@ -165,6 +165,29 @@ export class ProjectWork {
     return { chatId: row.chatId, queued: false };
   }
 
+  /**
+   * A ready project, as in a chat (asked for): each message goes to the model picked for it, with no interview and no
+   * plan to approve; the agent keeps its own checklist. A message while it works is taken on the way.
+   */
+  chat(projectId: string, content: string, model: ModelRef): { chatId: string; queued: boolean } {
+    const project = this.o.projects.get(projectId);
+    if (!project) throw new WorkRefused("not_repo");
+    const row = this.o.repo.get(projectId);
+    if (this.runs.has(projectId) && row?.startedAt) return this.message(projectId, content);
+    const known = row?.chatId ? this.o.chats.get(row.chatId) : null;
+    const chat = known ?? this.o.chats.create(model.providerId, model.model, "text", { folder: project.path, projectId, itemId: null, title: project.name });
+    if (known) this.o.chats.update(chat.id, { providerId: model.providerId, model: model.model });
+    this.o.repo.update(projectId, {
+      models: { interview: model, plan: model, work: model, strong: row?.models?.strong ?? null },
+      chatId: chat.id,
+      ...(row?.startedAt ? {} : { startedAt: Date.now(), workedMs: 0, checklist: [] }),
+      escalated: false,
+      report: null,
+    });
+    this.launch(projectId, chat.id, project.path, content);
+    return { chatId: chat.id, queued: false };
+  }
+
   /** After the budget, the time, getting stuck or Stop: go on in the same conversation. */
   continue(projectId: string): { chatId: string } {
     if (this.runs.has(projectId)) throw new WorkRefused("busy");
@@ -217,7 +240,7 @@ export class ProjectWork {
         }
       }
     };
-    const run = new WorkRun({ ...this.o.run, ended }, projectId, chatId, folder);
+    const run = new WorkRun({ ...this.o.run, ended }, projectId, chatId, folder, this.o.projects.get(projectId)?.kind === "existing");
     this.runs.set(projectId, run);
     // Claude Code and Codex work with their own loop: the message goes to them as it is (reply() keeps it).
     if (isCli(conn.preset)) {

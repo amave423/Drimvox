@@ -367,15 +367,13 @@ test("the agent's browser opens listed sites through the proxy and learns a site
   }
 });
 
-// Asked for: free access through one's own subscriptions, on its own tab of the local models, downloaded like an engine.
-test("the local models have a Subscriptions tab with CLIProxyAPI to download and the risk said plainly", async () => {
+// CLIProxyAPI is gone (asked for: Drimvox does it all itself): the local models have no Subscriptions tab.
+test("the local models have no Subscriptions tab", async () => {
   app = await launch();
   const page = await app.firstWindow();
   await openSection(page, "Локальные модели");
-  await page.getByRole("tab", { name: "Подписки" }).click();
-  await expect(page.getByRole("heading", { name: "Свои подписки вместо ключей" })).toBeVisible();
-  await expect(page.getByText(/аккаунт могут ограничить или заблокировать/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Скачать" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Текст" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Подписки" })).toHaveCount(0);
 });
 
 // Asked for: the window opens about 80% of the screen wide, as Claude Code does; the height stays.

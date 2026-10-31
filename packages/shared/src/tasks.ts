@@ -2,9 +2,17 @@ import { styleReferenceSchema, type DesignBrief, type DesignReview, type Look } 
 import { requirementSchema, type AcceptanceReport, type Milestone, type Requirement } from "./quality";
 import { z } from "zod";
 
-export const projectCreateSchema = z.object({ path: z.string().trim().min(1).max(1000) }).strict();
-/** A project's own name instead of its folder's. */
-export const projectRenameSchema = z.object({ name: z.string().trim().min(1).max(120) }).strict();
+/** "new": made from scratch through the interview and the plan; "existing": a ready project, worked on as in a chat. */
+export const projectKindSchema = z.enum(["new", "existing"]);
+export type ProjectKind = z.infer<typeof projectKindSchema>;
+export const projectCreateSchema = z.object({ path: z.string().trim().min(1).max(1000), kind: projectKindSchema.default("new") }).strict();
+/** A folder looked at before it is added: whether there is anything in it, to guess a ready project. */
+export const projectPeekSchema = z.object({ path: z.string().trim().min(1).max(1000) }).strict();
+/** A project's own name instead of its folder's, or its kind changed later. */
+export const projectRenameSchema = z
+  .object({ name: z.string().trim().min(1).max(120).optional(), kind: projectKindSchema.optional() })
+  .strict()
+  .refine((p) => p.name !== undefined || p.kind !== undefined);
 
 export interface ProjectView {
   id: string;
@@ -12,6 +20,7 @@ export interface ProjectView {
   path: string;
   /** "not_repo": the folder has no git yet; Drimvox offers to start it. */
   gitState: "ready" | "not_repo";
+  kind: ProjectKind;
   createdAt: number;
 }
 

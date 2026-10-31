@@ -45,6 +45,8 @@ type Raw = Record<string, unknown>;
  * Chat models of a catalog. `toUsd` converts the catalog's prices to dollars (RouterAI prices in rubles).
  * Models that cannot chat (embeddings, speech, pictures, video) are left out; they live elsewhere.
  */
+const namedFree = /[-:/_]free$/i;
+
 export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): ModelInfo[] {
   // Local models cost nothing; NVIDIA's hosted models run on free developer credits, not money.
   const free = presets[preset].billing !== "paid";
@@ -82,7 +84,8 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
       [priceIn, priceOut, priceCacheRead] = table;
       priceEstimated = true;
     }
-    if (priceIn === null && free) {
+    // A list without prices that marks free models by name ("…-free", "…:free"; seen with Beatapi): those cost nothing.
+    if (priceIn === null && (free || namedFree.test(id))) {
       priceIn = 0;
       priceOut = 0;
     }

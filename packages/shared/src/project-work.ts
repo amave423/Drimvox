@@ -95,4 +95,6 @@ export const projectPlanReviseSchema = z.object({ note: z.string().trim().min(1)
 export const projectWorkStartSchema = z.object(limits).strict();
 export const projectWorkUpdateSchema = z.object({ budgetUsd: limits.budgetUsd.optional(), hours: limits.hours.optional(), strong: modelRefSchema.nullable().optional() }).strict();
 export const projectWorkMessageSchema = z.object({ content: z.string().trim().min(1).max(200_000) }).strict();
+/** A message in a ready project's conversation, with the model that answers it (as in a chat). */
+export const projectWorkChatSchema = z.object({ content: z.string().trim().min(1).max(200_000), model: modelRefSchema }).strict();
 

@@ -1,15 +1,9 @@
 import { useEffect, useState, type RefObject } from "react";
 import { useApp } from "../../context";
 
-/**
- * The user's own messages as marks along the conversation (asked for: like in DeepSeek and Codex): each mark is one
- * question; hovered it shows the question's start, clicked it brings the question into view. The one in view is marked.
- */
-export function MessageRail({ texts, list }: { texts: string[]; list: RefObject<HTMLDivElement | null> }) {
-  const { t } = useApp();
+/** Which of the user's messages is in view: the last one whose top has passed the top third of the window. */
+function useCurrent(list: RefObject<HTMLDivElement | null>, count: number) {
   const [current, setCurrent] = useState(-1);
-
-  // Which question is in view: the last one whose top has passed the top third of the window.
   useEffect(() => {
     const root = list.current;
     if (!root) return;
@@ -27,21 +21,56 @@ export function MessageRail({ texts, list }: { texts: string[]; list: RefObject<
     const target: EventTarget = scroller === document.scrollingElement ? window : (scroller ?? window);
     target.addEventListener("scroll", look, { passive: true, capture: true } as AddEventListenerOptions);
     return () => target.removeEventListener("scroll", look, { capture: true } as EventListenerOptions);
-  }, [list, texts.length]);
+  }, [list, count]);
+  return current;
+}
 
+function goTo(list: RefObject<HTMLDivElement | null>, i: number) {
+  list.current?.querySelectorAll(".msg-user-wrap")[i]?.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+const line = (text: string) => text.replace(/\s+/g, " ").slice(0, 90);
+
+/**
+ * The user's own messages as marks along the workshop's timeline (asked for: like in DeepSeek and Codex): each mark is
+ * one message; hovered it shows the message's start, clicked it brings the message into view.
+ */
+export function MessageRail({ texts, list }: { texts: string[]; list: RefObject<HTMLDivElement | null> }) {
+  const { t } = useApp();
+  const current = useCurrent(list, texts.length);
   if (texts.length < 2) return null;
-  const go = (i: number) => {
-    const marks = list.current?.querySelectorAll(".msg-user-wrap");
-    marks?.[i]?.scrollIntoView({ block: "start", behavior: "smooth" });
-  };
   return (
     <nav className="msg-rail" aria-label={t("chat.yourMessages")}>
       {texts.map((text, i) => (
-        <button key={i} type="button" className={`msg-rail-mark${i === current ? " is-on" : ""}`} onClick={() => go(i)} aria-label={text.slice(0, 80)} aria-current={i === current || undefined}>
+        <button key={i} type="button" className={`msg-rail-mark${i === current ? " is-on" : ""}`} onClick={() => goTo(list, i)} aria-label={text.slice(0, 80)} aria-current={i === current || undefined}>
           <span className="msg-rail-line" aria-hidden />
-          <span className="msg-rail-text">{text.replace(/\s+/g, " ").slice(0, 90)}</span>
+          <span className="msg-rail-text">{line(text)}</span>
         </button>
       ))}
+    </nav>
+  );
+}
+
+/**
+ * The same messages as a plain list in a chat's margin, under deleting it (asked for: the marks at the edge were
+ * awkward, and the margin there stood empty). Always open; the one in view is marked.
+ */
+export function MessageJump({ texts, list }: { texts: string[]; list: RefObject<HTMLDivElement | null> }) {
+  const { t } = useApp();
+  const current = useCurrent(list, texts.length);
+  if (texts.length < 2) return null;
+  return (
+    <nav className="msg-jump" aria-label={t("chat.yourMessages")}>
+      <span className="muted">{t("chat.yourMessages")}</span>
+      <ol>
+        {texts.map((text, i) => (
+          <li key={i}>
+            <button type="button" className={i === current ? "is-on" : undefined} onClick={() => goTo(list, i)} aria-current={i === current || undefined} title={text.slice(0, 300)}>
+              {line(text)}
+            </button>
+          </li>
+        ))}
+      </ol>
     </nav>
   );
 }

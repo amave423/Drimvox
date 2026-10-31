@@ -1,7 +1,9 @@
 import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
-import { readLastModel, type ModelChoice } from "../../lib/lastModel";
+import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/lastModel";
+import { Composer } from "../chat/Composer";
+import { ModelPicker } from "../chat/ModelPicker";
 import { ChatSheet } from "../chat/ChatSheet";
 import { Tabs } from "../Tabs";
 import { TaskSheet } from "../tasks/TaskSheet";
@@ -15,12 +17,16 @@ import { WorkshopResult } from "./WorkshopResult";
 
 export const LAST_PROJECT_KEY = "drimvox.lastProject";
 
-export type Stage = "git" | "loading" | "start" | "interview" | "plan" | "work";
+export type Stage = "git" | "loading" | "start" | "interview" | "plan" | "work" | "talk";
 
-/** Where a project's work is: git first, the start, the interview, the plan, then the work itself. */
+/**
+ * Where a project's work is: git first, the start, the interview, the plan, then the work itself. A ready project is a
+ * conversation from the first message (asked for: like the chat with a folder).
+ */
 export function stageOf(project: ProjectView, work: ProjectWorkView | null, fresh = false): Stage {
   if (project.gitState === "not_repo") return "git";
   if (!work) return "loading";
+  if (project.kind === "existing") return work.chatId && work.startedAt ? "work" : "talk";
   if (fresh || work.status === "idle") return "start";
   if (work.status === "planning" && !work.plan) return "interview";
   if (work.status === "ready" || work.status === "planning") return "plan";
@@ -81,13 +87,25 @@ export function Workshop({ projectId }: { projectId: string }) {
               />
             </div>
           )}
+          {stage === "talk" && (
+            <ReadyStart
+              projectId={project.id}
+              initial={choice}
+              onStarted={() => void reload()}
+            />
+          )}
           {stage === "interview" && work?.planTaskId && <TaskSheet key={work.planTaskId} taskId={work.planTaskId} embedded />}
           {stage === "plan" && work && (
             <div className="workshop-pad workshop-scroll">
               <PlanCard key={work.plan?.context} work={work} onChanged={() => void reload()} />
             </div>
           )}
-          {stage === "work" && work?.chatId && (
+          {stage === "work" && work?.chatId && project.kind === "existing" && (
+            <div className="workshop-feed">
+              <ChatSheet key={work.chatId} chatId={work.chatId} viewKey={work.chatId} workshop />
+            </div>
+          )}
+          {stage === "work" && work?.chatId && project.kind !== "existing" && (
             <>
               <div className="workshop-tabs">
                 <Tabs<Part>
@@ -123,6 +141,41 @@ export function Workshop({ projectId }: { projectId: string }) {
           onNew={work && work.status !== "idle" && work.status !== "running" ? () => setFresh(true) : undefined}
         />
       </div>
+    </div>
+  );
+}
+
+/** A ready project before its first message: what it is for, and the box with the model to write to. */
+function ReadyStart({ projectId, initial, onStarted }: { projectId: string; initial: ModelChoice | null; onStarted(): void }) {
+  const { api, t } = useApp();
+  const [choice, setChoice] = useState<ModelChoice | null>(initial);
+  const [failed, setFailed] = useState(false);
+  async function send(content: string) {
+    if (!choice) return;
+    setFailed(false);
+    const res = await api.projects[":id"].work.chat
+      .$post({ param: { id: projectId }, json: { content, model: { providerId: choice.providerId, model: choice.model } } })
+      .catch(() => null);
+    if (!res?.ok) return setFailed(true);
+    rememberLastModel(choice);
+    onStarted();
+  }
+  return (
+    <div className="workshop-ready">
+      <div className="workshop-ready-intro">
+        <h2 className="sheet-h">{t("workshop.readyTitle")}</h2>
+        <p className="muted">{t("workshop.readyLede")}</p>
+      </div>
+      {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
+      <Composer
+        disabled={!choice}
+        streaming={false}
+        onSend={(text) => void send(text)}
+        onStop={() => {}}
+        picker={<ModelPicker value={choice} onChange={setChoice} placement="above" />}
+        options={{ changed: [], rows: [] }}
+        placeholder={t("chat.readyPlaceholder")}
+      />
     </div>
   );
 }
@@ -201,6 +254,7 @@ export function ProjectsStart() {
           </button>
         </div>
         {add.failed && <p className="error-note">{t("project.addFailed")}</p>}
+        {add.dialog}
         {projects.length > 0 && (
           <ul className="workshop-recent">
             {projects.map((p) => (

@@ -274,6 +274,8 @@ const migrations: string[] = [
   // How much a server is trusted: a new one asks only about what changes something.
   `alter table mcp_servers add column trust text not null default 'changes'; ${TRUST_PLAYWRIGHT}`,
   HEADLESS_DEVTOOLS,
+  // A ready project is worked on as in a chat; one from scratch goes through the interview and the plan.
+  `alter table projects add column kind text not null default 'new';`,
 ];
 
 export interface Database {

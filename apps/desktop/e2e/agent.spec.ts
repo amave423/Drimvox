@@ -1,4 +1,4 @@
-import { startTask as start } from "./start-task";
+import { startTask as start, addProject } from "./start-task";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -61,7 +61,7 @@ async function launch(script: FakeTurn[], env: Record<string, string> = {}): Pro
 /** Direct mode unless asked otherwise: these tests cover the agent, the pipeline has its own test. */
 async function startTask(page: Page, task: string, pipeline = false) {
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
-  await page.getByRole("button", { name: "+ Проект" }).click();
+  await addProject(page);
   await expect(page.locator(".topbar .crumb")).toHaveText(/drimvox-repo-/);
   const all = { interview: true, spec: true, approveSpec: true, testsFirst: true };
   await start(page, { task, model: "coder", stages: pipeline ? all : undefined });

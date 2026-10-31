@@ -1,8 +1,8 @@
 import { zValidator } from "@hono/zod-validator";
 import { findSkills, projectSkillRoots, toSkillView } from "../skills/skills";
-import { projectCreateSchema, projectRenameSchema, taskCreateSchema, type ProjectView } from "@drimvox/shared";
+import { projectCreateSchema, projectPeekSchema, projectRenameSchema, taskCreateSchema, type ProjectView } from "@drimvox/shared";
 import { Hono } from "hono";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { GitError, initWithCommit, isRepoRoot, removeWorktree } from "../agent/git";
 import type { ProjectRepo, TaskRepo } from "../agent/repo";
@@ -25,6 +25,7 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
   return new Hono()
     .get("/", async (c) => c.json(await Promise.all(projects.list().map(withGit))))
     .post("/", zValidator("json", projectCreateSchema), async (c) => {
+      const { kind } = c.req.valid("json");
       const path = resolve(c.req.valid("json").path);
       if (!existsSync(path) || !statSync(path).isDirectory()) return c.json({ error: { code: "not_found" as const } }, 400);
       const existing = projects.findByPath(path);
@@ -32,13 +33,24 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
       // A plain folder stays plain: git comes only when the user agrees on the project's page (seen live: git appeared
       // in the user's folder though nobody asked).
       try {
-        return c.json(await withGit(projects.create(basename(path) || path, path)), 201);
+        return c.json(await withGit(projects.create(basename(path) || path, path, kind)), 201);
       } catch (err) {
         return c.json(gitFailure(err), 409);
       }
     })
+    // Before adding: a folder with files in it (besides git and hidden ones) is most likely a ready project.
+    .post("/peek", zValidator("json", projectPeekSchema), (c) => {
+      const path = resolve(c.req.valid("json").path);
+      if (!existsSync(path) || !statSync(path).isDirectory()) return c.json({ error: { code: "not_found" as const } }, 400);
+      const files = readdirSync(path).filter((name) => !name.startsWith(".")).length;
+      return c.json({ files, guess: files > 0 ? ("existing" as const) : ("new" as const) }, 200);
+    })
     .patch("/:id", zValidator("json", projectRenameSchema), async (c) => {
-      const project = projects.rename(c.req.param("id"), c.req.valid("json").name);
+      const { name, kind } = c.req.valid("json");
+      const id = c.req.param("id");
+      if (!projects.get(id)) return c.json(notFound, 404);
+      if (kind) projects.setKind(id, kind);
+      const project = name ? projects.rename(id, name) : projects.get(id);
       if (!project) return c.json(notFound, 404);
       return c.json(await withGit(project), 200);
     })

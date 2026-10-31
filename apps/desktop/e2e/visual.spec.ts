@@ -1,4 +1,4 @@
-import { startTask } from "./start-task";
+import { startTask, addProject } from "./start-task";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -84,7 +84,7 @@ async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
 
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
 
-  await page.getByRole("button", { name: "+ Проект" }).click();
+  await addProject(page);
   await startTask(page, { task: "Проверь, как выглядит страница", model: "coder" });
 
   await expect(page.getByText("Проверил страницу.")).toBeVisible({ timeout: 30_000 });

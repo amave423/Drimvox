@@ -21,6 +21,7 @@ import { loadMediaModel } from "../../lib/media";
 import { CoreRefusal, postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
 import { Toggle } from "../Toggle";
+import { Hint } from "../Hint";
 import { MessageRail } from "./MessageRail";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
 import { directorRows, useDirector } from "./DirectorControl";
@@ -64,7 +65,7 @@ const PENDING_POLL_MS = 3000;
  * user's messages in time, with the box to write to the run under them.
  */
 export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: string | null; viewKey: string; autoSend?: string; workshop?: boolean }) {
-  const { api, token, t, settings, updateSettings, providers, navigate, reloadChats, reloadToday } = useApp();
+  const { api, token, t, settings, updateSettings, providers, projects, navigate, reloadChats, reloadToday } = useApp();
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -86,6 +87,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [noVision, setNoVision] = useState(false);
+  /** When the user last wrote to a project's run from this window. */
+  const [sentAt, setSentAt] = useState(0);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const dock = useRef<HTMLElement>(null);
@@ -188,6 +191,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
         : [{ line: activityLine(t, a.name, a.input), at: a.at }],
     );
   const { work, reload: reloadWork } = useProjectWork(projectId);
+  // A ready project is talked to as in a chat (asked for): each message goes to the model picked under the box.
+  const ready = !!projectId && projects.find((p) => p.id === projectId)?.kind === "existing";
   // Every screenshot of the run in order, so one opened goes on to the others; captioned with its page.
   const shots: Shot[] = projectId
     ? (chat?.messages ?? []).flatMap((m) =>
@@ -285,7 +290,12 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   /** In a project's conversation a message goes to the run: taken on the way, or starting it again. */
   async function sendToWork(id: string, content: string) {
     setFailed(false);
-    const res = await api.projects[":id"].work.message.$post({ param: { id }, json: { content } }).catch(() => null);
+    setSentAt(Date.now());
+    const res = await (ready && choice
+      ? api.projects[":id"].work.chat.$post({ param: { id }, json: { content, model: { providerId: choice.providerId, model: choice.model } } })
+      : api.projects[":id"].work.message.$post({ param: { id }, json: { content } })
+    ).catch(() => null);
+    if (ready && choice) rememberLastModel(choice);
     if (!res?.ok) setFailed(true);
     await reloadWork();
     if (chat) await load(chat.id);
@@ -418,6 +428,9 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
 
   const messages = chat?.messages ?? [];
   const answers = messages.filter((m) => m.role === "assistant");
+  // A reply to the agent's question closes its note at once, before the core saves the message.
+  const ownTexts = messages.filter((m) => m.role === "user").map((m) => m.content).concat(draft ? [draft.user] : []);
+  const lastUserAt = Math.max(sentAt, ...messages.filter((m) => m.role === "user").map((m) => m.createdAt));
   const empty = messages.length === 0 && !draft;
   // One's own message is edited in a text chat; a project's run and a program on a subscription keep their own course.
   const editable = kind === "text" && !projectId && !chat?.itemId && providers.find((p) => p.id === chat?.providerId)?.billing !== "subscription";
@@ -446,7 +459,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
 
         <ShotsContext.Provider value={shots}>
         {/* The user's own questions as marks to jump between (asked for: like DeepSeek and Codex). */}
-        <MessageRail texts={messages.filter((m) => m.role === "user").map((m) => m.content).concat(draft ? [draft.user] : [])} list={list} />
+        {workshop && <MessageRail texts={ownTexts} list={list} />}
         <div className={`messages${workshop ? " timeline" : ""}`} ref={list}>
           {(cutAt !== null ? messages.slice(0, cutAt) : messages).map((m) => at(m.id, m.createdAt,
             m.role === "user" ? (
@@ -512,8 +525,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
         {chat?.projectId && chat.itemId && (
           <WorkReview projectId={chat.projectId} itemId={chat.itemId} busy={!!draft} answers={answers.length} />
         )}
-        {/* The agent's newest question over the box (variant A); all of them are in the workshop's "Questions". */}
-        {workshop && work && work.questions.length > 0 && (
+        {/* The agent's newest question over the box until the user writes after it; all of them are in the workshop's "Questions". */}
+        {workshop && work && work.questions.length > 0 && work.questions.at(-1)!.at > lastUserAt && (
           <section className="work-questions-note">
             <strong>{t("workshop.asks")}</strong>
             <p>{work.questions.at(-1)!.question}</p>
@@ -523,13 +536,13 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
         {projectId ? (
           // A project's conversation: the run goes on while the user writes; Stop is in the workshop's header.
           <Composer
-            disabled={!work?.startedAt}
+            disabled={!work?.startedAt || (ready && !choice)}
             streaming={false}
             onSend={(text) => void send(text)}
             onStop={() => {}}
-            picker={null}
+            picker={ready ? <ModelPicker value={choice} onChange={setChoice} placement="above" /> : null}
             options={{ changed: [], rows: [] }}
-            placeholder={t("chat.workPlaceholder")}
+            placeholder={t(ready ? "chat.readyPlaceholder" : "chat.workPlaceholder")}
           />
         ) : (
           <Composer
@@ -562,9 +575,12 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                               {
                                 label: t("approval.modeLabel"),
                                 control: (
-                                  <Toggle checked={settings.folderAutoApprove} onChange={(on) => void updateSettings({ folderAutoApprove: on })}>
-                                    {t("approval.auto")}
-                                  </Toggle>
+                                  <span className="director-row">
+                                    <Toggle checked={settings.folderAutoApprove} onChange={(on) => void updateSettings({ folderAutoApprove: on })}>
+                                      {t("approval.auto")}
+                                    </Toggle>
+                                    <Hint text={t("approval.autoHint")} />
+                                  </span>
                                 ),
                               },
                             ]
@@ -589,7 +605,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
       </div>
 
       {!workshop && (
-        <ChatMargin choice={choice} answers={answers} chat={chat && chat.messages.length ? { id: chat.id, title: chat.title } : null} onDelete={chat ? () => void remove() : null} />
+        <ChatMargin choice={choice} answers={answers} chat={chat && chat.messages.length ? { id: chat.id, title: chat.title } : null} onDelete={chat ? () => void remove() : null} own={ownTexts} list={list} />
       )}
     </article>
   );

@@ -41,8 +41,7 @@ import { skillRoutes } from "./routes/skills";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { localRoutes } from "./routes/local";
-import { subscriptionRoutes } from "./routes/subscriptions";
-import { CliProxy } from "./local/cliproxy/service";
+import { forgetCliProxy } from "./local/cliproxy-leftovers";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
 import { monthUsage } from "./budget";
@@ -117,8 +116,6 @@ export interface AppOptions {
   skillSources?: SkillSources;
   /** Ollama and its catalogs; tests give a fake program, fixed hardware and fake catalogs. */
   local?: LocalOptions;
-  /** CLIProxyAPI's archive; tests give a fake one. */
-  cliProxy?: { asset?: { url: string; sha256: string } | null; fetch?: typeof fetch };
   /** GitHub's addresses; tests give a fake. */
   github?: GithubOptions;
 }
@@ -141,9 +138,8 @@ export function createCore(o: AppOptions) {
   const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
   void local.connectIfServed().catch(() => {});
-  // Free access through one's own subscriptions (docs/specs/subscriptions.md): the server the user left on starts again.
-  const cliProxy = new CliProxy({ db: o.db, cipher, providers, dir: join(o.dataDir, "cliproxy"), ...o.cliProxy });
-  void cliProxy.resume().catch(() => {});
+  // CLIProxyAPI is gone (asked for: Drimvox does it all itself): what an earlier version left is cleared once.
+  forgetCliProxy(o.db, providers, join(o.dataDir, "cliproxy"));
   useLocalImages(local.images);
   useLocalAudio(local.audio);
   const github = new GitHub(o.db, cipher, o.github);
@@ -264,7 +260,6 @@ export function createCore(o: AppOptions) {
     )
     .route("/providers", providerRoutes(providers))
     .route("/local", localRoutes(local))
-    .route("/subscriptions", subscriptionRoutes(cliProxy))
     .route("/proxy", proxyRoutes(proxies, o.proxyCheckUrl ?? "https://www.google.com/generate_204", sites, pushProxy))
     .route("/search", searchRoutes(searchStore, searchUrls))
     // Dictation (asked for): the recording to the voice model from the settings, its text back.
@@ -343,7 +338,6 @@ export function createCore(o: AppOptions) {
       await mcp.shutdown();
       await agentBrowser.stop();
       local.close();
-      cliProxy.close();
     },
   };
 }

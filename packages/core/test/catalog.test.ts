@@ -130,6 +130,18 @@ describe("normalizeModels", () => {
     });
   });
 
+  // Seen with Beatapi: its free models are "…-free" without a price in the list, and showed "price unknown".
+  it("counts a model named free as free when the list gives no price, and only then", () => {
+    const models = normalizeModels("custom", [
+      { id: "glm-5.3-flash-free" },
+      { id: "deepseek/deepseek-v4:free" },
+      { id: "freedom-7b" },
+      { id: "paid-free", pricing: { prompt: "0.000001", completion: "0.000002" } },
+    ]);
+    const price = Object.fromEntries(models.map((m) => [m.id, m.priceIn]));
+    expect(price).toEqual({ "glm-5.3-flash-free": 0, "deepseek/deepseek-v4:free": 0, "freedom-7b": null, "paid-free": 1 });
+  });
+
   it("sorts by name and drops entries without an id", () => {
     const models = normalizeModels("custom", [{ id: "b" }, { name: "no id" }, { id: "a" }]);
     expect(models.map((m) => m.id)).toEqual(["a", "b"]);

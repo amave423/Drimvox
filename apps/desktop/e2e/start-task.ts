@@ -36,3 +36,12 @@ export async function startTask(page: Page, s: Start): Promise<void> {
   await page.getByRole("button", { name: new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
   await expect(page.locator(".task-head h1")).toHaveText(title);
 }
+
+/** "+ Project" and its kind: from scratch (the interview and the plan) unless a ready one is asked for. */
+export async function addProject(page: Page, kind: "new" | "existing" = "new"): Promise<void> {
+  await page.getByRole("button", { name: "+ Проект" }).click();
+  const dialog = page.getByRole("dialog", { name: "Какой это проект?" });
+  await dialog.getByRole("radio", { name: kind === "new" ? /^С нуля/ : /^Готовый проект/ }).click();
+  await dialog.getByRole("button", { name: "Продолжить" }).click();
+  await expect(dialog).toHaveCount(0);
+}

@@ -376,6 +376,13 @@ test("keeps the model picker and chat actions within reach in a long chat", asyn
   const picker = page.getByRole("button", { name: /Тестовый \/ fake-model/ });
   await expect(picker).toBeInViewport();
   await expect(page.getByRole("button", { name: "Удалить чат" })).toBeInViewport();
+  // One's own messages are listed under deleting the chat, open, and a click brings one into view (asked for: the
+  // marks at the edge folded up after a click).
+  const own = page.getByRole("navigation", { name: "Ваши сообщения" });
+  await expect(own.getByRole("button")).toHaveText(["Вопрос 1", "Вопрос 2", "Вопрос 3"]);
+  await own.getByRole("button", { name: "Вопрос 1" }).click();
+  await expect(page.locator(".msg-user-wrap").first()).toBeInViewport();
+  await expect(own.getByRole("button", { name: "Вопрос 1" })).toHaveAttribute("aria-current", "true");
 
   await picker.click();
   await page.getByRole("option", { name: /Other Model/ }).click();

@@ -18,7 +18,7 @@ import type { Connection, ProviderRepo } from "../providers/repo";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 import type { Vision } from "../visual/look";
 import { VISUAL_HINT, visualTools, type VisualKit } from "../visual/tools";
-import { nudgeMessage, projectRules } from "./prompt";
+import { existingRules, nudgeMessage, projectRules } from "./prompt";
 import { polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
@@ -89,6 +89,8 @@ export class WorkRun {
     readonly projectId: string,
     readonly chatId: string,
     private readonly folder: string,
+    /** A ready project, worked on as in a chat: an answer may end without finish_work, no limits but the month's. */
+    private readonly chatMode = false,
   ) {}
 
   /** A message the user wrote while the run goes on; it is already in the conversation. */
@@ -143,8 +145,8 @@ export class WorkRun {
       for (;;) {
         if (signal.aborted) return stopWith("stopped", "user");
         const row = this.row();
-        if (this.spent() >= row.budgetUsd) return stopWith("paused", "budget");
-        if (worked() >= row.hours * 3_600_000) return stopWith("paused", "time");
+        if (!this.chatMode && this.spent() >= row.budgetUsd) return stopWith("paused", "budget");
+        if (!this.chatMode && worked() >= row.hours * 3_600_000) return stopWith("paused", "time");
 
         const escalated = row.escalated && row.models?.strong;
         const ref = escalated ? row.models!.strong! : (row.models?.work ?? { providerId: chat.providerId!, model: chat.model! });
@@ -157,7 +159,7 @@ export class WorkRun {
         compactHistory(messages);
         const outcome = await this.answer(messages, conn, ref.model, () => {
           const now = this.row();
-          return worked() >= now.hours * 3_600_000;
+          return !this.chatMode && worked() >= now.hours * 3_600_000;
         });
         this.d.repo.update(this.projectId, { workedMs: worked() });
         workedBase = worked();
@@ -179,6 +181,8 @@ export class WorkRun {
         }
         if (outcome.kind === "budget") return stopWith("paused", "budget");
         if (outcome.kind === "limit" || outcome.kind === "steps") continue;
+        // As in a chat: the answer is the end of the turn; the next message goes on.
+        if (this.chatMode) return stopWith("done", null);
 
         // The model stopped on its own without finish_work: remind it, unless it keeps stopping without progress.
         const checklist = this.row().checklist;
@@ -279,7 +283,7 @@ export class WorkRun {
           this.d.repo.update(this.projectId, { report, site: start });
         },
         codeReview: async () => {
-          if (this.codeReviewed) return null;
+          if (this.codeReviewed || this.chatMode) return null;
           this.codeReviewed = true;
           // The working model reviews, in a fresh conversation with only this to do (asked for: no expensive model for it).
           const row = this.row();
@@ -303,7 +307,7 @@ export class WorkRun {
           return issues ? reviewWorkMessage(issues) : null;
         },
         skillsLeft: () => {
-          if (this.skillsNudged) return null;
+          if (this.skillsNudged || this.chatMode) return null;
           this.skillsNudged = true;
           const left = skills.filter((s) => !this.skillsOpened.has(s.name));
           if (!left.length) return null;
@@ -314,7 +318,7 @@ export class WorkRun {
           ].join("\n");
         },
         review: async (start) => {
-          if (this.designReviewed || !vision || !this.d.visualKit.screenshot) return null;
+          if (this.designReviewed || this.chatMode || !vision || !this.d.visualKit.screenshot) return null;
           this.designReviewed = true;
           onCall("design_review", "");
           const issues = await reviewProjectDesign(
@@ -339,7 +343,7 @@ export class WorkRun {
       }),
     };
     const spentBefore = this.spent();
-    const overBudget = () => spentBefore + cost >= this.row().budgetUsd;
+    const overBudget = () => !this.chatMode && spentBefore + cost >= this.row().budgetUsd;
     let limited = false;
     const outcome = await runAgent({
       conn,
@@ -364,7 +368,7 @@ export class WorkRun {
       system: [
         nowLine(),
         folderHint(this.folder),
-        projectRules(plan, !!vision && !!this.d.visualKit.screenshot),
+        this.chatMode ? existingRules(!!vision && !!this.d.visualKit.screenshot) : projectRules(plan, !!vision && !!this.d.visualKit.screenshot),
         VISUAL_HINT,
         WEB_HINT,
         skillsInstructions(skills),

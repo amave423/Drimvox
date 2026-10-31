@@ -591,3 +591,52 @@ describe("work on a project", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 });
+
+// Asked for: a ready project works like the chat with a folder (no interview, no plan to approve), and the agent keeps
+// its own plan for the sidebar.
+describe("a ready project", () => {
+  it("guesses a ready project by the files in its folder", async () => {
+    expect(await (await env.call("POST", "/api/projects/peek", { path: folder })).json()).toEqual({ files: 1, guess: "existing" });
+    const empty = mkdtempSync(join(tmpdir(), "drimvox-empty-"));
+    mkdirSync(join(empty, ".git"));
+    expect(await (await env.call("POST", "/api/projects/peek", { path: empty })).json()).toEqual({ files: 0, guess: "new" });
+    rmSync(empty, { recursive: true, force: true });
+  });
+
+  it("is added as ready and can be told apart later", async () => {
+    const created = await (await env.call("POST", "/api/projects", { path: folder, kind: "existing" })).json();
+    expect(created.kind).toBe("existing");
+    const changed = await (await env.call("PATCH", `/api/projects/${created.id}`, { kind: "new" })).json();
+    expect(changed.kind).toBe("new");
+    const other = mkdtempSync(join(tmpdir(), "drimvox-new-"));
+    const fresh = await (await env.call("POST", "/api/projects", { path: other })).json();
+    expect(fresh.kind).toBe("new");
+    rmSync(other, { recursive: true, force: true });
+  });
+
+  it("answers the first message at once, keeps its plan, ends without finish_work and goes on with the next message", async () => {
+    const s = await setup({
+      coder: [
+        call("update_checklist", { items: [{ text: "Найти ошибку", done: true }, { text: "Поправить", done: false }] }),
+        { text: "Нашёл и поправил: сумма считается заново." },
+        { text: "Это главная страница." },
+      ],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    const res = await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Почини сумму", model: s.ref("coder") });
+    expect(res.status).toBe(200);
+    let work = await until(s.project.id, (w) => w.status === "done");
+    expect(work.plan).toBeNull();
+    expect(work.checklist).toEqual([{ text: "Найти ошибку", done: true }, { text: "Поправить", done: false }]);
+    // No reminders to finish: it answered and stopped, as in a chat.
+    expect(requestsOf("coder")).toHaveLength(2);
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("existing project");
+    const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
+    expect(chat.messages.map((m: any) => m.content)).toEqual(["Почини сумму", "Нашёл и поправил: сумма считается заново."]);
+
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "А это что?", model: s.ref("coder") });
+    work = await until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length === 3);
+    const again = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
+    expect(again.messages.at(-1).content).toBe("Это главная страница.");
+  });
+});

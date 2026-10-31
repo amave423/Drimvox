@@ -1,4 +1,4 @@
-import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
+import type { ProjectKind, ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
@@ -9,7 +9,8 @@ import { GithubPublish } from "./GithubPublish";
 import { ChangesTab, RunTab } from "./Workspace";
 
 type Part = "result" | "changes" | "project";
-const PARTS: Part[] = ["result", "changes", "project"];
+// The project first (asked for), then what changed, then what came of it.
+const PARTS: Part[] = ["project", "changes", "result"];
 
 /**
  * The workshop's right side, its width set by the handle beside it: what came of the work (the agent's last look at
@@ -17,7 +18,7 @@ const PARTS: Part[] = ["result", "changes", "project"];
  */
 export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView | null; open: boolean; onChanged(): void; onNew?: () => void }) {
   const { t } = useApp();
-  const [part, setPart] = useState<Part>("result");
+  const [part, setPart] = useState<Part>("project");
   const { work } = p;
   return (
     <aside id="workshop-result" className="workshop-result" aria-label={t("workshop.result")} aria-hidden={!p.open} inert={!p.open}>
@@ -45,20 +46,28 @@ function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): v
   );
 }
 
-/** The project itself: its folder, its tasks, skills, GitHub, a new task, and leaving Drimvox. */
+/** The project itself: its folder and kind, its tasks, skills, GitHub, a new task, and leaving Drimvox. */
 function ProjectPart({ project, onNew }: { project: ProjectView; onNew?: () => void }) {
-  const { api, t, tasks, navigate, reloadProjects, reloadTasks } = useApp();
-  const [confirm, setConfirm] = useState(false);
+  const { api, t, tasks, navigate, reloadProjects } = useApp();
   const own = tasks.filter((task) => task.projectId === project.id);
-  async function remove() {
-    await api.projects[":id"].$delete({ param: { id: project.id } }).catch(() => null);
-    await Promise.all([reloadProjects(), reloadTasks()]);
-    navigate({ kind: "projects" });
+  async function setKind(kind: ProjectKind) {
+    await api.projects[":id"].$patch({ param: { id: project.id }, json: { kind } }).catch(() => null);
+    await reloadProjects();
   }
   return (
     <div className="workshop-project">
       <p className="mono muted">{project.path}</p>
-      {onNew && (
+      <div className="project-kind-switch" role="group" aria-label={t("project.kindLabel")}>
+        <span className="muted">{t("project.kindLabel")}</span>
+        <span className="segmented">
+          {(["existing", "new"] as const).map((k) => (
+            <button key={k} type="button" className={project.kind === k ? "is-on" : undefined} aria-pressed={project.kind === k} onClick={() => project.kind !== k && void setKind(k)}>
+              {t(`project.kind.${k}`)}
+            </button>
+          ))}
+        </span>
+      </div>
+      {onNew && project.kind !== "existing" && (
         <button className="btn" onClick={onNew}>
           {t("projectWork.newTask")}
         </button>
@@ -82,23 +91,51 @@ function ProjectPart({ project, onNew }: { project: ProjectView; onNew?: () => v
       <p className="note">{t("project.copyNote")}</p>
       <ProjectSkills projectId={project.id} />
       {project.gitState === "ready" && <GithubPublish project={project} />}
-      <div className="actions project-remove">
-        {confirm ? (
-          <>
-            <span>{t("project.removeConfirm", { name: project.name })}</span>
-            <button className="btn is-pencil" onClick={() => void remove()}>
-              {t("project.remove")}
-            </button>
-            <button className="btn" onClick={() => setConfirm(false)}>
-              {t("providers.cancel")}
-            </button>
-          </>
-        ) : (
-          <button className="link" onClick={() => setConfirm(true)}>
+      <RemoveProject project={project} />
+    </div>
+  );
+}
+
+/**
+ * Leaving Drimvox, set apart at the end of the project's tab (asked for: it was hard to find); the folder stays. The
+ * sidebar's "⋯" leads here too.
+ */
+export function RemoveProject({ project, onDone, asked = false }: { project: ProjectView; onDone?: () => void; asked?: boolean }) {
+  const { api, t, navigate, reloadProjects, reloadTasks } = useApp();
+  const [confirm, setConfirm] = useState(asked);
+  const [busy, setBusy] = useState(false);
+  async function remove() {
+    setBusy(true);
+    await api.projects[":id"].$delete({ param: { id: project.id } }).catch(() => null);
+    await Promise.all([reloadProjects(), reloadTasks()]);
+    setBusy(false);
+    onDone?.();
+    navigate({ kind: "projects" });
+  }
+  return (
+    <section className="danger-zone" aria-label={t("project.remove")}>
+      <p className="muted">{t("project.removeHint")}</p>
+      {confirm ? (
+        <div className="actions">
+          <span>{t("project.removeConfirm", { name: project.name })}</span>
+          <button className="btn is-pencil" disabled={busy} onClick={() => void remove()}>
             {t("project.remove")}
           </button>
-        )}
-      </div>
-    </div>
+          <button
+            className="btn"
+            onClick={() => {
+              setConfirm(false);
+              if (asked) onDone?.();
+            }}
+          >
+            {t("providers.cancel")}
+          </button>
+        </div>
+      ) : (
+        <button className="btn is-pencil" onClick={() => setConfirm(true)}>
+          {t("project.removeAsk")}
+        </button>
+      )}
+    </section>
   );
 }

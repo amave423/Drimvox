@@ -1,4 +1,4 @@
-import { startTask } from "./start-task";
+import { startTask, addProject } from "./start-task";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -120,7 +120,7 @@ test("the look: samples in the interview, the user's own sample, the brief, a de
 
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
 
-  await page.getByRole("button", { name: "+ Проект" }).click();
+  await addProject(page);
   await startTask(page, {
     task: "Сделай страницу меню для кофейни",
     model: "coder",
