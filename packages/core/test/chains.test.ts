@@ -61,9 +61,19 @@ describe("chains of free models", () => {
     expect(mine.members.map((m: any) => m.state)).toEqual(["resting", "ok"]);
     expect(mine.answered).toBe("Fake / second-free");
     // The next question skips the resting one.
-    const before = fake!.requests.filter((r) => r.body?.model === "first-free").length;
+    const before = fake!.requests.filter((r) => r.body?.model === "first-free" && r.body?.stream !== false).length;
     await ask(chat.id, "Ещё");
-    expect(fake!.requests.filter((r) => r.body?.model === "first-free").length).toBe(before);
+    expect(fake!.requests.filter((r) => r.body?.model === "first-free" && r.body?.stream !== false).length).toBe(before);
+  });
+
+  // Seen with OpenRouter: some free models are closed to ordinary accounts and refuse at once; the chain goes on.
+  it("goes on past a model that refuses this account outright", async () => {
+    const id = await setup((model) => (model === "first-free" ? { fail: { status: 403, message: "Not available for free users" } } : { text: "Ответила вторая" }));
+    await env.call("PUT", "/api/chains", [chain(id, ["first-free", "second-free"])]);
+    const chat = await (await env.call("POST", "/api/chats", { providerId: "chain", model: "mine" })).json();
+    await ask(chat.id, "Привет");
+    const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
+    expect(saved.messages.at(-1)).toMatchObject({ status: "done", content: "Ответила вторая" });
   });
 
   it("makes its own chains from the free models only, and lists every chain as a free model", async () => {
@@ -87,7 +97,7 @@ describe("chains of free models", () => {
     await ask(chat.id, "Привет");
     const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
     expect(saved.messages.at(-1).status).toBe("error");
-    expect(fake!.requests.some((r) => r.body?.model === "second-free")).toBe(false);
+    expect(fake!.requests.some((r) => r.body?.model === "second-free" && r.body?.stream !== false)).toBe(false);
   });
 
   // Seen: one provider that never answered held the chains' tabs for 30-40 seconds.

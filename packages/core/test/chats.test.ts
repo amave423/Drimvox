@@ -247,6 +247,16 @@ describe("sending a message", () => {
       expect(events.find((e) => e.type === "done").message).toMatchObject({ status: "done", content: "Сейчас в Москве +5 °C." });
     });
 
+    // Asked for: a model on this computer is slow already; it is never cut off for keeping quiet.
+    it("waits for a slow model on this computer however long it keeps quiet", async () => {
+      env.setIdleTimeout(150);
+      fake = await startFakeProvider({ key: KEY, models: pricedModels, chunks: [{ text: "Мед" }, { text: "ленно" }], delayMs: 500 });
+      const local = await (await env.call("POST", "/api/providers", { preset: "lmstudio", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+      const chat = await (await env.call("POST", "/api/chats", { providerId: local.id, model: "fake-model" })).json();
+      const events = await readEvents(await send(chat.id, "Привет"));
+      expect(events.find((e) => e.type === "done").message).toMatchObject({ status: "done", content: "Медленно" });
+    });
+
     it("asks the provider to search when the user picks the provider's search", async () => {
       const { chat } = await setup();
       await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Новости?", web: "provider" }));

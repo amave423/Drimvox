@@ -4,6 +4,7 @@ import { describeError } from "../providers/errors";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";
 import { usdRub } from "../rates";
 import { languageModel } from "../providers/model";
+import { isLocal, NO_LIMIT_MS } from "../budget";
 import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
@@ -89,7 +90,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let running = 0;
   const resetClock = () => {
     clearTimeout(timer);
-    if (running === 0) timer = setTimeout(() => silence.abort(), i.idleTimeoutMs);
+    if (running === 0) timer = setTimeout(() => silence.abort(), isLocal(i.conn) ? NO_LIMIT_MS : i.idleTimeoutMs);
   };
 
   // Calls our own tools reported; the rest are the SDK's rejections.

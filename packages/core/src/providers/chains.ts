@@ -10,6 +10,8 @@ import type { Connection, ProviderRepo } from "./repo";
 const KEY = "chains";
 /** How long a model that failed rests when it does not say until when. */
 const REST_MS = 15 * 60_000;
+/** A model that refused this account outright (closed to it, unknown) rests longer: it will not answer soon. */
+const GONE_MS = 6 * 60 * 60_000;
 /** A limit's own reset, when the provider names it, is trusted up to this long. */
 const MAX_REST_MS = 24 * 60 * 60_000;
 
@@ -79,6 +81,8 @@ export class Chains {
     const free = await this.freeModels();
     // Models that call tools first (they also talk), then the ones the catalog says nothing about; local ones last.
     // Models the background check found gone are left out; those that answered come first, the fastest first; local ones last.
+    // Not yet asked: the background check asks them now, and until it knows they come after those that answered.
+    this.watch.kick();
     const picked = free.filter((f) => (auto.toolsOnly ? f.tools === true : true) && this.watch.check(f).state !== "gone");
     const local = (f: FreeModel) => (this.providers.connection(f.providerId)?.preset === "ollama" ? 1 : 0);
     const answers = (f: FreeModel) => (this.watch.check(f).state === "ok" ? 0 : 1);
@@ -232,11 +236,10 @@ function classify(err: unknown, chain: ModelChain): Pass | null {
     if (!chain.onLimit) return null;
     return new Pass("limit", Date.now() + resetIn(headers), err);
   }
-  if (status === undefined || status >= 500 || status === 404 || status === 408) {
-    if (!chain.onError) return null;
-    return new Pass("error", Date.now() + REST_MS, err);
-  }
-  return null;
+  // Any other refusal before the first word goes on to the next model too: a free model closed to this account (seen
+  // with OpenRouter: 400, 403, 404), a model that takes no tools, a provider down. The next one may answer.
+  if (!chain.onError) return null;
+  return new Pass("error", Date.now() + (status === 400 || status === 403 || status === 404 ? GONE_MS : REST_MS), err);
 }
 
 /** When a limit resets, as the provider says it (Retry-After, x-ratelimit-reset…), within a day. */

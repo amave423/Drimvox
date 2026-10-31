@@ -163,6 +163,8 @@ test("a chain of free models: made in the settings, picked on its tab, the next 
       { id: "b-works:free", name: "B Works", pricing: { prompt: "0", completion: "0" } },
     ],
     respond: (body) => (body.model === "a-busy:free" ? { fail: { status: 429, message: "Rate limit" } } : { text: "Ответила B" }),
+    // The chat's name is asked of the chain too: answered, so the model that answered does not rest.
+    title: "Шишки",
   });
   const page = await launch();
   await connect(page);

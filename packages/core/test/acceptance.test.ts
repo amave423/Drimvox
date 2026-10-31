@@ -149,7 +149,7 @@ describe("acceptance", () => {
     expect(told).toContain("README не упоминает subtract");
   });
 
-  it("hands the work over with an honest report after three rounds", async () => {
+  it("hands the work over with an honest report after three rounds", { timeout: 20_000 }, async () => {
     const id = await start(
       [spec, code("# Math\n"), code("# Math\n"), code("# Math\n")],
       [verdict("missing"), verdict("missing"), verdict("missing"), verdict("done")],

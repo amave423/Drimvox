@@ -1,3 +1,4 @@
+import { isLocal, NO_LIMIT_MS } from "../budget";
 import { mergeOptions, thinkingOptions } from "./thinking";
 import { toModelMessages } from "./history";
 import { notesBlock } from "../agent/notes";
@@ -40,7 +41,6 @@ const LANGUAGE_HINT =
   "Answer in the language the user writes in. When the user asks for names, words or a text in another language, only those are in that language; your answer stays in the user's.";
 
 /** How long a model on this computer may stay silent: reading a long context before the first word takes a while. */
-const LOCAL_IDLE_MS = 10 * 60_000;
 
 export const FORMAT_HINT =
   "Answers are shown as Markdown with tables, LaTeX math ($...$ inline, $$...$$ for blocks) and highlighted code. " +
@@ -133,7 +133,7 @@ export async function reply(i: ReplyInput): Promise<void> {
 
   // Some hosted models sit in a queue or hang; every streamed part resets the clock. A model on this computer reads a
   // long context (pages it opened) for minutes before its first word, so it gets longer.
-  const idleMs = i.conn.preset === "ollama" || i.conn.preset === "lmstudio" ? Math.max(i.idleTimeoutMs, LOCAL_IDLE_MS) : i.idleTimeoutMs;
+  const idleMs = isLocal(i.conn) ? NO_LIMIT_MS : i.idleTimeoutMs;
   const silence = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const resetClock = () => {

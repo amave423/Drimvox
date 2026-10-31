@@ -84,3 +84,8 @@
 - The finished file is checked against the sha256, given to Ollama as a blob (`/api/blobs`) and made a model with
   `/api/create`; Ollama reads the chat template from the GGUF. Vision projectors are not fetched.
 - Without a proxy and with the file server closed, the error says to set one.
+
+## Без ограничений по времени
+
+Попросили: локальные модели и так медленные. Модель Ollama или LM Studio не обрывается за молчание (в чате, задаче
+агента и проекте) и не останавливается по часам работы проекта; её останавливает только «Стоп» (`isLocal` в `budget.ts`).

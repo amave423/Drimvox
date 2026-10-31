@@ -116,6 +116,15 @@ export class FreeWatch {
     return this.checking;
   }
 
+  /** A check soon when some free model has never been asked (not more often than every ten minutes). */
+  kick(): void {
+    if (this.closed || this.checking || Date.now() - this.kicked < 10 * 60_000) return;
+    if (!this.list().some((m) => this.check(m).state === "unknown")) return;
+    this.kicked = Date.now();
+    void this.checkAll().catch(() => {});
+  }
+  private kicked = 0;
+
   /** Every half hour in the background, the first a minute after the start. */
   start(): void {
     if (this.timer) return;

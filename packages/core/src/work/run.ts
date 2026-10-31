@@ -4,7 +4,7 @@ import { reviewProjectCode, reviewWorkMessage } from "./code-review";
 import { compactHistory } from "./compact";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
-import { isFreeToRun } from "../budget";
+import { isFreeToRun, isLocal } from "../budget";
 import type { ToolHooks } from "../agent/tools";
 import type { ChatApprovals } from "../chats/approvals";
 import { describeCall, folderHint, folderTools } from "../chats/folder";
@@ -109,6 +109,14 @@ export class WorkRun {
     });
   }
 
+  /** The model working now runs on this computer: no hours limit for it. */
+  private localNow(): boolean {
+    const row = this.row();
+    const ref = row.escalated && row.models?.strong ? row.models.strong : row.models?.work;
+    const conn = ref ? this.d.providers.connection(ref.providerId) : null;
+    return !!conn && isLocal(conn);
+  }
+
   private row() {
     return this.d.repo.get(this.projectId)!;
   }
@@ -155,7 +163,7 @@ export class WorkRun {
         if (signal.aborted) return stopWith("stopped", "user");
         const row = this.row();
         if (!this.chatMode && this.spent() >= row.budgetUsd) return stopWith("paused", "budget");
-        if (!this.chatMode && worked() >= row.hours * 3_600_000) return stopWith("paused", "time");
+        if (!this.chatMode && worked() >= row.hours * 3_600_000 && !this.localNow()) return stopWith("paused", "time");
 
         const escalated = row.escalated && row.models?.strong;
         const ref = escalated ? row.models!.strong! : (row.models?.work ?? { providerId: chat.providerId!, model: chat.model! });
@@ -168,7 +176,7 @@ export class WorkRun {
         compactHistory(messages);
         const outcome = await this.answer(messages, conn, ref.model, () => {
           const now = this.row();
-          return !this.chatMode && worked() >= now.hours * 3_600_000;
+          return !this.chatMode && worked() >= now.hours * 3_600_000 && !isLocal(conn);
         });
         this.d.repo.update(this.projectId, { workedMs: worked() });
         workedBase = worked();
@@ -402,7 +410,7 @@ export class WorkRun {
       spentUsd: 0,
       budgetUsd: Number.POSITIVE_INFINITY,
       signal,
-      idleTimeoutMs: conn.preset === "ollama" || conn.preset === "lmstudio" ? Math.max(this.d.idleTimeoutMs, 600_000) : this.d.idleTimeoutMs,
+      idleTimeoutMs: this.d.idleTimeoutMs,
       hooks,
       onText: (text) => {
         content = content ? `${content}\n\n${text}` : text;

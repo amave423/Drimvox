@@ -19,6 +19,17 @@ export function monthUsage(db: Database, chats: ChatRepo): MonthUsage {
   return { spentUsd, budgetUsd, over: budgetUsd !== null && spentUsd >= budgetUsd, since: monthStart() };
 }
 
+/**
+ * A model on this computer (Ollama, LM Studio): slow on most machines, so it is never cut off for keeping quiet or for
+ * the hours of a project's run (asked for: local models had limits on top of being slow). Only Stop ends it.
+ */
+export function isLocal(conn: Pick<Connection, "preset">): boolean {
+  return conn.preset === "ollama" || conn.preset === "lmstudio";
+}
+
+/** The longest a timer may wait (setTimeout's own limit, about 24 days): "no limit" for a local model. */
+export const NO_LIMIT_MS = 2_147_483_647;
+
 /** Answers that cost nothing go on past the budget: models on this computer, subscriptions, credits, a flat fee. */
 export function isFreeToRun(conn: Pick<Connection, "preset" | "flat">): boolean {
   return conn.flat || presets[conn.preset].billing !== "paid";
