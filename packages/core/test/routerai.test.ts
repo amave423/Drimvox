@@ -94,8 +94,8 @@ describe("RouterAI", () => {
   it("lists only text models for chats, with ruble prices turned into dollars", async () => {
     const id = await connect();
     const models = await (await env.call("GET", `/api/providers/${id}/models`)).json();
-    // Nano Banana answers with text as well as pictures, so it is a chat model too.
-    expect(models.map((m: any) => m.id)).toEqual(["deepseek/deepseek-v3.2", "google/gemini-2.5-flash-image"]);
+    // Nano Banana answers with text as well as pictures, but it is a picture model: on the Pictures tab only (asked for).
+    expect(models.map((m: any) => m.id)).toEqual(["deepseek/deepseek-v3.2"]);
     expect(models[0]).toEqual({ id: "deepseek/deepseek-v3.2", name: "DeepSeek V3.2", contextLength: 163840, priceIn: 1, priceOut: 2, priceEstimated: false, tools: true, vision: null });
   });
 

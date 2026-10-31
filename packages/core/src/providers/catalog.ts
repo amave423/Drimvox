@@ -61,7 +61,9 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     // Music and speech models list text among their outputs too; a chat with them fails.
     // OpenRouter and its kin say it under "architecture"; DeepSeek's own API at the top level.
     const out = (raw.architecture as { output_modalities?: unknown } | undefined)?.output_modalities ?? raw.output_modalities;
-    if (Array.isArray(out) && (!out.includes("text") || out.includes("audio"))) continue;
+    // Picture makers that also answer in text (Gemini "-image", Nano Banana, GPT-5 Image) live on the Pictures tab only
+    // (seen: they were listed among the text models too).
+    if (Array.isArray(out) && (!out.includes("text") || out.includes("audio") || out.includes("image") || out.includes("video"))) continue;
     // A catalog that does not say: picture and video makers by their names go to their own tabs (seen live).
     if (!Array.isArray(out) && mediaKindByName(id)) continue;
 

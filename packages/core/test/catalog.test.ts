@@ -99,6 +99,16 @@ describe("normalizeModels", () => {
     expect(ids).toEqual(["nvidia/nemotron-3-super-120b-a12b:free"]);
   });
 
+  // Seen: Gemini "-image", Nano Banana and GPT-5 Image were in the text list as well as on the Pictures tab.
+  it("leaves picture makers that also write text to the Pictures tab", () => {
+    const ids = normalizeModels("openrouter", [
+      { id: "google/gemini-3-pro-image", architecture: { output_modalities: ["image", "text"] } },
+      { id: "openai/gpt-5-image", architecture: { output_modalities: ["image", "text"] } },
+      { id: "minimax/minimax-m3", architecture: { output_modalities: ["text"] } },
+    ]).map((m) => m.id);
+    expect(ids).toEqual(["minimax/minimax-m3"]);
+  });
+
   // Google's OpenAI-style address lists "models/gemini-…" and documents the name without "models/" for requests.
   it("names Google's models the way its chat requests take them", () => {
     expect(normalizeModels("custom", [{ id: "models/gemini-3-flash", object: "model" }]).map((m) => m.id)).toEqual(["gemini-3-flash"]);
