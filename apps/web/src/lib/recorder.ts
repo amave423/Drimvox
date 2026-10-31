@@ -65,33 +65,76 @@ export function plainText(text: string): string {
  * Plays a WAV that a voice on this computer read (Piper, docs/specs/local-speech.md); `wav` fetches it. Resolves to a
  * way to stop; falls back to the system's voice when the recording does not come.
  */
-export function speakWav(wav: () => Promise<Blob>, fallback: () => () => void, onEnd: () => void): () => void {
+/**
+ * A text in pieces of a sentence or a few, so the first is heard in seconds while the rest is made (seen: a whole answer
+ * was made first and nothing was heard for twenty seconds, as if it had hung).
+ */
+export function speechChunks(text: string, size = 280): string[] {
+  const sentences = text.match(/[^.!?…\n]+[.!?…]*[\s\n]*/g) ?? [text];
+  const chunks: string[] = [];
+  let now = "";
+  for (const s of sentences) {
+    // The first piece is short: it is what the listener waits for.
+    const limit = chunks.length === 0 ? Math.min(size, 140) : size;
+    if (now && (now + s).length > limit) {
+      chunks.push(now.trim());
+      now = "";
+    }
+    now += s;
+  }
+  if (now.trim()) chunks.push(now.trim());
+  return chunks.filter(Boolean);
+}
+
+/**
+ * Reads pieces one after another, the next one made while the current one plays; `onStart` when the first is heard.
+ * A failure before anything is heard falls back to the system's voice.
+ */
+export function speakPieces(chunks: string[], wav: (text: string) => Promise<Blob>, fallback: () => () => void, onStart: () => void, onEnd: () => void): () => void {
   let stopped = false;
   let audio: HTMLAudioElement | null = null;
-  let url: string | null = null;
   let stopFallback: (() => void) | null = null;
-  const end = () => {
-    if (url) URL.revokeObjectURL(url);
-    url = null;
+  let started = false;
+  const urls: string[] = [];
+  const finish = () => {
+    for (const u of urls) URL.revokeObjectURL(u);
+    urls.length = 0;
     onEnd();
   };
-  void wav()
-    .then((blob) => {
-      if (stopped) return;
-      url = URL.createObjectURL(blob);
-      audio = new Audio(url);
-      audio.onended = end;
-      audio.onerror = end;
-      return audio.play();
-    })
-    .catch(() => {
-      if (!stopped) stopFallback = fallback();
+  const made = chunks.map(() => null as Promise<Blob> | null);
+  const make = (i: number) => (made[i] ??= wav(chunks[i]!));
+  const play = async (i: number): Promise<void> => {
+    if (stopped || i >= chunks.length) return finish();
+    const blob = await make(i);
+    if (i + 1 < chunks.length) void make(i + 1).catch(() => {});
+    if (stopped) return;
+    const url = URL.createObjectURL(blob);
+    urls.push(url);
+    audio = new Audio(url);
+    await new Promise<void>((resolve, reject) => {
+      audio!.onended = () => resolve();
+      audio!.onerror = () => reject(new Error("playback"));
+      void audio!.play().then(() => {
+        if (!started) {
+          started = true;
+          onStart();
+        }
+      }, reject);
     });
+    return play(i + 1);
+  };
+  void play(0).catch(() => {
+    if (stopped) return;
+    if (!started) {
+      onStart();
+      stopFallback = fallback();
+    } else finish();
+  });
   return () => {
     stopped = true;
     audio?.pause();
     stopFallback?.();
-    end();
+    finish();
   };
 }
 

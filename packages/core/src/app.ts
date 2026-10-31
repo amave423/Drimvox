@@ -21,6 +21,7 @@ import { authRoutes, sessionGuard } from "./auth/routes";
 import { AuthStore } from "./auth/store";
 import { duckDuckGo, openPage, type PageReader, type PageShower, type WebAccess } from "./internet/web";
 import { BlockedSites, withBlockedProxy } from "./internet/blocked";
+import { Favicons } from "./internet/favicons";
 import { Background } from "./agent/background";
 import { McpHub } from "./mcp/hub";
 import { AgentBrowser } from "./browser/agent-browser";
@@ -149,6 +150,11 @@ export function createCore(o: AppOptions) {
   const mcpRepo = new McpRepo(o.db, cipher);
   const agentBrowser = o.browser ?? new AgentBrowser({ profileDir: join(o.dataDir, "agent-browser") });
   const sites = new BlockedSites(o.db);
+  // The marks of linked sites, asked of each site and kept on disk; a site closed from Russia through the proxy.
+  const favicons = new Favicons(join(o.dataDir, "favicons"), (host) => {
+    const proxy = proxies.url();
+    return proxy && sites.has(host) ? fetchVia(proxy) : fetch;
+  });
   const browser = new Browser(agentBrowser);
   // The desktop's browser takes the proxy for the listed sites only, and tells of a site that opened only through it.
   const driver: BrowserDriver = agentBrowser;
@@ -236,6 +242,11 @@ export function createCore(o: AppOptions) {
 
   const api = new Hono()
     .get("/health", (c) => c.json({ ok: true as const }))
+    .get("/favicon", async (c) => {
+      const icon = await favicons.get(c.req.query("url") ?? "").catch(() => null);
+      if (!icon) return c.body(null, 404);
+      return c.body(new Uint8Array(icon.bytes), 200, { "content-type": icon.type, "cache-control": "private, max-age=86400" });
+    })
     .get("/status", (c) =>
       c.json({
         version: o.version,

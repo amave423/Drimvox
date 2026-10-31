@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { useApp } from "../../context";
 import { normalizeMath } from "../../lib/markdown";
-import { siteIcon } from "../../lib/siteIcons";
+import { SiteMark } from "./LinkedText";
 import { Diagram } from "./Diagram";
 
 interface Props {
@@ -45,14 +45,9 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: Prop
  * from the words around them). Opens in the system browser.
  */
 function SiteLink({ props, children }: { props: ComponentProps<"a">; children: ReactNode }) {
-  const icon = siteIcon(props.href);
   return (
     <a {...props} className="md-link" target="_blank" rel="noreferrer" title={props.href}>
-      {icon && (
-        <svg className="md-link-icon" viewBox="0 0 24 24" aria-hidden>
-          <path d={icon.path} />
-        </svg>
-      )}
+      <SiteMark url={props.href} className="md-link-icon" />
       {children}
     </a>
   );

@@ -21,6 +21,7 @@ import { loadMediaModel } from "../../lib/media";
 import { CoreRefusal, postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
 import { Toggle } from "../Toggle";
+import { MessageRail } from "./MessageRail";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
 import { directorRows, useDirector } from "./DirectorControl";
 import { AssistantMessage, ChatApprovalCard, UserMessage, type AnswerAction, type ChatApproval } from "./Messages";
@@ -444,6 +445,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
         {empty && !workshop && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
 
         <ShotsContext.Provider value={shots}>
+        {/* The user's own questions as marks to jump between (asked for: like DeepSeek and Codex). */}
+        <MessageRail texts={messages.filter((m) => m.role === "user").map((m) => m.content).concat(draft ? [draft.user] : [])} list={list} />
         <div className={`messages${workshop ? " timeline" : ""}`} ref={list}>
           {(cutAt !== null ? messages.slice(0, cutAt) : messages).map((m) => at(m.id, m.createdAt,
             m.role === "user" ? (

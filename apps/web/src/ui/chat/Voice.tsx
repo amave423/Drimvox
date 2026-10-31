@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
-import { speak, startRecording, plainText, speakWav } from "../../lib/recorder";
+import { speak, startRecording, plainText, speakPieces, speechChunks } from "../../lib/recorder";
 
 /**
  * Dictation in the message box (asked for): press, speak, press again; the voice model from the settings writes it down
@@ -66,40 +66,61 @@ export function DictateButton({ onText, disabled }: { onText(text: string): void
 export function SpeakButton({ text }: { text: string }) {
   const { api, t, settings } = useApp();
   const [on, setOn] = useState(false);
+  // The voice is being made and nothing is heard yet (asked for: it looked as if it had hung).
+  const [preparing, setPreparing] = useState(false);
   const stop = useRef<(() => void) | null>(null);
   useEffect(() => () => stop.current?.(), []);
   if (typeof speechSynthesis === "undefined" && !settings.speechVoice) return null;
-  const label = t(on ? "voice.silence" : "voice.listen");
+  const label = t(preparing ? "voice.preparing" : on ? "voice.silence" : "voice.listen");
   return (
-    <button
-      type="button"
-      className="msg-tool msg-speak"
-      aria-label={label}
-      title={label}
-      aria-pressed={on}
-      onClick={() => {
-        if (on) return stop.current?.();
-        setOn(true);
-        const done = () => setOn(false);
-        const system = () => speak(text, settings.locale, done);
-        // A Piper voice from the settings reads it on this computer (asked for: the system's voice sounded like a robot).
-        stop.current = settings.speechVoice
-          ? speakWav(
-              async () => {
-                const res = await api.voice.speak.$post({ json: { text: plainText(text) } });
+    <>
+      <button
+        type="button"
+        className="msg-tool msg-speak"
+        aria-label={label}
+        title={label}
+        aria-pressed={on}
+        aria-busy={preparing}
+        onClick={() => {
+          if (on) return stop.current?.();
+          setOn(true);
+          const done = () => {
+            setOn(false);
+            setPreparing(false);
+          };
+          const system = () => speak(text, settings.locale, done);
+          // A Piper voice from the settings reads it on this computer (asked for: the system's voice sounded like a robot),
+          // in pieces: the first is heard in seconds while the rest is made.
+          if (settings.speechVoice) {
+            setPreparing(true);
+            stop.current = speakPieces(
+              speechChunks(plainText(text)),
+              async (piece) => {
+                const res = await api.voice.speak.$post({ json: { text: piece } });
                 if (!res.ok) throw new Error(String(res.status));
                 return res.blob();
               },
               system,
+              () => setPreparing(false),
               done,
-            )
-          : system();
-      }}
-    >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M4 9v6h4l5 4V5L8 9H4z" />
-        {on ? <path d="M17 9l4 6M21 9l-4 6" /> : <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />}
-      </svg>
-    </button>
+            );
+          } else stop.current = system();
+        }}
+      >
+        {preparing ? (
+          <span className="action-spinner" aria-hidden />
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M4 9v6h4l5 4V5L8 9H4z" />
+            {on ? <path d="M17 9l4 6M21 9l-4 6" /> : <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />}
+          </svg>
+        )}
+      </button>
+      {preparing && (
+        <span className="muted msg-speak-note" role="status">
+          {t("voice.preparing")}
+        </span>
+      )}
+    </>
   );
 }

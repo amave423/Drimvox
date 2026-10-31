@@ -48,6 +48,11 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean): string
     "Your checklist: keep it current with update_checklist (short items, done marked) whenever an item is done or you find",
     "new work; the user sees it. If you cannot decide something well yourself, ask_user with your assumption and go on: never",
     "wait for an answer. A message from the user while you work comes as a user message: follow it, then go on.",
+    // Seen: in a chat the model said what it was doing between its actions and the user could follow; in a project it
+    // often worked through many steps without a word.
+    "Think aloud for the user as you go: before each group of actions write one short sentence on what you are about to do",
+    "and why (\"Checking how the order form saves data\"), and after you learn something, one sentence on what you found",
+    "and what follows. Never do more than a few actions in a row without a word; keep these lines short, not a report.",
     // Seen live: after "Go" the agent wrote in English until the user asked in Russian.
     "Write to the user in the language the user writes in (the plan's language): your messages, the checklist, questions",
     "and the report.",
