@@ -19,6 +19,7 @@ import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from ".
 import type { Vision } from "../visual/look";
 import { VISUAL_HINT, visualTools, type VisualKit } from "../visual/tools";
 import { existingRules, nudgeMessage, projectRules } from "./prompt";
+import type { ProjectGit } from "./project-git";
 import { polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
@@ -54,6 +55,8 @@ export interface RunDeps {
   /** This month's spending against the app's budget. */
   month(): MonthUsage;
   vision(conn: Connection, model: string): Promise<Vision | null>;
+  /** The project's git rules: the branch before the work, commits on the agent's word, the push at the end. */
+  git?: ProjectGit;
   /** The picture tool when the settings name an image model: it draws straight into the project's folder. */
   imageTools?(folder: string, owner: string, hooks: Omit<ToolHooks, "onFinish">, onSpend: (usd: number) => void, budgetLeft: () => number): Promise<ToolSet>;
   /** The run ended (done, paused or stopped): notifications, the sidebar. */
@@ -138,9 +141,13 @@ export class WorkRun {
     let errors = 0;
     let doneBefore = this.row().checklist.filter((i) => i.done).length;
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
+    // The branch the project's git rules ask for, before anything changes.
+    await this.d.git?.prepare(this.projectId, this.folder).catch(() => {});
 
+    // How the run ended, written after git's last steps: until then it still counts as running (a new message waits).
+    let final: { status: "paused" | "stopped" | "done"; reason: "budget" | "time" | "stuck" | "error" | "user" | "month_budget" | null; detail: string | null; workedMs: number } | null = null;
     const stopWith = (status: "paused" | "stopped" | "done", reason: "budget" | "time" | "stuck" | "error" | "user" | "month_budget" | null, detail?: string) => {
-      this.d.repo.update(this.projectId, { status, reason, detail: detail ?? null, workedMs: worked() });
+      final = { status, reason, detail: detail ?? null, workedMs: worked() };
     };
 
     try {
@@ -209,6 +216,14 @@ export class WorkRun {
     } finally {
       // A dev server the agent started does not hold the port once the run is over.
       this.d.visualKit.background.stopAll(this.chatId);
+      // What the agent left uncommitted goes in one commit; then its branch to GitHub, as the rules say.
+      if (this.d.git) {
+        const done = this.row().checklist.filter((i) => i.done).at(-1)?.text;
+        const asked = this.d.chats.history(this.chatId).filter((m) => m.role === "user").at(-1)?.content.split("\n")[0] ?? "";
+        await this.d.git.commit(this.projectId, this.folder, done ?? asked).catch(() => false);
+        await this.d.git.finish(this.projectId, this.folder, asked || done || "").catch(() => {});
+      }
+      if (final) this.d.repo.update(this.projectId, final);
       this.d.ended(this.projectId);
     }
   }
@@ -256,6 +271,7 @@ export class WorkRun {
         })
       : {};
     const spentNow = this.spent();
+    const gitLine = this.d.git ? await this.d.git.instructions(this.projectId, this.folder) : undefined;
     const imageTools = this.d.imageTools
       ? await this.d.imageTools(this.folder, this.chatId, hooks, (usd) => (cost += usd), () => (this.chatMode ? Number.POSITIVE_INFINITY : this.row().budgetUsd - spentNow - cost))
       : {};
@@ -347,6 +363,7 @@ export class WorkRun {
           return issues ? polishWorkMessage(issues) : null;
         },
         onCall,
+        ...(this.d.git && this.d.git.rules(this.projectId).commit !== "never" ? { commit: (message: string) => this.d.git!.commit(this.projectId, this.folder, message) } : {}),
       }),
     };
     const spentBefore = this.spent();
@@ -375,7 +392,7 @@ export class WorkRun {
       system: [
         nowLine(),
         folderHint(this.folder),
-        this.chatMode ? existingRules(!!vision && !!this.d.visualKit.screenshot) : projectRules(plan, !!vision && !!this.d.visualKit.screenshot),
+        this.chatMode ? existingRules(!!vision && !!this.d.visualKit.screenshot, gitLine) : projectRules(plan, !!vision && !!this.d.visualKit.screenshot, gitLine),
         VISUAL_HINT,
         WEB_HINT,
         skillsInstructions(skills),

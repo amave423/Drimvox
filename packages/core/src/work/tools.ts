@@ -16,6 +16,8 @@ export interface WorkToolHooks {
   /** Before it is done, once: the skills the agent has not opened, which may be meant for this moment; null when none. */
   skillsLeft?(): string | null;
   onCall(name: string, input: string): void;
+  /** The project's rules let the agent commit: Drimvox commits what is done with this message (docs/specs/project-git.md). */
+  commit?(message: string): Promise<boolean>;
 }
 
 /** Trimmed to a length, with an ellipsis where it was cut. */
@@ -42,6 +44,20 @@ export function workTools(h: WorkToolHooks): ToolSet {
         return open.length ? `Checklist saved. Open: ${open.map((i) => i.text).join("; ")}.` : "Checklist saved: everything is done. Check the result once more, then call finish_work.";
       },
     }),
+    ...(h.commit
+      ? {
+          commit_changes: tool({
+            description:
+              "Commit what you changed so far, as the project's git rules say (when to call it is in your instructions). Drimvox makes the commit itself, leaving secrets and dependency folders out. Give one short line in the style your instructions name.",
+            inputSchema: z.object({ message: z.string().min(1).max(500) }),
+            execute: async ({ message }) => {
+              const made = await h.commit!(clip(message, 200));
+              h.onCall("commit_changes", clip(message, 200));
+              return made ? "Committed." : "Nothing to commit.";
+            },
+          }),
+        }
+      : {}),
     ask_user: tool({
       description:
         "Ask the user something you cannot decide well yourself, without waiting: say what you assume meanwhile and go on with it. The user may answer later in the conversation; then follow the answer.",

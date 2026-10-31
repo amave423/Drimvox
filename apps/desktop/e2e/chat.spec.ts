@@ -153,6 +153,55 @@ test("asks the free models a word, hides those that are gone and marks the busy 
   await expect(page.getByText("Скрыто 1: сейчас не отвечают")).toBeVisible();
 });
 
+// docs/specs/model-chains.md: a chain of free models made in the settings, picked in the chat on its own tab; the busy
+// first model hands the question to the next.
+test("a chain of free models: made in the settings, picked on its tab, the next model answers for a busy one", async () => {
+  fake = await startFakeProvider({
+    key: KEY,
+    models: [
+      { id: "a-busy:free", name: "A Busy", pricing: { prompt: "0", completion: "0" } },
+      { id: "b-works:free", name: "B Works", pricing: { prompt: "0", completion: "0" } },
+    ],
+    respond: (body) => (body.model === "a-busy:free" ? { fail: { status: 429, message: "Rate limit" } } : { text: "Ответила B" }),
+  });
+  const page = await launch();
+  await connect(page);
+  await expect(page.getByText("Моделей: 2")).toBeVisible();
+  // The parameters' Chains tab: Drimvox's own two and a new one of the user's.
+  await openSection(page, "Настройки");
+  await page.getByRole("tab", { name: "Цепочки" }).click();
+  const list = page.getByRole("navigation", { name: "Цепочки бесплатных моделей" });
+  await expect(list).toContainText("Авто: для кода");
+  await expect(list).toContainText("Авто: для чата");
+  await list.getByRole("button", { name: "+ Новая цепочка" }).click();
+  await expect(list.getByRole("button", { name: /Моя цепочка 1/ })).toHaveAttribute("aria-current", "true");
+  for (const model of ["A Busy", "B Works"]) {
+    await page.getByRole("button", { name: "+ Добавить бесплатную модель" }).click();
+    await page.getByLabel("+ Добавить бесплатную модель").selectOption({ label: `Тестовый / ${model}` });
+  }
+  await expect(page.locator(".chain-link")).toHaveCount(2);
+  await expect(page.locator(".chain-link").first()).toContainText("A Busy");
+
+  await newChat(page);
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.locator(".picker-providers").getByRole("button", { name: "⛓ Цепочки" }).click();
+  const chains = page.getByRole("listbox", { name: "⛓ Цепочки" });
+  // One line each: the providers in turn after the name.
+  const mine = chains.getByRole("option", { name: /Моя цепочка 1/ });
+  await expect(mine).toContainText("Тестовый → Тестовый");
+  expect((await mine.boundingBox())!.height).toBeLessThan(44);
+  await mine.click();
+  await say(page, "Привет");
+  await expect(page.getByText("Ответила B")).toBeVisible({ timeout: 20_000 });
+
+  // In the settings the busy one rests and the one that answered is named.
+  await openSection(page, "Настройки");
+  await page.getByRole("tab", { name: "Цепочки" }).click();
+  await page.getByRole("navigation", { name: "Цепочки бесплатных моделей" }).getByRole("button", { name: /Моя цепочка 1/ }).click();
+  await expect(page.locator(".chain-link").first()).toContainText("отдыхает до");
+  await expect(page.locator(".chain-link").nth(1)).toContainText("отвечает");
+});
+
 test("thinks in a small window, then draws formulas, a chart and highlighted code", async () => {
   const answer =
     "Энергия: $E = mc^2$, а площадь \\(S = \\pi r^2\\).\n\n" +

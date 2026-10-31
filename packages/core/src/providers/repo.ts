@@ -1,4 +1,4 @@
-import { presets, type PresetId, type ProviderCreate, type ProviderUpdate, type ProviderView } from "@drimvox/shared";
+import { CHAIN_PROVIDER_ID, presets, type ModelInfo, type PresetId, type ProviderCreate, type ProviderUpdate, type ProviderView } from "@drimvox/shared";
 import { randomUUID } from "node:crypto";
 import type { Database } from "../db";
 import { fetchVia, noProxyFetch, type ProxyStore } from "../proxy";
@@ -21,6 +21,14 @@ export interface Connection {
   flat: boolean;
   /** Every request to the provider goes through this: straight, or through the proxy. */
   fetch: typeof fetch;
+  /** The chains of free models, when this is their provider (docs/specs/model-chains.md): models answer in turn. */
+  chain?: ChainSource;
+}
+
+/** What the chains give the rest of the core: each chain as a model, and the list of them. */
+export interface ChainSource {
+  model(chainId: string): unknown;
+  models(): Promise<ModelInfo[]>;
 }
 
 /** A request the API should answer with 400. */
@@ -59,6 +67,13 @@ export class ProviderRepo {
     private readonly presetUrls: Partial<Record<PresetId, string>> = {},
   ) {}
 
+  private chains: ChainSource | null = null;
+
+  /** Set once the chains exist: their provider answers with them. */
+  setChains(chains: ChainSource): void {
+    this.chains = chains;
+  }
+
   /** Set once the local models are set up: they need the providers too. */
   setWaker(waker: LocalWaker): void {
     this.waker = waker;
@@ -69,10 +84,11 @@ export class ProviderRepo {
   }
 
   list(): ProviderView[] {
-    return this.rows("select * from providers order by created_at").map(toView);
+    return this.rows("select * from providers where id <> 'chain' order by created_at").map(toView);
   }
 
   get(id: string): ProviderView | null {
+    if (id === CHAIN_PROVIDER_ID && this.chains) return CHAIN_VIEW;
     const row = this.row(id);
     return row ? toView(row) : null;
   }
@@ -109,6 +125,7 @@ export class ProviderRepo {
   }
 
   update(id: string, patch: ProviderUpdate): ProviderView | null {
+    if (id === CHAIN_PROVIDER_ID) return null;
     const row = this.row(id);
     if (!row) return null;
     if (patch.baseUrl && !presets[row.preset].editableUrl) throw new InvalidInput("This address cannot be changed");
@@ -130,11 +147,16 @@ export class ProviderRepo {
   }
 
   remove(id: string): boolean {
+    if (id === CHAIN_PROVIDER_ID) return false;
     return Number(this.db.sql.prepare("delete from providers where id = ?").run(id).changes) > 0;
   }
 
   /** Null when the provider does not exist. A key that cannot be decrypted counts as missing. */
   connection(id: string): Connection | null {
+    // The chains' provider: free (each model in a chain is), answering through the chain itself.
+    if (id === CHAIN_PROVIDER_ID && this.chains) {
+      return { id, preset: "custom", currency: "USD", baseUrl: "drimvox://chain", apiKey: null, cacheKey: "chain", useProxy: false, proxy: null, flat: true, fetch: globalThis.fetch, chain: this.chains };
+    }
     const row = this.row(id);
     if (!row) return null;
     let apiKey: string | null = null;
@@ -194,6 +216,9 @@ function hostOf(url: string): string {
     return "";
   }
 }
+
+/** The chains as a provider, for checks that a picked provider exists; it is never listed with the others. */
+const CHAIN_VIEW: ProviderView = { id: CHAIN_PROVIDER_ID, preset: "custom", name: "Цепочки", baseUrl: "drimvox://chain", hasKey: false, billing: "free", currency: "USD", useProxy: false, flat: true, createdAt: 0 };
 
 function toView(row: Row): ProviderView {
   return {

@@ -185,8 +185,9 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await page.getByRole("button", { name: "Показать боковую панель" }).click();
   await expect(page.locator("#sidebar")).toBeVisible();
   expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Доски");
-  // Nothing to accept, and git stays the user's.
-  expect(execFileSync("git", ["log", "--oneline"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);
+  // By the default git rules the work is in a branch of the agent's own; main stays as it was.
+  expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toMatch(/^drimvox\/task-/);
+  expect(execFileSync("git", ["log", "--oneline", "main"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);
   expect(fake!.requests.some((r) => JSON.stringify(r.body?.messages ?? []).includes("Сделай заголовок крупнее"))).toBe(true);
   // An answer closes the question's note over the box (seen: it stayed after the reply).
   await page.locator(".side-project").first().click();
@@ -227,6 +228,16 @@ test("a ready project: asked on adding, talked to as in a chat, its plan on the 
   await expect(result.getByRole("tab").first()).toHaveText("Проект");
   await expect(result.getByRole("button", { name: "Существующий проект" })).toHaveAttribute("aria-pressed", "true");
   await expect(result.getByRole("button", { name: "Убрать из Drimvox…" })).toBeVisible();
+  // Git by the project's rules: the agent's branch, accepted into main from the project's tab.
+  const rules = result.getByRole("region", { name: "Git: как работает агент" });
+  await expect(rules.getByLabel("Куда пишет")).toHaveValue("task-branch");
+  await expect(rules.getByLabel("Когда коммитит")).toHaveValue("per-item");
+  await expect(rules.getByLabel("Сообщения")).toHaveValue("history");
+  const branch = result.getByRole("region", { name: "Ветка агента" });
+  await expect(branch).toContainText("→ main");
+  await branch.getByRole("button", { name: "Принять" }).click();
+  await expect(branch).toHaveCount(0);
+  expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toBe("main");
   // The next message goes on in the same conversation, still with a model to pick under the box.
   await expect(page.locator(".workshop-feed .composer-bar").getByRole("button", { name: /coder/i })).toBeVisible();
 

@@ -145,9 +145,9 @@ export class GitHub {
     return res?.ok && body?.login ? body.login : null;
   }
 
-  private call(path: string, token: string, body?: unknown): Promise<Response> {
+  private call(path: string, token: string, body?: unknown, method?: string): Promise<Response> {
     return fetch(`${this.api}${path}`, {
-      method: body === undefined ? "GET" : "POST",
+      method: method ?? (body === undefined ? "GET" : "POST"),
       headers: {
         accept: "application/vnd.github+json",
         authorization: `Bearer ${token}`,
@@ -201,6 +201,43 @@ export class GitHub {
     const account = this.signedIn();
     if (!(await this.project(dir)).remote) throw new GithubFailure("no_remote", "The project has no remote");
     await this.pushTo(dir, account, false);
+  }
+
+  /** Signed in, and the project's remote is on GitHub over https: the agent's branch can go there with a pull request. */
+  async ready(dir: string): Promise<boolean> {
+    const remote = (await this.project(dir)).remote;
+    return !!this.account() && !!remote && !!this.repoOf(remote);
+  }
+
+  /** "owner/repo" of a remote on GitHub's own host over https; null for others. */
+  private repoOf(remote: string): string | null {
+    const m = /^https:\/\/([^/@]+@)?([^/]+)\/([^/]+)\/([^/]+?)(\.git)?\/?$/i.exec(remote);
+    return m && m[2]!.toLowerCase() === new URL(this.web).host.toLowerCase() ? `${m[3]}/${m[4]}` : null;
+  }
+
+  /** Opens a pull request of `head` into `base`; an open one for the same branch is found instead of a second. */
+  async pullRequest(dir: string, head: string, base: string, title: string, body: string): Promise<{ number: number; url: string }> {
+    const account = this.signedIn();
+    const repo = this.repoOf((await this.project(dir)).remote ?? "");
+    if (!repo) throw new GithubFailure("no_remote", "The project has no GitHub remote");
+    const res = await this.call(`/repos/${repo}/pulls`, account.token, { title, head, base, body });
+    const made = (await res.json().catch(() => ({}))) as { number?: number; html_url?: string; message?: string };
+    if (res.ok && made.number && made.html_url) return { number: made.number, url: made.html_url };
+    if (res.status === 422) {
+      const owner = repo.split("/")[0];
+      const open = await this.call(`/repos/${repo}/pulls?head=${encodeURIComponent(`${owner}:${head}`)}&state=open`, account.token);
+      const found = ((await open.json().catch(() => [])) as { number?: number; html_url?: string }[])[0];
+      if (found?.number && found.html_url) return { number: found.number, url: found.html_url };
+    }
+    throw new GithubFailure("github_error", made.message ?? `GitHub answered ${res.status}`);
+  }
+
+  /** Closes a pull request without merging it. */
+  async closePullRequest(dir: string, number: number): Promise<void> {
+    const account = this.signedIn();
+    const repo = this.repoOf((await this.project(dir)).remote ?? "");
+    if (!repo) return;
+    await this.call(`/repos/${repo}/pulls/${number}`, account.token, { state: "closed" }, "PATCH").catch(() => null);
   }
 
   /**

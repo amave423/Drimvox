@@ -123,6 +123,8 @@ const TTL_MS = 10 * 60_000;
 const cache = new Map<string, { at: number; models: ModelInfo[] }>();
 
 export async function listModels(conn: Connection, fresh = false): Promise<ModelInfo[]> {
+  // The chains of free models are this provider's models.
+  if (conn.chain) return conn.chain.models();
   // A CLI's list is cheap to build and shows the model its default last turned out to be.
   if (isCli(conn.preset)) return cliModels({ ...conn, preset: conn.preset });
   // Pictures on this computer have no models to talk to (docs/specs/local-images.md).

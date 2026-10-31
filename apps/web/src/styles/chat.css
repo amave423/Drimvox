@@ -343,3 +343,12 @@
 .msg-jump button.is-on { color: var(--ink); }
 @media print { .msg-rail, .msg-jump { display: none; } }
 .msg-speak-note { font-size: 13px; align-self: center; }
+
+/* Chains of free models in the picker: one line each, the providers in turn after the name (docs/specs/model-chains.md). */
+.chain-list button { align-items: center; padding: 6px 8px; }
+.chain-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 14px; }
+.chain-name { white-space: nowrap; }
+.chain-members { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.chain-awake { flex: none; color: var(--ok); font-size: 12px; }
+.chain-awake.is-wait { color: var(--wait); }
+.chain-setup { align-self: start; font-size: 13px; padding: 4px 8px; }

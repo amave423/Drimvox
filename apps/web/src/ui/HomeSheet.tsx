@@ -1,3 +1,4 @@
+import { CHAIN_PROVIDER_ID } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../context";
 import { readLastModel, rememberLastModel, type ModelChoice } from "../lib/lastModel";
@@ -64,7 +65,7 @@ function HomeAsk() {
   const [text, setText] = useState("");
   const [choice, setChoice] = useState<ModelChoice | null>(() => {
     const last = readLastModel();
-    return last && providers.some((p) => p.id === last.providerId) ? last : null;
+    return last && (last.providerId === CHAIN_PROVIDER_ID || providers.some((p) => p.id === last.providerId)) ? last : null;
   });
   const can = !!choice && !!text.trim();
   const ask = () => {

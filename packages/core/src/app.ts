@@ -43,6 +43,9 @@ import { providerRoutes } from "./routes/providers";
 import { localRoutes } from "./routes/local";
 import { imageToolsFor } from "./media/agent-tool";
 import { forgetCliProxy } from "./local/cliproxy-leftovers";
+import { ProjectGit } from "./work/project-git";
+import { Chains } from "./providers/chains";
+import { chainRoutes } from "./routes/chains";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
 import { monthUsage } from "./budget";
@@ -138,6 +141,9 @@ export function createCore(o: AppOptions) {
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
   const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
+  // Chains of free models answer as models of their own provider (docs/specs/model-chains.md).
+  const chains = new Chains(o.db, providers);
+  providers.setChains(chains);
   void local.connectIfServed().catch(() => {});
   // CLIProxyAPI is gone (asked for: Drimvox does it all itself): what an earlier version left is cleared once.
   forgetCliProxy(o.db, providers, join(o.dataDir, "cliproxy"));
@@ -211,6 +217,7 @@ export function createCore(o: AppOptions) {
     idleTimeoutMs,
   });
   const backlogService = new BacklogService(backlog, projects, chats);
+  const projectGit = new ProjectGit(o.db, github);
   const projectWork = new ProjectWork({
     repo: workRepo,
     runner,
@@ -232,6 +239,7 @@ export function createCore(o: AppOptions) {
       plan: (projectId) => backlog.plan(projectId),
       month: () => monthUsage(o.db, chats),
       vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
+      git: projectGit,
       imageTools: (worktree, taskId, hooks, onSpend, budgetLeft) => imageToolsFor(readSettings(o.db).imageModel, providers, { worktree, taskId, media, hooks, budgetLeft, onSpend }),
     },
   });
@@ -311,7 +319,8 @@ export function createCore(o: AppOptions) {
     .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), async (since) => spendingByModel(o.db, providers, since)))
     .route("/projects", projectRoutes(projects, tasks, providers, runner))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
-    .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo))
+    .route("/chains", chainRoutes(chains))
+    .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo, projectGit))
     .route("/tasks", taskRoutes(tasks, runner, shots, backlogService))
     .route("/github", githubRoutes(github, projects))
     // Every project's work at once: the window's notifications (docs/specs/project-work.md).

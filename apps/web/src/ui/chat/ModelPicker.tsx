@@ -1,4 +1,4 @@
-import { estimateCost, type ChatKind, type MediaModel, type ModelInfo, type PhotoInput, type ProviderView } from "@drimvox/shared";
+import { CHAIN_PROVIDER_ID, estimateCost, type ChainView, type ChatKind, type MediaModel, type ModelInfo, type PhotoInput, type ProviderView } from "@drimvox/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
 import { fixedBy, useFlip, useOnWindow } from "../../lib/flip";
@@ -32,7 +32,15 @@ interface PickerProps {
 type Listed = { id: string; name: string; info: ModelInfo | null; photoInput?: PhotoInput | null; providerId?: string };
 
 export function ModelPicker({ value, onChange, placement = "below", kinds: wanted = ["text"], vision = false, photos = false, audio = false }: PickerProps) {
-  const { api, t, providers: all, settings, updateSettings } = useApp();
+  const { api, t, providers: all, settings, updateSettings, navigate } = useApp();
+  const openChains = () => {
+    try {
+      localStorage.setItem("drimvox.settingsPart", "chains");
+    } catch {
+      // The settings open on their first part.
+    }
+    navigate({ kind: "settings" });
+  };
   // For dictation: only providers with a model that hears (seen: every provider and the picture tabs were offered).
   const [hearing, setHearing] = useState<Set<string> | null>(null);
   useEffect(() => {
@@ -50,7 +58,9 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   // The speech engine on this computer only writes dictation down: it is offered for that alone.
   const providers = audio ? all.filter((p) => hearing?.has(p.id)) : all.filter((p) => p.preset !== "whispercpp");
   const favorites = settings.favoriteModels;
-  const sidebar = providers.length > 1 || (favorites.length > 0 && !audio);
+  // Chains of free models are picked like models, on a tab of their own (docs/specs/model-chains.md).
+  const chainsTab = wanted.includes("text") && !audio && !vision;
+  const sidebar = providers.length > 1 || (favorites.length > 0 && !audio) || chainsTab;
   // Three groups: by key, on this computer, by subscription (asked for: local models in a section of their own).
   const local = (p: ProviderView) => p.preset === "ollama" || p.preset === "lmstudio" || p.preset === "sdcpp" || p.preset === "whispercpp";
   const byKey = providers.filter((p) => p.billing !== "subscription" && !local(p));
@@ -59,7 +69,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const [open, setOpen] = useState(false);
   const [chosenProvider, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
   // A provider that is not offered (no model that hears) gives way to the first that is.
-  const providerId = providers.some((p) => p.id === chosenProvider) || chosenProvider === FAVORITES ? chosenProvider : providers[0]?.id;
+  const providerId = providers.some((p) => p.id === chosenProvider) || chosenProvider === FAVORITES || (chainsTab && chosenProvider === CHAIN_PROVIDER_ID) ? chosenProvider : providers[0]?.id;
   // Local models and programs on a subscription only talk: no tabs for pictures and video there (seen: empty tabs).
   const preset = providers.find((p) => p.id === providerId)?.preset;
   const talkOnly = preset === "ollama" || preset === "lmstudio" || providers.find((p) => p.id === providerId)?.billing === "subscription";
@@ -68,6 +78,8 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const [chosenKind, setKind] = useState<ChatKind>(value?.kind && wanted.includes(value.kind) ? value.kind : wanted[0]!);
   // Favourites are models to talk to; pictures and clips keep their own lists.
   const onFavorites = providerId === FAVORITES;
+  const onChains = providerId === CHAIN_PROVIDER_ID;
+  const [chainList, setChainList] = useState<ChainView[] | null>(null);
   const kind = onFavorites ? "text" : kinds.includes(chosenKind) ? chosenKind : (kinds[0] ?? "text");
   const [favoriteList, setFavoriteList] = useState<Listed[] | null>(null);
   const [query, setQuery] = useState("");
@@ -84,7 +96,20 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   useOnWindow(panel, onWindow);
 
   useEffect(() => {
-    if (!open || !providerId || providerId === FAVORITES) return;
+    if (!open || !onChains) return;
+    let live = true;
+    void api.chains
+      .$get()
+      .then((r) => r.json())
+      .then((list) => live && setChainList(list as ChainView[]))
+      .catch(() => live && setChainList([]));
+    return () => {
+      live = false;
+    };
+  }, [api, open, onChains]);
+
+  useEffect(() => {
+    if (!open || !providerId || providerId === FAVORITES || providerId === CHAIN_PROVIDER_ID) return;
     // The list kept from the last time shows at once; the fresh one replaces it when it comes.
     const kept = storedModels(providerId);
     setResult(kept ? { models: kept } : null);
@@ -177,7 +202,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   }, [result, media, kind, query, vision, photos, onFavorites, favoriteList, audio]);
   const loading = onFavorites ? favoriteList === null : kind === "text" ? result === null : media === null;
 
-  const providerName = providers.find((p) => p.id === value?.providerId)?.name;
+  const providerName = value?.providerId === CHAIN_PROVIDER_ID ? t("chains.provider") : providers.find((p) => p.id === value?.providerId)?.name;
   // A CLI's "default" is whatever the program itself is set to.
   const isCliDefault = (pid: string | undefined, model: string) =>
     model === "default" && providers.find((p) => p.id === pid)?.billing === "subscription";
@@ -278,6 +303,11 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
                   {t("model.favorites")}
                 </button>
               )}
+              {chainsTab && (
+                <button type="button" className={onChains ? "is-on" : undefined} onClick={() => setProviderId(CHAIN_PROVIDER_ID)}>
+                  {t("chains.tab")}
+                </button>
+              )}
               {byKey.map((p) => (
                 <button type="button" key={p.id} className={p.id === providerId ? "is-on" : undefined} onClick={() => setProviderId(p.id)}>
                   {p.name}
@@ -297,6 +327,47 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
               ))}
             </nav>
           )}
+          {onChains ? (
+            <div className="picker-main">
+              {chainList === null && <p className="muted">{t("model.loading")}</p>}
+              {/* One line each (asked for: the models of a chain took too much room). */}
+              <ul className="picker-list chain-list" role="listbox" aria-label={t("chains.tab")}>
+                {(chainList ?? []).map((c) => {
+                  const awake = c.members.filter((m) => m.state === "ok").length;
+                  return (
+                    <li key={c.id} role="option" className="picker-item" aria-selected={value?.providerId === CHAIN_PROVIDER_ID && value?.model === c.id}>
+                      <button
+                        type="button"
+                        disabled={c.members.length === 0}
+                        title={c.members.map((m) => `${m.providerName} / ${m.name}`).join(" → ")}
+                        onClick={() => {
+                          onChange({ providerId: CHAIN_PROVIDER_ID, model: c.id, kind: "text" });
+                          setOpen(false);
+                        }}
+                      >
+                        <span className="chain-line">
+                          <span className="chain-name">{c.name}</span>
+                          <small className="chain-members">{c.members.length ? c.members.map((m) => m.providerName).join(" → ") : t("chains.empty")}</small>
+                        </span>
+                        <small className={`chain-awake${awake ? "" : " is-wait"}`}>{t("chains.awake", { n: awake, total: c.members.length })}</small>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <a
+                className="chain-setup"
+                href="#chains"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setOpen(false);
+                  openChains();
+                }}
+              >
+                {t("chains.setup")}
+              </a>
+            </div>
+          ) : (
           <div className="picker-main">
           {kinds.length > 1 && !onFavorites && (
             <div className="picker-kinds" role="tablist">
@@ -339,6 +410,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
             )}
           </ul>
           </div>
+          )}
         </div>
       )}
     </div>

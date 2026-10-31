@@ -15,6 +15,7 @@ import { Setting } from "./Setting";
 import { NoticeSoundSetting, noticeLookNow } from "./NoticeSoundSetting";
 import { SpeechVoiceSetting } from "./SpeechVoiceSetting";
 import { SearchSection } from "./SearchSection";
+import { ChainsSection } from "./ChainsSection";
 import { SpendingSection } from "./SpendingSection";
 import { ModelPicker } from "./chat/ModelPicker";
 import { Tabs } from "./Tabs";
@@ -24,7 +25,7 @@ const localeNames = { ru: "Русский", en: "English" } as const;
 type SaveState = "idle" | "saved" | "failed";
 
 /** The settings' sections (seen: one long page of everything was hard to find one's way in). */
-const PARTS = ["general", "models", "internet", "mcp", "skills"] as const;
+const PARTS = ["general", "models", "chains", "internet", "mcp", "skills"] as const;
 type SettingsPart = (typeof PARTS)[number];
 const PART_KEY = "drimvox.settingsPart";
 
@@ -172,6 +173,7 @@ export function SettingsSheet() {
         <ProjectModels save={(patch) => void save(patch)} />
       </>
     ),
+    chains: <ChainsSection />,
     internet: (
       <>
         <Setting id="engine-label" title={t("settings.searchEngine")} about={t("settings.searchEngineAbout")}>

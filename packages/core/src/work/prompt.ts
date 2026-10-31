@@ -39,7 +39,7 @@ export function workRules(plan: ProjectPlan | null): string {
  * What the agent is told in a project's run (docs/specs/project-work.md): one long loop, alone, from the plan to a
  * working result, with its own checklist and its own checks.
  */
-export function projectRules(plan: ProjectPlan | null, canLook: boolean): string {
+export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "- Never commit or push: git stays the user's."): string {
   return [
     "You build the user's project alone, from the plan to a working result, right in the project's folder, as a careful",
     "senior engineer would. Nobody accepts steps one by one: the user watches and may write to you at any time.",
@@ -70,7 +70,7 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean): string
     // Seen live: a team board let anyone listen to any board over WebSocket; the tests covered only the HTTP routes.
     "- When the project has accounts, roles or anyone's private data, write a test for every way in (pages and API,",
     "  real-time channels, files, invitations) proving that someone without the right is refused.",
-    "- Never commit or push: git stays the user's.",
+    git,
     "- Keep the project's notes current with update_notes: commands, decisions, what is done.",
     "- Do the work, then stop: no endless polishing. Look at each page once on each width, again only after a real fix.",
     "When every checklist item is done and checked, call finish_work with a short report in the user's language: what is done,",
@@ -87,7 +87,7 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean): string
  * What the agent is told in a ready project (asked for: like the chat with a folder, which the user liked, with a plan to
  * follow): it answers each message as it comes, keeps a checklist for a task, and ends its turn with a reply.
  */
-export function existingRules(canLook: boolean): string {
+export function existingRules(canLook: boolean, git = "- Never commit or push: git stays the user's."): string {
   return [
     "You work in the user's existing project, right in its folder, as a careful senior engineer would. The user talks to",
     "you as in a chat: each message is a question or a task in this project. Read the code you need before you change it;",
@@ -104,7 +104,7 @@ export function existingRules(canLook: boolean): string {
     "Write to the user in the language the user writes in.",
     "Rules:",
     "- Change only what the task needs; no unrelated refactoring, no new dependencies without a reason.",
-    "- Never commit or push: git stays the user's.",
+    git,
     "- Keep the project's notes current with update_notes when you learn how the project works.",
     "End your turn with a short reply: what you changed and how to check it, or the answer. finish_work is not needed;",
     "call it only when the user asked to make something to open (a site or a server) and it is ready, with start.",

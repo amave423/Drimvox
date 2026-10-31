@@ -6,6 +6,7 @@ import { ProjectSkills } from "../SkillsSection";
 import { Tabs } from "../Tabs";
 import { StatusChip } from "../tasks/StatusDot";
 import { GithubPublish } from "./GithubPublish";
+import { ProjectGitCard } from "./ProjectGitCard";
 import { ChangesTab, RunTab } from "./Workspace";
 
 type Part = "result" | "changes" | "project";
@@ -28,7 +29,7 @@ export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView 
       <div className="workshop-result-body">
         {part === "result" && (work?.startedAt ? <ResultPart work={work} onChanged={p.onChanged} /> : <p className="muted">{t("workshop.noResult")}</p>)}
         {part === "changes" && (work ? <ChangesTab work={work} /> : null)}
-        {part === "project" && <ProjectPart project={p.project} onNew={p.onNew} />}
+        {part === "project" && <ProjectPart project={p.project} onNew={p.onNew} busy={work?.status === "running"} />}
       </div>
     </aside>
   );
@@ -47,7 +48,7 @@ function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): v
 }
 
 /** The project itself: its folder and kind, its tasks, skills, GitHub, a new task, and leaving Drimvox. */
-function ProjectPart({ project, onNew }: { project: ProjectView; onNew?: () => void }) {
+function ProjectPart({ project, onNew, busy }: { project: ProjectView; onNew?: () => void; busy: boolean }) {
   const { api, t, tasks, navigate, reloadProjects } = useApp();
   const own = tasks.filter((task) => task.projectId === project.id);
   async function setKind(kind: ProjectKind) {
@@ -90,6 +91,7 @@ function ProjectPart({ project, onNew }: { project: ProjectView; onNew?: () => v
       )}
       <p className="note">{t("project.copyNote")}</p>
       <ProjectSkills projectId={project.id} />
+      {project.gitState === "ready" && <ProjectGitCard project={project} busy={busy} />}
       {project.gitState === "ready" && <GithubPublish project={project} />}
       <RemoveProject project={project} />
     </div>

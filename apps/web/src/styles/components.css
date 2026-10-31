@@ -217,3 +217,31 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .mcp-trust { display: grid; gap: 6px; justify-items: start; margin: 8px 0; }
 .mcp-trust p { margin: 0; font-size: 13px; max-width: 70ch; }
 .mcp-trust .segmented { flex-wrap: wrap; }
+
+/* Chains of free models in the settings (docs/specs/model-chains.md): the list beside the chosen chain. */
+.chains { display: grid; gap: 12px; }
+.chains-body { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 20px; align-items: start; }
+.chains-list { display: grid; gap: 4px; }
+.chains-item { display: grid; gap: 1px; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; background: none; color: var(--fg); font: inherit; font-size: 14px; cursor: pointer; }
+.chains-item small { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chains-item:hover { background: var(--paper); }
+.chains-item.is-on { background: var(--sheet); border-color: var(--line); }
+.chains-new { justify-self: start; padding: 6px 10px; }
+.chains-edit { display: grid; gap: 10px; min-width: 0; }
+.chains-head { display: flex; gap: 8px; }
+.chains-head .field-input { flex: 1; }
+.chain-links { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.chain-link { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--sheet); font-size: 14px; }
+.chain-link.is-dragged { opacity: 0.5; }
+.chain-grip { color: var(--muted); cursor: grab; letter-spacing: -2px; }
+.chain-num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--paper); color: var(--muted); font-size: 12px; }
+.chain-model { display: grid; min-width: 0; }
+.chain-model small { font-size: 12px; }
+.chain-state { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); white-space: nowrap; }
+.chain-state.is-resting { background: var(--wait-soft); color: var(--wait); }
+.chain-moves { display: flex; gap: 2px; }
+.chain-add { justify-self: stretch; text-align: left; padding: 8px 10px; border: 1.5px dashed var(--line); border-radius: 10px; background: none; color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; }
+.chain-rules { display: grid; gap: 8px; margin-top: 6px; }
+.chain-order { display: grid; gap: 4px; font-size: 14px; }
+.radio-row { display: flex; gap: 8px; align-items: center; }
+@media (max-width: 760px) { .chains-body { grid-template-columns: 1fr; } }

@@ -13,6 +13,8 @@ export function languageModel(conn: Connection, modelId: string): LanguageModel 
   const apiKey = conn.apiKey ?? undefined;
   // Straight or through the provider's proxy.
   const fetch = conn.fetch;
+  // A chain of free models answers as one model (docs/specs/model-chains.md).
+  if (conn.chain) return conn.chain.model(modelId) as LanguageModel;
   if (conn.preset === "anthropic") return createAnthropic({ apiKey, baseURL: conn.baseUrl, fetch }).languageModel(modelId);
   if (conn.preset === "google") return createGoogleGenerativeAI({ apiKey, baseURL: conn.baseUrl, fetch }).languageModel(modelId);
   if (conn.preset === "openai") return createOpenAI({ apiKey, baseURL: conn.baseUrl, fetch }).chat(modelId);

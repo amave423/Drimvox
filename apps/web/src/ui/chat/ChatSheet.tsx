@@ -11,6 +11,7 @@ import {
   type StreamEvent,
   type AttachmentView,
   type ActivityEntry,
+  CHAIN_PROVIDER_ID,
 } from "@drimvox/shared";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ok } from "../../api";
@@ -169,7 +170,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   useEffect(() => {
     if (chatId || choice) return;
     const last = readLastModel();
-    if (last && providers.some((p) => p.id === last.providerId)) setChoice(last);
+    if (last && (last.providerId === CHAIN_PROVIDER_ID || providers.some((p) => p.id === last.providerId))) setChoice(last);
   }, [chatId, choice, providers]);
 
   const list = useRef<HTMLDivElement>(null);

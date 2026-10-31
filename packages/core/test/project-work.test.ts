@@ -240,8 +240,10 @@ describe("work on a project", () => {
     expect(chat.messages[0]).toMatchObject({ role: "user" });
     expect(chat.messages[0].content).toContain("Каталог");
     expect(chat.messages.at(-1)).toMatchObject({ role: "assistant", status: "done" });
-    // Nothing to accept: the work is in the folder, git stays the user's.
-    expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
+    // By the default git rules the work is committed in a branch of the agent's own; main stays as it was.
+    expect(git(folder, "branch", "--show-current")).toMatch(/^drimvox\/task-/);
+    expect(git(folder, "log", "--oneline", "main").split("\n")).toHaveLength(1);
+    expect(git(folder, "status", "--porcelain")).toBe("");
     // The plan's task is over once the work started.
     expect((await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json()).statusReason).toBe("started");
   });
@@ -638,5 +640,66 @@ describe("a ready project", () => {
     work = await until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length === 3);
     const again = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
     expect(again.messages.at(-1).content).toBe("Это главная страница.");
+  });
+});
+
+// Asked for: the agent works with git by the project's rules — a branch, commits on its word, accept or reject.
+describe("a project's git rules", () => {
+  async function ready(turns: FakeTurn[], rules: Record<string, unknown> = {}) {
+    const s = await setup({ coder: turns });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    const put = await env.call("PUT", `/api/projects/${s.project.id}/git/rules`, { target: "task-branch", commit: "per-item", messages: "en", push: false, pullRequest: false, allowMain: false, ...rules });
+    expect(put.status).toBe(200);
+    return s;
+  }
+  const ask = async (s: Awaited<ReturnType<typeof ready>>, content: string, turns: number) => {
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content, model: s.ref("coder") });
+    return until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length >= turns);
+  };
+
+  it("commits in a branch of its own when the agent says, leaves secrets out, and tells the agent how to write", async () => {
+    const s = await ready([
+      call("write_file", { path: "cart.js", content: "total()\n" }),
+      call("write_file", { path: ".env", content: "KEY=secret\n" }),
+      call("commit_changes", { message: "Fix cart total" }),
+      { text: "Готово." },
+    ]);
+    await ask(s, "Почини корзину", 4);
+    expect(git(folder, "branch", "--show-current")).toMatch(/^drimvox\/task-/);
+    expect(git(folder, "log", "--format=%s", "-1")).toBe("Fix cart total");
+    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n")).toEqual(["cart.js"]);
+    expect(git(folder, "status", "--porcelain")).toBe("?? .env");
+    const system = JSON.stringify(requestsOf("coder")[0]!.body.messages[0]);
+    expect(system).toContain("commit_changes");
+    expect(system).toContain("in English");
+    const view = await (await env.call("GET", `/api/projects/${s.project.id}/git`)).json();
+    expect(view.state).toMatchObject({ base: "main", ahead: 1, github: false, pullRequest: null });
+    // The changes are counted from main, committed ones too.
+    const changes = await (await env.call("GET", `/api/projects/${s.project.id}/work/changes`)).json();
+    expect(changes.map((f: any) => f.path)).toContain("cart.js");
+  });
+
+  it("accepts the branch into main, or rejects it and goes back to main", async () => {
+    const s = await ready([call("write_file", { path: "a.txt", content: "a\n" }), { text: "Готово." }, call("write_file", { path: "b.txt", content: "b\n" }), { text: "Готово." }]);
+    await ask(s, "Сделай a", 2);
+    expect((await env.call("POST", `/api/projects/${s.project.id}/git/accept`)).status).toBe(200);
+    expect(git(folder, "branch", "--show-current")).toBe("main");
+    expect(readFileSync(join(folder, "a.txt"), "utf8")).toBe("a\n");
+    await ask(s, "Сделай b", 4);
+    const branch = git(folder, "branch", "--show-current");
+    expect(branch).toMatch(/^drimvox\//);
+    expect((await env.call("POST", `/api/projects/${s.project.id}/git/reject`)).status).toBe(200);
+    expect(git(folder, "branch", "--show-current")).toBe("main");
+    expect(git(folder, "ls-files")).not.toContain("b.txt");
+    expect(git(folder, "branch", "--list", branch)).toContain(branch);
+  });
+
+  it("commits nothing when the rules say so, and the agent is told git is the user's", async () => {
+    const s = await ready([call("write_file", { path: "a.txt", content: "a\n" }), { text: "Готово." }], { commit: "never" });
+    await ask(s, "Сделай a", 2);
+    expect(git(folder, "branch", "--show-current")).toBe("main");
+    expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.tools ?? []).includes("commit_changes")).toBe(false);
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("Never commit or push");
   });
 });

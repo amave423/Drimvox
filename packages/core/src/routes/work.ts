@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { projectPlanReviseSchema, projectPlanStartSchema, projectWorkChatSchema, projectWorkMessageSchema, projectWorkStartSchema, projectWorkUpdateSchema } from "@drimvox/shared";
+import { projectGitRulesSchema, projectPlanReviseSchema, projectPlanStartSchema, projectWorkChatSchema, projectWorkMessageSchema, projectWorkStartSchema, projectWorkUpdateSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { readFile } from "node:fs/promises";
 import type { ProjectRepo } from "../agent/repo";
@@ -9,12 +9,13 @@ import type { Shots } from "../visual/look";
 import { folderChanges } from "../work/changes";
 import { workReport } from "../work/report";
 import type { ProjectWorkRepo } from "../work/repo";
+import type { ProjectGit } from "../work/project-git";
 import { WorkRefused, type ProjectWork } from "../work/service";
 
 const notFound = { error: { code: "not_found" } } as const;
 
 /** A project's work (docs/specs/project-work.md): the interview and the plan, "Go", messages on the way, Stop, limits. */
-export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work: ProjectWork, shots: Shots, repo: ProjectWorkRepo) {
+export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work: ProjectWork, shots: Shots, repo: ProjectWorkRepo, git: ProjectGit) {
   const refused = (err: unknown) => {
     if (err instanceof WorkRefused) return { error: { code: err.code } };
     if (err instanceof TaskBusy) return { error: { code: "busy" as const } };
@@ -107,7 +108,33 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
     })
     .get("/:id/work/changes", async (c) => {
       const project = projects.get(c.req.param("id"));
-      return project ? c.json(await folderChanges(project.path), 200) : c.json(notFound, 404);
+      if (!project) return c.json(notFound, 404);
+      // In the agent's own branch: everything since the branch it came from, committed or not.
+      const base = (await git.state(project.id, project.path)).base;
+      return c.json(await folderChanges(project.path, base), 200);
+    })
+    // How the agent works with git, and where its branch is (docs/specs/project-git.md).
+    .get("/:id/git", async (c) => {
+      const project = projects.get(c.req.param("id"));
+      if (!project) return c.json(notFound, 404);
+      return c.json({ rules: git.rules(project.id), state: await git.state(project.id, project.path) }, 200);
+    })
+    .put("/:id/git/rules", zValidator("json", projectGitRulesSchema), (c) => {
+      const project = projects.get(c.req.param("id"));
+      if (!project) return c.json(notFound, 404);
+      return c.json(git.setRules(project.id, c.req.valid("json")), 200);
+    })
+    .post("/:id/git/accept", async (c) => {
+      const project = projects.get(c.req.param("id"));
+      if (!project) return c.json(notFound, 404);
+      if (work.isRunning(project.id)) return c.json({ error: { code: "busy" as const } }, 409);
+      return (await git.accept(project.id, project.path)) ? c.json(await git.state(project.id, project.path), 200) : c.json({ error: { code: "merge_failed" as const } }, 409);
+    })
+    .post("/:id/git/reject", async (c) => {
+      const project = projects.get(c.req.param("id"));
+      if (!project) return c.json(notFound, 404);
+      if (work.isRunning(project.id)) return c.json({ error: { code: "busy" as const } }, 409);
+      return (await git.reject(project.id, project.path)) ? c.json(await git.state(project.id, project.path), 200) : c.json({ error: { code: "switch_failed" as const } }, 409);
     })
     .get("/:id/work/shots/:shot", async (c) => {
       const id = c.req.param("id");

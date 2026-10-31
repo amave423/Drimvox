@@ -11,8 +11,10 @@ const MAX_NEW = 200;
  * What the agent changed in the project's folder (docs/specs/project-work.md): every edit since the last commit, new
  * files included, without touching git's index; the user commits.
  */
-export async function folderChanges(folder: string): Promise<DiffFile[]> {
-  const head = (await runGit(folder, ["rev-parse", "--verify", "-q", "HEAD"], true)).code === 0 ? "HEAD" : EMPTY_TREE;
+export async function folderChanges(folder: string, base: string | null = null): Promise<DiffFile[]> {
+  // From where the agent's branch left its base, when it works in one (its commits are its changes too).
+  const fork = base ? (await runGit(folder, ["merge-base", base, "HEAD"], true)).stdout.trim() : "";
+  const head = fork || ((await runGit(folder, ["rev-parse", "--verify", "-q", "HEAD"], true)).code === 0 ? "HEAD" : EMPTY_TREE);
   const tracked = (await runGit(folder, ["diff", "--no-color", "--no-ext-diff", "--find-renames", head], true)).stdout;
   const untracked = (await runGit(folder, ["ls-files", "--others", "--exclude-standard", "-z"], true)).stdout.split("\0").filter(Boolean).slice(0, MAX_NEW);
   const added: string[] = [];

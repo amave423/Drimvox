@@ -1,3 +1,4 @@
+import { CHAIN_PROVIDER_ID } from "@drimvox/shared";
 import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
@@ -50,7 +51,7 @@ export function Workshop({ projectId }: { projectId: string }) {
   const split = usePaneWidth();
   const [choice] = useState<ModelChoice | null>(() => {
     const last = readLastModel();
-    return last && providers.some((p) => p.id === last.providerId) ? last : null;
+    return last && (last.providerId === CHAIN_PROVIDER_ID || providers.some((p) => p.id === last.providerId)) ? last : null;
   });
   // The top bar and the sidebar show this work's state and checklist: kept in step with what the workshop sees.
   const doneItems = work?.checklist.filter((i) => i.done).length;

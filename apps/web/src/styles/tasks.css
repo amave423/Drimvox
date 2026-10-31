@@ -358,3 +358,10 @@
 /* Open permission requests wait at the bottom, by the message box, where the eyes are. */
 .approval-dock { display: grid; gap: 8px; margin: 8px 0 0; scroll-margin-bottom: 120px; }
 .approval-dock .approval { margin: 0; }
+
+/* How the agent works with git in a project, and its branch to accept (docs/specs/project-git.md). */
+.workshop-project .card { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); }
+.workshop-project .card-h { margin: 0; font: 600 15px var(--font-serif); }
+.workshop-project .card .field { font-size: 13px; }
+.workshop-project .card .actions { flex-wrap: wrap; }
+.git-note, .git-branch p { margin: 0; font-size: 13px; }
