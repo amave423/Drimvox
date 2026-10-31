@@ -20,9 +20,10 @@ import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/la
 import { loadMediaModel } from "../../lib/media";
 import { CoreRefusal, postStream } from "../../lib/sse";
 import { Composer } from "./Composer";
+import { Toggle } from "../Toggle";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
 import { directorRows, useDirector } from "./DirectorControl";
-import { AssistantMessage, UserMessage, type AnswerAction, type ChatApproval } from "./Messages";
+import { AssistantMessage, ChatApprovalCard, UserMessage, type AnswerAction, type ChatApproval } from "./Messages";
 import { ModelPicker } from "./ModelPicker";
 import { isPhoto, photoProblem } from "./photos";
 import { loadModels } from "../../lib/models";
@@ -62,7 +63,7 @@ const PENDING_POLL_MS = 3000;
  * user's messages in time, with the box to write to the run under them.
  */
 export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: string | null; viewKey: string; autoSend?: string; workshop?: boolean }) {
-  const { api, token, t, settings, providers, navigate, reloadChats, reloadToday } = useApp();
+  const { api, token, t, settings, updateSettings, providers, navigate, reloadChats, reloadToday } = useApp();
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -86,6 +87,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   const [noVision, setNoVision] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const dock = useRef<HTMLElement>(null);
   const kind = choice?.kind ?? "text";
 
   useEffect(() => {
@@ -218,7 +220,16 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
     ...(webMode === "off" ? [t("web.off")] : webMode === "provider" && searchProvider ? [t("web.provider", { name: searchProvider })] : []),
     ...(thinks && thinking !== "auto" ? [t("thinking.short", { level: t(`thinking.${thinking}` as MessageKey) })] : []),
     ...(folder ? [t("folder.connected", { name: folder.split(/[\\/]/).filter(Boolean).at(-1) ?? folder })] : []),
+    ...(folder && settings.folderAutoApprove ? [t("approval.autoShort")] : []),
   ];
+  // Requests the answer waits on now: from this window's answer, or one seen after coming back to the chat.
+  const openApprovals: ChatApproval[] = draft
+    ? draft.approvals.filter((a) => a.state === "open")
+    : (chat?.messages.some((m) => m.status === "streaming") ? (chat?.approvals ?? []) : []).map((a) => ({ ...a, state: "open" as const }));
+  // A new request is brought into view: the message box is where the eyes are (asked for: it was unclear where it was).
+  useEffect(() => {
+    if (openApprovals.length) dock.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [openApprovals.length]);
   const confirm = !!mediaModel && needsConfirmation(mediaModel, estimateUsd);
   const optionRows = useMediaOptionRows({ model: mediaModel, value: options, onChange: setOptions });
   const mediaRows = {
@@ -484,6 +495,13 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
         </div>
         </ShotsContext.Provider>
 
+        {openApprovals.length > 0 && (
+          <section className="approval-dock" ref={dock} aria-label={t("approval.waiting")}>
+            {openApprovals.map((a) => (
+              <ChatApprovalCard key={a.id} approval={a} onApprove={approve} />
+            ))}
+          </section>
+        )}
         {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
         {monthRefusal && <p className="error-note">{t("chat.monthBudget", { spent: formatUsd(monthRefusal.spent), budget: formatUsd(monthRefusal.budget) })}</p>}
         {attachError && <p className="error-note">{t(`attach.${attachError}` as MessageKey, { max: MAX_FILES })}</p>}
@@ -535,6 +553,19 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                         { label: t("web.label"), control: <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} /> },
                         ...(thinks ? [{ label: t("thinking.label"), control: <ThinkingSwitch value={thinking} onChange={setThinking} /> }] : []),
                         { label: t("folder.label"), control: <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} /> },
+                        // Asked for: commands in the folder can run without a card to click each time.
+                        ...(folder
+                          ? [
+                              {
+                                label: t("approval.modeLabel"),
+                                control: (
+                                  <Toggle checked={settings.folderAutoApprove} onChange={(on) => void updateSettings({ folderAutoApprove: on })}>
+                                    {t("approval.auto")}
+                                  </Toggle>
+                                ),
+                              },
+                            ]
+                          : []),
                       ],
                     }
                   : { changed: [], rows: [] }

@@ -1,5 +1,5 @@
 import type { TaskView } from "@drimvox/shared";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { buildFeed, type FeedItem } from "../../lib/activity";
@@ -34,6 +34,12 @@ export function TaskSheet({ taskId, embedded }: { taskId: string; embedded?: boo
   const { api, t, settings, navigate } = useApp();
   const { task, events } = useTaskStream(taskId);
   const [comments, setComments] = useState<LineComment[]>([]);
+  const asking = useRef<HTMLDivElement>(null);
+  const askingId = task?.status === "waiting" && task.statusReason === "approval" ? (task.pendingApproval?.id ?? null) : null;
+  // The request comes into view where it waits, at the bottom of the feed (asked for: up top nobody saw it).
+  useEffect(() => {
+    if (askingId) asking.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [askingId]);
 
   if (!task) return <article className={embedded ? "sheet is-embedded" : "sheet"} aria-busy />;
   // A subtask's brief is written for the model; the user sees what the subtask is about instead.
@@ -121,6 +127,12 @@ export function TaskSheet({ taskId, embedded }: { taskId: string; embedded?: boo
             <Feed items={feed} taskId={task.id} />
           </>
         )}
+        {/* The open request at the bottom, after what led to it; the notice up top says it waits. */}
+        {askingId && task.pendingApproval && (
+          <div className="task-notice is-wait is-asking approval-dock" ref={asking}>
+            <ApprovalCard approval={task.pendingApproval} allowed={null} onAnswer={answer} />
+          </div>
+        )}
       </div>
 
       {/* Inside the workshop the spending and the branch are in its own bars. */}
@@ -175,17 +187,6 @@ function TaskNotice({ task, feed, onAnswer }: { task: TaskView; feed: FeedItem[]
     </button>
   );
 
-  // The question is answered here, at the top, next to Stop: not at the bottom of a long feed.
-  if (task.status === "waiting" && task.statusReason === "approval" && task.pendingApproval) {
-    return (
-      <div className="task-notice is-wait is-asking">
-        <ApprovalCard approval={task.pendingApproval} allowed={null} onAnswer={onAnswer} />
-        <button className="btn is-pencil" onClick={stop}>
-          {t("task.stop")}
-        </button>
-      </div>
-    );
-  }
   const asker = task.subtasks.find((s) => s.status === "waiting" && s.statusReason === "approval");
   const asking = task.status === "waiting" && (task.statusReason === "approval" || task.statusReason === "subtask_waiting");
   if (task.status === "running" || asking) {

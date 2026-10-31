@@ -350,3 +350,6 @@
 .tabs + .note { margin-top: 14px; }
 .local-model-name { flex: 1 1 240px; display: grid; min-width: 0; overflow-wrap: anywhere; }
 .local-model-name small { font-size: 12px; }
+/* Open permission requests wait at the bottom, by the message box, where the eyes are. */
+.approval-dock { display: grid; gap: 8px; margin: 8px 0 0; scroll-margin-bottom: 120px; }
+.approval-dock .approval { margin: 0; }

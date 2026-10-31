@@ -166,6 +166,40 @@ export interface ChatApproval {
   state: "open" | "allowed" | "denied";
 }
 
+/** One permission request of a chat answer: open, with its buttons, or answered. */
+export function ChatApprovalCard({ approval: a, onApprove }: { approval: ChatApproval; onApprove?(id: string, allow: boolean, always: boolean, server?: boolean): void }) {
+  const { t } = useApp();
+  return (
+    <div className={`approval${a.state === "open" && onApprove ? " is-asking" : ""}`} role={a.state === "open" ? "alert" : undefined}>
+      <strong>{t("approval.title")}</strong>
+      {a.purpose && <p className="approval-purpose">{a.purpose}</p>}
+      <span className="muted">{t(`approval.reason.${a.reason ?? "mcp"}` as MessageKey)}</span>
+      <code className="mono">{a.reason ? a.tool : `${a.server}: ${a.tool} ${JSON.stringify(a.input)}`}</code>
+      {a.state === "open" && onApprove ? (
+        <div className="actions">
+          <button className="btn is-primary" onClick={() => onApprove(a.id, true, false)}>
+            {t("approval.allow")}
+          </button>
+          <button className="btn" onClick={() => onApprove(a.id, true, true)}>
+            {t("approval.always")}
+          </button>
+          {/* A server's tools one by one asked again and again (seen: a browser server has twenty of them). */}
+          {!a.reason && a.server && (
+            <button className="btn" onClick={() => onApprove(a.id, true, true, true)}>
+              {t("approval.server", { server: a.server })}
+            </button>
+          )}
+          <button className="btn is-pencil" onClick={() => onApprove(a.id, false, false)}>
+            {t("approval.deny")}
+          </button>
+        </div>
+      ) : (
+        <span className={a.state === "allowed" ? "is-ok" : "is-pencil-text"}>{t(a.state === "allowed" ? "approval.allowed" : "approval.denied")}</span>
+      )}
+    </div>
+  );
+}
+
 export function AssistantMessage({
   content,
   reasoning,
@@ -203,35 +237,13 @@ export function AssistantMessage({
   return (
     <div className={`msg msg-assistant${streaming ? " is-streaming" : ""}`} aria-busy={streaming}>
       {model && <div className="msg-who mono">{model}</div>}
-      {approvals.map((a) => (
-        <div key={a.id} className="approval" role={a.state === "open" ? "alert" : undefined}>
-          <strong>{t("approval.title")}</strong>
-          {a.purpose && <p className="approval-purpose">{a.purpose}</p>}
-          <span className="muted">{t(`approval.reason.${a.reason ?? "mcp"}` as MessageKey)}</span>
-          <code className="mono">{a.reason ? a.tool : `${a.server}: ${a.tool} ${JSON.stringify(a.input)}`}</code>
-          {a.state === "open" && onApprove ? (
-            <div className="actions">
-              <button className="btn is-primary" onClick={() => onApprove(a.id, true, false)}>
-                {t("approval.allow")}
-              </button>
-              <button className="btn" onClick={() => onApprove(a.id, true, true)}>
-                {t("approval.always")}
-              </button>
-              {/* A server's tools one by one asked again and again (seen: a browser server has twenty of them). */}
-              {!a.reason && a.server && (
-                <button className="btn" onClick={() => onApprove(a.id, true, true, true)}>
-                  {t("approval.server", { server: a.server })}
-                </button>
-              )}
-              <button className="btn is-pencil" onClick={() => onApprove(a.id, false, false)}>
-                {t("approval.deny")}
-              </button>
-            </div>
-          ) : (
-            <span className={a.state === "allowed" ? "is-ok" : "is-pencil-text"}>{t(a.state === "allowed" ? "approval.allowed" : "approval.denied")}</span>
-          )}
-        </div>
-      ))}
+      {/* Open requests wait at the bottom, by the message box (asked for: nobody found them up here); the answered
+          ones stay with the answer as a record. */}
+      {approvals
+        .filter((a) => a.state !== "open")
+        .map((a) => (
+          <ChatApprovalCard key={a.id} approval={a} />
+        ))}
       {reasoning && <Reasoning text={reasoning} thinking={!!streaming && !content} />}
       <AnswerFlow text={shown} actions={actions} streaming={!!streaming} live={!!streaming || rendering} />
       {message?.media.map((item) => <MediaView key={item.id} item={item} />)}

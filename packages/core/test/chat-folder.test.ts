@@ -100,6 +100,31 @@ describe("a chat with a folder", () => {
     rmSync(join(folder, "..", "outside-secret.txt"), { force: true });
   });
 
+  // Asked for: a switch that lets the folder's commands run without a card to click each time.
+  it("runs a command that would ask without asking when the switch is on", async () => {
+    await env.call("PATCH", "/api/settings", { folderAutoApprove: true });
+    const chat = await chatWith([call("run_command", { command: "git push", purpose: "Отправить" }), { text: "Готово." }]);
+    await connect(chat.id, folder);
+    const events = await readEvents(await send(chat.id, "Отправь"));
+    expect(events.some((e: any) => e.type === "approval")).toBe(false);
+    expect(events.at(-1).message.content).toBe("Готово.");
+    const asked = JSON.stringify(fake!.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!.body.messages);
+    expect(asked).not.toContain("denied");
+  });
+
+  // Seen in the user's chats: one answer with 22 pages took 1.2 million input tokens, every step resending all of them.
+  it("sends older outputs of a long answer shortened and the newest ones whole", async () => {
+    writeFileSync(join(folder, "big.txt"), "строка данных\n".repeat(1000));
+    const listing = Array.from({ length: 9 }, () => call("list_files", { path: "." }));
+    const chat = await chatWith([call("read_file", { path: "big.txt" }), ...listing, call("read_file", { path: "big.txt" }), { text: "Прочитал." }]);
+    await connect(chat.id, folder);
+    await readEvents(await send(chat.id, "Прочитай big.txt"));
+    const last = fake!.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!.body.messages as { role: string; content: unknown }[];
+    const outputs = last.filter((m) => m.role === "tool").map((m) => String(m.content));
+    expect(outputs[0]).toContain("trimmed by Drimvox");
+    expect(outputs.at(-1)!.length).toBeGreaterThan(10_000);
+  });
+
   it("has no file tools without a folder", async () => {
     const chat = await chatWith([{ text: "Привет" }]);
     await readEvents(await send(chat.id, "Привет"));

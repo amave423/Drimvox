@@ -63,6 +63,8 @@ export interface WorkDeps {
   plan(projectId: string): ProjectPlan | null;
   visualKit: VisualKit;
   visionModel(): { providerId: string; model: string } | null;
+  /** The settings' switch: commands in a chat's folder run without asking. */
+  folderAutoApprove?(): boolean;
   /** Drimvox's shared skills; a folder's own (.drimvox/skills, .claude/skills) come first. */
   skillsDir: string;
   /** This month's spending against the app's budget. */
@@ -363,6 +365,8 @@ export function chatRoutes(
                   chat.folder,
                   emit,
                   async (command, reason, signal, purpose) =>
+                    // Asked for: with the switch on, the folder's commands run without a card to click.
+                    work.folderAutoApprove?.() ||
                     (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, purpose, signal })) !== false,
                   { list: () => chats.attachments.ofChat(chat.id), file: (id) => chats.attachments.file(id) },
                   // Pictures in the folder: the settings' vision model, else the chat's own when it sees them.
