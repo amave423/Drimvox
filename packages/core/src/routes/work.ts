@@ -25,11 +25,11 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
     .post("/:id/work/plan", zValidator("json", projectPlanStartSchema), async (c) => {
       const id = c.req.param("id");
       if (!projects.get(id)) return c.json(notFound, 404);
-      const { task, models } = c.req.valid("json");
+      const { task, models, quick } = c.req.valid("json");
       const refs = [models.interview, models.plan, models.work, ...(models.strong ? [models.strong] : [])];
       if (refs.some((m) => !providers.get(m.providerId))) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
       try {
-        return c.json(await work.plan(id, task, models), 201);
+        return c.json(await work.plan(id, task, models, quick), 201);
       } catch (err) {
         return c.json(refused(err), 409);
       }

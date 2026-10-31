@@ -104,7 +104,8 @@ export class AgentRunner {
       stages,
       input.team ? { kind: "goal", team: JSON.stringify(input.team) } : input.kind ? { kind: input.kind, ...input.extra } : {},
     );
-    const first: TaskPhase = stages.interview ? "interview" : stages.spec ? "spec" : "code";
+    // A project's plan without an interview starts at the plan itself (a small change in an existing project).
+    const first: TaskPhase = stages.interview ? "interview" : input.kind === "plan" ? "list" : stages.spec ? "spec" : "code";
     enterPhase(this.context(id, new AbortController()), id, first);
     this.launch(id, input.task);
     return this.view(id)!;

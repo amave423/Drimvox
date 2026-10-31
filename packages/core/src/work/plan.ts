@@ -13,9 +13,12 @@ import { isCommand } from "../backlog/plan";
 export const PLAN_NOW = "Nothing more to ask. Write the plan now and call write_plan.";
 const PLAN_REMINDER = "You have not written the plan. Call write_plan now.";
 
-export function planInstructions(developer: boolean): string {
+export function planInstructions(developer: boolean, quick = false): string {
   return [
     "Current step: the plan. You may only read the project.",
+    quick
+      ? "There was no interview: the user asked for a change in an existing project. First read the code it touches. The plan is as short as the change: the steps it needs (1-8), screens and decisions only for what changes, a design brief only if the look changes; ask nothing, assume what is reasonable and say so in the summary."
+      : "",
     developer ? "" : "The user is not a programmer: write the plan in plain words, by what the user will see and do.",
     "Write the final plan of what one agent will build, alone, from start to finish, after the user says \"Go\". The user",
     "reads it before the work starts and must see the whole result in it, so be specific and complete; everything in the",

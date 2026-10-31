@@ -16,6 +16,39 @@ export type Place = { x: number; y: number; width: number; height: number } | nu
 const UNSEEN = { width: 1280, height: 860 };
 
 /**
+ * Chromium's errors of the connection itself — reset, refused, timed out, no name, closed in the middle — as a block
+ * shows up from Russia; an answer of the site (404, 500) or a stopped load is not one of them.
+ */
+const CONNECTION_ERRORS = new Set([-7, -15, -100, -101, -102, -104, -105, -106, -107, -109, -118, -137, -324]);
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * A PAC script: the listed sites (and their subdomains) through the proxy, everything else directly (asked for: some
+ * Russian sites refuse visitors through a proxy).
+ */
+export function pacScript(proxyUrl: string, hosts: string[]): string {
+  const u = new URL(proxyUrl);
+  const kind = u.protocol.startsWith("socks") ? "SOCKS5" : u.protocol === "https:" ? "HTTPS" : "PROXY";
+  const port = u.port || (u.protocol === "https:" ? "443" : u.protocol.startsWith("socks") ? "1080" : "80");
+  const list = JSON.stringify(hosts);
+  return `function FindProxyForURL(url, host) {
+  host = host.toLowerCase();
+  var sites = ${list};
+  for (var i = 0; i < sites.length; i++) {
+    if (host === sites[i] || host === "www." + sites[i] || dnsDomainIs(host, "." + sites[i])) return "${kind} ${u.hostname}:${port}";
+  }
+  return "DIRECT";
+}`;
+}
+
+/**
  * The agent's browser on the desktop (asked for: a browser exactly like Claude's, not a picture of one): real Chromium
  * tabs inside Drimvox's window, in a session of their own that keeps sign-ins and passed checks. The core drives the
  * shown tab over the DevTools protocol; the panel puts the tab over its page box, where the user clicks, types and passes
@@ -27,10 +60,16 @@ export class AgentView {
   private place: Place = null;
   private next = 1;
   private profile: Session | null = null;
+  /** The proxy and the sites that go through it; null: everything directly. */
+  private proxy: { url: string; hosts: string[] } | null = null;
+  /** Sites tried through the proxy after they did not open directly, by the tab trying. */
+  private readonly trials = new Map<number, string>();
 
   constructor(
     private readonly window: () => BrowserWindow | null,
     private readonly changed: (state: AgentTabState) => void,
+    /** A site that opened only through the proxy: the core remembers it. */
+    private readonly blocked: (host: string) => void = () => {},
   ) {}
 
   state(): AgentTabState {
@@ -66,6 +105,8 @@ export class AgentView {
       case "stop":
         for (const t of [...this.tabs]) this.close(t.id);
         return;
+      case "proxy":
+        return this.useProxy(typeof args[0] === "string" ? args[0] : null, Array.isArray(args[1]) ? args[1].filter((h): h is string => typeof h === "string") : []);
       default:
         throw new Error(`Unknown browser request ${op}`);
     }
@@ -75,6 +116,24 @@ export class AgentView {
   setPlace(place: Place): void {
     this.place = place;
     this.layout();
+  }
+
+  private async useProxy(url: string | null, hosts: string[]): Promise<void> {
+    this.proxy = url ? { url, hosts } : null;
+    await this.applyProxy();
+  }
+
+  /** The session's proxy: the listed sites and those on trial through it, the rest directly. */
+  private async applyProxy(): Promise<void> {
+    const s = this.session();
+    if (!this.proxy) return s.setProxy({ mode: "direct" });
+    const hosts = [...new Set([...this.proxy.hosts, ...this.trials.values()])];
+    const pac = pacScript(this.proxy.url, hosts);
+    await s.setProxy({ mode: "pac_script", pacScript: `data:application/x-ns-proxy-autoconfig;base64,${Buffer.from(pac).toString("base64")}` });
+  }
+
+  private covered(host: string): boolean {
+    return !!this.proxy?.hosts.some((site) => host === site || host.endsWith(`.${site}`));
   }
 
   private shown() {
@@ -120,7 +179,38 @@ export class AgentView {
     wc.on("will-navigate", (event, next) => {
       if (!/^(https?|about|data|blob):/.test(next)) event.preventDefault();
     });
-    wc.on("destroyed", () => this.forget(tab.id));
+    // A page that does not connect directly is tried once through the proxy; opened, its site is remembered.
+    wc.on("did-fail-load", (_event, code, _text, failed, mainFrame) => {
+      const host = hostOf(failed);
+      if (!mainFrame || !this.proxy || !host || !CONNECTION_ERRORS.has(code) || this.covered(host)) return;
+      if (this.trials.get(wc.id) === host) {
+        // Through the proxy it failed too: the site is down, not blocked.
+        this.trials.delete(wc.id);
+        void this.applyProxy();
+        return;
+      }
+      this.trials.set(wc.id, host);
+      void this.applyProxy().then(() => wc.loadURL(failed).catch(() => {}));
+    });
+    wc.on("did-finish-load", () => {
+      const host = this.trials.get(wc.id);
+      if (!host || hostOf(wc.getURL()) !== host) return;
+      this.trials.delete(wc.id);
+      if (this.proxy) this.proxy.hosts = [...this.proxy.hosts, host];
+      this.blocked(host);
+    });
+    // The proxy's own password, from its address in the settings.
+    wc.on("login", (event, _details, info, callback) => {
+      if (!info.isProxy || !this.proxy) return;
+      const u = new URL(this.proxy.url);
+      if (!u.username) return;
+      event.preventDefault();
+      callback(decodeURIComponent(u.username), decodeURIComponent(u.password));
+    });
+    wc.on("destroyed", () => {
+      this.trials.delete(wc.id);
+      this.forget(tab.id);
+    });
     this.tabs.push(tab);
     this.active = tab.id;
     this.layout();

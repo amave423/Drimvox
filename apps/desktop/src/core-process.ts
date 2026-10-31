@@ -29,7 +29,7 @@ const browser = new RelayBrowser(
     }),
 );
 
-process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number; png?: string; page?: unknown; error?: string; console?: string[]; result?: unknown; state?: unknown } }) => {
+process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number; png?: string; page?: unknown; error?: string; console?: string[]; result?: unknown; state?: unknown; host?: string } }) => {
   // The app is closing: stop what the core started (agents, the Ollama it runs), then go.
   if (data?.type === "quit") {
     setTimeout(() => process.exit(0), 2_500).unref();
@@ -37,6 +37,7 @@ process.parentPort.on("message", ({ data }: { data: { type?: string; id?: number
     return;
   }
   if (data?.type === "browser-state") return browser.update(data.state as Parameters<RelayBrowser["update"]>[0]);
+  if (data?.type === "browser-blocked" && typeof data.host === "string") return browser.blocked(data.host);
   if (data?.type === "browser-done" && typeof data.id === "number") {
     const call = browserCalls.get(data.id);
     browserCalls.delete(data.id);

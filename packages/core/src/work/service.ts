@@ -21,6 +21,8 @@ export class WorkRefused extends Error {
 const siteKey = (projectId: string) => `site:${projectId}`;
 
 const INTERVIEW = { interview: true, spec: false, approveSpec: false, testsFirst: false };
+/** A small change in an existing project: straight to the plan (asked for: a big interview for a small fix). */
+const QUICK = { interview: false, spec: false, approveSpec: false, testsFirst: false };
 
 /**
  * A project's work (docs/specs/project-work.md): the interview and the plan are a task of the project; "Go" starts one
@@ -106,11 +108,12 @@ export class ProjectWork {
   }
 
   /** The interview, then the plan: a task of the project, with the interview's model first. */
-  async plan(projectId: string, task: string, models: ProjectModels): Promise<TaskView> {
+  async plan(projectId: string, task: string, models: ProjectModels, quick = false): Promise<TaskView> {
     const project = this.o.projects.get(projectId);
     if (!project || !(await isRepoRoot(project.path))) throw new WorkRefused("not_repo");
     if (this.runs.has(projectId)) throw new WorkRefused("busy");
-    const view = await this.o.runner.start(projectId, { task, providerId: models.interview.providerId, model: models.interview.model, stages: INTERVIEW, kind: "plan" });
+    const first = quick ? models.plan : models.interview;
+    const view = await this.o.runner.start(projectId, { task, providerId: first.providerId, model: first.model, stages: quick ? QUICK : INTERVIEW, kind: "plan" });
     this.o.repo.update(projectId, { models, planTaskId: view.id, status: "planning", reason: null, detail: null, escalated: false });
     return view;
   }

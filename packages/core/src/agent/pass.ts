@@ -227,7 +227,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
       planning
         ? planInstructions()
         : phase === "list"
-          ? projectPlanInstructions(ctx.developer())
+          ? projectPlanInstructions(ctx.developer(), !(JSON.parse(row.stages) as TaskStages).interview)
           : row.kind === "item"
             ? itemInstructions(JSON.parse(row.checks) as string[])
             : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),

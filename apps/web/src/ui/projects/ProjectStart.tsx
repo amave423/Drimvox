@@ -4,6 +4,7 @@ import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { rememberLastModel, type ModelChoice } from "../../lib/lastModel";
 import { ModelPicker } from "../chat/ModelPicker";
+import { Toggle } from "../Toggle";
 
 const ROLES = ["interview", "plan", "work"] as const;
 type Role = (typeof ROLES)[number];
@@ -20,6 +21,8 @@ const TEMPLATES = ["landing", "shop", "bot", "api", "dashboard", "portfolio"] as
 /** What was typed and picked before leaving (asked for: a visit to the parameters lost it), per project. */
 interface Draft {
   text: string;
+  /** A small change in an existing project: no interview. */
+  quick?: boolean;
   models: Record<Role, ModelChoice | null>;
   strong: ModelChoice | null;
   split: boolean;
@@ -39,6 +42,7 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
   const { api, t } = useApp();
   const [kept] = useState(() => readDraft(projectId));
   const [text, setText] = useState(kept?.text ?? "");
+  const [quick, setQuick] = useState(kept?.quick ?? false);
   const [models, setModels] = useState<Record<Role, ModelChoice | null>>(kept?.models ?? { interview: initial, plan: initial, work: initial });
   const [strong, setStrong] = useState<ModelChoice | null>(kept?.strong ?? null);
   const [addingStrong, setAddingStrong] = useState(!!kept?.strong);
@@ -46,11 +50,11 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
   const [split, setSplit] = useState(kept?.split ?? false);
   useEffect(() => {
     try {
-      localStorage.setItem(draftKey(projectId), JSON.stringify({ text, models, strong, split } satisfies Draft));
+      localStorage.setItem(draftKey(projectId), JSON.stringify({ text, quick, models, strong, split } satisfies Draft));
     } catch {
       // Kept for this visit only.
     }
-  }, [projectId, text, models, strong, split]);
+  }, [projectId, text, quick, models, strong, split]);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const ready = ROLES.every((r) => models[r]) && !!text.trim();
@@ -62,7 +66,7 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
     const res = await api.projects[":id"].work.plan
       .$post({
         param: { id: projectId },
-        json: { task: text.trim(), models: { interview: ref(models.interview!), plan: ref(models.plan!), work: ref(models.work!), strong: strong ? ref(strong) : null } },
+        json: { task: text.trim(), quick, models: { interview: ref(models.interview!), plan: ref(models.plan!), work: ref(models.work!), strong: strong ? ref(strong) : null } },
       })
       .catch(() => null);
     setBusy(false);
@@ -94,19 +98,28 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
           void start();
         }}
       >
-        {/* Ready starts for common projects (asked for): a click puts a fuller task in the box, to change as needed. */}
-        <div className="project-templates" role="group" aria-label={t("projectWork.templates")}>
-          {TEMPLATES.map((id) => (
-            <button key={id} type="button" className="chip" onClick={() => setText(t(`projectWork.template.${id}.text` as MessageKey))}>
-              {t(`projectWork.template.${id}` as MessageKey)}
-            </button>
-          ))}
+        {/* Asked for: a small fix in a project that exists should not start with a big interview. */}
+        <div className="project-kind">
+          <Toggle checked={quick} onChange={setQuick}>
+            {t("projectWork.quick")}
+          </Toggle>
+          <span className="muted">{t(quick ? "projectWork.quickHint" : "projectWork.fullHint")}</span>
         </div>
+        {/* Ready starts for common projects (asked for): a click puts a fuller task in the box, to change as needed. */}
+        {!quick && (
+          <div className="project-templates" role="group" aria-label={t("projectWork.templates")}>
+            {TEMPLATES.map((id) => (
+              <button key={id} type="button" className="chip" onClick={() => setText(t(`projectWork.template.${id}.text` as MessageKey))}>
+                {t(`projectWork.template.${id}` as MessageKey)}
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           className="field-input task-input"
           rows={5}
           value={text}
-          placeholder={t("projectWork.placeholder")}
+          placeholder={t(quick ? "projectWork.quickPlaceholder" : "projectWork.placeholder")}
           aria-label={t("projectWork.startTitle")}
           onChange={(e) => setText(e.target.value)}
         />
@@ -165,7 +178,7 @@ export function ProjectStart({ projectId, initial, onStarted }: { projectId: str
         </p>
         <div className="actions">
           <button className="btn is-primary" disabled={busy || !ready}>
-            {t("projectWork.start")}
+            {t(quick ? "projectWork.startQuick" : "projectWork.start")}
           </button>
         </div>
         {failed && <p className="error-note">{t(`projectWork.error.${failed}` as MessageKey)}</p>}

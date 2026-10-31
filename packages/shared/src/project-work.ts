@@ -89,7 +89,8 @@ export interface ProjectWorkView {
 
 const limits = { budgetUsd: z.number().min(0.01).max(10_000), hours: z.number().min(0.1).max(200) };
 
-export const projectPlanStartSchema = z.object({ task: z.string().trim().min(1).max(20_000), models: projectModelsSchema }).strict();
+/** `quick`: a small change in an existing project — no interview, the plan's model writes a short plan at once. */
+export const projectPlanStartSchema = z.object({ task: z.string().trim().min(1).max(20_000), models: projectModelsSchema, quick: z.boolean().default(false) }).strict();
 export const projectPlanReviseSchema = z.object({ note: z.string().trim().min(1).max(20_000) }).strict();
 export const projectWorkStartSchema = z.object(limits).strict();
 export const projectWorkUpdateSchema = z.object({ budgetUsd: limits.budgetUsd.optional(), hours: limits.hours.optional(), strong: modelRefSchema.nullable().optional() }).strict();

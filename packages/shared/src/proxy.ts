@@ -9,6 +9,8 @@ export const proxyUrlSchema = z
   .refine((u) => /^https?:\/\/[^/?#]+/.test(u), "http or https only");
 
 export const proxySetSchema = z.object({ url: proxyUrlSchema }).strict();
+/** The sites that open through the proxy, one host each (instagram.com); the rest open directly. */
+export const proxySitesSchema = z.object({ hosts: z.array(z.string().trim().min(1).max(253)).max(500) }).strict();
 
 /** The proxy as the interface sees it: the password never leaves the core. */
 export interface ProxyView {

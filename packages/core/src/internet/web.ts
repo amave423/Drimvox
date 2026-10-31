@@ -121,11 +121,11 @@ export const duckDuckGo: WebAccess = makeDuckDuckGo({
 });
 
 /** One page as text: public addresses only, every redirect checked too. */
-async function openPage(url: string, signal?: AbortSignal): Promise<Page> {
+export async function openPage(url: string, signal?: AbortSignal, f: typeof fetch = fetch): Promise<Page> {
   let target = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     await assertPublic(target);
-    const res = await fetch(target, {
+    const res = await f(target, {
       headers: { "User-Agent": UA, Accept: "text/html,text/plain,application/json;q=0.9,*/*;q=0.5" },
       redirect: "manual",
       signal: anySignal(signal, 20_000),

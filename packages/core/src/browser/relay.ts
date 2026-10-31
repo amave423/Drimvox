@@ -1,7 +1,7 @@
 import type { BrowserDriver, BrowserState } from "./driver";
 
 /** What the desktop's main process does with the browser it holds, asked by name. */
-export type BrowserCall = (op: "open" | "newTab" | "select" | "close" | "back" | "reload" | "command" | "stop", args: unknown[]) => Promise<unknown>;
+export type BrowserCall = (op: "open" | "newTab" | "select" | "close" | "back" | "reload" | "command" | "stop" | "proxy", args: unknown[]) => Promise<unknown>;
 
 /**
  * The desktop's browser (asked for: a real browser inside Drimvox, like Claude's): its tabs live in the window, in the
@@ -10,6 +10,7 @@ export type BrowserCall = (op: "open" | "newTab" | "select" | "close" | "back" |
 export class RelayBrowser implements BrowserDriver {
   private now: BrowserState = { running: false, url: "", title: "", tabs: [], active: null };
   private readonly listeners = new Set<(s: BrowserState) => void>();
+  private readonly blockedListeners = new Set<(host: string) => void>();
 
   constructor(private readonly call: BrowserCall) {}
 
@@ -17,6 +18,20 @@ export class RelayBrowser implements BrowserDriver {
   update(state: BrowserState): void {
     this.now = state;
     for (const l of this.listeners) l(state);
+  }
+
+  /** The main process found a site that opens only through the proxy. */
+  blocked(host: string): void {
+    for (const l of this.blockedListeners) l(host);
+  }
+
+  onBlocked(listener: (host: string) => void): () => void {
+    this.blockedListeners.add(listener);
+    return () => void this.blockedListeners.delete(listener);
+  }
+
+  async useProxy(proxy: string | null, hosts: string[]): Promise<void> {
+    await this.call("proxy", [proxy, hosts]);
   }
 
   available(): boolean {

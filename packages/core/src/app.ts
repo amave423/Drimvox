@@ -19,7 +19,8 @@ import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
 import { authRoutes, sessionGuard } from "./auth/routes";
 import { AuthStore } from "./auth/store";
-import { duckDuckGo, type PageReader, type PageShower, type WebAccess } from "./internet/web";
+import { duckDuckGo, openPage, type PageReader, type PageShower, type WebAccess } from "./internet/web";
+import { BlockedSites, withBlockedProxy } from "./internet/blocked";
 import { Background } from "./agent/background";
 import { McpHub } from "./mcp/hub";
 import { AgentBrowser } from "./browser/agent-browser";
@@ -39,6 +40,8 @@ import { skillRoutes } from "./routes/skills";
 import { projectRoutes } from "./routes/projects";
 import { providerRoutes } from "./routes/providers";
 import { localRoutes } from "./routes/local";
+import { subscriptionRoutes } from "./routes/subscriptions";
+import { CliProxy } from "./local/cliproxy/service";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
 import { monthUsage } from "./budget";
@@ -51,7 +54,7 @@ import { SKILL_SOURCES, type SkillSources } from "./skills/install";
 import { SEARCH_URLS, SearchStore, withSearchService, type SearchUrls } from "./internet/search-service";
 import { githubRoutes } from "./routes/github";
 import { GitHub, type GithubOptions } from "./github/github";
-import { ProxyStore } from "./proxy";
+import { fetchVia, ProxyStore } from "./proxy";
 import { taskRoutes } from "./routes/tasks";
 import { setPriceCatalogUrl } from "./providers/native";
 import type { CliId } from "./cli/kinds";
@@ -113,6 +116,8 @@ export interface AppOptions {
   skillSources?: SkillSources;
   /** Ollama and its catalogs; tests give a fake program, fixed hardware and fake catalogs. */
   local?: LocalOptions;
+  /** CLIProxyAPI's archive; tests give a fake one. */
+  cliProxy?: { asset?: { url: string; sha256: string } | null; fetch?: typeof fetch };
   /** GitHub's addresses; tests give a fake. */
   github?: GithubOptions;
 }
@@ -134,12 +139,23 @@ export function createCore(o: AppOptions) {
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
   const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
+  void local.connectIfServed().catch(() => {});
+  // Free access through one's own subscriptions (docs/specs/subscriptions.md): the server the user left on starts again.
+  const cliProxy = new CliProxy({ db: o.db, cipher, providers, dir: join(o.dataDir, "cliproxy"), ...o.cliProxy });
+  void cliProxy.resume().catch(() => {});
   useLocalImages(local.images);
   useLocalAudio(local.audio);
   const github = new GitHub(o.db, cipher, o.github);
   const mcpRepo = new McpRepo(o.db, cipher);
   const agentBrowser = o.browser ?? new AgentBrowser({ profileDir: join(o.dataDir, "agent-browser") });
+  const sites = new BlockedSites(o.db);
   const browser = new Browser(agentBrowser);
+  // The desktop's browser takes the proxy for the listed sites only, and tells of a site that opened only through it.
+  const driver: BrowserDriver = agentBrowser;
+  const pushProxy = () => void driver.useProxy?.(proxies.url(), sites.list()).catch(() => {});
+  driver.onBlocked?.((host) => sites.add(host));
+  sites.onChange(pushProxy);
+  pushProxy();
   // The Playwright server can work in Chrome without a window; the desktop's tab inside the window has no address for it.
   const mcp = new McpHub(mcpRepo, agentBrowser instanceof AgentBrowser ? agentBrowser : undefined);
   const approvals = new ChatApprovals();
@@ -154,8 +170,14 @@ export function createCore(o: AppOptions) {
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
   // Sites that draw with scripts (databases, shops) are read in the desktop's or the server's browser.
   // A search service's key, when the user set one, replaces the free search (seen live: DuckDuckGo blocked again and again).
-  // Behind DuckDuckGo, Bing (asked for: the free search must not stop at one engine's limit).
-  const base = withSearchService(o.web ?? withSecondSearch(duckDuckGo, (q, s) => bingSearch(q, s)), searchStore, searchUrls);
+  // Behind DuckDuckGo, Bing (asked for: the free search must not stop at one engine's limit). Pages of sites closed from
+  // Russia go through the proxy, the rest directly (asked for: some Russian sites refuse a proxy).
+  const free = withSecondSearch(duckDuckGo, (q, s) => bingSearch(q, s));
+  const base = withSearchService(
+    o.web ?? withBlockedProxy(free, { proxy: () => proxies.url(), sites, openVia: (url, proxy, signal) => openPage(url, signal, fetchVia(proxy)) }),
+    searchStore,
+    searchUrls,
+  );
   const reader = o.readPage;
   const shower = o.showPage;
   const web: WebAccess = {
@@ -231,7 +253,8 @@ export function createCore(o: AppOptions) {
     )
     .route("/providers", providerRoutes(providers))
     .route("/local", localRoutes(local))
-    .route("/proxy", proxyRoutes(proxies, o.proxyCheckUrl ?? "https://www.google.com/generate_204"))
+    .route("/subscriptions", subscriptionRoutes(cliProxy))
+    .route("/proxy", proxyRoutes(proxies, o.proxyCheckUrl ?? "https://www.google.com/generate_204", sites, pushProxy))
     .route("/search", searchRoutes(searchStore, searchUrls))
     // Dictation (asked for): the recording to the voice model from the settings, its text back.
     .post("/voice/transcribe", zValidator("json", z.object({ audio: z.string().min(1).max(30_000_000), mimeType: z.string().regex(/^audio\/[\w.+-]+$/) })), async (c) => {
@@ -268,6 +291,7 @@ export function createCore(o: AppOptions) {
         plan: (projectId) => backlog.plan(projectId),
         visualKit,
         visionModel: () => readSettings(o.db).visionModel,
+        folderAutoApprove: () => readSettings(o.db).folderAutoApprove,
         skillsDir: join(o.dataDir, "skills"),
         month: () => monthUsage(o.db, chats),
       }),
@@ -308,6 +332,7 @@ export function createCore(o: AppOptions) {
       await mcp.shutdown();
       await agentBrowser.stop();
       local.close();
+      cliProxy.close();
     },
   };
 }

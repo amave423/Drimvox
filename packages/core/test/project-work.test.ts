@@ -95,6 +95,21 @@ describe("work on a project", () => {
     expect(task).toMatchObject({ kind: "plan", status: "waiting", statusReason: "plan_ready" });
   });
 
+  // Asked for: a small fix in an existing project should not start with a big interview.
+  it("writes the plan at once with the plan's model for a small task, without an interview", async () => {
+    const s = await setup({ asker: [noQuestions], planner: [writePlan] });
+    const res = await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
+      task: "Кнопка уезжает за край на телефоне",
+      quick: true,
+      models: { interview: s.ref("asker"), plan: s.ref("planner"), work: s.ref("planner"), strong: null },
+    });
+    expect(res.status).toBe(201);
+    const work = await until(s.project.id, (w) => w.status === "ready");
+    expect(work.plan).toMatchObject({ steps: PLAN.steps });
+    expect(requestsOf("asker")).toHaveLength(0);
+    expect(JSON.stringify(requestsOf("planner")[0]!.body.messages[0])).toContain("There was no interview");
+  });
+
   // Seen live: an interviewer wrote its questions as text; they were lost and the plan came without them.
   it("asks an interviewer that wrote its questions as text to ask them properly", async () => {
     const asks = call("ask_questions", { questions: [{ id: "look", question: "Какой стиль?", options: [{ label: "Тёплый" }, { label: "Строгий" }] }], understood: "Сайт", unknown: [] });

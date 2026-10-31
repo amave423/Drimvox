@@ -199,3 +199,18 @@
 .browser-waiting { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--wait-soft); }
 .browser-waiting p { margin: 0; flex: 1; }
 .browser-view.is-embedded { background: var(--paper); }
+/* A small task or a new project: the switch over the task box, with what it means. */
+.project-kind { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+/* Subscriptions through CLIProxyAPI: switches, accounts, sign-in, limits with their bars. */
+.subs { display: grid; gap: 10px; }
+.subs-h { margin: 12px 0 0; font-size: 16px; }
+.subs-switches { display: grid; gap: 6px; }
+.subs-logins { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.subs-login { display: grid; gap: 6px; }
+.subs-limits { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.subs-limit { display: grid; grid-template-columns: minmax(90px, 160px) 1fr auto; align-items: center; gap: 10px; }
+.subs-bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.subs-bar > span { display: block; height: 100%; background: var(--ok); }
+.subs-bar > span.is-full { background: var(--pencil); }
+.subs-limit-left { font-size: 13px; white-space: nowrap; }
+@media (max-width: 600px) { .subs-limit { grid-template-columns: 1fr; } }

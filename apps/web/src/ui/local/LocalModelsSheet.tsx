@@ -9,6 +9,7 @@ import { LocalCatalogView } from "./LocalCatalog";
 import { LocalImagesSection } from "./LocalImages";
 import { LocalAudioSection } from "./LocalAudio";
 import { LocalSpeechSection } from "./LocalSpeech";
+import { LocalSubscriptions } from "./LocalSubscriptions";
 import { Tabs } from "../Tabs";
 import type { LocalPart } from "../../context";
 import { PullControl, type PullActions } from "./PullControl";
@@ -105,6 +106,7 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
             { value: "image", label: t("local.part.image") },
             { value: "video", label: t("local.part.video") },
             { value: "audio", label: t("local.part.audio") },
+            { value: "subs", label: t("local.part.subs") },
           ]}
         />
 
@@ -177,6 +179,7 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
           </>
         )}
         {(part === "image" || part === "video") && <LocalImagesSection key={part} kind={part} />}
+        {part === "subs" && <LocalSubscriptions />}
         {part === "audio" && (
           <>
             <LocalAudioSection />

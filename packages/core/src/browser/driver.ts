@@ -38,6 +38,10 @@ export interface BrowserDriver {
   command(method: string, params?: Record<string, unknown>): Promise<unknown>;
   /** The page back at the panel's size after a look at another width; where the panel sets no size, nothing to do. */
   restoreSize?(): Promise<void>;
+  /** The proxy for the listed sites only, the rest directly (the desktop's browser); null: everything directly. */
+  useProxy?(proxy: string | null, hosts: string[]): Promise<void>;
+  /** A site that did not open directly but opened through the proxy: to remember; returns the way to stop listening. */
+  onBlocked?(listener: (host: string) => void): () => void;
   stop(): Promise<void>;
 }
 

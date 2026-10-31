@@ -110,6 +110,11 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(page.getByLabel("Что сделать?")).toHaveValue("Сайт лесопилки");
   await expect(models.getByRole("button", { name: /Planner/ })).toHaveCount(1);
   await expect(models.getByRole("button", { name: /Coder/ })).toHaveCount(2);
+  // Asked for: a small task in an existing project skips the interview; switched back, the interview it is.
+  const quick = page.getByRole("switch", { name: "Небольшая задача в готовом проекте" });
+  await quick.check({ force: true });
+  await expect(page.getByRole("button", { name: "Составить план" })).toBeVisible();
+  await quick.uncheck({ force: true });
   await page.getByRole("button", { name: "Начать опрос" }).click();
 
   // The plan comes right under the interview: read it, then "Go".

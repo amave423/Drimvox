@@ -19,3 +19,4 @@ export * from "./backlog";
 export * from "./project-work";
 export * from "./github";
 export * from "./speech-text";
+export * from "./subscriptions";

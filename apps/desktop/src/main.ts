@@ -53,6 +53,7 @@ let origin = "";
 const agentView = new AgentView(
   () => win,
   (state) => core?.postMessage({ type: "browser-state", state }),
+  (host) => core?.postMessage({ type: "browser-blocked", host }),
 );
 
 if (!app.requestSingleInstanceLock()) {
@@ -148,10 +149,14 @@ function startCore(): Promise<number> {
     const env = { ...process.env, ...coreGitEnv(gitDir()) } as Record<string, string>;
     const child = utilityProcess.fork(join(__dirname, "core.cjs"), [], { serviceName: "Drimvox core", env });
     child.postMessage(init);
-    child.once("message", (msg: { type: string; port?: number; error?: string }) => {
+    // The core may ask for the browser (its proxy) before it says it is ready: only "ready" and "error" answer the start.
+    const started = (msg: { type: string; port?: number; error?: string }) => {
       if (msg.type === "ready" && msg.port) resolve(msg.port);
-      else reject(new Error(msg.error ?? "Ядро ответило непонятным сообщением"));
-    });
+      else if (msg.type === "error") reject(new Error(msg.error ?? "Ядро ответило непонятным сообщением"));
+      else return;
+      child.off("message", started);
+    };
+    child.on("message", started);
     child.on("message", (msg: { type?: string; id?: number; url?: string; width?: number; height?: number; actions?: PageAction[]; reason?: string; op?: string; args?: unknown[] }) => {
       if (msg.type === "browser" && typeof msg.id === "number" && typeof msg.op === "string") {
         const id = msg.id;

@@ -322,6 +322,59 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
   }
 });
 
+// Asked for: the proxy only for sites closed from Russia, not for all. The listed sites go through it; a site that does
+// not open directly is tried through it and remembered; the rest go directly.
+test("the agent's browser opens listed sites through the proxy and learns a site that opens only through it", async () => {
+  test.setTimeout(60_000);
+  const proxied: string[] = [];
+  const proxy = createServer((req, res) => {
+    proxied.push(req.url ?? "");
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end(`<title>Через прокси</title><p>${req.url}</p>`);
+  });
+  await new Promise<void>((r) => proxy.listen(0, "127.0.0.1", r));
+  try {
+    app = await launch();
+    const page = await app.firstWindow();
+    await expect(paramsButton(page)).toBeVisible();
+    const port = (proxy.address() as AddressInfo).port;
+    await page.evaluate(async (port) => {
+      const headers = { authorization: `Bearer ${await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken()}`, "content-type": "application/json" };
+      await fetch("/api/proxy", { method: "PUT", headers, body: JSON.stringify({ url: `http://127.0.0.1:${port}` }) });
+      await fetch("/api/proxy/sites", { method: "PUT", headers, body: JSON.stringify({ hosts: ["listed-blocked.test"] }) });
+    }, port);
+
+    await page.getByRole("button", { name: "Браузер", exact: true }).click();
+    const pane = page.getByRole("complementary", { name: "Браузер агента" });
+    await pane.getByRole("button", { name: "Открыть браузер" }).click();
+    await pane.getByLabel("Адрес").fill("http://listed-blocked.test/");
+    await pane.getByLabel("Адрес").press("Enter");
+    await expect(pane.getByRole("tab", { selected: true })).toHaveText("Через прокси", { timeout: 20_000 });
+
+    // Not listed, and no such name directly: tried through the proxy, opened, remembered.
+    await pane.getByLabel("Адрес").fill("http://other-blocked.test/");
+    await pane.getByLabel("Адрес").press("Enter");
+    await expect.poll(() => proxied.some((u) => u.includes("other-blocked.test")), { timeout: 20_000 }).toBe(true);
+    await expect
+      .poll(() => page.evaluate(async () => (await (await fetch("/api/proxy/sites", { headers: { authorization: `Bearer ${await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken()}` } })).json()).hosts), { timeout: 20_000 })
+      .toContain("other-blocked.test");
+  } finally {
+    proxy.closeAllConnections();
+    await new Promise((r) => proxy.close(r));
+  }
+});
+
+// Asked for: free access through one's own subscriptions, on its own tab of the local models, downloaded like an engine.
+test("the local models have a Subscriptions tab with CLIProxyAPI to download and the risk said plainly", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await openSection(page, "Локальные модели");
+  await page.getByRole("tab", { name: "Подписки" }).click();
+  await expect(page.getByRole("heading", { name: "Свои подписки вместо ключей" })).toBeVisible();
+  await expect(page.getByText(/аккаунт могут ограничить или заблокировать/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Скачать" })).toBeVisible();
+});
+
 // Asked for: the window opens about 80% of the screen wide, as Claude Code does; the height stays.
 test("opens the window about 80% of the screen wide", async () => {
   app = await launch();
