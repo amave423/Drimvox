@@ -37,12 +37,12 @@
 
 /* The parameters: a page over the whole window, the way back on the top left, the sections on the right. */
 .shell.is-params { grid-template-columns: 1fr; }
-.params { width: 100%; max-width: 1400px; display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 0 28px; align-items: start; }
+.params { width: 100%; max-width: 1400px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 0 28px; align-items: start; }
 .params-main { min-width: 0; display: grid; gap: 12px; }
 .params-main > .sheet { max-width: none; }
 .params-back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 999px; color: var(--muted); font-size: 14px; }
 .params-back:hover { color: var(--fg); background: var(--sheet); }
-.params-nav { position: sticky; top: 0; display: grid; gap: 2px; padding: 46px 0 0 14px; border-left: 1px solid var(--line); }
+.params-nav { position: sticky; top: 0; display: grid; gap: 2px; padding: 46px 14px 0 0; border-right: 1px solid var(--line); }
 .params-nav .side-link { margin: 0; }
 .params-nav .side-link.is-on { background: var(--sheet); box-shadow: 0 1px 0 var(--line); }
 @container (max-width: 880px) {

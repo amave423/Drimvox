@@ -374,6 +374,10 @@ test("the local models have no Subscriptions tab", async () => {
   await openSection(page, "Локальные модели");
   await expect(page.getByRole("tab", { name: "Текст" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Подписки" })).toHaveCount(0);
+  // The sections are on the left of the parameters (asked for).
+  const nav = (await page.getByRole("navigation", { name: "Разделы параметров" }).boundingBox())!;
+  const main = (await page.locator(".params-main").boundingBox())!;
+  expect(nav.x + nav.width).toBeLessThanOrEqual(main.x);
 });
 
 // Asked for: the window opens about 80% of the screen wide, as Claude Code does; the height stays.
