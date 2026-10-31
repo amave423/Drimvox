@@ -37,6 +37,8 @@ async function main() {
     password: { setupCode: code },
     screenshot,
     readPage,
+    // Tests keep a real Ollama on the machine out (Drimvox connects one with models by itself).
+    presetUrls: process.env.DRIMVOX_TEST_OLLAMA_URL ? { ollama: process.env.DRIMVOX_TEST_OLLAMA_URL } : undefined,
   });
 
   console.log(`Drimvox ${__DRIMVOX_VERSION__} listens on http://127.0.0.1:${server.port}, data in ${config.dataDir}`);

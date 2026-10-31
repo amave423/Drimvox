@@ -116,6 +116,15 @@ export class LocalModels {
     return this.providerId() ?? this.providers.create({ preset: "ollama", name: presets.ollama.name }).id;
   }
 
+  /**
+   * At start: an Ollama that already runs with models (a service on a server, models pulled by its own command) is
+   * connected without starting anything, so the chat lists them before anyone opens the local models' sheet.
+   */
+  async connectIfServed(): Promise<void> {
+    if (this.providerId()) return;
+    if ((await this.ollama.models()).length > 0) this.connect();
+  }
+
   private afterPull(): void {
     // A fresh timestamp drops the provider's cached model list, so the new model shows at once.
     this.providers.update(this.connect(), {});
@@ -123,6 +132,9 @@ export class LocalModels {
 
   async status(): Promise<LocalStatus> {
     const s = await this.ollama.status();
+    // Models already in Ollama (downloaded before, by its own command, or on a fresh server) are usable at once: the
+    // chat said "connect a neural network" and it read as "an API key is needed" (seen on the user's server).
+    if (s.running && s.models.length > 0 && !this.providerId()) this.connect();
     return {
       ...s,
       ...(this.installer.state().state === "done" ? { installed: true } : {}),

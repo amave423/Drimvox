@@ -141,6 +141,15 @@ describe("Ollama on this computer", () => {
 });
 
 describe("downloads", () => {
+  // Seen on the user's server: models were in Ollama, the chat said "connect a neural network" and it read as "an API
+  // key is needed". An Ollama with models is connected as soon as the local models are looked at.
+  it("connects an Ollama that already has models, without a button", async () => {
+    setup({ models: ["gemma4:e2b"] });
+    expect((await status()).providerId).toBeTruthy();
+    const providers = await (await env.call("GET", "/api/providers")).json();
+    expect(providers.filter((p: any) => p.preset === "ollama")).toHaveLength(1);
+  });
+
   it("pulls with progress, then adds the Ollama provider so chat can use it", async () => {
     setup({ pullMs: 30 });
     expect((await status()).providerId).toBeNull();
