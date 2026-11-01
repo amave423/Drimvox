@@ -12,18 +12,21 @@ interface Part {
 }
 
 /**
- * The guide, from what the user meets first to the questions people ask (asked for: newcomers understood nothing from
- * the short version). Its texts are guide.<id>.title, .lede and .1…n.
+ * The guide, from the very first words to the questions people ask (asked for: written for someone who has never used
+ * an app like this or an AI model). Its texts are guide.<id>.title, .lede and .1…n.
  */
 const PARTS: Part[] = [
-  { id: "about", points: 3 },
-  { id: "connect", points: 4, lede: true },
-  { id: "modes", points: 3 },
-  { id: "chat", points: 5, lede: true },
+  { id: "basics", points: 5, lede: true },
+  { id: "about", points: 4 },
+  { id: "connect", points: 6, lede: true, steps: true },
+  { id: "chat", points: 6, lede: true, steps: true },
+  { id: "folder", points: 4 },
   { id: "project", points: 8, lede: true, steps: true },
+  { id: "chains", points: 3 },
   { id: "money", points: 4 },
-  { id: "extras", points: 3 },
-  { id: "faq", points: 5 },
+  { id: "extras", points: 5 },
+  { id: "words", points: 6 },
+  { id: "faq", points: 7 },
 ];
 
 const key = (id: string, what: string) => `guide.${id}.${what}` as MessageKey;

@@ -44,13 +44,13 @@ test("opens with a working core and remembers theme and language", async () => {
   await expect(steps).toContainText("По подписке.");
   await expect(steps.getByRole("button", { name: "Подключить нейросеть" })).toBeVisible();
   // The guide goes from what Drimvox is to the questions people ask, with contents that lead to each part.
-  const parts = ["Что такое Drimvox", "Шаг 1. Подключите нейросеть", "Шаг 2. Два режима и параметры", "Чат", "Проект: агент делает всё сам", "Деньги и безопасность", "Уведомления, навыки и серверы", "Частые вопросы"];
+  const parts = ["Сначала главное: пять слов", "Что умеет Drimvox", "Шаг 1. Подключите нейросеть", "Шаг 2. Первый разговор", "Чат с папкой: нейросеть работает с вашими файлами", "Проект: агент делает работу сам", "Бесплатные модели и цепочки", "Деньги и безопасность", "Дополнительно", "Словарик", "Частые вопросы"];
   for (const part of parts) await expect(page.getByRole("region", { name: part })).toHaveCount(1);
   const contents = page.getByRole("navigation", { name: "Содержание" });
   await contents.getByRole("button", { name: "Частые вопросы" }).click();
   await expect(page.getByRole("region", { name: "Частые вопросы" })).toBeInViewport();
   // A project's points are steps, in order.
-  await expect(page.getByRole("region", { name: "Проект: агент делает всё сам" }).locator("ol > li")).toHaveCount(8);
+  await expect(page.getByRole("region", { name: "Проект: агент делает работу сам" }).locator("ol > li")).toHaveCount(8);
   // The names in the guide open what they name.
   await page.getByRole("region", { name: "Шаг 1. Подключите нейросеть" }).getByRole("link", { name: "Локальные модели" }).click();
   await expect(page.getByRole("heading", { name: "Локальные модели", level: 1 })).toBeVisible();

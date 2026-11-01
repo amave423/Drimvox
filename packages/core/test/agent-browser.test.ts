@@ -101,15 +101,18 @@ describe("the agent's browser", () => {
       site = createServer((_, res) => {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         // "localhost" and "127.0.0.1" are different sites to the browser.
-        res.end(`<title>Ждёт</title><body style="margin:0"><iframe src="http://localhost:${(inner.address() as AddressInfo).port}/" style="position:absolute;left:100px;top:100px;width:300px;height:65px;border:0"></iframe><script>addEventListener('message', (e) => { if (e.data === 'checked') document.title = 'Пройдено'; })</script></body>`);
+        res.end(`<title>Ждёт</title><body style="margin:0"><iframe src="http://localhost:${(inner.address() as AddressInfo).port}/" style="position:absolute;left:100px;top:100px;width:300px;height:65px;border:0" onload="document.body.dataset.ready = '1'"></iframe><script>addEventListener('message', (e) => { if (e.data === 'checked') document.title = 'Пройдено'; })</script></body>`);
       });
       await new Promise<void>((r) => site!.listen(0, "127.0.0.1", r));
       profile = mkdtempSync(join(tmpdir(), "drimvox-browser-"));
       browser = new AgentBrowser({ profileDir: profile });
       const stop = browser.watch({ frame: () => {}, state: () => {} });
       await browser.open(`http://127.0.0.1:${(site.address() as AddressInfo).port}/`);
-      for (let i = 0; i < 100 && browser.state().title !== "Ждёт"; i++) await new Promise((r) => setTimeout(r, 100));
-      await new Promise((r) => setTimeout(r, 500));
+      // The frame from the other site loaded, not a fixed wait (seen: under load the click came before it and was lost).
+      const loaded = async () =>
+        ((await browser!.command("Runtime.evaluate", { expression: "document.body && document.body.dataset.ready === '1'", returnByValue: true }).catch(() => null)) as { result?: { value?: boolean } } | null)?.result?.value === true;
+      for (let i = 0; i < 150 && !(await loaded()); i++) await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 300));
       // The box: 20 px in, at the frame's 100, 100.
       await browser.input({ type: "mouse", action: "down", x: 132, y: 132 });
       await browser.input({ type: "mouse", action: "up", x: 132, y: 132 });

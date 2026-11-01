@@ -75,9 +75,9 @@ export const catalogEn: Record<keyof typeof catalogRu, string> = {
   "catalog.e.memory.about": "A model's long memory: facts about the project and people between conversations.",
   "catalog.e.memory.details": "The Model Context Protocol reference server. It keeps a knowledge graph of entities, relations and observations in a file on this computer. The model writes down what matters and recalls it in later conversations.",
   "catalog.e.memory.can": "Remember facts and relations|Find what was remembered|Correct and delete what is outdated",
-  "catalog.e.memory.example": "Remember: in the Sawmill project prices are without VAT",
-  "catalog.e.memory.steps": "Creates the entity “Sawmill”|Adds an observation about VAT",
-  "catalog.e.memory.result": "Remembered. Next time I will count prices without VAT.",
+  "catalog.e.memory.example": "Remember: in the Clinic project prices include VAT",
+  "catalog.e.memory.steps": "Creates the entity “Clinic”|Adds an observation about VAT",
+  "catalog.e.memory.result": "Remembered. Next time I will count prices with VAT included.",
 
   "catalog.e.sequential-thinking.name": "Step-by-step thinking",
   "catalog.e.sequential-thinking.about": "Helps a model break a hard task into steps and revise them.",

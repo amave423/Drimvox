@@ -60,9 +60,9 @@ describe("a search service with a key", () => {
 
   it("searches with Tavily or Brave when a key is set, and their results read like the free search's", async () => {
     await env.call("PUT", "/api/search", { service: "tavily", key: "tvly-good" });
-    const tavily = await (await env.call("POST", "/api/search/check", { query: "лесопилка" })).json();
+    const tavily = await (await env.call("POST", "/api/search/check", { query: "стоматология" })).json();
     expect(tavily.results).toEqual([{ title: "Лесопилка", url: "https://wood.example/", snippet: "Доски и брус" }]);
-    expect(JSON.parse(seen.at(-1)!.body)).toMatchObject({ query: "лесопилка" });
+    expect(JSON.parse(seen.at(-1)!.body)).toMatchObject({ query: "стоматология" });
 
     await env.call("PUT", "/api/search", { service: "brave", key: "brave-good" });
     const brave = await (await env.call("POST", "/api/search/check", { query: "брус" })).json();
@@ -75,11 +75,11 @@ describe("a search service with a key", () => {
     fake = await startFakeProvider({
       key: "k",
       models: [{ id: "m1", name: "Model 1" }],
-      script: [{ toolCalls: [{ name: "web_search", args: { query: "лесопилка" } }] }, { text: "Нашёл лесопилку." }],
+      script: [{ toolCalls: [{ name: "web_search", args: { query: "стоматология" } }] }, { text: "Нашёл клинику." }],
     });
     const provider = (await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: "k" })).json()).id;
     const chat = await (await env.call("POST", "/api/chats", { providerId: provider, model: "m1" })).json();
-    const events = await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Найди лесопилку", web: "free" }));
+    const events = await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Найди стоматологию", web: "free" }));
     expect(events.find((e: any) => e.type === "done").message).toMatchObject({ status: "done" });
     expect(JSON.stringify(fake.requests.filter((r) => r.path === "/v1/chat/completions")[1]!.body.messages)).toContain("Доски и брус");
   });

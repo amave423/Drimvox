@@ -18,7 +18,7 @@ let folder: string;
 
 beforeEach(() => {
   env = createTestEnv();
-  folder = makeRepo({ "index.html": "<h1>Лесопилка</h1>\n" });
+  folder = makeRepo({ "index.html": "<h1>Клиника</h1>\n" });
 });
 
 afterEach(async () => {
@@ -29,9 +29,9 @@ afterEach(async () => {
 });
 
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
-const noQuestions = call("ask_questions", { questions: [], understood: "Сайт лесопилки", unknown: [] });
+const noQuestions = call("ask_questions", { questions: [], understood: "Сайт клиники", unknown: [] });
 const PLAN = {
-  summary: "Сайт лесопилки: каталог досок и калькулятор заказа.",
+  summary: "Сайт клиники: онлайн-запись к врачу и прайс-лист.",
   steps: ["Каталог", "Калькулятор", "Проверить страницы"],
   checks: ["Каталог открывается", "npm test"],
   pages: [{ url: "http://localhost:5173/", command: "npm run dev" }],
@@ -68,7 +68,7 @@ async function until(projectId: string, done: (w: any) => boolean) {
 /** The interview with one model, the plan with another; the plan waits for "Go". */
 async function planned(s: Awaited<ReturnType<typeof setup>>, models: { interview?: string; plan?: string; work?: string; strong?: string | null } = {}) {
   const res = await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
-    task: "Сайт лесопилки",
+    task: "Сайт клиники",
     models: {
       interview: s.ref(models.interview ?? "coder"),
       plan: s.ref(models.plan ?? "coder"),
@@ -198,7 +198,7 @@ describe("work on a project", () => {
   it("keeps the plan's pages with what is on them and the technical decisions with their reasons", async () => {
     const full = {
       ...PLAN,
-      screens: [{ name: "Каталог", contents: "Доски по сортам, фильтр по длине, кнопка «В заказ»" }],
+      screens: [{ name: "Каталог", contents: "Врачи по специальностям, свободное время, кнопка «Заказ»" }],
       decisions: [{ what: "Vite + React", why: "быстрый старт и простая сборка" }],
     };
     const s = await setup({ coder: [noQuestions, call("write_plan", full)] });
@@ -414,7 +414,7 @@ describe("work on a project", () => {
   // The workspace's "Changes": what the agent did to the folder since the last commit, new files too, index untouched.
   it("shows the folder's changes since the last commit", async () => {
     const s = await setup({ coder: [noQuestions] });
-    writeFileSync(join(folder, "index.html"), "<h1>Лесопилка «Дуб»</h1>\n");
+    writeFileSync(join(folder, "index.html"), "<h1>Клиника «Здоровье»</h1>\n");
     mkdirSync(join(folder, "src"));
     writeFileSync(join(folder, "src", "app.js"), "export const a = 1;\n");
     const files = (await (await env.call("GET", `/api/projects/${s.project.id}/work/changes`)).json()) as { path: string; status: string; added: number }[];
@@ -583,7 +583,7 @@ describe("work on a project", () => {
     const s = await setup({ coder: [noQuestions, writePlan] });
     const cli = await (await env.call("POST", "/api/providers", { preset: "claude-code" })).json();
     await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
-      task: "Сайт лесопилки",
+      task: "Сайт клиники",
       models: { interview: s.ref("coder"), plan: s.ref("coder"), work: { providerId: cli.id, model: "default" }, strong: null },
     });
     await until(s.project.id, (w) => w.status === "ready");

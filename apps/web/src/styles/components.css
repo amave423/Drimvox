@@ -219,7 +219,7 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .mcp-trust .segmented { flex-wrap: wrap; }
 
 /* Chains of free models in the settings (docs/specs/model-chains.md): the list beside the chosen chain. */
-.chains { display: grid; gap: 12px; }
+.chains { display: grid; gap: 14px; margin-top: 20px; }
 .chains-body { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 20px; align-items: start; }
 .chains-list { display: grid; gap: 4px; }
 .chains-item { display: grid; gap: 1px; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; background: none; color: var(--fg); font: inherit; font-size: 14px; cursor: pointer; }
@@ -249,8 +249,8 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .chain-moves { display: flex; gap: 2px; }
 .chain-add { justify-self: stretch; text-align: left; padding: 8px 10px; border: 1.5px dashed var(--line); border-radius: 10px; background: none; color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; }
 .chain-rules { display: grid; gap: 8px; margin-top: 6px; }
-.chain-order { display: grid; gap: 4px; font-size: 14px; }
-.radio-row { display: flex; gap: 8px; align-items: center; }
+.chain-order { display: grid; gap: 6px; font-size: 14px; }
+.radio-row { display: flex; gap: 10px; align-items: center; cursor: pointer; }
 @media (max-width: 760px) { .chains-body { grid-template-columns: 1fr; } }
 
 /* Drimvox's own list choice (Dropdown.tsx): the field's look closed, the model picker's panel open. */
@@ -281,3 +281,17 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .ssh-badge.is-trusted { background: var(--wait-soft); color: var(--wait); }
 .ssh-form { display: grid; gap: 10px; max-width: 520px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); }
 .ssh-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+
+/* Radio buttons and checkboxes in the app's look (asked for: the system's own stood out, unstyled). A radio is a ring that
+   fills with ink; a checkbox a rounded square that fills with ink around a light core. */
+.radio-row input[type="radio"], .option input[type="radio"], .stage-switch input[type="checkbox"] {
+  appearance: none; flex: none; width: 16px; height: 16px; margin: 0; border: 1.5px solid var(--muted); background: var(--sheet);
+  cursor: pointer; transition: border-color 120ms, background-color 120ms, box-shadow 120ms;
+}
+.radio-row input[type="radio"], .option input[type="radio"] { border-radius: 50%; }
+.stage-switch input[type="checkbox"] { border-radius: 5px; }
+.radio-row input[type="radio"]:hover, .option input[type="radio"]:hover, .stage-switch input[type="checkbox"]:hover:not(:disabled) { border-color: var(--ink); }
+.radio-row input[type="radio"]:checked, .option input[type="radio"]:checked, .stage-switch input[type="checkbox"]:checked { border-color: var(--ink); background: var(--ink); box-shadow: inset 0 0 0 3px var(--sheet); }
+.radio-row input:focus-visible, .option input:focus-visible, .stage-switch input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.stage-switch input[type="checkbox"]:disabled { opacity: 0.5; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .radio-row input, .option input, .stage-switch input { transition: none; } }

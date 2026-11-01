@@ -117,7 +117,6 @@
 .stages { border: 0; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
 .stages legend { padding: 0; margin-bottom: 4px; color: var(--muted); font-size: 13px; }
 .stage-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.stage-switch input { accent-color: var(--ink); }
 .stage-switch.is-disabled { color: var(--muted); cursor: default; }
 
 .phase-steps { list-style: none; counter-reset: step; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 2px 0 0; padding: 0; font-size: 13px; color: var(--muted); }
@@ -132,7 +131,7 @@
 .option { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
 .option:hover { border-color: var(--muted); }
 .option.is-on { border-color: var(--ink); background: var(--ink-soft); }
-.option input { margin-top: 4px; accent-color: var(--ink); }
+.option input { margin-top: 3px; }
 .option-text { display: grid; gap: 2px; min-width: 0; }
 .option-text small { color: var(--muted); font-size: 13px; }
 .option-text .field-input { margin-top: 6px; }

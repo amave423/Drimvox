@@ -21,7 +21,7 @@ let fake: FakeProvider | undefined;
 test.beforeEach(() => {
   userData = mkdtempSync(join(tmpdir(), "drimvox-e2e-"));
   repo = mkdtempSync(join(tmpdir(), "drimvox-repo-"));
-  writeFileSync(join(repo, "README.md"), "# Лесопилка\n");
+  writeFileSync(join(repo, "README.md"), "# Клиника\n");
   const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, stdio: "pipe" });
   git("init", "-q", "-b", "main");
   git("config", "user.name", "Test");
@@ -67,11 +67,11 @@ async function launch(script: FakeTurn[], sees = false): Promise<Page> {
 // docs/specs/project-work.md: the interview, the final plan with "Go", then one long run with its checklist on the right.
 test("a project: the interview, the plan with Go, the agent works alone with its checklist, a message on the way", async () => {
   const page = await launch([
-    call("ask_questions", { questions: [], understood: "Сайт лесопилки", unknown: [] }),
-    call("write_plan", { summary: "Сайт лесопилки с каталогом досок.", steps: ["Каталог досок", "Проверить страницу"], checks: [], pages: [] }),
-    { ...call("write_file", { path: "index.html", content: "<h1>Доски</h1>\n" }), delayMs: 1500 },
+    call("ask_questions", { questions: [], understood: "Сайт клиники", unknown: [] }),
+    call("write_plan", { summary: "Сайт клиники с онлайн-записью.", steps: ["Онлайн-запись", "Проверить страницу"], checks: [], pages: [] }),
+    { ...call("write_file", { path: "index.html", content: "<h1>Запись</h1>\n" }), delayMs: 1500 },
     call("ask_user", { question: "Нужна доставка?", assumption: "Пока без доставки" }),
-    call("update_checklist", { items: [{ text: "Каталог досок", done: true }, { text: "Проверить страницу", done: true }] }),
+    call("update_checklist", { items: [{ text: "Онлайн-запись", done: true }, { text: "Проверить страницу", done: true }] }),
     call("finish_work", { report: "Каталог готов: откройте index.html." }),
     { text: "Каталог готов: откройте index.html." },
   ]);
@@ -81,7 +81,7 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await addProject(page);
   // No task list, no points, no order: what to make and who does what.
   await expect(page.getByRole("checkbox")).toHaveCount(0);
-  await page.getByLabel("Что сделать?").fill("Сайт лесопилки");
+  await page.getByLabel("Что сделать?").fill("Сайт клиники");
   const models = page.getByRole("group", { name: "Модели" });
   await expect(models).toContainText("Модель для опроса, плана и работы");
   await expect(models).toContainText("Сильная модель");
@@ -108,7 +108,7 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   // What was typed and picked stays through a visit to the parameters (seen: it was gone).
   await page.locator(".side-nav").getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByRole("button", { name: "Назад" }).click();
-  await expect(page.getByLabel("Что сделать?")).toHaveValue("Сайт лесопилки");
+  await expect(page.getByLabel("Что сделать?")).toHaveValue("Сайт клиники");
   await expect(models.getByRole("button", { name: /Planner/ })).toHaveCount(1);
   await expect(models.getByRole("button", { name: /Coder/ })).toHaveCount(2);
   // Small tasks go to an existing project now: no switch for them here (asked for).
@@ -117,14 +117,14 @@ test("a project: the interview, the plan with Go, the agent works alone with its
 
   // The plan comes right under the interview: read it, then "Go".
   const plan = page.getByRole("region", { name: "Итоговый план" });
-  await expect(plan).toContainText("Сайт лесопилки с каталогом досок.", { timeout: 30_000 });
-  await expect(plan.getByRole("listitem")).toHaveText(["Каталог досок", "Проверить страницу"]);
+  await expect(plan).toContainText("Сайт клиники с онлайн-записью.", { timeout: 30_000 });
+  await expect(plan.getByRole("listitem")).toHaveText(["Онлайн-запись", "Проверить страницу"]);
   await expect(plan.getByLabel("Время, часов")).toHaveValue("2");
   await plan.getByRole("button", { name: "Начать работу" }).click();
 
   // The workshop: the run's timeline with the plan as its first message, the state in the top bar, the checklist in
   // the sidebar.
-  await expect(page.locator(".timeline .msg-user").first()).toContainText("Каталог досок");
+  await expect(page.locator(".timeline .msg-user").first()).toContainText("Онлайн-запись");
   const state = page.locator(".topbar").getByRole("status");
   await expect(state).toContainText("Агент работает");
   // A message while it works goes in at once and the agent takes it on the way.
@@ -141,7 +141,7 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await page.getByRole("tab", { name: "Вопросы · 1" }).click();
   await expect(page.locator(".work-question")).toContainText("Нужна доставка?");
   await page.getByRole("tab", { name: "План" }).click();
-  await expect(page.locator(".workshop-main .plan-details")).toContainText("Сайт лесопилки с каталогом досок.");
+  await expect(page.locator(".workshop-main .plan-details")).toContainText("Сайт клиники с онлайн-записью.");
   await page.getByRole("tab", { name: "Ход работы" }).click();
   // The result panel: the report and the folder's changes; the handle beside it folds it away and brings it back.
   const result = page.getByRole("complementary", { name: "Результат" });
@@ -184,7 +184,7 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(page.locator("#sidebar")).toBeHidden();
   await page.getByRole("button", { name: "Показать боковую панель" }).click();
   await expect(page.locator("#sidebar")).toBeVisible();
-  expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Доски");
+  expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Запись");
   // By the default git rules the work is in a branch of the agent's own; main stays as it was.
   expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toMatch(/^drimvox\/task-/);
   expect(execFileSync("git", ["log", "--oneline", "main"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);
@@ -202,7 +202,7 @@ test("a project: the interview, the plan with Go, the agent works alone with its
 test("a ready project: asked on adding, talked to as in a chat, its plan on the left, removed from the sidebar", async () => {
   const page = await launch([
     call("update_checklist", { items: [{ text: "Прочитать README", done: true }, { text: "Ответить", done: false }] }),
-    { text: "Это сайт лесопилки." },
+    { text: "Это сайт клиники." },
   ]);
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await page.getByRole("button", { name: "+ Проект" }).click();
@@ -220,7 +220,7 @@ test("a ready project: asked on adding, talked to as in a chat, its plan on the 
   await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
 
   await expect(page.locator(".timeline .msg-user")).toContainText("Что это за проект?");
-  await expect(page.locator(".timeline")).toContainText("Это сайт лесопилки.", { timeout: 30_000 });
+  await expect(page.locator(".timeline")).toContainText("Это сайт клиники.", { timeout: 30_000 });
   await expect(page.getByRole("list", { name: "План агента" })).toContainText("Прочитать README");
   // No plan or questions tabs: the conversation is the whole middle.
   await expect(page.getByRole("tab", { name: "Ход работы" })).toHaveCount(0);
@@ -254,7 +254,7 @@ test("a ready project: asked on adding, talked to as in a chat, its plan on the 
   await page.locator(".side-projects .danger-zone").getByRole("button", { name: "Убрать проект из Drimvox" }).click();
   await expect(page.getByRole("heading", { name: "Над чем поработаем?" })).toBeVisible();
   await expect(page.locator(".side-project")).toHaveCount(0);
-  expect(readFileSync(join(repo, "README.md"), "utf8")).toContain("Лесопилка");
+  expect(readFileSync(join(repo, "README.md"), "utf8")).toContain("Клиника");
 });
 
 // Asked for: many screenshots are gone through with a switch, not opened and closed one by one; the result panel has none
