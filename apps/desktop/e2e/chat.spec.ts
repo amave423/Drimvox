@@ -383,6 +383,12 @@ test("works in a connected folder and undoes an answer", async () => {
   await page.getByRole("button", { name: "Папка" }).click();
   // A connected folder is never hidden: the options button names it.
   await expect(page.getByRole("button", { name: /^Параметры: Папка: drimvox-e2e-folder-/ })).toBeVisible();
+  // The auto-approve label fits beside its switch (seen: the word was cut under the switch).
+  const approve = page.locator(".options-row", { hasText: "Автоподтверждение" });
+  await expect(approve).toBeVisible();
+  expect(
+    await approve.locator(":scope > span").first().evaluate((el) => el.scrollWidth <= el.clientWidth && el.getBoundingClientRect().right <= el.nextElementSibling!.getBoundingClientRect().left),
+  ).toBe(true);
 
   await say(page, "Создай hello.txt");
   await expect(page.getByText("Создал hello.txt.")).toBeVisible();

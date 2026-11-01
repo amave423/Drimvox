@@ -268,3 +268,16 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .dropdown-list .is-active button { background: var(--paper); }
 .dropdown-list [aria-selected="true"] button { color: var(--ink); }
 .dropdown-empty { margin: 4px 8px; font-size: 13px; }
+
+/* Saved SSH servers (SshSection.tsx). */
+.ssh-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.ssh-item { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); }
+.ssh-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.ssh-item small { font-size: 12.5px; }
+.ssh-item .actions { margin-top: 4px; }
+.ssh-item p { margin: 2px 0 0; font-size: 13px; }
+.ssh-ok { color: var(--ok); }
+.ssh-badge { margin-left: auto; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--paper); color: var(--muted); }
+.ssh-badge.is-trusted { background: var(--wait-soft); color: var(--wait); }
+.ssh-form { display: grid; gap: 10px; max-width: 520px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); }
+.ssh-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }

@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import { noNative } from "./no-native.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +18,7 @@ export const options = {
   target: "node24",
   external: ["electron"],
   define: { __DRIMVOX_VERSION__: JSON.stringify(version) },
+  plugins: [noNative],
   sourcemap: true,
   logLevel: "info",
 };

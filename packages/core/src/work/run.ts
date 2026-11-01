@@ -16,10 +16,11 @@ import { nowLine } from "../now";
 import { findModel } from "../providers/catalog";
 import type { Connection, ProviderRepo } from "../providers/repo";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
-import type { Vision } from "../visual/look";
+import { askAboutPictures, type Vision } from "../visual/look";
 import { VISUAL_HINT, visualTools, type VisualKit } from "../visual/tools";
 import { existingRules, nudgeMessage, projectRules } from "./prompt";
 import type { ProjectGit } from "./project-git";
+import { toolbox, type ToolboxDeps } from "../tools";
 import { polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
@@ -55,6 +56,8 @@ export interface RunDeps {
   /** This month's spending against the app's budget. */
   month(): MonthUsage;
   vision(conn: Connection, model: string): Promise<Vision | null>;
+  /** Downloads, mail, SSH, dependency audits, before and after of a page (tools/index.ts). */
+  toolbox?: ToolboxDeps;
   /** The project's git rules: the branch before the work, commits on the agent's word, the push at the end. */
   git?: ProjectGit;
   /** The picture tool when the settings name an image model: it draws straight into the project's folder. */
@@ -285,6 +288,14 @@ export class WorkRun {
       : {};
     const own: ToolSet = {
       ...mcpTools,
+      ...(this.d.toolbox
+        ? toolbox(this.d.toolbox, {
+            folder: this.folder,
+            vision,
+            hooks,
+            see: vision ? async (png, question, signal) => (await askAboutPictures(vision, [{ data: png, mediaType: "image/png" }], question, signal)).text : undefined,
+          })
+        : {}),
       ...imageTools,
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
       ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true, vision, onSpend: (usd) => (cost += usd), folder: this.folder }),

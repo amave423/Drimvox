@@ -21,3 +21,4 @@ export * from "./github";
 export * from "./speech-text";
 export * from "./project-git";
 export * from "./chains";
+export * from "./ssh";

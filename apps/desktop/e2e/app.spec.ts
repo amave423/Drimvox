@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 import { openSection, paramsButton } from "./sections";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import ssh2 from "ssh2";
+
+const { Server: SshServer, utils: sshUtils } = ssh2;
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 
@@ -440,4 +443,51 @@ test("creates and deletes a shared skill in the settings", async () => {
   await row.getByRole("button", { name: "Удалить" }).click();
   await row.getByRole("button", { name: "Точно удалить" }).click();
   await expect(page.getByText("Общих скиллов пока нет.")).toBeVisible();
+});
+
+// docs/specs/ssh.md (seen: a server set up through plink with its password in the command): a server saved in the
+// parameters, its password never shown again, and a check that really connects, in the packed core.
+test("saves an SSH server in the parameters and checks that it connects", async () => {
+  // ssh2 now and then makes an ed25519 key it cannot read back: one it reads is taken.
+  let hostKey = sshUtils.generateKeyPairSync("ed25519").private;
+  while (sshUtils.parseKey(hostKey) instanceof Error) hostKey = sshUtils.generateKeyPairSync("ed25519").private;
+  const ssh = new SshServer({ hostKeys: [hostKey] }, (client) => {
+    client
+      .on("authentication", (ctx) => (ctx.method === "password" && ctx.password === "pass-1234" ? ctx.accept() : ctx.reject(["password"])))
+      .on("ready", () =>
+        client.on("session", (accept) =>
+          accept().on("exec", (acceptExec) => {
+            const stream = acceptExec();
+            stream.write("Linux ml-server\n");
+            stream.exit(0);
+            stream.end();
+          }),
+        ),
+      )
+      .on("error", () => {});
+  });
+  await new Promise<void>((r) => ssh.listen(0, "127.0.0.1", r));
+  try {
+    app = await launch();
+    const page = await app.firstWindow();
+    await openSection(page, "Настройки");
+    await page.getByRole("tab", { name: "Серверы SSH" }).click();
+    await page.getByRole("button", { name: "+ Добавить сервер" }).click();
+    await page.getByLabel("Название").fill("Домашний");
+    await page.getByLabel("Адрес").fill("127.0.0.1");
+    await page.getByLabel("Порт").fill(String((ssh.address() as AddressInfo).port));
+    await page.getByLabel("Пользователь").fill("ml_server");
+    await page.getByRole("radio", { name: "По паролю" }).click();
+    await page.getByLabel("Пароль").fill("pass-1234");
+    await page.getByRole("button", { name: "Сохранить" }).click();
+    const item = page.locator(".ssh-item", { hasText: "Домашний" });
+    await expect(item).toContainText("ml_server@127.0.0.1");
+    await expect(item).toContainText("Спрашивать каждую");
+    await item.getByRole("button", { name: "Проверить" }).click();
+    await expect(item).toContainText("Подключение работает: Linux ml-server", { timeout: 20_000 });
+    await expect(item).toContainText("ключ сервера SHA256:");
+    expect(await page.content()).not.toContain("pass-1234");
+  } finally {
+    await new Promise((r) => ssh.close(() => r(null)));
+  }
 });

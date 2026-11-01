@@ -243,7 +243,11 @@ export class AgentBrowser implements BrowserDriver {
     let port = 0;
     for (let i = 0; i < 100 && !port; i++) {
       await new Promise((r) => setTimeout(r, 100));
-      if (existsSync(portFile)) port = Number(readFileSync(portFile, "utf8").split("\n")[0]);
+      try {
+        if (existsSync(portFile)) port = Number(readFileSync(portFile, "utf8").split("\n")[0]);
+      } catch {
+        // Windows: the browser is still writing the file (EBUSY); read again in a moment.
+      }
     }
     if (!port) {
       proc.kill();
@@ -252,6 +256,10 @@ export class AgentBrowser implements BrowserDriver {
     const endpoint = `http://127.0.0.1:${port}`;
     const version = (await (await fetch(`${endpoint}/json/version`)).json()) as { webSocketDebuggerUrl: string };
     await this.connect(version.webSocketDebuggerUrl);
+    // Downloads go where the agent's downloads_ tools look, as on the desktop (docs/specs/agent-browser.md).
+    const downloads = join(dirname(this.o.profileDir), "browser-downloads");
+    mkdirSync(downloads, { recursive: true });
+    await this.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: downloads, eventsEnabled: false }).catch(() => {});
     return endpoint;
   }
 

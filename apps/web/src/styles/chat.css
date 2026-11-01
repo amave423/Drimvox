@@ -205,7 +205,7 @@
 .chat-options .options-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* As wide as its rows, no wider (seen: a strip of empty panel to the right of the buttons). */
 .options-panel { width: max-content; min-width: 260px; max-width: min(380px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }
-.options-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; font-size: 13px; min-height: 32px; }
+.options-row { display: grid; grid-template-columns: 136px 1fr; align-items: center; gap: 10px; font-size: 13px; min-height: 32px; }
 .options-row .picker { justify-self: start; }
 /* An option's own list opens over the panel, from its bottom right corner up and to the left (seen: to the right it ran
    off the window; above the panel, a tall panel pushed it past the top of the window). */

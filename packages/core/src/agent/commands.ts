@@ -3,7 +3,7 @@ import { closeOfficeLeftovers } from "./office";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" };
+export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" | "ssh" };
 
 /** A browser of the user's: with a window it opens on the user's screen, with the user's profile. */
 const BROWSER_NAME = String.raw`(?:chrome|msedge|firefox|brave|opera|vivaldi)(?:\.exe)?`;
@@ -24,6 +24,8 @@ function opensBrowser(command: string): boolean {
 
 const rules: [RegExp, Exclude<CommandVerdict, { action: "allow" }>["reason"]][] = [
   [/\bgit\s+push\b/i, "push"],
+  // Seen: plink downloaded and run with the server's password in the command, kept in the chat (ssh_run does it safely).
+  [/\b(plink|putty|sshpass)(\.exe)?\b/i, "ssh"],
   [/\b(npm|pnpm|bun)\b[^\n;&|]*\s(-g|--global)\b/i, "global"],
   [/\byarn\s+global\b/i, "global"],
   [/\bpip3?\s+install\b/i, "global"],

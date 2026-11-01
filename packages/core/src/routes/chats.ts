@@ -36,7 +36,8 @@ import type { Studio } from "../media/studio";
 import type { ProviderRepo } from "../providers/repo";
 import type { ProjectPlan } from "@drimvox/shared";
 import type { BacklogService } from "../backlog/service";
-import { resolveVision } from "../visual/look";
+import { askAboutPictures, resolveVision } from "../visual/look";
+import { toolbox, type ToolboxDeps } from "../tools";
 import { visualTools, type VisualKit } from "../visual/tools";
 import { WORK_STEPS, workRules } from "../work/prompt";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
@@ -69,6 +70,8 @@ export interface WorkDeps {
   skillsDir: string;
   /** This month's spending against the app's budget. */
   month(): MonthUsage;
+  /** Downloads, a temporary inbox, SSH, dependency audits, before and after of a page (tools/index.ts). */
+  toolbox?: ToolboxDeps;
 }
 
 /** Looks at pages per answer of a task: the desktop and the phone, then again after a fix. */
@@ -339,6 +342,20 @@ export function chatRoutes(
                 WORK_LOOKS,
               )
             : {};
+        // Downloads, mail, SSH, audits, before and after: in a chat with a folder (a plain chat keeps only the web).
+        const chatToolbox = async () => {
+          const seeing = await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel, listModels);
+          return toolbox(work.toolbox!, {
+            folder: chat.folder,
+            vision: seeing,
+            hooks: {
+              onCall: (call) => void emit({ type: "tool", name: call.name, input: describeInput(call.input) }),
+              askApproval: async (command, reason, signal) =>
+                (await approvals.ask(chat.id, emit, { server: "", tool: command, input: null, reason, purpose: undefined, signal })) !== false,
+            },
+            see: seeing ? async (png, question, signal) => (await askAboutPictures(seeing, [{ data: png, mediaType: "image/png" }], question, signal)).text : undefined,
+          });
+        };
         // Skills for a chat with a folder: the folder's own first, then the shared ones.
         const skills = chat.folder && toolsOk ? findSkills([...projectSkillRoots(chat.folder), { dir: work.skillsDir, scope: "shared" }]) : [];
         const skillHooks = { onCall: (call: { name: string; input: unknown }) => void emit({ type: "tool", name: call.name, input: describeInput(call.input) }), onResult: () => {} };
@@ -358,6 +375,7 @@ export function chatRoutes(
           // With a folder the model reads, writes and runs commands in it; risky commands ask in the answer.
           extraTools: {
             ...mcpTools,
+            ...(toolsOk && chat.folder && work.toolbox ? await chatToolbox() : {}),
             ...workTools,
             ...(chat.folder ? skillTools(skills, chat.folder, skillHooks) : {}),
             ...(chat.folder && toolsOk

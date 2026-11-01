@@ -44,6 +44,9 @@ import { localRoutes } from "./routes/local";
 import { imageToolsFor } from "./media/agent-tool";
 import { forgetCliProxy } from "./local/cliproxy-leftovers";
 import { ProjectGit } from "./work/project-git";
+import { SshServers } from "./tools/ssh";
+import { setMailApi } from "./tools/email";
+import { sshRoutes } from "./routes/ssh";
 import { Chains } from "./providers/chains";
 import { FreeWatch } from "./providers/free-watch";
 import { chainRoutes } from "./routes/chains";
@@ -121,6 +124,8 @@ export interface AppOptions {
   skillSources?: SkillSources;
   /** Ollama and its catalogs; tests give a fake program, fixed hardware and fake catalogs. */
   local?: LocalOptions;
+  /** Where the temporary inboxes come from (mail.tm); a fake in tests. */
+  mailApi?: string;
   /** GitHub's addresses; tests give a fake. */
   github?: GithubOptions;
 }
@@ -222,6 +227,10 @@ export function createCore(o: AppOptions) {
   });
   const backlogService = new BacklogService(backlog, projects, chats);
   const projectGit = new ProjectGit(o.db, github);
+  // Other computers over SSH, downloads, mail, audits, before and after (tools/index.ts).
+  const sshServers = new SshServers(o.db, cipher);
+  setMailApi(o.mailApi);
+  const tools = { dataDir: o.dataDir, ssh: sshServers, browser: browser.driver };
   const projectWork = new ProjectWork({
     repo: workRepo,
     runner,
@@ -244,6 +253,7 @@ export function createCore(o: AppOptions) {
       month: () => monthUsage(o.db, chats),
       vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
       git: projectGit,
+      toolbox: tools,
       imageTools: (worktree, taskId, hooks, onSpend, budgetLeft) => imageToolsFor(readSettings(o.db).imageModel, providers, { worktree, taskId, media, hooks, budgetLeft, onSpend }),
     },
   });
@@ -314,8 +324,10 @@ export function createCore(o: AppOptions) {
         folderAutoApprove: () => readSettings(o.db).folderAutoApprove,
         skillsDir: join(o.dataDir, "skills"),
         month: () => monthUsage(o.db, chats),
+        toolbox: tools,
       }),
     )
+    .route("/ssh", sshRoutes(sshServers))
     .route("/mcp", mcpRoutes(mcpRepo, mcp))
     .route("/browser", browserRoutes(browser))
     .route("/media", mediaRoutes(media))
