@@ -47,7 +47,74 @@ describe("dictation", () => {
     const res = await env.call("POST", "/api/voice/transcribe", { audio: wav(), mimeType: "audio/wav" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ text: "Привет, мир" });
-    const sent = JSON.stringify(fake.requests.find((r) => r.path === "/v1/chat/completions")!.body.messages);
-    expect(sent).toMatch(/input_audio/);
+    const asked = fake.requests.find((r) => r.path === "/v1/chat/completions")!.body;
+    expect(JSON.stringify(asked.messages)).toMatch(/input_audio/);
+    // No thinking for writing down (seen: a free reasoning model answered with nothing every time).
+    expect(asked.reasoning).toEqual({ enabled: false });
+  });
+
+  it("says when the model heard nothing, and passes on the provider's own words when it fails", async () => {
+    fake = await startFakeProvider({ key: KEY, models: [{ id: "ears" }], script: [{ text: "" }, { fail: { status: 400, message: "Audio input is not supported for this model" } }] });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    await env.call("PATCH", "/api/settings", { voiceModel: { providerId: provider.id, model: "ears" } });
+    const empty = await env.call("POST", "/api/voice/transcribe", { audio: wav(), mimeType: "audio/wav" });
+    expect(empty.status).toBe(422);
+    expect(await empty.json()).toEqual({ error: { code: "nothing_heard" } });
+    const failed = await env.call("POST", "/api/voice/transcribe", { audio: wav(), mimeType: "audio/wav" });
+    expect(failed.status).toBe(502);
+    expect((await failed.json()).error.detail).toContain("Audio input is not supported");
+  });
+});
+
+// Asked for: voices from the cloud for reading answers.
+describe("a provider's voice reads answers", () => {
+  it("asks Gemini's newest Flash speech model with the chosen voice and gives a WAV", async () => {
+    const pcm = Buffer.alloc(4800, 1);
+    fake = await startFakeProvider({
+      authorized: (h) => h["x-goog-api-key"] === KEY,
+      handle: (method, path) => {
+        if (method === "GET" && path === "/v1beta/models") return { json: { models: ["gemini-2.5-flash-preview-tts", "gemini-3.5-flash-tts", "gemini-3.5-pro-tts", "gemini-3.5-flash"].map((m) => ({ name: `models/${m}` })) } };
+        if (method === "POST" && path === "/v1beta/models/gemini-3.5-flash-tts:generateContent")
+          return { json: { candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;codec=pcm;rate=24000", data: pcm.toString("base64") } }] } }] } };
+        return undefined;
+      },
+    });
+    env.setPresetUrl("google", `${fake.origin}/v1beta`);
+    const google = await (await env.call("POST", "/api/providers", { preset: "google", apiKey: KEY })).json();
+    // Nothing chosen: said so.
+    expect((await env.call("POST", "/api/voice/speak", { text: "Привет" })).status).toBe(409);
+
+    await env.call("PATCH", "/api/settings", { cloudVoice: { providerId: google.id, voice: "Kore" } });
+    const res = await env.call("POST", "/api/voice/speak", { text: "Привет из облака." });
+    expect(res.status).toBe(200);
+    const wav = Buffer.from(await res.arrayBuffer());
+    expect(wav.subarray(0, 4).toString()).toBe("RIFF");
+    expect(wav.readUInt32LE(24)).toBe(24000);
+    expect(wav.length).toBe(44 + pcm.length);
+    const asked = fake.requests.find((r) => r.path.endsWith(":generateContent"))!.body;
+    expect(asked.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe("Kore");
+    expect(JSON.stringify(asked.contents)).toContain("Привет из облака.");
+  });
+
+  it("asks OpenAI's speech model, and passes on the provider's words when it refuses", async () => {
+    let refuse = false;
+    fake = await startFakeProvider({
+      authorized: (h) => h.authorization === `Bearer ${KEY}`,
+      handle: (method, path) => {
+        if (method === "POST" && path === "/v1/audio/speech") return refuse ? { status: 429, json: { error: { message: "You exceeded your current quota" } } } : { bytes: Buffer.from("RIFF0000WAVE"), contentType: "audio/wav" };
+        return undefined;
+      },
+    });
+    env.setPresetUrl("openai", `${fake.origin}/v1`);
+    const openai = await (await env.call("POST", "/api/providers", { preset: "openai", apiKey: KEY })).json();
+    await env.call("PATCH", "/api/settings", { cloudVoice: { providerId: openai.id, voice: "nova" } });
+    const res = await env.call("POST", "/api/voice/speak", { text: "Привет" });
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("RIFF0000WAVE");
+    expect(fake.requests.find((r) => r.path === "/v1/audio/speech")!.body).toMatchObject({ model: "gpt-4o-mini-tts", voice: "nova", input: "Привет", response_format: "wav" });
+    refuse = true;
+    const refused = await env.call("POST", "/api/voice/speak", { text: "Привет" });
+    expect(refused.status).toBe(502);
+    expect((await refused.json()).error.detail).toContain("exceeded your current quota");
   });
 });

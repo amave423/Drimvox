@@ -56,6 +56,7 @@ import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
 import { monthUsage } from "./budget";
 import { transcribe } from "./voice";
+import { speakCloud } from "./voice-cloud";
 import { useLocalAudio } from "./local/audio/service";
 import { z } from "zod";
 import { describeError } from "./providers/errors";
@@ -304,19 +305,23 @@ export function createCore(o: AppOptions) {
         const bytes = Buffer.from(audio, "base64");
         // A model on this computer writes it down itself, free and offline (docs/specs/local-audio.md).
         const text = conn.preset === "whispercpp" ? await local.audio.transcribe(choice.model, bytes) : await transcribe(conn, choice.model, bytes, mimeType);
+        // Said plainly rather than "could not": the model answered, but with no words.
+        if (!text) return c.json({ error: { code: "nothing_heard" as const } }, 422);
         return c.json({ text }, 200);
       } catch (err) {
         return c.json({ error: describeError(err) }, 502);
       }
     })
     // An answer read aloud by the Piper voice from the settings (docs/specs/local-speech.md), as a WAV.
+    // Or by a provider's voice, when one is chosen (asked for: voices from the cloud).
     .post("/voice/speak", zValidator("json", speakSchema), async (c) => {
-      const voice = readSettings(o.db).speechVoice;
-      if (!voice) return c.json({ error: { code: "no_speech_voice" as const } }, 409);
+      const { speechVoice: voice, cloudVoice } = readSettings(o.db);
+      const cloud = cloudVoice ? providers.connection(cloudVoice.providerId) : null;
+      if (!voice && !cloud) return c.json({ error: { code: "no_speech_voice" as const } }, 409);
       try {
         const words = speechText(c.req.valid("json").text);
         if (!words) return c.json({ error: { code: "nothing_to_read" as const } }, 400);
-        const wav = await local.speech.speak(voice, words);
+        const wav = cloud && cloudVoice ? await speakCloud(cloud, cloudVoice.voice, words) : await local.speech.speak(voice!, words);
         return c.body(new Uint8Array(wav), 200, { "Content-Type": "audio/wav" });
       } catch (err) {
         return c.json({ error: { code: "speech_failed" as const, detail: err instanceof Error ? err.message : String(err) } }, 502);

@@ -1,9 +1,10 @@
-import type { LocalSpeechStatus, LocalVoiceId } from "@drimvox/shared";
-import { useEffect, useState } from "react";
+import { cloudVoices, type LocalSpeechStatus, type LocalVoiceId } from "@drimvox/shared";
+import { useEffect, useRef, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";
 import { Segmented } from "./Segmented";
 import { Setting } from "./Setting";
+import { Dropdown } from "./Dropdown";
 
 const SYSTEM = "system";
 
@@ -39,6 +40,86 @@ export function SpeechVoiceSetting() {
         <button type="button" className="btn" onClick={() => navigate({ kind: "local", part: "audio" })}>
           {t("settings.speechVoiceGet")}
         </button>
+      )}
+    </Setting>
+  );
+}
+
+const NONE = "none";
+
+/**
+ * A provider's voice that reads answers instead of the Piper or system one (asked for: voices from the cloud): Gemini's
+ * and OpenAI's voices of the providers connected, and a sample to hear it before choosing.
+ */
+export function CloudVoiceSetting() {
+  const { api, t, settings, updateSettings, providers } = useApp();
+  const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
+  const [problem, setProblem] = useState<string | null>(null);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => () => audio.current?.pause(), []);
+  const options = providers.flatMap((p) =>
+    p.preset === "google" || p.preset === "openai"
+      ? cloudVoices[p.preset].map((v) => ({ value: `${p.id}|${v.id}`, label: `${v.id} · ${p.name}`, hint: t(`settings.cloudVoiceKind.${v.kind}`) }))
+      : [],
+  );
+  const chosen = settings.cloudVoice ? `${settings.cloudVoice.providerId}|${settings.cloudVoice.voice}` : NONE;
+
+  async function sample() {
+    if (state === "playing") {
+      audio.current?.pause();
+      setState("idle");
+      return;
+    }
+    setProblem(null);
+    setState("loading");
+    try {
+      const res = await api.voice.speak.$post({ json: { text: t("settings.cloudVoiceSample") } });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { detail?: string } } | null;
+        throw new Error(body?.error?.detail ?? String(res.status));
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const player = new Audio(url);
+      audio.current = player;
+      player.onended = () => {
+        URL.revokeObjectURL(url);
+        setState("idle");
+      };
+      await player.play();
+      setState("playing");
+    } catch (err) {
+      setProblem(`${t("settings.cloudVoiceFailed")} ${err instanceof Error ? err.message : ""}`.trim());
+      setState("idle");
+    }
+  }
+
+  return (
+    <Setting id="cloud-voice-label" title={t("settings.cloudVoice")} about={t("settings.cloudVoiceHint")}>
+      {options.length === 0 ? (
+        <p className="muted">{t("settings.cloudVoiceNone")}</p>
+      ) : (
+        <div className="speech-voice">
+          <Dropdown<string>
+            label={t("settings.cloudVoice")}
+            value={chosen}
+            options={[{ value: NONE, label: t("settings.cloudVoiceOff") }, ...options]}
+            onChange={(value) => {
+              setProblem(null);
+              const [providerId, voice] = value.split("|");
+              void updateSettings({ cloudVoice: value === NONE || !providerId || !voice ? null : { providerId, voice } });
+            }}
+          />
+          {settings.cloudVoice && (
+            <button type="button" className="btn" disabled={state === "loading"} onClick={() => void sample()}>
+              {t(state === "loading" ? "voice.preparing" : state === "playing" ? "voice.silence" : "settings.cloudVoiceListen")}
+            </button>
+          )}
+        </div>
+      )}
+      {problem && (
+        <p className="muted" role="status">
+          {problem}
+        </p>
       )}
     </Setting>
   );

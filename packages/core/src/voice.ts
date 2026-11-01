@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { languageModel } from "./providers/model";
 import type { Connection } from "./providers/repo";
+import { thinkingOptions } from "./chats/thinking";
 
 /**
  * A recording turned into text by a model that hears (asked for: dictate a message): the voice model chosen in the
@@ -9,7 +10,12 @@ import type { Connection } from "./providers/repo";
 export async function transcribe(conn: Connection, model: string, audio: Buffer, mimeType: string): Promise<string> {
   const result = await generateText({
     model: languageModel(conn, model),
-    maxRetries: 1,
+    // A model that thinks first may put the words in its thinking and answer with nothing (seen: every dictation failed
+    // with a free "reasoning" model); writing down needs no thinking.
+    providerOptions: thinkingOptions(conn.preset, "off"),
+    // Free models are often busy for a moment.
+    maxRetries: 2,
+    abortSignal: AbortSignal.timeout(120_000),
     messages: [
       {
         role: "user",

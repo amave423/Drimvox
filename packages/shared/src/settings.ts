@@ -41,6 +41,8 @@ export const settingsSchema = z.object({
   voiceModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
   /** The Piper voice that reads answers aloud (docs/specs/local-speech.md); null: the system's own voice. */
   speechVoice: z.enum(localVoiceIds).nullable(),
+  /** A provider's voice that reads answers instead (asked for: voices from the cloud); null: the Piper or system voice. */
+  cloudVoice: z.object({ providerId: z.string().min(1), voice: z.string().min(1).max(60) }).nullable(),
   /** The most the whole app may spend in a calendar month, in dollars; null: no limit. */
   monthlyBudgetUsd: z.number().min(0.00001).max(100000).nullable(),
   /** A chat with a connected folder runs its commands without asking (asked for: a switch, auto or by hand). */
@@ -61,4 +63,31 @@ export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 export type Currency = Settings["currency"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, folderAutoApprove: false, favoriteModels: [], searchEngine: "auto", agentFiles: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null };
+export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, folderAutoApprove: false, favoriteModels: [], searchEngine: "auto", agentFiles: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null, cloudVoice: null };
+
+/**
+ * Voices of the providers that read answers aloud (docs/specs/local-speech.md): Gemini's speech models and OpenAI's.
+ * Each speaks Russian and English; `kind` is how it sounds, for the list.
+ */
+export const cloudVoices: Record<"google" | "openai", { id: string; kind: "female" | "male" }[]> = {
+  google: [
+    { id: "Kore", kind: "female" },
+    { id: "Aoede", kind: "female" },
+    { id: "Leda", kind: "female" },
+    { id: "Zephyr", kind: "female" },
+    { id: "Charon", kind: "male" },
+    { id: "Puck", kind: "male" },
+    { id: "Orus", kind: "male" },
+    { id: "Fenrir", kind: "male" },
+  ],
+  openai: [
+    { id: "nova", kind: "female" },
+    { id: "shimmer", kind: "female" },
+    { id: "coral", kind: "female" },
+    { id: "sage", kind: "female" },
+    { id: "alloy", kind: "male" },
+    { id: "ash", kind: "male" },
+    { id: "echo", kind: "male" },
+    { id: "onyx", kind: "male" },
+  ],
+};

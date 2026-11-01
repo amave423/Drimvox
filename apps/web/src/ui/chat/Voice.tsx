@@ -19,9 +19,14 @@ export function DictateButton({ onText, disabled }: { onText(text: string): void
       try {
         const audio = await stop.current();
         const res = await api.voice.transcribe.$post({ json: { audio, mimeType: "audio/wav" } });
-        const body = (await res.json().catch(() => null)) as { text?: string; error?: { code?: string } } | null;
+        const body = (await res.json().catch(() => null)) as { text?: string; error?: { code?: string; detail?: string } } | null;
         if (res.ok && body?.text) onText(body.text);
-        else setProblem(body?.error?.code === "no_voice_model" ? t("voice.noModel") : t("voice.failed"));
+        else {
+          const code = body?.error?.code;
+          // The provider's own words say what went wrong (seen: only "could not recognise", whatever the reason).
+          const detail = body?.error?.detail ? ` ${body.error.detail}` : "";
+          setProblem(code === "no_voice_model" ? t("voice.noModel") : code === "nothing_heard" ? t("voice.nothingHeard") : `${t("voice.failed")}${detail}`);
+        }
       } catch {
         setProblem(t("voice.failed"));
       }
@@ -70,7 +75,9 @@ export function SpeakButton({ text }: { text: string }) {
   const [preparing, setPreparing] = useState(false);
   const stop = useRef<(() => void) | null>(null);
   useEffect(() => () => stop.current?.(), []);
-  if (typeof speechSynthesis === "undefined" && !settings.speechVoice) return null;
+  // A voice made by the core: a Piper one on this computer, or a provider's from the cloud.
+  const madeVoice = !!settings.speechVoice || !!settings.cloudVoice;
+  if (typeof speechSynthesis === "undefined" && !madeVoice) return null;
   const label = t(preparing ? "voice.preparing" : on ? "voice.silence" : "voice.listen");
   return (
     <>
@@ -91,7 +98,7 @@ export function SpeakButton({ text }: { text: string }) {
           const system = () => speak(text, settings.locale, done);
           // A Piper voice from the settings reads it on this computer (asked for: the system's voice sounded like a robot),
           // in pieces: the first is heard in seconds while the rest is made.
-          if (settings.speechVoice) {
+          if (madeVoice) {
             setPreparing(true);
             stop.current = speakPieces(
               speechChunks(plainText(text)),
