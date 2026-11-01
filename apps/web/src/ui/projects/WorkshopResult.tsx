@@ -29,7 +29,7 @@ export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView 
       <div className="workshop-result-body">
         {part === "result" && (work?.startedAt ? <ResultPart work={work} onChanged={p.onChanged} /> : <p className="muted">{t("workshop.noResult")}</p>)}
         {part === "changes" && (work ? <ChangesTab work={work} /> : null)}
-        {part === "project" && <ProjectPart project={p.project} onNew={p.onNew} busy={work?.status === "running"} />}
+        {part === "project" && <ProjectPart project={p.project} onNew={p.onNew} busy={work?.status === "running"} locked={!!work?.startedAt} />}
       </div>
     </aside>
   );
@@ -48,7 +48,7 @@ function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): v
 }
 
 /** The project itself: its folder and kind, its tasks, skills, GitHub, a new task, and leaving Drimvox. */
-function ProjectPart({ project, onNew, busy }: { project: ProjectView; onNew?: () => void; busy: boolean }) {
+function ProjectPart({ project, onNew, busy, locked }: { project: ProjectView; onNew?: () => void; busy: boolean; locked: boolean }) {
   const { api, t, tasks, navigate, reloadProjects } = useApp();
   const own = tasks.filter((task) => task.projectId === project.id);
   async function setKind(kind: ProjectKind) {
@@ -60,13 +60,18 @@ function ProjectPart({ project, onNew, busy }: { project: ProjectView; onNew?: (
       <p className="mono muted">{project.path}</p>
       <div className="project-kind-switch" role="group" aria-label={t("project.kindLabel")}>
         <span className="muted">{t("project.kindLabel")}</span>
-        <span className="segmented">
-          {(["existing", "new"] as const).map((k) => (
-            <button key={k} type="button" className={project.kind === k ? "is-on" : undefined} aria-pressed={project.kind === k} onClick={() => project.kind !== k && void setKind(k)}>
-              {t(`project.kind.${k}`)}
-            </button>
-          ))}
-        </span>
+        {/* Once the agent has been written to, the kind is said, not switched (asked for). */}
+        {locked ? (
+          <strong className="project-kind-fixed">{t(`project.kind.${project.kind}`)}</strong>
+        ) : (
+          <span className="segmented">
+            {(["existing", "new"] as const).map((k) => (
+              <button key={k} type="button" className={project.kind === k ? "is-on" : undefined} aria-pressed={project.kind === k} onClick={() => project.kind !== k && void setKind(k)}>
+                {t(`project.kind.${k}`)}
+              </button>
+            ))}
+          </span>
+        )}
       </div>
       {onNew && project.kind !== "existing" && (
         <button className="btn" onClick={onNew}>

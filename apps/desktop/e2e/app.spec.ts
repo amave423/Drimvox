@@ -99,7 +99,7 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { drimvox?: object }).drimvox ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusPage", "getToken", "installUpdate", "noticeLook", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "placeBrowser", "savePdf", "setTitleBar", "testNotify", "updateState"] });
+  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusPage", "getToken", "installUpdate", "noticeLook", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "pickKey", "placeBrowser", "savePdf", "setTitleBar", "testNotify", "updateState"] });
 });
 
 test("the catalog switches a ready skill on and off, and shows a server's details with the token it needs", async () => {

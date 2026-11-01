@@ -16,8 +16,30 @@ const AT_ONCE = 4;
 const seen = new Map<string, { state: Availability; at: number }>();
 const key = (conn: Connection, model: string) => `${conn.cacheKey}|${model}`;
 
+/** Where what was learned is kept between starts (seen: models Google no longer serves looked fine after each restart). */
+let store: { load(): Record<string, { state: Availability; at: number }>; save(all: Record<string, { state: Availability; at: number }>): void } | null = null;
+
+/** Everything learned forgotten, as after a restart (tests). */
+export function forgetAvailability(): void {
+  seen.clear();
+}
+
+export function keepAvailabilityIn(s: NonNullable<typeof store>): void {
+  store = s;
+  try {
+    for (const [k, v] of Object.entries(s.load())) if (Date.now() - v.at <= REMEMBER[v.state]) seen.set(k, v);
+  } catch {
+    // Nothing kept, or unreadable: learned again.
+  }
+}
+
 export function noteAvailability(conn: Connection, model: string, state: Availability): void {
   seen.set(key(conn, model), { state, at: Date.now() });
+  try {
+    store?.save(Object.fromEntries([...seen].filter(([, v]) => Date.now() - v.at <= REMEMBER[v.state])));
+  } catch {
+    // The database is closing: kept in memory.
+  }
 }
 
 export function availabilityOf(conn: Connection, model: string): Availability | undefined {

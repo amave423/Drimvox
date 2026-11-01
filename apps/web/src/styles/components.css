@@ -281,6 +281,11 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .ssh-badge.is-trusted { background: var(--wait-soft); color: var(--wait); }
 .ssh-form { display: grid; gap: 10px; max-width: 520px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); }
 .ssh-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+/* The choices take their own width, not the form's (seen: two long empty pills). */
+.ssh-form .segmented { justify-self: start; }
+.ssh-key { display: flex; gap: 8px; }
+.ssh-key .field-input { flex: 1; }
+.ssh-form .field > small { font-size: 12.5px; line-height: 1.4; }
 
 /* Radio buttons and checkboxes in the app's look (asked for: the system's own stood out, unstyled). A radio is a ring that
    fills with ink; a checkbox a rounded square that fills with ink around a light core. */

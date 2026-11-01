@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { forgetAvailability } from "../src/providers/availability";
 import { createTestEnv, readEvents, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider } from "./fake-provider";
 
@@ -141,5 +142,24 @@ describe("chains of free models", () => {
     const probes = fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body?.stream === false);
     expect(probes.length).toBeGreaterThan(0);
     expect(probes.every((r) => r.body.max_tokens === 1)).toBe(true);
+  });
+
+  // Seen with Gemini: models Google no longer serves to new users looked fine again after every restart.
+  it("remembers which free models answer across a restart", async () => {
+    const id = await setup((model) => (model === "first-free" ? { fail: { status: 404, message: "no longer available to new users" } } : { text: "Да" }));
+    await env.call("POST", "/api/chains/check");
+    let free: any[] = [];
+    for (let i = 0; i < 100; i++) {
+      free = await (await env.call("GET", "/api/chains/free")).json();
+      if (free.length && free.every((m) => m.check.state !== "checking" && m.check.state !== "unknown")) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(free.find((m: any) => m.model === "second-free").check.state).toBe("ok");
+    forgetAvailability();
+    env.reopen();
+    const models = await (await env.call("GET", `/api/providers/${id}/models`)).json();
+    const listed = (models.models ?? models) as { id: string; available?: string }[];
+    expect(listed.find((m) => m.id === "first-free")?.available).toBe("gone");
+    expect(listed.find((m) => m.id === "second-free")?.available).toBe("ok");
   });
 });

@@ -4,7 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { Client, type ConnectConfig } from "ssh2";
+import { Client, utils, type ConnectConfig } from "ssh2";
 import { z } from "zod";
 import type { ToolHooks } from "../agent/tools";
 import type { Database } from "../db";
@@ -12,6 +12,13 @@ import type { Cipher } from "../secrets";
 import type { Workspace } from "../agent/workspace";
 
 const KEY = "ssh.servers";
+
+/** A server that cannot be saved as given: the key file is not there, not a private key, or locked with a passphrase. */
+export class SshInputError extends Error {
+  constructor(readonly code: "key_missing" | "key_invalid" | "key_encrypted") {
+    super(code);
+  }
+}
 const OUTPUT = 20_000;
 
 interface Stored extends Omit<SshServerView, "hasPassword"> {
@@ -50,6 +57,13 @@ export class SshServers {
 
   save(input: SshServerInput, id?: string): SshServerView {
     const parsed = sshServerSchema.parse(input);
+    // A key file named by hand is checked now (asked: what if the path is one letter off?), not at the first command.
+    if (parsed.auth === "key" && parsed.keyPath) {
+      const path = keyFile(parsed.keyPath)!;
+      if (!existsSync(path)) throw new SshInputError("key_missing");
+      const key = utils.parseKey(readFileSync(path));
+      if (key instanceof Error) throw new SshInputError(/encrypted|passphrase/i.test(key.message) ? "key_encrypted" : "key_invalid");
+    }
     const list = this.all();
     const old = id ? list.find((s) => s.id === id) : undefined;
     const sameHost = old && old.host === parsed.host && old.port === parsed.port;

@@ -49,6 +49,7 @@ import { setMailApi } from "./tools/email";
 import { sshRoutes } from "./routes/ssh";
 import { Chains } from "./providers/chains";
 import { FreeWatch } from "./providers/free-watch";
+import { keepAvailabilityIn } from "./providers/availability";
 import { chainRoutes } from "./routes/chains";
 import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
@@ -149,6 +150,11 @@ export function createCore(o: AppOptions) {
   providers.setWaker(local.ollama);
   // Chains of free models answer as models of their own provider (docs/specs/model-chains.md).
   // Free models kept between starts and asked a word in the background (docs/specs/model-chains.md).
+  // What models answer, kept between starts (a model gone for this account stays hidden after a restart).
+  keepAvailabilityIn({
+    load: () => JSON.parse((o.db.sql.prepare("select value from settings where key = 'models.availability'").get() as { value: string } | undefined)?.value ?? "{}"),
+    save: (all) => void o.db.sql.prepare("insert into settings (key, value) values ('models.availability', ?) on conflict(key) do update set value = excluded.value").run(JSON.stringify(all)),
+  });
   const freeWatch = new FreeWatch(o.db, providers);
   if (!o.web) freeWatch.start();
   const chains = new Chains(o.db, providers, freeWatch);
@@ -333,7 +339,7 @@ export function createCore(o: AppOptions) {
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills"), o.skillSources ?? SKILL_SOURCES))
     .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), async (since) => spendingByModel(o.db, providers, since)))
-    .route("/projects", projectRoutes(projects, tasks, providers, runner))
+    .route("/projects", projectRoutes(projects, tasks, providers, runner, (id) => !!workRepo.get(id)?.startedAt))
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
     .route("/chains", chainRoutes(chains, freeWatch))
     .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo, projectGit))

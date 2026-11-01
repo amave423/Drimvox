@@ -188,6 +188,10 @@
 .attachment-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
 .msg-user .attachment-thumb { width: 120px; height: 90px; }
 .attachment-icon { font-size: 14px; }
+/* Removing a waiting file: a small round button, not an underlined link (seen: a stray line under the cross). */
+.attachment-remove { flex: none; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; }
+.attachment-remove:hover { background: var(--line); color: var(--fg); }
+.attachment-remove:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 .attach-button { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--control-h); height: var(--control-h); border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--muted); }
 .attach-button:hover:not(:disabled) { color: var(--ink); border-color: var(--ink); }
 .attach-button:disabled { opacity: 0.5; }

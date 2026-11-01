@@ -139,6 +139,23 @@ describe("other computers over SSH", () => {
     expect(asked).toEqual([]);
   });
 
+  // Asked: what if the key's path is one letter off? Checked on saving, said in words.
+  it("checks a key file on saving: there, and a private key", () => {
+    env = createTestEnv();
+    const servers = new SshServers(env.db, createCipher(randomBytes(32)));
+    const dir = temp("drimvox-keys-");
+    let key = utils.generateKeyPairSync("ed25519");
+    while (utils.parseKey(key.private) instanceof Error) key = utils.generateKeyPairSync("ed25519");
+    writeFileSync(join(dir, "id_ed25519"), key.private);
+    writeFileSync(join(dir, "id_ed25519.pub"), "not a private key");
+    const base = { name: "k", host: "h", port: 22, user: "u", auth: "key" as const, trust: "ask" as const };
+    expect(servers.save({ ...base, keyPath: join(dir, "id_ed25519") })).toMatchObject({ keyPath: join(dir, "id_ed25519") });
+    expect(() => servers.save({ ...base, keyPath: join(dir, "id_ed2551") })).toThrow(expect.objectContaining({ code: "key_missing" }));
+    expect(() => servers.save({ ...base, keyPath: join(dir, "id_ed25519.pub") })).toThrow(expect.objectContaining({ code: "key_invalid" }));
+    // No path: the computer's own key or ssh-agent, nothing to check.
+    expect(servers.save({ ...base })).toMatchObject({ keyPath: null });
+  });
+
   it("refuses a server whose key changed", async () => {
     env = createTestEnv();
     const port = await server(() => "ok");

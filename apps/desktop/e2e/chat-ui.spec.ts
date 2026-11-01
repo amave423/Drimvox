@@ -270,9 +270,14 @@ test("a big photo is made smaller before it goes", async () => {
     return Array.from(new Uint8Array(await blob.arrayBuffer()));
   });
   await page.locator('.composer input[type="file"]').setInputFiles({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from(png) });
-  await expect(page.locator(".attachments.is-pending")).toContainText("photo.webp");
-  const size = await page.locator(".attachments.is-pending .attachment .mono").first().textContent();
+  // A picture shows itself and its weight, not its name (asked for); the name stays in the hint.
+  const pending = page.locator(".attachments.is-pending .attachment").first();
+  await expect(pending).toHaveAttribute("title", "photo.webp");
+  await expect(pending).not.toContainText("photo.webp");
+  const size = await pending.locator(".mono").textContent();
   expect(size).toMatch(/KB|1\.\d MB/);
+  // The cross is a round button, not an underlined link (seen: a stray line under it).
+  expect(await pending.getByRole("button", { name: /Убрать|Remove/ }).evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe("none");
 
   // The picture opens big before it goes, and again from the message after (seen: neither could be opened).
   await page.getByRole("button", { name: "Открыть photo.webp" }).click();

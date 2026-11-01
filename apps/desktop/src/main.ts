@@ -406,6 +406,17 @@ function registerIpc() {
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
+  // An SSH key file (docs/specs/ssh.md): the picker opens in ~/.ssh, so the path is right without typing it.
+  ipcMain.handle("drimvox:pick-key", async (event) => {
+    if (!fromOurPage(event.senderFrame?.url)) throw new Error("Forbidden");
+    if (process.env.DRIMVOX_TEST_PICK_KEY) return process.env.DRIMVOX_TEST_PICK_KEY;
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const ssh = join(app.getPath("home"), ".ssh");
+    const options = { properties: ["openFile", "showHiddenFiles"] as ("openFile" | "showHiddenFiles")[], defaultPath: existsSync(ssh) ? ssh : app.getPath("home") };
+    const result = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
+
   // Only this one folder: the page cannot ask the main process to open arbitrary paths.
   ipcMain.on("drimvox:open-skills", (event) => {
     if (!fromOurPage(event.senderFrame?.url)) return;

@@ -122,9 +122,11 @@ export function SideProjects() {
                         >
                           {t("side.renameProjectLabel")}
                         </button>
-                        <button role="menuitem" onClick={() => void setKind(project.id, project.kind === "existing" ? "new" : "existing")}>
+                        {!works.find((w) => w.projectId === project.id)?.startedAt && (
+                          <button role="menuitem" onClick={() => void setKind(project.id, project.kind === "existing" ? "new" : "existing")}>
                           {t(project.kind === "existing" ? "side.makeNew" : "side.makeExisting")}
                         </button>
+                        )}
                         <button
                           role="menuitem"
                           className="is-pencil"

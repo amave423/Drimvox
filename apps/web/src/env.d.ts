@@ -4,6 +4,8 @@ interface DrimvoxBridge {
   setTitleBar(colors: { background: string; symbols: string }): void;
   /** Native folder picker; null when the user cancels. */
   pickFolder(): Promise<string | null>;
+  /** An SSH key file, the picker opening in ~/.ssh. */
+  pickKey?(): Promise<string | null>;
   savePdf?(name: string): Promise<string | null>;
   /** Drimvox's own notification; shown only while the window is not in front. A click opens the task or the project. */
   notify(notice: NoticeRequest & { taskId?: string; projectId?: string; chatId?: string }): void;

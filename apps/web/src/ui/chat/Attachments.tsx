@@ -80,16 +80,20 @@ export function PendingFiles({ files, onRemove }: { files: PendingFile[]; onRemo
   if (files.length === 0) return null;
   return (
     <ul className="attachments is-pending">
-      {files.map((f) => (
-        <li key={f.key} className="attachment">
-          {isImage(f.file.type, f.file.name) ? <LocalThumb file={f.file} /> : <span className="attachment-icon" aria-hidden>📄</span>}
-          <span className="attachment-name">{f.file.name}</span>
-          <span className="muted mono">{formatSize(f.file.size)}</span>
-          <button type="button" className="link" aria-label={t("attach.remove", { name: f.file.name })} onClick={() => onRemove(f.key)}>
-            ×
-          </button>
-        </li>
-      ))}
+      {files.map((f) => {
+        // A picture shows itself: its weight beside it, the name only in the hint (asked for).
+        const picture = isImage(f.file.type, f.file.name);
+        return (
+          <li key={f.key} className="attachment" title={f.file.name}>
+            {picture ? <LocalThumb file={f.file} /> : <span className="attachment-icon" aria-hidden>📄</span>}
+            {!picture && <span className="attachment-name">{f.file.name}</span>}
+            <span className="muted mono">{formatSize(f.file.size)}</span>
+            <button type="button" className="attachment-remove" aria-label={t("attach.remove", { name: f.file.name })} onClick={() => onRemove(f.key)}>
+              <span aria-hidden>×</span>
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -104,15 +108,15 @@ function LocalThumb({ file }: { file: File }) {
   return src ? <ZoomableImage className="attachment-thumb" src={src} alt={file.name} /> : null;
 }
 
-/** Files sent with a message: pictures as thumbnails, the rest by name. */
+/** Files sent with a message: pictures as thumbnails with their weight, the rest by name. */
 export function SentFiles({ chatId, files }: { chatId: string; files: AttachmentView[] }) {
   if (files.length === 0) return null;
   return (
     <ul className="attachments">
       {files.map((f) => (
-        <li key={f.id} className="attachment">
+        <li key={f.id} className="attachment" title={f.name}>
           {f.kind === "image" ? <SentThumb chatId={chatId} file={f} /> : <span className="attachment-icon" aria-hidden>📄</span>}
-          <span className="attachment-name">{f.name}</span>
+          {f.kind !== "image" && <span className="attachment-name">{f.name}</span>}
           <span className="muted mono">{formatSize(f.size)}</span>
         </li>
       ))}

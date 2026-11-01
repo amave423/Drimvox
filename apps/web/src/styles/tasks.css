@@ -364,3 +364,4 @@
 .workshop-project .card .field { font-size: 13px; }
 .workshop-project .card .actions { flex-wrap: wrap; }
 .git-note, .git-branch p { margin: 0; font-size: 13px; }
+.project-kind-fixed { font-weight: 500; font-size: 13.5px; }

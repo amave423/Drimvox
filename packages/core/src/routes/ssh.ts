@@ -1,7 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import { sshServerSchema } from "@drimvox/shared";
 import { Hono } from "hono";
-import type { SshServers } from "../tools/ssh";
+import { SshInputError, type SshServers } from "../tools/ssh";
 
 const notFound = { error: { code: "not_found" } } as const;
 
@@ -9,10 +9,22 @@ const notFound = { error: { code: "not_found" } } as const;
 export function sshRoutes(servers: SshServers) {
   return new Hono()
     .get("/", (c) => c.json(servers.list(), 200))
-    .post("/", zValidator("json", sshServerSchema), (c) => c.json(servers.save(c.req.valid("json")), 201))
+    .post("/", zValidator("json", sshServerSchema), (c) => {
+      try {
+        return c.json(servers.save(c.req.valid("json")), 201);
+      } catch (err) {
+        if (err instanceof SshInputError) return c.json({ error: { code: err.code } }, 400);
+        throw err;
+      }
+    })
     .put("/:id", zValidator("json", sshServerSchema), (c) => {
       if (!servers.list().some((s) => s.id === c.req.param("id"))) return c.json(notFound, 404);
-      return c.json(servers.save(c.req.valid("json"), c.req.param("id")), 200);
+      try {
+        return c.json(servers.save(c.req.valid("json"), c.req.param("id")), 200);
+      } catch (err) {
+        if (err instanceof SshInputError) return c.json({ error: { code: err.code } }, 400);
+        throw err;
+      }
     })
     .delete("/:id", (c) => (servers.remove(c.req.param("id")) ? c.body(null, 204) : c.json(notFound, 404)))
     .post("/:id/check", async (c) => {

@@ -1,7 +1,7 @@
 import type { FreeCheck, ModelInfo, ModelRef } from "@drimvox/shared";
 import type { Database } from "../db";
 import { isCli } from "../cli/kinds";
-import { canCheck, noteAvailability, probe } from "./availability";
+import { availabilityOf, canCheck, noteAvailability, probe } from "./availability";
 import { listModels } from "./catalog";
 import type { ProviderRepo } from "./repo";
 
@@ -54,7 +54,12 @@ export class FreeWatch {
   }
 
   check(ref: ModelRef): FreeCheck {
-    return this.checks.get(keyOf(ref)) ?? { state: "unknown", ms: null, at: null };
+    const own = this.checks.get(keyOf(ref));
+    if (own) return own;
+    // What a chat or an earlier start learned of it (kept between starts).
+    const conn = this.providers.connection(ref.providerId);
+    const known = conn ? availabilityOf(conn, ref.model) : undefined;
+    return known ? { state: known, ms: null, at: null } : { state: "unknown", ms: null, at: null };
   }
 
   /** What a chain's own call found: it answers (and how fast), or it is busy. */

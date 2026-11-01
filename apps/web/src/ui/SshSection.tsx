@@ -1,6 +1,7 @@
 import type { SshServerInput, SshServerView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../context";
+import type { MessageKey } from "../i18n";
 import { Segmented } from "./Segmented";
 
 const empty: SshServerInput = { name: "", host: "", port: 22, user: "", auth: "key", password: "", keyPath: "", trust: "ask" };
@@ -14,7 +15,7 @@ export function SshSection() {
   const [servers, setServers] = useState<SshServerView[] | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; input: SshServerInput } | null>(null);
   const [checks, setChecks] = useState<Record<string, { ok: boolean; text: string } | "checking">>({});
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   const load = () =>
     void api.ssh
@@ -26,10 +27,13 @@ export function SshSection() {
 
   async function save() {
     if (!editing) return;
-    setFailed(false);
+    setFailed(null);
     const json = { ...editing.input, password: editing.input.auth === "password" && editing.input.password ? editing.input.password : undefined, keyPath: editing.input.keyPath || undefined };
     const res = await (editing.id ? api.ssh[":id"].$put({ param: { id: editing.id }, json }) : api.ssh.$post({ json })).catch(() => null);
-    if (!res?.ok) return setFailed(true);
+    if (!res?.ok) {
+      const body = (await res?.json().catch(() => null)) as { error?: { code?: string } } | null;
+      return setFailed(body?.error?.code ?? "unknown");
+    }
     setEditing(null);
     load();
   }
@@ -126,16 +130,31 @@ export function SshSection() {
               <input className="field-input" type="password" autoComplete="new-password" value={editing.input.password ?? ""} placeholder={editing.id ? t("ssh.passwordKeep") : ""} onChange={(e) => set({ password: e.target.value })} />
             </label>
           ) : (
-            <label className="field">
+            <div className="field">
               <span>{t("ssh.keyPath")}</span>
-              <input className="field-input mono" value={editing.input.keyPath ?? ""} placeholder={t("ssh.keyDefault")} onChange={(e) => set({ keyPath: e.target.value })} />
-            </label>
+              <div className="ssh-key">
+                <input className="field-input mono" aria-label={t("ssh.keyPath")} value={editing.input.keyPath ?? ""} placeholder={t("ssh.keyDefault")} onChange={(e) => set({ keyPath: e.target.value })} />
+                {window.drimvox?.pickKey && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={async () => {
+                      const path = await window.drimvox!.pickKey!();
+                      if (path) set({ keyPath: path });
+                    }}
+                  >
+                    {t("ssh.pickKey")}
+                  </button>
+                )}
+              </div>
+              <small className="muted">{t("ssh.keyHint")}</small>
+            </div>
           )}
           <div className="field">
             <span id="ssh-trust">{t("ssh.trust")}</span>
             <Segmented labelledBy="ssh-trust" value={editing.input.trust} options={[{ value: "ask", label: t("ssh.asks") }, { value: "trusted", label: t("ssh.trusted") }]} onChange={(trust) => set({ trust })} />
           </div>
-          {failed && <p className="error-note">{t("ssh.saveFailed")}</p>}
+          {failed && <p className="error-note">{t(failed.startsWith("key_") ? (`ssh.error.${failed}` as MessageKey) : "ssh.saveFailed")}</p>}
           <div className="actions">
             <button className="btn is-primary" disabled={!ready}>
               {t("ssh.save")}

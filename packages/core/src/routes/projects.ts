@@ -11,7 +11,7 @@ import type { ProviderRepo } from "../providers/repo";
 
 const notFound = { error: { code: "not_found" } } as const;
 
-export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers: ProviderRepo, runner: AgentRunner) {
+export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers: ProviderRepo, runner: AgentRunner, kindLocked: (projectId: string) => boolean = () => false) {
   const withGit = async (p: Omit<ProjectView, "gitState">): Promise<ProjectView> => ({
     ...p,
     gitState: existsSync(p.path) && (await isRepoRoot(p.path)) ? "ready" : "not_repo",
@@ -49,6 +49,8 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
       const { name, kind } = c.req.valid("json");
       const id = c.req.param("id");
       if (!projects.get(id)) return c.json(notFound, 404);
+      // Once the agent has been written to, the kind stays (asked for: the work and its history are of that kind).
+      if (kind && kind !== projects.get(id)!.kind && kindLocked(id)) return c.json({ error: { code: "kind_locked" as const } }, 409);
       if (kind) projects.setKind(id, kind);
       const project = name ? projects.rename(id, name) : projects.get(id);
       if (!project) return c.json(notFound, 404);

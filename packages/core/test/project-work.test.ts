@@ -636,6 +636,8 @@ describe("a ready project", () => {
     const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
     expect(chat.messages.map((m: any) => m.content)).toEqual(["Почини сумму", "Нашёл и поправил: сумма считается заново."]);
 
+    // Written to once, the project's kind stays (asked for).
+    expect((await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "new" })).status).toBe(409);
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "А это что?", model: s.ref("coder") });
     work = await until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length === 3);
     const again = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();

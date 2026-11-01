@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("drimvox", {
   getToken: (): Promise<string> => ipcRenderer.invoke("drimvox:token"),
   setTitleBar: (colors: { background: string; symbols: string }) => ipcRenderer.send("drimvox:titlebar", colors),
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke("drimvox:pick-folder"),
+  pickKey: (): Promise<string | null> => ipcRenderer.invoke("drimvox:pick-key"),
   savePdf: (name: string): Promise<string | null> => ipcRenderer.invoke("drimvox:save-pdf", name),
   openSkillsFolder: () => ipcRenderer.send("drimvox:open-skills"),
   notify: (notice: unknown) => ipcRenderer.send("drimvox:notify", notice),

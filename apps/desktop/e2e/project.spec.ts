@@ -226,7 +226,9 @@ test("a ready project: asked on adding, talked to as in a chat, its plan on the 
   await expect(page.getByRole("tab", { name: "Ход работы" })).toHaveCount(0);
   const result = page.getByRole("complementary", { name: "Результат" });
   await expect(result.getByRole("tab").first()).toHaveText("Проект");
-  await expect(result.getByRole("button", { name: "Существующий проект" })).toHaveAttribute("aria-pressed", "true");
+  // Once the agent was written to, the kind is said, not switched (asked for).
+  await expect(result.locator(".project-kind-fixed")).toHaveText("Существующий проект");
+  await expect(result.getByRole("button", { name: "Новый проект" })).toHaveCount(0);
   // Removing is in the sidebar's "⋯" only (asked for: the frame in the project tab went).
   await expect(result.getByRole("button", { name: "Убрать из Drimvox…" })).toHaveCount(0);
   // Git by the project's rules: the agent's branch, accepted into main from the project's tab.
