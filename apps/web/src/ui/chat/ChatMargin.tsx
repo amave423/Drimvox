@@ -4,16 +4,22 @@ import { authHeaders } from "../../api";
 import { formatTokens, formatUsd } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
 import { SubscriptionLimits } from "../providers/SubscriptionLimits";
-import { ModelNote } from "./ModelNote";
+import { filesOf, type ActivityEntry } from "@drimvox/shared";
+import { ModelNote, useModelInfo } from "./ModelNote";
 import { MessageJump } from "./MessageRail";
+import { FileViewer } from "./FileChips";
 
 interface Answer {
   costUsd: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  activity: ActivityEntry[];
 }
 
-/** The chat's margin: the model, what is left of a subscription, what the chat cost, deleting it and the user's messages to jump to. */
+/**
+ * The chat's margin, laid out like the "console" design (asked for): how full the model's context is, the model and its
+ * price, the files the chat worked with, what the chat cost, saving and deleting it; below, the user's messages to jump to.
+ */
 export function ChatMargin({
   choice,
   answers,
@@ -24,13 +30,15 @@ export function ChatMargin({
 }: {
   choice: ModelChoice | null;
   answers: Answer[];
-  chat: { id: string; title: string | null } | null;
+  chat: { id: string; title: string | null; folder: string | null } | null;
   onDelete: (() => void) | null;
   own: string[];
   list: RefObject<HTMLDivElement | null>;
 }) {
   const { t, settings, providers, token } = useApp();
   const [saved, setSaved] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const model = useModelInfo(choice);
 
   /** Markdown from the core, saved as a file (asked for: export a chat). */
   async function exportMarkdown() {
@@ -62,19 +70,53 @@ export function ChatMargin({
   const tokens = answers.reduce((sum, m) => sum + (m.inputTokens ?? 0) + (m.outputTokens ?? 0), 0);
   const unpriced = answers.some((m) => m.costUsd === null && m.outputTokens !== null);
   const subscription = !!choice && providers.find((p) => p.id === choice.providerId)?.billing === "subscription";
+  // How full the context is: what the latest answer sent and got back, against the model's window.
+  const last = answers.findLast((m) => m.inputTokens !== null);
+  const used = last ? (last.inputTokens ?? 0) + (last.outputTokens ?? 0) : 0;
+  const files = chat?.folder ? filesOf(answers.flatMap((m) => m.activity)) : [];
 
   return (
     // Sticks to the top while the conversation scrolls, so these stay within reach.
     <aside className="margin chat-margin">
-      {choice && <ModelNote choice={choice} />}
+      {model?.contextLength && (
+        <section className="margin-sec" aria-label={t("margin.context")}>
+          <h3 className="margin-label">{t("margin.context")}</h3>
+          <div className="context-bar" role="meter" aria-valuemin={0} aria-valuemax={model.contextLength} aria-valuenow={Math.min(used, model.contextLength)} aria-label={t("margin.context")}>
+            <span style={{ width: `${Math.min(100, (used / model.contextLength) * 100)}%` }} />
+          </div>
+          <p className="mono margin-figure">{t("margin.contextUsed", { used: formatTokens(used, settings.locale), of: formatTokens(model.contextLength, settings.locale) })}</p>
+        </section>
+      )}
+      {choice && model && (
+        <section className="margin-sec">
+          <h3 className="margin-label">{t("margin.model")}</h3>
+          <ModelNote choice={choice} model={model} />
+        </section>
+      )}
       {choice && subscription && (
-        <div className="note">
-          <strong>{t("limits.title")}</strong>
+        <section className="margin-sec">
+          <h3 className="margin-label">{t("limits.title")}</h3>
           <SubscriptionLimits providerId={choice.providerId} seen={answers.length} />
-        </div>
+        </section>
+      )}
+      {files.length > 0 && chat && (
+        <section className="margin-sec">
+          <h3 className="margin-label">{t("margin.files")}</h3>
+          <ul className="margin-files">
+            {files.map((f) => (
+              <li key={f.path}>
+                <button type="button" className="link" title={t("files.open", { path: f.path })} onClick={() => setViewing(f.path)}>
+                  <span className="mono">{f.path}</span>
+                </button>{" "}
+                <span className={`file-touch is-${f.touch}`}>{t(`files.touch.${f.touch}`)}</span>
+              </li>
+            ))}
+          </ul>
+          {viewing && <FileViewer chatId={chat.id} path={viewing} onClose={() => setViewing(null)} />}
+        </section>
       )}
       {answers.length > 0 && (
-        <p className="note">
+        <p className="margin-sec mono margin-figure">
           {tokens === 0 ? t("chat.totalsCost", { cost: formatUsd(spent) }) : t("chat.totals", { cost: formatUsd(spent), tokens: formatTokens(tokens, settings.locale) })}
           {unpriced && (
             <>
@@ -85,7 +127,7 @@ export function ChatMargin({
         </p>
       )}
       {chat && (
-        <p className="note chat-export">
+        <p className="chat-export">
           <span className="muted">{t("chat.export")}</span>{" "}
           <button className="link" onClick={() => void exportMarkdown()}>
             Markdown
@@ -98,7 +140,7 @@ export function ChatMargin({
       )}
       {onDelete &&
         (confirmDelete ? (
-          <div className="note is-pencil delete-confirm">
+          <div className="margin-sec is-pencil delete-confirm">
             <p>{t("chat.deleteConfirm")}</p>
             <div className="actions">
               <button className="btn is-pencil" onClick={onDelete}>

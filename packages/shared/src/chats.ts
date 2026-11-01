@@ -106,6 +106,28 @@ export interface ActivityEntry {
   at?: number;
 }
 
+/** What an answer did to a file: wrote it (new or rewritten), changed part of it, or only read it. */
+export type FileTouch = "written" | "changed" | "read";
+
+const TOUCHES: Record<string, FileTouch> = { write_file: "written", save_attachment: "written", render_diagram: "written", edit_file: "changed", read_file: "read" };
+const RANK: Record<FileTouch, number> = { written: 3, changed: 2, read: 1 };
+
+/**
+ * The files of the folder an answer wrote, changed or read, from the tools it called (docs/specs/chats.md, asked for:
+ * the files the agent made or used, attached to its answer). Each file once, with the most it did to it.
+ */
+export function filesOf(activity: ActivityEntry[]): { path: string; touch: FileTouch }[] {
+  const found = new Map<string, FileTouch>();
+  for (const a of activity) {
+    const touch = TOUCHES[a.name];
+    const path = a.input.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+    if (!touch || !path || path === "." || path.length > 300) continue;
+    const had = found.get(path);
+    if (!had || RANK[touch] > RANK[had]) found.set(path, touch);
+  }
+  return [...found].map(([path, touch]) => ({ path, touch }));
+}
+
 export interface MessageView {
   id: string;
   role: "user" | "assistant";

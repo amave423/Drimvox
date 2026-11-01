@@ -142,6 +142,8 @@ interface AssistantProps {
   onApprove?(id: string, allow: boolean, always: boolean, server?: boolean): void;
   /** Puts the chat's folder back as it was before this answer. */
   onUndo?(): void;
+  /** The files of the folder the answer wrote, changed or read. */
+  files?: ReactNode;
 }
 
 /** One thing the model did, as the answer shows it. */
@@ -212,6 +214,7 @@ export function AssistantMessage({
   approvals = [],
   onApprove,
   onUndo,
+  files,
 }: AssistantProps) {
   const { t, settings } = useApp();
   const tokens = (n: number) => formatTokens(n, settings.locale);
@@ -247,6 +250,7 @@ export function AssistantMessage({
       {reasoning && <Reasoning text={reasoning} thinking={!!streaming && !content} />}
       <AnswerFlow text={shown} actions={actions} streaming={!!streaming} live={!!streaming || rendering} />
       {message?.media.map((item) => <MediaView key={item.id} item={item} />)}
+      {files}
       {/* An answer followed live shows its own caret and words; "answering" is for one only known to be under way. */}
       {(making || (rendering && !streaming)) && (
         <p className="msg-making">

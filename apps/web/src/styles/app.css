@@ -196,7 +196,7 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .bottom-month.is-over { color: var(--pencil); }
 
 /* A chat saved as a PDF: only the conversation, full width, nothing that scrolls or sticks. */
-.chat-export { font-size: 13px; }
+.chat-export { margin: 0; font-size: 13px; }
 .chat-export-saved { display: block; margin-top: 4px; overflow-wrap: anywhere; }
 @media print {
   .side, .workshop-split, .topbar, .bottombar, .margin, .composer, .chat-head .tabs, .msg-user-tools, .code-copy, .lightbox-close, .msg-tool, .logo-draw { display: none !important; }

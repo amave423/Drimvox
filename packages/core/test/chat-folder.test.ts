@@ -5,6 +5,7 @@ import { createTestEnv, readEvents, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { git, makeRepo } from "./git-repo";
 import { FOLDER_STEPS } from "../src/chats/folder";
+import { filesOf } from "@drimvox/shared";
 
 const KEY = "good-key";
 let env: TestEnv;
@@ -58,6 +59,17 @@ describe("a chat with a folder", () => {
       { name: "write_file", input: "hello.txt" },
       { name: "edit_file", input: "app.js" },
     ]);
+    // The files it made or used are attached to the answer, each once, with the most it did; they can be looked at.
+    expect(filesOf(saved.activity)).toEqual([
+      { path: "app.js", touch: "changed" },
+      { path: "hello.txt", touch: "written" },
+    ]);
+    const shown = await env.call("GET", `/api/chats/${chat.id}/file?path=hello.txt`);
+    expect(shown.status).toBe(200);
+    expect(shown.headers.get("content-security-policy")).toBe("sandbox");
+    expect(await shown.text()).toBe("привет\n");
+    expect((await env.call("GET", `/api/chats/${chat.id}/file?path=../outside.txt`)).status).toBe(400);
+    expect((await env.call("GET", `/api/chats/${chat.id}/file?path=nothing.txt`)).status).toBe(404);
     // The model works in the user's files; git stays the user's.
     expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
 

@@ -365,3 +365,36 @@
 .chain-awake { flex: none; color: var(--ok); font-size: 12px; }
 .chain-awake.is-wait { color: var(--wait); }
 .chain-setup { align-self: start; font-size: 13px; padding: 4px 8px; }
+
+/* The margin's sections, as in the "console" design: a small grey label, then the value. */
+.margin-sec { margin: 0; display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.margin-sec p { margin: 0; }
+.margin-label { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.margin-model { font-weight: 600; }
+.margin-model .muted { font-weight: 400; }
+.margin-price, .margin-figure { font-size: 12.5px; color: var(--muted); }
+.context-bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.context-bar span { display: block; height: 100%; border-radius: 999px; background: var(--ink); }
+.margin-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.margin-files .link { font-size: 12.5px; text-align: left; }
+.file-touch { font-size: 12px; color: var(--muted); }
+.file-touch.is-written { color: var(--ok); }
+.file-touch.is-changed { color: var(--ink); }
+
+/* The files an answer made or used, under it (asked for, from the "workbench" design). */
+.file-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.file-chip { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 5px 12px; border: 0; border-radius: 999px; background: var(--ink-soft); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
+.file-chip .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-chip-touch { font-size: 12px; opacity: 0.8; }
+.file-chip.is-read { background: var(--paper); color: var(--fg); }
+.file-chip:hover, .file-chip:focus-visible { outline: 1px solid var(--ink); }
+.file-view { position: relative; display: flex; flex-direction: column; width: min(1000px, calc(100vw - 48px)); max-height: calc(100vh - var(--topbar-h) - 48px); margin-top: var(--topbar-h); border-radius: 12px; background: var(--sheet); box-shadow: var(--sheet-shadow); cursor: default; overflow: hidden; }
+.file-view-head { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 18px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.file-view-head .mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-view-close { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
+.file-view-close:hover { background: var(--paper); color: var(--fg); }
+.file-view-close svg { width: 16px; height: 16px; }
+.file-view-body { overflow: auto; padding: 12px 18px; }
+.file-view-body img { display: block; max-width: 100%; margin: 0 auto; }
+.file-view-body pre { margin: 0; }
+.margin-sec.is-pencil { color: var(--pencil); }

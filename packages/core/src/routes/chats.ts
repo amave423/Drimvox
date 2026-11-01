@@ -18,7 +18,8 @@ import { type MonthUsage, type ModelSpending,
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { Workspace } from "../agent/workspace";
 import { resolve } from "node:path";
 import { extract, imageType } from "../chats/attachments";
 import { restore } from "../chats/checkpoint";
@@ -41,6 +42,9 @@ import { toolbox, type ToolboxDeps } from "../tools";
 import { visualTools, type VisualKit } from "../visual/tools";
 import { WORK_STEPS, workRules } from "../work/prompt";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
+
+/** The largest file of the folder shown from an answer. */
+const MAX_SHOWN_FILE = 2 * 1024 * 1024;
 
 /** What the activity line shows of a tool's input. */
 /** The one thing of a call worth a line under the answer: the page, the command, the skill and its file. */
@@ -141,6 +145,23 @@ export function chatRoutes(
       if (!file || file.chatId !== c.req.param("id")) return c.json(notFound, 404);
       const type = file.kind === "image" ? imageType(file.type, file.name) : "application/octet-stream";
       return c.body(new Uint8Array(chats.attachments.file(file.id)), 200, { "content-type": type, "cache-control": "private, max-age=86400" });
+    })
+    // A file of the chat's folder, to look at from the answer that made or used it (docs/specs/chats.md).
+    .get("/:id/file", zValidator("query", z.object({ path: z.string().min(1).max(1000) })), (c) => {
+      const chat = chats.get(c.req.param("id"));
+      if (!chat?.folder) return c.json(notFound, 404);
+      let file: string;
+      try {
+        file = new Workspace(chat.folder).resolve(c.req.valid("query").path);
+      } catch {
+        return c.json({ error: { code: "invalid" as const, detail: "Outside the folder" } }, 400);
+      }
+      if (!existsSync(file) || !statSync(file).isFile()) return c.json(notFound, 404);
+      if (statSync(file).size > MAX_SHOWN_FILE) return c.json({ error: { code: "too_big" as const } }, 413);
+      const picture = /\.(png|jpe?g|gif|webp|svg)$/i.exec(file)?.[1]?.toLowerCase();
+      const type = picture ? (picture === "svg" ? "image/svg+xml" : `image/${picture === "jpg" ? "jpeg" : picture}`) : "text/plain; charset=utf-8";
+      // Shown as text or a picture, never run as a page of the app.
+      return c.body(new Uint8Array(readFileSync(file)), 200, { "content-type": type, "content-security-policy": "sandbox", "x-content-type-options": "nosniff", "cache-control": "no-store" });
     })
     // Puts the folder back as it was before this answer.
     .post("/:id/messages/:messageId/undo", async (c) => {

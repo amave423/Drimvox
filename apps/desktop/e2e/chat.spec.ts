@@ -411,6 +411,16 @@ test("works in a connected folder and undoes an answer", async () => {
   // What it did stays in the answer, in order before the text it led to (seen: it vanished once the chat reloaded).
   await expect(page.locator(".msg-assistant summary", { hasText: "Пишет hello.txt" })).toBeVisible();
   expect(readFileSync(join(folder, "hello.txt"), "utf8")).toBe("привет\n");
+  // The file it made is attached to the answer and opens to look at; the margin lists it too, under the context and the model.
+  await page.locator(".file-chip", { hasText: "hello.txt" }).click();
+  const viewer = page.getByRole("dialog", { name: "hello.txt" });
+  await expect(viewer).toContainText("привет");
+  await page.keyboard.press("Escape");
+  await expect(viewer).toHaveCount(0);
+  const margin = page.locator(".chat-margin");
+  await expect(margin.locator(".margin-label")).toHaveText(["Контекст", "Модель", "Файлы в этом чате"]);
+  await expect(margin.locator(".margin-figure").first()).toHaveText(/ из 32 тыс\.$/);
+  await expect(margin.locator(".margin-files")).toContainText("hello.txt записан");
 
   await page.getByRole("button", { name: "Откатить" }).click();
   await expect(page.getByRole("button", { name: "Откатить" })).toHaveCount(0);

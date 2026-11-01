@@ -12,6 +12,7 @@ import {
   type AttachmentView,
   type ActivityEntry,
   CHAIN_PROVIDER_ID,
+  filesOf,
 } from "@drimvox/shared";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ok } from "../../api";
@@ -34,6 +35,7 @@ import { readWebMode, WebSwitch } from "./WebSwitch";
 import { FolderSwitch } from "./FolderSwitch";
 import { readThinking, ThinkingSwitch } from "./ThinkingSwitch";
 import { ChatMargin } from "./ChatMargin";
+import { FileChips } from "./FileChips";
 import { WorkReview } from "../projects/WorkReview";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 import { activityLine } from "./activityLine";
@@ -485,6 +487,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                 // Still being written: its actions so far, as they come; once done, folded.
                 actions={toActions(live?.messageId === m.id ? live.activity : m.activity)}
                 onUndo={draft || chat?.itemId || running ? undefined : () => void undo(m.id)}
+                files={chat?.folder && live?.messageId !== m.id ? <FileChips chatId={chat.id} files={filesOf(m.activity)} /> : null}
                 // Seen after coming back to the chat: the requests this answer waits on, to answer here.
                 approvals={m.status === "streaming" && !draft ? chat?.approvals.map((a) => ({ ...a, state: "open" as const })) : undefined}
                 onApprove={approve}
@@ -606,7 +609,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
       </div>
 
       {!workshop && (
-        <ChatMargin choice={choice} answers={answers} chat={chat && chat.messages.length ? { id: chat.id, title: chat.title } : null} onDelete={chat ? () => void remove() : null} own={ownTexts} list={list} />
+        <ChatMargin choice={choice} answers={answers} chat={chat && chat.messages.length ? { id: chat.id, title: chat.title, folder: chat.folder } : null} onDelete={chat ? () => void remove() : null} own={ownTexts} list={list} />
       )}
     </article>
   );
