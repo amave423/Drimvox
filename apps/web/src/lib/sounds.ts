@@ -40,11 +40,33 @@ const SOUNDS: Record<Exclude<NoticeSound, "off">, Tone[]> = {
   pop: [{ hz: 620, at: 0, ring: 0.12, wave: "sine", gain: 1, to: 1240 }],
 };
 
+/** Recording starts with two notes going up and ends with them going down, quietly (asked for: a sound that it started). */
+const CUES: Record<"start" | "stop", Tone[]> = {
+  start: [
+    { hz: 660, at: 0, ring: 0.12, wave: "sine", gain: 0.7 },
+    { hz: 990, at: 0.08, ring: 0.18, wave: "sine", gain: 0.6 },
+  ],
+  stop: [
+    { hz: 990, at: 0, ring: 0.12, wave: "sine", gain: 0.6 },
+    { hz: 660, at: 0.08, ring: 0.2, wave: "sine", gain: 0.5 },
+  ],
+};
+
 let context: AudioContext | null = null;
+
+/** Plays the cue of recording starting or ending, at `volume` (0 to 1). */
+export function playCue(cue: "start" | "stop", volume: number): void {
+  play(CUES[cue], volume * 0.6);
+}
 
 /** Plays a notification sound at `volume` (0 to 1); quietly does nothing where sound cannot be made. */
 export function playSound(sound: NoticeSound, volume: number): void {
-  if (sound === "off" || volume <= 0) return;
+  if (sound === "off") return;
+  play(SOUNDS[sound], volume);
+}
+
+function play(tones: Tone[], volume: number): void {
+  if (volume <= 0) return;
   try {
     context ??= new AudioContext();
     if (context.state === "suspended") void context.resume();
@@ -52,7 +74,7 @@ export function playSound(sound: NoticeSound, volume: number): void {
     const master = context.createGain();
     master.gain.value = Math.min(1, volume) * 0.35;
     master.connect(context.destination);
-    for (const tone of SOUNDS[sound]) {
+    for (const tone of tones) {
       const osc = context.createOscillator();
       const env = context.createGain();
       osc.type = tone.wave;

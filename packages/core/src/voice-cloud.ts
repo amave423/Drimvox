@@ -27,6 +27,29 @@ export function wavOf(pcm: Buffer, rate: number): Buffer {
   return Buffer.concat([head, pcm]);
 }
 
+/**
+ * The sound alone: Google appends its content credentials (a C2PA "jumb" box) to the raw PCM, which played as sound is a
+ * blast of noise at the end (seen: "a loud sound like a walkie-talkie" after every answer). Cut there, with a short fade
+ * so the voice does not end on a click.
+ */
+export function cleanPcm(pcm: Buffer, rate: number): Buffer {
+  let end = pcm.length;
+  for (let at = pcm.indexOf("C2PA"); at >= 0; at = pcm.indexOf("C2PA", at + 1)) {
+    if (pcm.indexOf("jumb", at) - at < 64 && pcm.indexOf("jumb", at) > at) {
+      end = at;
+      break;
+    }
+  }
+  const out = Buffer.from(pcm.subarray(0, end - (end % 2)));
+  const samples = out.length / 2;
+  const fade = Math.min(samples, Math.round(rate * 0.015));
+  for (let i = 0; i < fade; i++) {
+    const at = (samples - fade + i) * 2;
+    out.writeInt16LE(Math.round(out.readInt16LE(at) * (1 - (i + 1) / fade)), at);
+  }
+  return out;
+}
+
 /** The newest Flash speech model the key can use: Flash is quick and has a free tier. */
 async function geminiModel(conn: Connection, signal: AbortSignal): Promise<string> {
   const known = geminiModels.get(conn.cacheKey);
@@ -67,7 +90,7 @@ export async function speakCloud(conn: Connection, voice: string, text: string):
     const audio = body.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
     if (!audio?.data) throw new Error("The provider sent no sound.");
     const rate = Number(/rate=(\d+)/.exec(audio.mimeType ?? "")?.[1] ?? GEMINI_RATE);
-    return wavOf(Buffer.from(audio.data, "base64"), rate);
+    return wavOf(cleanPcm(Buffer.from(audio.data, "base64"), rate), rate);
   }
   if (conn.preset === "openai") {
     const res = await conn.fetch(`${conn.baseUrl}/audio/speech`, {

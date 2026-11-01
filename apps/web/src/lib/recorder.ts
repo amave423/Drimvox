@@ -31,17 +31,37 @@ async function toWav(recorded: Blob): Promise<Blob> {
   return wavOf((await offline.startRendering()).getChannelData(0));
 }
 
-/** Starts recording from the microphone; the returned function stops it and gives the WAV as base64. */
-export async function startRecording(): Promise<() => Promise<string>> {
+/** A recording under way: how loud the voice is now (0 to 1, for the wave on screen), and stopping it for the WAV as base64. */
+export interface Recording {
+  level(): number;
+  stop(): Promise<string>;
+}
+
+/** Starts recording from the microphone. */
+export async function startRecording(): Promise<Recording> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const recorder = new MediaRecorder(stream);
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => chunks.push(e.data);
   recorder.start();
-  return () =>
+  // The voice's loudness, read from the same microphone (asked for: something alive while recording, not a lit icon).
+  const meter = new AudioContext();
+  const analyser = meter.createAnalyser();
+  analyser.fftSize = 512;
+  meter.createMediaStreamSource(stream).connect(analyser);
+  const wave = new Float32Array(analyser.fftSize);
+  const level = () => {
+    analyser.getFloatTimeDomainData(wave);
+    let sum = 0;
+    for (const v of wave) sum += v * v;
+    // Speech sits around 0.02–0.2 RMS; spread it over the bar's height.
+    return Math.min(1, Math.sqrt(sum / wave.length) * 6);
+  };
+  const stop = () =>
     new Promise<string>((resolve, reject) => {
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
+        void meter.close();
         try {
           const wav = await toWav(new Blob(chunks, { type: recorder.mimeType }));
           const bytes = new Uint8Array(await wav.arrayBuffer());
@@ -54,6 +74,7 @@ export async function startRecording(): Promise<() => Promise<string>> {
       };
       recorder.stop();
     });
+  return { level, stop };
 }
 
 /** The words of an answer to read aloud: no emoji, code, addresses or symbols (asked for). */

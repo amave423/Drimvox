@@ -1,4 +1,4 @@
-import { agentFiles, currencies, locales, searchEngines, themes, type SettingsPatch } from "@drimvox/shared";
+import { agentFiles, currencies, locales, searchEngines, themes, type Settings, type SettingsPatch } from "@drimvox/shared";
 import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../context";
 import { shownSign } from "../lib/format";
@@ -175,6 +175,20 @@ export function SettingsSheet() {
               </button>
             )}
           </div>
+        </Setting>
+
+        <Setting id="dictation-language-label" title={t("voice.language")} about={t("voice.languageHint")}>
+          <Segmented<Settings["dictationLanguage"]>
+            labelledBy="dictation-language-label"
+            value={settings.dictationLanguage}
+            options={[
+              { value: "interface", label: t("voice.language.interface") },
+              { value: "ru", label: "Русский" },
+              { value: "en", label: "English" },
+              { value: "auto", label: t("voice.language.auto") },
+            ]}
+            onChange={(dictationLanguage) => void save({ dictationLanguage })}
+          />
         </Setting>
 
         <SpeechVoiceSetting />

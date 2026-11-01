@@ -6,4 +6,6 @@ if (!model || !file) {
   console.error("usage: -m model -f file");
   process.exit(1);
 }
-console.log(" Привет из whisper.");
+// The language it was told, so a test sees it was not left to guess.
+const language = args.includes("-l") ? args[args.indexOf("-l") + 1] : "auto";
+console.log(language === "ru" ? " Привет из whisper." : ` [${language}] Привет из whisper.`);

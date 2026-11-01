@@ -297,14 +297,16 @@ export function createCore(o: AppOptions) {
     .route("/search", searchRoutes(searchStore, searchUrls))
     // Dictation (asked for): the recording to the voice model from the settings, its text back.
     .post("/voice/transcribe", zValidator("json", z.object({ audio: z.string().min(1).max(30_000_000), mimeType: z.string().regex(/^audio\/[\w.+-]+$/) })), async (c) => {
-      const choice = readSettings(o.db).voiceModel;
+      const settings = readSettings(o.db);
+      const choice = settings.voiceModel;
       const conn = choice ? providers.connection(choice.providerId) : null;
       if (!choice || !conn) return c.json({ error: { code: "no_voice_model" as const } }, 409);
+      const language = settings.dictationLanguage === "interface" ? settings.locale : settings.dictationLanguage;
       const { audio, mimeType } = c.req.valid("json");
       try {
         const bytes = Buffer.from(audio, "base64");
         // A model on this computer writes it down itself, free and offline (docs/specs/local-audio.md).
-        const text = conn.preset === "whispercpp" ? await local.audio.transcribe(choice.model, bytes) : await transcribe(conn, choice.model, bytes, mimeType);
+        const text = conn.preset === "whispercpp" ? await local.audio.transcribe(choice.model, bytes, language) : await transcribe(conn, choice.model, bytes, mimeType, language);
         // Said plainly rather than "could not": the model answered, but with no words.
         if (!text) return c.json({ error: { code: "nothing_heard" as const } }, 422);
         return c.json({ text }, 200);

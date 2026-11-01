@@ -39,6 +39,11 @@ export const settingsSchema = z.object({
   imageModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
   /** The model that turns dictation into text: one that takes audio (Gemini, GPT-4o audio); null: no dictation. */
   voiceModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
+  /**
+   * The language dictation is spoken in: the interface's by default (seen: whisper guessed short Russian phrases wrong
+   * until told the language), guessed by the model, or fixed.
+   */
+  dictationLanguage: z.enum(["interface", "auto", "ru", "en"]),
   /** The Piper voice that reads answers aloud (docs/specs/local-speech.md); null: the system's own voice. */
   speechVoice: z.enum(localVoiceIds).nullable(),
   /** A provider's voice that reads answers instead (asked for: voices from the cloud); null: the Piper or system voice. */
@@ -63,7 +68,7 @@ export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 export type Currency = Settings["currency"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, folderAutoApprove: false, favoriteModels: [], searchEngine: "auto", agentFiles: [], monthlyBudgetUsd: null, voiceModel: null, speechVoice: null, cloudVoice: null };
+export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, folderAutoApprove: false, favoriteModels: [], searchEngine: "auto", agentFiles: [], monthlyBudgetUsd: null, voiceModel: null, dictationLanguage: "interface", speechVoice: null, cloudVoice: null };
 
 /**
  * Voices of the providers that read answers aloud (docs/specs/local-speech.md): Gemini's speech models and OpenAI's.

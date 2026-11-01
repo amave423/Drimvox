@@ -29,8 +29,8 @@ test.afterEach(async () => {
   rmSync(userData, { recursive: true, force: true });
 });
 
-async function launch(env: Record<string, string> = {}): Promise<Page> {
-  app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_USD_RUB: "80", ...env } });
+async function launch(env: Record<string, string> = {}, switches: string[] = []): Promise<Page> {
+  app = await electron.launch({ args: [mainJs, ...switches], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_USD_RUB: "80", ...env } });
   const page = await app.firstWindow();
   await expect(paramsButton(page)).toBeVisible();
   return page;
@@ -426,6 +426,33 @@ test("works in a connected folder and undoes an answer", async () => {
   await expect(page.getByRole("button", { name: "Откатить" })).toHaveCount(0);
   expect(existsSync(join(folder, "hello.txt"))).toBe(false);
   rmSync(folder, { recursive: true, force: true });
+});
+
+// docs/specs/local-audio.md: dictation shows the recording as it happens and puts the words into the box.
+test("dictation shows a live wave with the time, then writes the words into the message box", async () => {
+  fake = await startFakeProvider({ key: KEY, models, script: [{ text: "Запиши Иванову на четверг" }] });
+  // Chromium's fake microphone plays a tone, so the wave has something to show.
+  const page = await launch({}, ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]);
+  await connect(page);
+  await startChat(page);
+  await page.evaluate(async () => {
+    const h = { Authorization: `Bearer ${await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken()}`, "content-type": "application/json" };
+    const providers = await (await fetch("/api/providers", { headers: h })).json();
+    await fetch("/api/settings", { method: "PATCH", headers: h, body: JSON.stringify({ voiceModel: { providerId: providers[0].id, model: "fake-model" } }) });
+  });
+  await page.getByRole("button", { name: "Надиктовать" }).click();
+  const live = page.locator(".dictate-live");
+  await expect(live).toBeVisible();
+  await expect(live.locator(".dictate-time")).toHaveText("0:01", { timeout: 5000 });
+  // The bars follow the microphone (its fake one beeps once a second): some stand taller than the resting line.
+  expect(await live.locator(".dictate-wave span").evaluateAll((bars) => bars.filter((b) => !/scaleY\(0\.08\)/.test((b as HTMLElement).style.transform)).length)).toBeGreaterThan(0);
+  await live.click();
+  await expect(live).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: /Сообщение/ })).toHaveValue("Запиши Иванову на четверг");
+  // The recording went to the model as WAV, with the language told.
+  const asked = JSON.stringify(fake.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!.body.messages);
+  expect(asked).toContain("input_audio");
+  expect(asked).toContain("spoken in Russian");
 });
 
 // docs/specs/chat-attachments.md: a file goes with the message, the model reads it, the chat shows it.

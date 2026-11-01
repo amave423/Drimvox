@@ -1,21 +1,67 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
-import { speak, startRecording, plainText, speakPieces, speechChunks } from "../../lib/recorder";
+import { dictionaries, type MessageKey } from "../../i18n";
+import { speak, startRecording, plainText, speakPieces, speechChunks, type Recording } from "../../lib/recorder";
+import { playCue } from "../../lib/sounds";
+
+/** Bars in the live wave of a recording. */
+const BARS = 28;
+
+/** The recording as it happens: a beating dot, the time and a wave of the voice running right to left. */
+function RecordingWave({ recording, onStop }: { recording: Recording; onStop(): void }) {
+  const { t } = useApp();
+  const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0));
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const started = performance.now();
+    let frame = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      // A new bar every 70 ms: fast enough to follow the voice, slow enough to read as a wave.
+      if (now - last > 70) {
+        last = now;
+        const level = recording.level();
+        setLevels((old) => [...old.slice(1), level]);
+        setSeconds(Math.floor((now - started) / 1000));
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [recording]);
+  return (
+    <button type="button" className="dictate-live" onClick={onStop} aria-label={t("voice.stop")} title={t("voice.stop")}>
+      <span className="dictate-dot" aria-hidden />
+      <span className="dictate-wave" aria-hidden>
+        {levels.map((v, i) => (
+          <span key={i} style={{ transform: `scaleY(${Math.max(0.08, v)})` }} />
+        ))}
+      </span>
+      <span className="dictate-time mono">
+        {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+      </span>
+    </button>
+  );
+}
 
 /**
  * Dictation in the message box (asked for): press, speak, press again; the voice model from the settings writes it down
  * and the text joins what is in the box. Explained when no voice model is chosen.
  */
 export function DictateButton({ onText, disabled }: { onText(text: string): void; disabled?: boolean }) {
-  const { api, t } = useApp();
+  const { api, t, settings } = useApp();
   const [state, setState] = useState<"idle" | "recording" | "writing">("idle");
   const [problem, setProblem] = useState<string | null>(null);
+  const [recording, setRecording] = useState<Recording | null>(null);
   const stop = useRef<(() => Promise<string>) | null>(null);
+  const volume = settings.notifyVolume || 0.6;
 
   async function toggle() {
     setProblem(null);
     if (state === "recording" && stop.current) {
       setState("writing");
+      setRecording(null);
+      playCue("stop", volume);
       try {
         const audio = await stop.current();
         const res = await api.voice.transcribe.$post({ json: { audio, mimeType: "audio/wav" } });
@@ -25,7 +71,10 @@ export function DictateButton({ onText, disabled }: { onText(text: string): void
           const code = body?.error?.code;
           // The provider's own words say what went wrong (seen: only "could not recognise", whatever the reason).
           const detail = body?.error?.detail ? ` ${body.error.detail}` : "";
-          setProblem(code === "no_voice_model" ? t("voice.noModel") : code === "nothing_heard" ? t("voice.nothingHeard") : `${t("voice.failed")}${detail}`);
+          // The provider's problem in the interface's words where there are some (seen: OpenRouter takes audio only with
+          // $0.50 on the account, free models too).
+          const known = code && `error.${code}` in dictionaries.ru && code !== "unknown" ? ` ${t(`error.${code}` as MessageKey)}` : "";
+          setProblem(code === "no_voice_model" ? t("voice.noModel") : code === "nothing_heard" ? t("voice.nothingHeard") : `${t("voice.failed")}${known}${detail}`);
         }
       } catch {
         setProblem(t("voice.failed"));
@@ -35,7 +84,10 @@ export function DictateButton({ onText, disabled }: { onText(text: string): void
       return;
     }
     try {
-      stop.current = await startRecording();
+      const started = await startRecording();
+      stop.current = started.stop;
+      setRecording(started);
+      playCue("start", volume);
       setState("recording");
     } catch {
       setProblem(t("voice.noMicrophone"));
@@ -58,6 +110,13 @@ export function DictateButton({ onText, disabled }: { onText(text: string): void
           <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
         </svg>
       </button>
+      {recording && <RecordingWave recording={recording} onStop={() => void toggle()} />}
+      {state === "writing" && (
+        <span className="dictate-writing muted" role="status">
+          <span className="action-spinner" aria-hidden />
+          {t("voice.writing")}
+        </span>
+      )}
       {problem && (
         <span className="dictate-problem" role="status">
           {problem}

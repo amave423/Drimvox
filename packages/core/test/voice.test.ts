@@ -70,12 +70,14 @@ describe("dictation", () => {
 describe("a provider's voice reads answers", () => {
   it("asks Gemini's newest Flash speech model with the chosen voice and gives a WAV", async () => {
     const pcm = Buffer.alloc(4800, 1);
+    // Google's content credentials after the sound (seen live: played, they were a blast of noise).
+    const credentials = Buffer.concat([Buffer.from("C2PA"), Buffer.from([0xb0, 0x17, 0, 0, 0, 0, 0x17, 0xb0]), Buffer.from("jumb"), Buffer.alloc(3000, 0x7f)]);
     fake = await startFakeProvider({
       authorized: (h) => h["x-goog-api-key"] === KEY,
       handle: (method, path) => {
         if (method === "GET" && path === "/v1beta/models") return { json: { models: ["gemini-2.5-flash-preview-tts", "gemini-3.5-flash-tts", "gemini-3.5-pro-tts", "gemini-3.5-flash"].map((m) => ({ name: `models/${m}` })) } };
         if (method === "POST" && path === "/v1beta/models/gemini-3.5-flash-tts:generateContent")
-          return { json: { candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;codec=pcm;rate=24000", data: pcm.toString("base64") } }] } }] } };
+          return { json: { candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;codec=pcm;rate=24000", data: Buffer.concat([pcm, credentials]).toString("base64") } }] } }] } };
         return undefined;
       },
     });
@@ -90,7 +92,10 @@ describe("a provider's voice reads answers", () => {
     const wav = Buffer.from(await res.arrayBuffer());
     expect(wav.subarray(0, 4).toString()).toBe("RIFF");
     expect(wav.readUInt32LE(24)).toBe(24000);
+    // The sound alone, without the credentials; it fades out instead of ending on a click.
     expect(wav.length).toBe(44 + pcm.length);
+    expect(wav.indexOf("C2PA")).toBe(-1);
+    expect(wav.readInt16LE(wav.length - 2)).toBe(0);
     const asked = fake.requests.find((r) => r.path.endsWith(":generateContent"))!.body;
     expect(asked.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe("Kore");
     expect(JSON.stringify(asked.contents)).toContain("Привет из облака.");

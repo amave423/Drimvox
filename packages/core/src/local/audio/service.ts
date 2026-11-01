@@ -249,8 +249,8 @@ export class LocalAudio {
     }
   }
 
-  /** A WAV recording written down by the model, in the language it is spoken in. */
-  async transcribe(id: string, wav: Buffer): Promise<string> {
+  /** A WAV recording written down by the model, in the language given ("ru", "en") or the one it hears ("auto"). */
+  async transcribe(id: string, wav: Buffer, language = "auto"): Promise<string> {
     const model = this.installed().find((m) => m.id === id);
     if (!model) throw new Error("This speech model is not downloaded");
     const found = findCli(this.engineDir);
@@ -265,7 +265,7 @@ export class LocalAudio {
       const out = await new Promise<string>((resolve, reject) =>
         execFile(
           cli[0]!,
-          [...cli.slice(1), "-m", relative(cwd, this.pathOf(model)), "-f", relative(cwd, file), "-l", "auto", "-nt", "-np"],
+          [...cli.slice(1), "-m", relative(cwd, this.pathOf(model)), "-f", relative(cwd, file), "-l", language, "-nt", "-np"],
           { cwd, timeout: TRANSCRIBE_MS, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
           (err, stdout) => (err ? reject(err) : resolve(String(stdout))),
         ),

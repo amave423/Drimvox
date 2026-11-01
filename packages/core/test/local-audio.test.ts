@@ -81,7 +81,11 @@ describe("speech on this computer", () => {
 
     await env.call("PATCH", "/api/settings", { voiceModel: { providerId: after.providerId, model: "whisper-small" } });
     const res = await env.call("POST", "/api/voice/transcribe", { audio: Buffer.from("RIFF....WAVE").toString("base64"), mimeType: "audio/wav" });
+    // Told the language: the interface's by default (seen: short Russian phrases guessed wrong), or the one chosen.
     expect(await res.json()).toEqual({ text: "Привет из whisper." });
+    await env.call("PATCH", "/api/settings", { dictationLanguage: "en" });
+    const english = await env.call("POST", "/api/voice/transcribe", { audio: Buffer.from("RIFF....WAVE").toString("base64"), mimeType: "audio/wav" });
+    expect(await english.json()).toEqual({ text: "[en] Привет из whisper." });
 
     // Asked for: a way to delete the engines. The models stay; asking for one again brings the engine back.
     expect((await env.call("DELETE", "/api/local/audio/engine")).status).toBe(204);
