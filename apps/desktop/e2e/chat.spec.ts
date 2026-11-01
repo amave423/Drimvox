@@ -209,6 +209,7 @@ test("thinks in a small window, then draws formulas, a chart and highlighted cod
   const answer =
     "Энергия: $E = mc^2$, а площадь \\(S = \\pi r^2\\).\n\n" +
     '```mermaid\npie title Доли\n  "Чай" : 60\n  "Кофе" : 40\n```\n\n' +
+    "```mermaid\nflowchart TD\n  A[Начало] --> B{Проверка}\n  B -- Да --> C[Успех]\n  B -- Нет --> D[Ошибка]\n```\n\n" +
     "```js\nconst total = 1;\n```";
   fake = await startFakeProvider({
     key: KEY,
@@ -218,6 +219,10 @@ test("thinks in a small window, then draws formulas, a chart and highlighted cod
   });
   const page = await launch();
   await connect(page);
+  // In the dark theme, whose colours are color-mix() of the mark's (seen: every diagram failed there).
+  await openSection(page, "Настройки");
+  await page.getByRole("radio", { name: "Тёмное" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await startChat(page);
   await say(page, "Покажи пример");
 
@@ -231,8 +236,19 @@ test("thinks in a small window, then draws formulas, a chart and highlighted cod
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await expect(page.locator(".md .katex")).toHaveCount(2);
-  await expect(page.locator(".diagram svg")).toBeVisible();
-  await expect(page.locator(".diagram")).toContainText("Чай");
+  await expect(page.locator(".diagram svg")).toHaveCount(2);
+  await expect(page.locator(".diagram").first()).toContainText("Чай");
+  await expect(page.getByText("Диаграмму не удалось нарисовать")).toHaveCount(0);
+  // A diagram opens over the window, fitted; it zooms and closes with Escape.
+  await page.getByRole("button", { name: "Открыть диаграмму" }).nth(1).click();
+  const viewer = page.getByRole("dialog", { name: "Диаграмма" });
+  await expect(viewer).toContainText("Успех");
+  const before = await viewer.locator(".diagram-scale").textContent();
+  await viewer.getByRole("button", { name: "Приблизить" }).click();
+  await expect(viewer.locator(".diagram-scale")).not.toHaveText(before!);
+  await expect(viewer.getByRole("button", { name: "Скачать PNG" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(viewer).toHaveCount(0);
   await expect(page.locator(".md .hljs-keyword").first()).toHaveText("const");
   await expect(page.getByText(/Размышления/)).toBeVisible();
 });

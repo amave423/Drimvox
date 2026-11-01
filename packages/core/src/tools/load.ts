@@ -2,20 +2,14 @@ import { tool, type ToolSet } from "ai";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { ToolHooks } from "../agent/tools";
+import { isIP } from "node:net";
+import { isPrivateIp } from "../internet/web";
 
 /** This computer and the local network only: loading someone else's site is an attack, not a test. */
 export function isOwnAddress(url: string): boolean {
   try {
     const host = new URL(url).hostname.replace(/^\[|\]$/g, "");
-    return (
-      host === "localhost" ||
-      host.endsWith(".localhost") ||
-      host === "::1" ||
-      /^127\./.test(host) ||
-      /^10\./.test(host) ||
-      /^192\.168\./.test(host) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(host)
-    );
+    return host === "localhost" || host.endsWith(".localhost") || (isIP(host) !== 0 && isPrivateIp(host));
   } catch {
     return false;
   }

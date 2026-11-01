@@ -8,6 +8,7 @@ import type { ToolHooks } from "../agent/tools";
 import type { Workspace } from "../agent/workspace";
 import { localAudio } from "../local/audio/service";
 import { ffmpeg, runFfmpeg } from "./ffmpeg";
+import { toolRunner } from "./run";
 
 const kb = (path: string) => `${Math.max(1, Math.round(statSync(path).size / 1024))} KB`;
 const tail = (log: string) => log.trim().split("\n").slice(-6).join("\n");
@@ -18,14 +19,7 @@ const tail = (log: string) => log.trim().split("\n").slice(-6).join("\n");
  * inside. ffmpeg is the computer's own or downloaded once.
  */
 export function mediaTools(dataDir: string, ws: Workspace, hooks: Pick<ToolHooks, "onCall">): ToolSet {
-  const run = async (name: string, input: string, work: () => Promise<string>) => {
-    hooks.onCall({ callId: randomUUID(), name, input });
-    try {
-      return await work();
-    } catch (err) {
-      return `Error: ${err instanceof Error ? err.message : String(err)}`;
-    }
-  };
+  const run = toolRunner(hooks);
   const input = (path: string) => {
     const full = ws.resolve(path);
     if (!existsSync(full)) throw new Error(`No file ${path}`);

@@ -1,5 +1,4 @@
 import { tool, type ToolSet } from "ai";
-import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
@@ -10,6 +9,7 @@ import type { ToolHooks } from "../agent/tools";
 import type { BrowserDriver } from "../browser/driver";
 import type { Workspace } from "../agent/workspace";
 import { resize } from "./images";
+import { toolRunner } from "./run";
 
 /**
  * The Mermaid the chat draws with (docs/specs/tools.md): the copy in the built UI, or in node_modules when run from
@@ -42,14 +42,7 @@ export function compareTools(
   mermaid: string | null = mermaidScript(),
 ): ToolSet {
   const file = (name: string, width: number, kind: "before" | "diff" | "after") => join(dir, `${name.replace(/[^\w.-]+/g, "_").slice(0, 60)}-${width}-${kind}.png`);
-  const run = async (name: string, input: string, work: () => Promise<string>) => {
-    hooks.onCall({ callId: randomUUID(), name, input });
-    try {
-      return await work();
-    } catch (err) {
-      return `Error: ${err instanceof Error ? err.message : String(err)}`;
-    }
-  };
+  const run = toolRunner(hooks);
   /** The whole page at a width, as a picture. */
   async function shoot(width: number): Promise<Buffer> {
     await driver.command("Emulation.setDeviceMetricsOverride", { width, height: width < 768 ? 844 : 900, deviceScaleFactor: 1, mobile: false });

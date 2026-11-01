@@ -806,6 +806,13 @@ export const ru = {
   "chat.thinking": "Думает… {seconds} с",
   "chat.reasoningTook": "Размышления · {seconds} с",
   "chat.diagramFailed": "Диаграмму не удалось нарисовать, ниже её код.",
+  "diagram.open": "Открыть диаграмму",
+  "diagram.title": "Диаграмма",
+  "diagram.zoomIn": "Приблизить",
+  "diagram.zoomOut": "Отдалить",
+  "diagram.fit": "По размеру окна",
+  "diagram.saveSvg": "Скачать SVG",
+  "diagram.savePng": "Скачать PNG",
 
   "notice.work.approval": "Агент ждёт разрешения на команду",
   "notice.work.done": "Проект готов",

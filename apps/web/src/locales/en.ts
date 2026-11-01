@@ -806,6 +806,13 @@ export const en: Record<keyof typeof ru, string> = {
   "chat.thinking": "Thinking… {seconds} s",
   "chat.reasoningTook": "Reasoning · {seconds} s",
   "chat.diagramFailed": "The diagram could not be drawn; its code is below.",
+  "diagram.open": "Open the diagram",
+  "diagram.title": "Diagram",
+  "diagram.zoomIn": "Zoom in",
+  "diagram.zoomOut": "Zoom out",
+  "diagram.fit": "Fit to window",
+  "diagram.saveSvg": "Save SVG",
+  "diagram.savePng": "Save PNG",
 
   "notice.work.approval": "The agent waits for permission on a command",
   "notice.work.done": "The project is done",

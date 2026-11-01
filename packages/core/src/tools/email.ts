@@ -1,7 +1,8 @@
 import { tool, type ToolSet } from "ai";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import type { ToolHooks } from "../agent/tools";
+import { toolRunner } from "./run";
 
 /** mail.tm: free temporary inboxes with an open API; a test gives a fake. */
 let API = "https://api.mail.tm";
@@ -33,14 +34,7 @@ async function call<T>(path: string, init: RequestInit = {}, token?: string): Pr
  */
 export function emailTools(hooks: Pick<ToolHooks, "onCall">): ToolSet {
   const inboxes: Inbox[] = [];
-  const run = async (name: string, input: string, work: () => Promise<string>) => {
-    hooks.onCall({ callId: randomUUID(), name, input });
-    try {
-      return await work();
-    } catch (err) {
-      return `Error: ${err instanceof Error ? err.message : String(err)}`;
-    }
-  };
+  const run = toolRunner(hooks);
   const inbox = (address?: string) => {
     const found = address ? inboxes.find((i) => i.address === address) : inboxes.at(-1);
     if (!found) throw new Error("No inbox yet: call email_new first.");

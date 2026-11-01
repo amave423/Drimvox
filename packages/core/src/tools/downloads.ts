@@ -1,5 +1,4 @@
 import { tool, type ToolSet } from "ai";
-import { randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { z } from "zod";
@@ -8,6 +7,7 @@ import type { Workspace } from "../agent/workspace";
 import { extract } from "../chats/attachments";
 import type { Vision } from "../visual/look";
 import { readImageText } from "./ocr";
+import { toolRunner } from "./run";
 
 /** Where the agent's browser saves what it downloads (the desktop's tab and the server's Chrome alike). */
 export const downloadsDir = (dataDir: string) => join(dataDir, "browser-downloads");
@@ -33,14 +33,7 @@ export function downloadTools(dataDir: string, ws: Workspace | null, vision: Vis
     if (!found) throw new Error(`No downloaded file "${name}". Downloaded: ${files().slice(0, 20).map((f) => f.name).join(", ") || "nothing yet"}.`);
     return join(dir, found.name);
   };
-  const run = async (name: string, input: string, work: () => Promise<string>) => {
-    hooks.onCall({ callId: randomUUID(), name, input });
-    try {
-      return await work();
-    } catch (err) {
-      return `Error: ${err instanceof Error ? err.message : String(err)}`;
-    }
-  };
+  const run = toolRunner(hooks);
   const textOf = async (path: string, signal?: AbortSignal) => {
     const data = readFileSync(path);
     if (IMAGE.test(path)) {

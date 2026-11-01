@@ -203,7 +203,8 @@ async function assertPublic(url: string): Promise<void> {
   if (addresses.some((a) => isPrivateIp(a.address))) throw new Error("Only public internet addresses can be opened");
 }
 
-function isPrivateIp(ip: string): boolean {
+/** An address of this computer, the local network or a reserved range. */
+export function isPrivateIp(ip: string): boolean {
   if (ip.includes(":")) {
     const v6 = ip.toLowerCase();
     if (v6 === "::1" || v6 === "::") return true;

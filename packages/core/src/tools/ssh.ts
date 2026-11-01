@@ -10,6 +10,7 @@ import type { ToolHooks } from "../agent/tools";
 import type { Database } from "../db";
 import type { Cipher } from "../secrets";
 import type { Workspace } from "../agent/workspace";
+import { toolRunner } from "./run";
 
 const KEY = "ssh.servers";
 
@@ -212,14 +213,7 @@ export function sshTools(servers: SshServers, ws: Workspace | null, hooks: Pick<
     if (!s) throw new Error(`No server named "${name}". Saved: ${servers.list().map((x) => x.name).join(", ")}.`);
     return s;
   };
-  const run = async (name: string, input: string, work: () => Promise<string>) => {
-    hooks.onCall({ callId: randomUUID(), name, input });
-    try {
-      return await work();
-    } catch (err) {
-      return `Error: ${err instanceof Error ? err.message : String(err)}`;
-    }
-  };
+  const run = toolRunner(hooks);
   const allowed = async (s: Stored, what: string, signal?: AbortSignal) =>
     s.trust === "trusted" || (await hooks.askApproval(`${s.name}: ${what}`, "ssh", signal)) !== false;
   const local = (path: string) => {

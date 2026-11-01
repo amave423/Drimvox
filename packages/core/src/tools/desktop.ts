@@ -1,6 +1,6 @@
 import { tool, type ToolSet } from "ai";
 import { execFile, spawn } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { ToolHooks } from "../agent/tools";
 import type { Workspace } from "../agent/workspace";
 import { UIA_SCRIPT } from "./desktop-uia";
+import { toolRunner } from "./run";
 
 interface Owner {
   hwnd: number;
@@ -74,14 +75,7 @@ export function desktopTools(
   see?: (png: Buffer, question: string, signal?: AbortSignal) => Promise<string>,
 ): ToolSet {
   if (process.platform !== "win32") return {};
-  const run = async (name: string, input: string, work: () => Promise<string>) => {
-    hooks.onCall({ callId: randomUUID(), name, input });
-    try {
-      return await work();
-    } catch (err) {
-      return `Error: ${err instanceof Error ? err.message : String(err)}`;
-    }
-  };
+  const run = toolRunner(hooks);
   /** Clicks, typing and closing in a window of a program the agent did not start need the user's yes. */
   async function acting<T extends { ask?: boolean; owner: Owner }>(what: string, input: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     const first = await uia<T>({ ...input, allowed: [...launched] }, signal);
