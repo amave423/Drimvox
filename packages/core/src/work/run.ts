@@ -59,6 +59,8 @@ export interface RunDeps {
   vision(conn: Connection, model: string): Promise<Vision | null>;
   /** Downloads, mail, SSH, dependency audits, before and after of a page (tools/index.ts). */
   toolbox?: ToolboxDeps;
+  /** Pointer files to AGENTS.md the settings ask for (CLAUDE.md, GEMINI.md, QWEN.md). */
+  agentFiles?(): string[];
   /** The project's git rules: the branch before the work, commits on the agent's word, the push at the end. */
   git?: ProjectGit;
   /** The picture tool when the settings name an image model: it draws straight into the project's folder. */
@@ -233,7 +235,7 @@ export class WorkRun {
         const row = this.row();
         const goal = this.d.plan(this.projectId)?.context ?? this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? "";
         const branch = this.d.git ? (await this.d.git.state(this.projectId, this.folder).catch(() => null))?.branch ?? null : null;
-        writeState(this.folder, { goal, checklist: row.checklist, start: row.site, branch, report: row.report, at: Date.now() });
+        writeState(this.folder, { goal, checklist: row.checklist, start: row.site, branch, report: row.report, at: Date.now() }, this.d.agentFiles?.() ?? []);
       } catch {
         // A folder that cannot be written: the state is only in Drimvox.
       }

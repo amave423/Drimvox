@@ -300,3 +300,6 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .radio-row input:focus-visible, .option input:focus-visible, .stage-switch input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .stage-switch input[type="checkbox"]:disabled { opacity: 0.5; cursor: default; }
 @media (prefers-reduced-motion: reduce) { .radio-row input, .option input, .stage-switch input { transition: none; } }
+
+/* Pointer files for other agents: one switch per agent. */
+.agent-files { display: grid; gap: 8px; }

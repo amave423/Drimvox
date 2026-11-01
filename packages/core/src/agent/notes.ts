@@ -52,10 +52,11 @@ export interface ProjectState {
 
 /**
  * The project's state, written by Drimvox itself after each turn of its agent, whatever the model remembered to note
- * (asked for: any agent, in Drimvox or another program, picks the work up without explanations). Claude Code reads
- * CLAUDE.md, so one pointing here is made when the project has none.
+ * (asked for: any agent, in Drimvox or another program, picks the work up without explanations). AGENTS.md is the open
+ * format most agents read; for those that read a file of their own, a one-line pointer is made when the settings ask
+ * for it (CLAUDE.md, GEMINI.md, QWEN.md) and the project has none.
  */
-export function writeState(root: string, s: ProjectState): void {
+export function writeState(root: string, s: ProjectState, pointers: string[] = []): void {
   const lines = [
     "## Project state (kept by Drimvox)",
     "",
@@ -69,8 +70,10 @@ export function writeState(root: string, s: ProjectState): void {
   if (s.report) lines.push("", "Last report:", s.report.trim().slice(0, 1500));
   lines.push("", "Next agent: read the notes above and this state, check the open plan items, then go on.");
   writeSection(root, STATE_START, STATE_END, lines.join("\n"));
-  const claude = join(root, "CLAUDE.md");
-  if (!existsSync(claude)) writeFileSync(claude, "@AGENTS.md\n");
+  for (const name of pointers) {
+    const file = join(root, name);
+    if (!existsSync(file)) writeFileSync(file, "@AGENTS.md\n");
+  }
 }
 
 /** Replaces one marked section of AGENTS.md, creating the file or the section when missing. */

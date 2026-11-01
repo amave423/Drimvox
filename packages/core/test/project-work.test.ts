@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -671,12 +671,13 @@ describe("a project's git rules", () => {
     // The agent's own commit, then Drimvox's with the project's state for whoever picks it up next.
     expect(git(folder, "log", "--format=%s", "main..HEAD").split("\n")).toEqual(["Почини корзину", "Fix cart total"]);
     expect(git(folder, "show", "--name-only", "--format=", "HEAD~1").split("\n")).toEqual(["cart.js"]);
-    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["AGENTS.md", "CLAUDE.md"]);
+    // AGENTS.md only: pointer files for other agents only when the settings ask (asked for: not every agent is Claude).
+    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n")).toEqual(["AGENTS.md"]);
     const agents = readFileSync(join(folder, "AGENTS.md"), "utf8");
     expect(agents).toContain("## Project state (kept by Drimvox)");
     expect(agents).toContain("Goal: Почини корзину");
     expect(agents).toMatch(/Git branch: drimvox\/task-/);
-    expect(readFileSync(join(folder, "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
+    expect(existsSync(join(folder, "CLAUDE.md"))).toBe(false);
     expect(git(folder, "status", "--porcelain")).toBe("?? .env");
     const system = JSON.stringify(requestsOf("coder")[0]!.body.messages[0]);
     expect(system).toContain("commit_changes");
@@ -686,6 +687,15 @@ describe("a project's git rules", () => {
     // The changes are counted from main, committed ones too.
     const changes = await (await env.call("GET", `/api/projects/${s.project.id}/work/changes`)).json();
     expect(changes.map((f: any) => f.path)).toContain("cart.js");
+  });
+
+  it("makes pointer files for the agents chosen in the settings", async () => {
+    const s = await ready([{ text: "Готово." }]);
+    await env.call("PATCH", "/api/settings", { agentFiles: ["gemini", "qwen"] });
+    await ask(s, "Сделай что-нибудь", 1);
+    expect(readFileSync(join(folder, "GEMINI.md"), "utf8")).toBe("@AGENTS.md\n");
+    expect(readFileSync(join(folder, "QWEN.md"), "utf8")).toBe("@AGENTS.md\n");
+    expect(existsSync(join(folder, "CLAUDE.md"))).toBe(false);
   });
 
   it("accepts the branch into main, or rejects it and goes back to main", async () => {

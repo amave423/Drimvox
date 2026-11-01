@@ -1,3 +1,4 @@
+import { agentFileNames } from "@drimvox/shared";
 import { AttachmentRepo } from "./chats/attachment-repo";
 import { BacklogService } from "./backlog/service";
 import { backlogRoutes } from "./routes/backlog";
@@ -260,6 +261,7 @@ export function createCore(o: AppOptions) {
       vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
       git: projectGit,
       toolbox: tools,
+      agentFiles: () => readSettings(o.db).agentFiles.map((a) => agentFileNames[a]),
       imageTools: (worktree, taskId, hooks, onSpend, budgetLeft) => imageToolsFor(readSettings(o.db).imageModel, providers, { worktree, taskId, media, hooks, budgetLeft, onSpend }),
     },
   });
