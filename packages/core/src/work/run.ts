@@ -20,6 +20,7 @@ import { askAboutPictures, type Vision } from "../visual/look";
 import { VISUAL_HINT, visualTools, type VisualKit } from "../visual/tools";
 import { existingRules, nudgeMessage, projectRules } from "./prompt";
 import type { ProjectGit } from "./project-git";
+import { writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
 import { polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
@@ -227,6 +228,15 @@ export class WorkRun {
     } finally {
       // A dev server the agent started does not hold the port once the run is over.
       this.d.visualKit.background.stopAll(this.chatId);
+      // The project's state for whoever picks it up next, in Drimvox or another program (AGENTS.md, notes.ts).
+      try {
+        const row = this.row();
+        const goal = this.d.plan(this.projectId)?.context ?? this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? "";
+        const branch = this.d.git ? (await this.d.git.state(this.projectId, this.folder).catch(() => null))?.branch ?? null : null;
+        writeState(this.folder, { goal, checklist: row.checklist, start: row.site, branch, report: row.report, at: Date.now() });
+      } catch {
+        // A folder that cannot be written: the state is only in Drimvox.
+      }
       // What the agent left uncommitted goes in one commit; then its branch to GitHub, as the rules say.
       if (this.d.git) {
         const done = this.row().checklist.filter((i) => i.done).at(-1)?.text;

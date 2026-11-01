@@ -142,6 +142,9 @@ export class McpHub {
         const endpoint = await this.browser.endpoint().catch(() => null);
         if (endpoint) args = playwrightArgs(args, endpoint, this.browser.outputDir);
       }
+      // ${NAME} in an argument is the server's own variable of that name: a connection string or a key that a server
+      // takes only as an argument stays encrypted with the variables, not written into the command (catalog.md).
+      args = fillArgs(args, server.env);
       const transport =
         server.transport === "stdio"
           ? new StdioClientTransport({
@@ -195,4 +198,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
       },
     );
   });
+}
+
+/** ${NAME} in a server's arguments, filled from its own (encrypted) variables; an unknown name stays as written. */
+export function fillArgs(args: string[], env: Record<string, string>): string[] {
+  return args.map((a) => a.replace(/\$\{([A-Z][A-Z0-9_]*)\}/g, (whole, name: string) => env[name] ?? whole));
 }

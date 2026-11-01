@@ -5,7 +5,7 @@ import { BASE, auth, createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
 import { HEADLESS_DEVTOOLS, HEADLESS_PLAYWRIGHT, TRUST_PLAYWRIGHT } from "../src/db";
-import { needsAsking } from "../src/mcp/hub";
+import { fillArgs, needsAsking } from "../src/mcp/hub";
 
 const NL = String.fromCharCode(10);
 const BLANK = NL + NL;
@@ -342,5 +342,18 @@ describe("tools in a chat", () => {
       }
     }
     expect(done).toMatchObject({ status: "done", content: "Сделал двенадцать шагов.", error: null });
+  });
+});
+
+// A connection string or a key a server takes only as an argument stays with the encrypted variables (catalog.md).
+describe("arguments from the server's variables", () => {
+  it("fills ${NAME} from the server's own variables and leaves unknown names as written", () => {
+    expect(fillArgs(["-y", "@modelcontextprotocol/server-postgres", "${DATABASE_URL}", "--api-key=${KEY}", "${NOPE}"], { DATABASE_URL: "postgresql://u:p@h/db", KEY: "sk_test_1" })).toEqual([
+      "-y",
+      "@modelcontextprotocol/server-postgres",
+      "postgresql://u:p@h/db",
+      "--api-key=sk_test_1",
+      "${NOPE}",
+    ]);
   });
 });

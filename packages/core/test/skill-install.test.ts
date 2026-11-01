@@ -64,4 +64,18 @@ describe("installing a ready skill", () => {
     expect(await res.json()).toMatchObject({ name: "docx" });
     expect(readFileSync(join(env.dir, "skills", "docx", "SKILL.md"), "utf8")).toMatch(/python-docx/);
   });
+
+  // Asked for: skills for security, search and speed, accessibility, Next.js, FastAPI, Docker, docs and emails.
+  it("installs each of Drimvox's own skills under its own name, with a description the model reads", async () => {
+    for (const id of ["security-review", "seo-performance", "accessibility", "nextjs", "fastapi", "docker", "project-docs", "email-html"]) {
+      const res = await env.call("POST", "/api/skills/install", { source: { kind: "builtin", id } });
+      expect(res.status, id).toBe(201);
+      expect(await res.json()).toMatchObject({ name: id });
+      const text = readFileSync(join(env.dir, "skills", id, "SKILL.md"), "utf8");
+      expect(text).toMatch(new RegExp(`^---
+name: ${id}
+description: ".{40,}"
+---`));
+    }
+  });
 });

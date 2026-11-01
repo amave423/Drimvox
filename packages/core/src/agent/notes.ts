@@ -19,6 +19,7 @@ function notesFile(root: string): string | null {
 
 /** The notes as the system prompt carries them; empty when the project has none yet. */
 export function notesBlock(root: string): string {
+  // AGENTS.md first: a CLAUDE.md that only points to it adds nothing.
   const file = notesFile(root);
   if (!file) return "";
   const text = readFileSync(file, "utf8").trim();
@@ -33,10 +34,50 @@ export function writeNotes(root: string, notes: string): void {
   if (body.length > NOTES_LIMIT) {
     throw new Error(`The notes are ${body.length} characters; make them shorter than ${NOTES_LIMIT}: keep what the next agent must know, drop history.`);
   }
+  writeSection(root, START, END, body);
+}
+
+const STATE_START = "<!-- drimvox:state -->";
+const STATE_END = "<!-- /drimvox:state -->";
+
+/** What Drimvox knows of a project's work, written for whoever picks it up next. */
+export interface ProjectState {
+  goal: string;
+  checklist: { text: string; done: boolean }[];
+  start: { command: string; url: string } | null;
+  branch: string | null;
+  report: string | null;
+  at: number;
+}
+
+/**
+ * The project's state, written by Drimvox itself after each turn of its agent, whatever the model remembered to note
+ * (asked for: any agent, in Drimvox or another program, picks the work up without explanations). Claude Code reads
+ * CLAUDE.md, so one pointing here is made when the project has none.
+ */
+export function writeState(root: string, s: ProjectState): void {
+  const lines = [
+    "## Project state (kept by Drimvox)",
+    "",
+    `Updated: ${new Date(s.at).toISOString().slice(0, 16).replace("T", " ")} UTC`,
+    "",
+    `Goal: ${s.goal.trim().split("\n")[0]!.slice(0, 400)}`,
+  ];
+  if (s.checklist.length) lines.push("", "Plan:", ...s.checklist.slice(0, 40).map((i) => `- [${i.done ? "x" : " "}] ${i.text}`));
+  if (s.start) lines.push("", `Run: \`${s.start.command}\`, then open ${s.start.url}`);
+  if (s.branch) lines.push("", `Git branch: ${s.branch}`);
+  if (s.report) lines.push("", "Last report:", s.report.trim().slice(0, 1500));
+  lines.push("", "Next agent: read the notes above and this state, check the open plan items, then go on.");
+  writeSection(root, STATE_START, STATE_END, lines.join("\n"));
+  const claude = join(root, "CLAUDE.md");
+  if (!existsSync(claude)) writeFileSync(claude, "@AGENTS.md\n");
+}
+
+/** Replaces one marked section of AGENTS.md, creating the file or the section when missing. */
+function writeSection(root: string, open: string, close: string, body: string): void {
   const file = join(root, "AGENTS.md");
-  const section = `${START}\n${body}\n${END}`;
+  const section = `${open}\n${body}\n${close}`;
   const old = existsSync(file) ? readFileSync(file, "utf8") : "";
-  const [open, close] = [START, END];
   const at = old.indexOf(open);
   const end = old.indexOf(close);
   const next =

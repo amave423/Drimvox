@@ -130,8 +130,8 @@ export function CatalogDetails(p: {
           }}
         >
           <label className="field">
-            <span className="field-label">{t("catalog.secretLabel", { name })}</span>
-            <input className="field-input mono" type="password" autoComplete="off" value={secret} onChange={(ev) => setSecret(ev.target.value)} />
+            <span className="field-label">{e.secret.label ? t(`catalog.secret.${e.id}` as MessageKey) : t("catalog.secretLabel", { name })}</span>
+            <input className="field-input mono" type={e.secret.plain ? "text" : "password"} autoComplete="off" value={secret} onChange={(ev) => setSecret(ev.target.value)} />
           </label>
           <p className="muted">
             {t("catalog.secretHelp")}{" "}

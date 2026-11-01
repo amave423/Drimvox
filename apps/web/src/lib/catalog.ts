@@ -1,14 +1,16 @@
-import type { McpServerView, SkillView, McpTrust } from "@drimvox/shared";
-import { siAnthropic, siFigma, siGithub, siNotion, siShadcnui, siSupabase, siUpstash } from "simple-icons";
+import { builtinSkills, type McpServerView, type SkillView, type McpTrust } from "@drimvox/shared";
+import { siAnthropic, siDocker, siFastapi, siFigma, siGithub, siGmail, siGooglesearchconsole, siMarkdown, siModelcontextprotocol, siNextdotjs, siNotion, siOwasp, siPostgresql, siSentry, siShadcnui, siSqlite, siStripe, siSupabase, siUpstash } from "simple-icons";
 
 /** What the card is about: the catalog's filter. */
 export type CatalogCategory = "web" | "code" | "design" | "docs";
 
 /** A mark for the card: a vendor's logo from Simple Icons (CC0), or a plain glyph of Drimvox's own. */
 export interface CatalogLogo {
-  path: string;
+  path?: string;
   /** A glyph drawn with strokes rather than filled. */
   stroke?: boolean;
+  /** A vendor without a logo in Simple Icons: its letters, set as a mark (asked for: the drawn glyphs looked odd). */
+  letters?: string;
 }
 
 /** A secret the user gives before a server can work: an environment variable, or a header with a prefix. */
@@ -16,6 +18,10 @@ export interface CatalogSecret {
   env?: string;
   header?: { name: string; prefix: string };
   helpUrl: string;
+  /** What is asked for, when it is not a key or a token (catalog.secret.<id>): a connection string, a file's path. */
+  label?: boolean;
+  /** Shown as typed (a path), not hidden like a key. */
+  plain?: boolean;
 }
 
 interface Base {
@@ -46,7 +52,7 @@ export interface SkillEntry extends Base {
   kind: "skill";
   /** The skill's name in SKILL.md, which is also how Drimvox knows it is installed. */
   skill: string;
-  source: { kind: "github"; repo: string; path: string; ref: string } | { kind: "builtin"; id: "docx" | "xlsx" | "pptx" | "pdf" };
+  source: { kind: "github"; repo: string; path: string; ref: string } | { kind: "builtin"; id: (typeof builtinSkills)[number] };
 }
 
 export type CatalogEntry = McpEntry | SkillEntry;
@@ -72,6 +78,7 @@ const glyph = {
   table: "M4 5h16v14H4zM4 10h16M4 15h16M10 5v14",
   slides: "M3 4h18v12H3zM12 16v4M8 20h8M7 12l3-3 2 2 4-4",
   pdf: "M6 3h8l4 4v14H6zM14 3v4h4M8.5 15.5h2a1.5 1.5 0 0 0 0-3h-2v5",
+  access: "M12 4.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 7l7 1.5L19 7M12 8.5V14M12 14l-3.5 7M12 14l3.5 7",
   art: "M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.5 0-.5-.3-.9-.3-1.4 0-.8.7-1.6 1.6-1.6H17a4 4 0 0 0 4-4c0-5-4-9.5-9-9.5zM7.5 11h.01M10 7h.01M14.5 7h.01",
   palette: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   canvas: "M4 4h16v13H4zM4 14l4-4 3 3 3-3 6 6M8 20h8",
@@ -83,18 +90,23 @@ const glyph = {
 };
 const drawn = (path: string): CatalogLogo => ({ path, stroke: true });
 const brand = (icon: { path: string }): CatalogLogo => ({ path: icon.path });
+const letters = (text: string): CatalogLogo => ({ letters: text });
 
 export const CATALOG: CatalogEntry[] = [
   // Servers: what they open to the model. Playwright and Chrome DevTools are built into the agent's browser now (asked for).
-  { kind: "mcp", id: "exa", name: "Exa", vendor: "Exa Labs", category: "web", logo: drawn(glyph.search), link: "https://github.com/exa-labs/exa-mcp-server", license: "MIT", server: { url: "https://mcp.exa.ai/mcp" }, matches: (s) => (s.url ?? "").includes("mcp.exa.ai") },
-  { kind: "mcp", id: "firecrawl", name: "Firecrawl", vendor: "Mendable", category: "web", logo: drawn(glyph.flame), link: "https://github.com/firecrawl/firecrawl-mcp-server", license: "MIT", server: npx("firecrawl-mcp"), secret: { env: "FIRECRAWL_API_KEY", helpUrl: "https://www.firecrawl.dev/app/api-keys" }, matches: (s) => hasArg(s, "firecrawl-mcp") },
+  { kind: "mcp", id: "exa", name: "Exa", vendor: "Exa Labs", category: "web", logo: letters("Exa"), link: "https://github.com/exa-labs/exa-mcp-server", license: "MIT", server: { url: "https://mcp.exa.ai/mcp" }, matches: (s) => (s.url ?? "").includes("mcp.exa.ai") },
+  { kind: "mcp", id: "firecrawl", name: "Firecrawl", vendor: "Mendable", category: "web", logo: letters("FC"), link: "https://github.com/firecrawl/firecrawl-mcp-server", license: "MIT", server: npx("firecrawl-mcp"), secret: { env: "FIRECRAWL_API_KEY", helpUrl: "https://www.firecrawl.dev/app/api-keys" }, matches: (s) => hasArg(s, "firecrawl-mcp") },
   { kind: "mcp", id: "context7", name: "Context7", vendor: "Upstash", category: "code", logo: brand(siUpstash), link: "https://github.com/upstash/context7", license: "MIT", server: npx("@upstash/context7-mcp@latest"), matches: (s) => hasArg(s, "context7") },
   { kind: "mcp", id: "github", name: "GitHub", vendor: "GitHub", category: "code", logo: brand(siGithub), link: "https://github.com/github/github-mcp-server", license: "MIT", server: { url: "https://api.githubcopilot.com/mcp/" }, secret: { header: { name: "Authorization", prefix: "Bearer " }, helpUrl: "https://github.com/settings/personal-access-tokens/new" }, matches: (s) => (s.url ?? "").includes("githubcopilot.com/mcp") },
+  { kind: "mcp", id: "postgres", name: "PostgreSQL", vendor: "Model Context Protocol", category: "code", logo: brand(siPostgresql), link: "https://www.npmjs.com/package/@modelcontextprotocol/server-postgres", license: "MIT", server: npx("@modelcontextprotocol/server-postgres", "${DATABASE_URL}"), secret: { env: "DATABASE_URL", helpUrl: "https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING", label: true }, matches: (s) => hasArg(s, "server-postgres") },
+  { kind: "mcp", id: "sqlite", name: "SQLite", vendor: "johnnyoshika", category: "code", logo: brand(siSqlite), link: "https://github.com/johnnyoshika/mcp-server-sqlite-npx", license: "MIT", server: npx("mcp-server-sqlite-npx", "${SQLITE_DB}"), secret: { env: "SQLITE_DB", helpUrl: "https://sqlite.org/", label: true, plain: true }, matches: (s) => hasArg(s, "mcp-server-sqlite") },
+  { kind: "mcp", id: "sentry", name: "Sentry", vendor: "Sentry", category: "code", logo: brand(siSentry), link: "https://github.com/getsentry/sentry-mcp", license: "Apache-2.0", server: npx("@sentry/mcp-server@latest"), secret: { env: "SENTRY_ACCESS_TOKEN", helpUrl: "https://sentry.io/settings/account/api/auth-tokens/" }, matches: (s) => hasArg(s, "@sentry/mcp-server") },
+  { kind: "mcp", id: "stripe", name: "Stripe", vendor: "Stripe", category: "code", logo: brand(siStripe), link: "https://github.com/stripe/agent-toolkit", license: "MIT", server: npx("@stripe/mcp", "--tools=all", "--api-key=${STRIPE_SECRET_KEY}"), secret: { env: "STRIPE_SECRET_KEY", helpUrl: "https://dashboard.stripe.com/apikeys" }, matches: (s) => hasArg(s, "@stripe/mcp") },
   { kind: "mcp", id: "supabase", name: "Supabase", vendor: "Supabase", category: "code", logo: brand(siSupabase), link: "https://github.com/supabase-community/supabase-mcp", license: "Apache-2.0", server: npx("@supabase/mcp-server-supabase@latest"), secret: { env: "SUPABASE_ACCESS_TOKEN", helpUrl: "https://supabase.com/dashboard/account/tokens" }, matches: (s) => hasArg(s, "mcp-server-supabase") },
-  { kind: "mcp", id: "memory", vendor: "Model Context Protocol", category: "code", logo: drawn(glyph.memory), link: "https://github.com/modelcontextprotocol/servers/tree/main/src/memory", license: "MIT", server: npx("@modelcontextprotocol/server-memory"), matches: (s) => hasArg(s, "server-memory") },
-  { kind: "mcp", id: "sequential-thinking", vendor: "Model Context Protocol", category: "code", logo: drawn(glyph.steps), link: "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking", license: "MIT", server: npx("@modelcontextprotocol/server-sequential-thinking"), matches: (s) => hasArg(s, "server-sequential-thinking") },
+  { kind: "mcp", id: "memory", vendor: "Model Context Protocol", category: "code", logo: brand(siModelcontextprotocol), link: "https://github.com/modelcontextprotocol/servers/tree/main/src/memory", license: "MIT", server: npx("@modelcontextprotocol/server-memory"), matches: (s) => hasArg(s, "server-memory") },
+  { kind: "mcp", id: "sequential-thinking", vendor: "Model Context Protocol", category: "code", logo: letters("1·2·3"), link: "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking", license: "MIT", server: npx("@modelcontextprotocol/server-sequential-thinking"), matches: (s) => hasArg(s, "server-sequential-thinking") },
   { kind: "mcp", id: "shadcn", name: "shadcn/ui", vendor: "shadcn", category: "design", logo: brand(siShadcnui), link: "https://ui.shadcn.com/docs/mcp", license: "MIT", server: npx("shadcn@latest", "mcp"), matches: (s) => s.args.includes("mcp") && hasArg(s, "shadcn") },
-  { kind: "mcp", id: "magic", name: "21st.dev Magic", vendor: "21st.dev", category: "design", logo: drawn(glyph.sparkles), link: "https://github.com/21st-dev/magic-mcp", license: "ISC", server: npx("@21st-dev/magic@latest"), secret: { env: "API_KEY_21ST", helpUrl: "https://21st.dev/mcp" }, matches: (s) => hasArg(s, "@21st-dev/magic") },
+  { kind: "mcp", id: "magic", name: "21st.dev Magic", vendor: "21st.dev", category: "design", logo: letters("21"), link: "https://github.com/21st-dev/magic-mcp", license: "ISC", server: npx("@21st-dev/magic@latest"), secret: { env: "API_KEY_21ST", helpUrl: "https://21st.dev/mcp" }, matches: (s) => hasArg(s, "@21st-dev/magic") },
   { kind: "mcp", id: "figma", name: "Figma", vendor: "Framelink", category: "design", logo: brand(siFigma), link: "https://github.com/GLips/Figma-Context-MCP", license: "MIT", server: npx("figma-developer-mcp", "--stdio"), secret: { env: "FIGMA_API_KEY", helpUrl: "https://www.figma.com/developers/api#access-tokens" }, matches: (s) => hasArg(s, "figma-developer-mcp") },
   { kind: "mcp", id: "notion", name: "Notion", vendor: "Notion", category: "docs", logo: brand(siNotion), link: "https://github.com/makenotion/notion-mcp-server", license: "MIT", server: npx("@notionhq/notion-mcp-server"), secret: { env: "NOTION_TOKEN", helpUrl: "https://www.notion.so/profile/integrations" }, matches: (s) => hasArg(s, "notion-mcp-server") },
 
@@ -115,6 +127,14 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "skill", id: "xlsx", vendor: "Drimvox", category: "docs", logo: drawn(glyph.table), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "xlsx", source: { kind: "builtin", id: "xlsx" } },
   { kind: "skill", id: "pptx", vendor: "Drimvox", category: "docs", logo: drawn(glyph.slides), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "pptx", source: { kind: "builtin", id: "pptx" } },
   { kind: "skill", id: "pdf", vendor: "Drimvox", category: "docs", logo: drawn(glyph.pdf), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "pdf", source: { kind: "builtin", id: "pdf" } },
+  { kind: "skill", id: "security-review", vendor: "Drimvox", category: "code", logo: brand(siOwasp), link: "https://owasp.org/www-project-top-ten/", license: "MIT", skill: "security-review", source: { kind: "builtin", id: "security-review" } },
+  { kind: "skill", id: "seo-performance", vendor: "Drimvox", category: "web", logo: brand(siGooglesearchconsole), link: "https://web.dev/articles/vitals", license: "MIT", skill: "seo-performance", source: { kind: "builtin", id: "seo-performance" } },
+  { kind: "skill", id: "accessibility", vendor: "Drimvox", category: "web", logo: drawn(glyph.access), link: "https://www.w3.org/WAI/standards-guidelines/wcag/", license: "MIT", skill: "accessibility", source: { kind: "builtin", id: "accessibility" } },
+  { kind: "skill", id: "nextjs", vendor: "Drimvox", category: "code", logo: brand(siNextdotjs), link: "https://nextjs.org/docs", license: "MIT", skill: "nextjs", source: { kind: "builtin", id: "nextjs" } },
+  { kind: "skill", id: "fastapi", vendor: "Drimvox", category: "code", logo: brand(siFastapi), link: "https://fastapi.tiangolo.com/", license: "MIT", skill: "fastapi", source: { kind: "builtin", id: "fastapi" } },
+  { kind: "skill", id: "docker", vendor: "Drimvox", category: "code", logo: brand(siDocker), link: "https://docs.docker.com/", license: "MIT", skill: "docker", source: { kind: "builtin", id: "docker" } },
+  { kind: "skill", id: "project-docs", vendor: "Drimvox", category: "docs", logo: brand(siMarkdown), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "project-docs", source: { kind: "builtin", id: "project-docs" } },
+  { kind: "skill", id: "email-html", vendor: "Drimvox", category: "docs", logo: brand(siGmail), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "email-html", source: { kind: "builtin", id: "email-html" } },
 ];
 
 /** The user's own server or skill that a card stands for, if any. */

@@ -668,14 +668,21 @@ describe("a project's git rules", () => {
     ]);
     await ask(s, "Почини корзину", 4);
     expect(git(folder, "branch", "--show-current")).toMatch(/^drimvox\/task-/);
-    expect(git(folder, "log", "--format=%s", "-1")).toBe("Fix cart total");
-    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n")).toEqual(["cart.js"]);
+    // The agent's own commit, then Drimvox's with the project's state for whoever picks it up next.
+    expect(git(folder, "log", "--format=%s", "main..HEAD").split("\n")).toEqual(["Почини корзину", "Fix cart total"]);
+    expect(git(folder, "show", "--name-only", "--format=", "HEAD~1").split("\n")).toEqual(["cart.js"]);
+    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["AGENTS.md", "CLAUDE.md"]);
+    const agents = readFileSync(join(folder, "AGENTS.md"), "utf8");
+    expect(agents).toContain("## Project state (kept by Drimvox)");
+    expect(agents).toContain("Goal: Почини корзину");
+    expect(agents).toMatch(/Git branch: drimvox\/task-/);
+    expect(readFileSync(join(folder, "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
     expect(git(folder, "status", "--porcelain")).toBe("?? .env");
     const system = JSON.stringify(requestsOf("coder")[0]!.body.messages[0]);
     expect(system).toContain("commit_changes");
     expect(system).toContain("in English");
     const view = await (await env.call("GET", `/api/projects/${s.project.id}/git`)).json();
-    expect(view.state).toMatchObject({ base: "main", ahead: 1, github: false, pullRequest: null });
+    expect(view.state).toMatchObject({ base: "main", ahead: 2, github: false, pullRequest: null });
     // The changes are counted from main, committed ones too.
     const changes = await (await env.call("GET", `/api/projects/${s.project.id}/work/changes`)).json();
     expect(changes.map((f: any) => f.path)).toContain("cart.js");

@@ -110,11 +110,11 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   // Skills and servers each on their own tab.
   await page.getByRole("tab", { name: "Скиллы" }).click();
   const cards = page.locator(".catalog-card");
-  await expect(cards).toHaveCount(16);
-  for (const name of ["Дизайн интерфейсов", "Сначала тест", "Документы Word"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  await expect(cards).toHaveCount(24);
+  for (const name of ["Дизайн интерфейсов", "Сначала тест", "Документы Word", "Проверка безопасности", "SEO и скорость", "Docker", "HTML-письма"]) await expect(page.locator(".catalog-grid")).toContainText(name);
   // A filter by what the card is about.
   await page.getByRole("button", { name: "Документы", exact: true }).click();
-  await expect(cards).toHaveCount(4);
+  await expect(cards).toHaveCount(6);
 
   const word = cards.filter({ hasText: "Документы Word" });
   await word.getByRole("switch").click({ force: true });
@@ -133,8 +133,10 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   // The details show what using it looks like.
   await page.getByRole("tab", { name: "Серверы MCP" }).click();
   // Playwright and Chrome DevTools are built into the agent's browser now, not offered as servers (asked for).
-  await expect(cards).toHaveCount(11);
-  for (const name of ["Exa", "Context7", "GitHub", "Figma"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  await expect(cards).toHaveCount(15);
+  for (const name of ["Exa", "Context7", "GitHub", "Figma", "PostgreSQL", "SQLite", "Sentry", "Stripe"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  // The cards say what a server is for in a few sentences (asked for: the lines said too little).
+  expect(((await cards.filter({ hasText: "Context7" }).locator("p.muted").first().textContent()) ?? "").length).toBeGreaterThan(120);
   for (const name of ["Playwright", "Chrome DevTools"]) await expect(page.locator(".catalog-grid")).not.toContainText(name);
   await cards.first().getByRole("button", { name: "Подробнее" }).click();
   const exa = page.getByRole("dialog", { name: "Exa" });
