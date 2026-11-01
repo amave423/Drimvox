@@ -66,16 +66,16 @@ describe("dictation", () => {
   });
 });
 
-// Asked for: voices from the cloud for reading answers.
+// Asked for: voices from every provider that has them, for reading answers.
 describe("a provider's voice reads answers", () => {
-  it("asks Gemini's newest Flash speech model with the chosen voice and gives a WAV", async () => {
+  it("finds Gemini's speech models with their voices, reads with the chosen one and cuts Google's credentials off the sound", async () => {
     const pcm = Buffer.alloc(4800, 1);
     // Google's content credentials after the sound (seen live: played, they were a blast of noise).
     const credentials = Buffer.concat([Buffer.from("C2PA"), Buffer.from([0xb0, 0x17, 0, 0, 0, 0, 0x17, 0xb0]), Buffer.from("jumb"), Buffer.alloc(3000, 0x7f)]);
     fake = await startFakeProvider({
       authorized: (h) => h["x-goog-api-key"] === KEY,
       handle: (method, path) => {
-        if (method === "GET" && path === "/v1beta/models") return { json: { models: ["gemini-2.5-flash-preview-tts", "gemini-3.5-flash-tts", "gemini-3.5-pro-tts", "gemini-3.5-flash"].map((m) => ({ name: `models/${m}` })) } };
+        if (method === "GET" && path === "/v1beta/models") return { json: { models: [{ name: "models/gemini-3.5-flash-tts", displayName: "Gemini 3.5 Flash TTS" }, { name: "models/gemini-3.5-flash" }] } };
         if (method === "POST" && path === "/v1beta/models/gemini-3.5-flash-tts:generateContent")
           return { json: { candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;codec=pcm;rate=24000", data: Buffer.concat([pcm, credentials]).toString("base64") } }] } }] } };
         return undefined;
@@ -86,11 +86,16 @@ describe("a provider's voice reads answers", () => {
     // Nothing chosen: said so.
     expect((await env.call("POST", "/api/voice/speak", { text: "Привет" })).status).toBe(409);
 
-    await env.call("PATCH", "/api/settings", { cloudVoice: { providerId: google.id, voice: "Kore" } });
+    const models = await (await env.call("GET", "/api/voice/cloud")).json();
+    expect(models).toEqual([expect.objectContaining({ providerId: google.id, model: "gemini-3.5-flash-tts", name: "Gemini 3.5 Flash TTS" })]);
+    expect(models[0].voices).toHaveLength(30);
+    expect(models[0].voices).toContain("Kore");
+
+    await env.call("PATCH", "/api/settings", { cloudVoice: { providerId: google.id, model: "gemini-3.5-flash-tts", voice: "Kore" } });
     const res = await env.call("POST", "/api/voice/speak", { text: "Привет из облака." });
     expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("audio/wav");
     const wav = Buffer.from(await res.arrayBuffer());
-    expect(wav.subarray(0, 4).toString()).toBe("RIFF");
     expect(wav.readUInt32LE(24)).toBe(24000);
     // The sound alone, without the credentials; it fades out instead of ending on a click.
     expect(wav.length).toBe(44 + pcm.length);
@@ -98,28 +103,58 @@ describe("a provider's voice reads answers", () => {
     expect(wav.readInt16LE(wav.length - 2)).toBe(0);
     const asked = fake.requests.find((r) => r.path.endsWith(":generateContent"))!.body;
     expect(asked.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).toBe("Kore");
-    expect(JSON.stringify(asked.contents)).toContain("Привет из облака.");
   });
 
-  it("asks OpenAI's speech model, and passes on the provider's words when it refuses", async () => {
+  it("lists an aggregator's speech models with their voices and reads through its /audio/speech, passing on refusals", async () => {
     let refuse = false;
     fake = await startFakeProvider({
       authorized: (h) => h.authorization === `Bearer ${KEY}`,
-      handle: (method, path) => {
-        if (method === "POST" && path === "/v1/audio/speech") return refuse ? { status: 429, json: { error: { message: "You exceeded your current quota" } } } : { bytes: Buffer.from("RIFF0000WAVE"), contentType: "audio/wav" };
+      handle: (method, path, body) => {
+        if (method === "GET" && path === "/v1/models")
+          return {
+            json: {
+              data: [
+                // Voices listed in the catalog, as OpenRouter does; free.
+                { id: "heygen/heygen-voice-1-turbo:free", name: "HeyGen Voice 1 Turbo (free)", architecture: { output_modalities: ["speech"] }, pricing: { prompt: "0" }, supported_voices: ["nadine", "bram"] },
+                // Voices not listed, as RouterAI does: known by the family; Gemini speaks PCM only.
+                { id: "google/gemini-3.8-flash-tts", name: "Google: Gemini 3.8 Flash TTS", architecture: { output_modalities: ["speech"] }, pricing: { prompt: 0.000001 } },
+                // Voices nobody knows: left out.
+                { id: "fish-audio/s2-pro", name: "Fish Audio: S2 Pro", architecture: { output_modalities: ["speech"] } },
+                // Not a speech model.
+                { id: "chat-model", architecture: { output_modalities: ["text"] } },
+              ],
+            },
+          };
+        if (method === "POST" && path === "/v1/audio/speech") {
+          if (refuse) return { status: 402, json: { error: { message: "Insufficient credits" } } };
+          return body.response_format === "pcm" ? { bytes: Buffer.alloc(480, 2), contentType: "audio/pcm" } : { bytes: Buffer.from("ID3-mp3-bytes"), contentType: "audio/mpeg" };
+        }
         return undefined;
       },
     });
-    env.setPresetUrl("openai", `${fake.origin}/v1`);
-    const openai = await (await env.call("POST", "/api/providers", { preset: "openai", apiKey: KEY })).json();
-    await env.call("PATCH", "/api/settings", { cloudVoice: { providerId: openai.id, voice: "nova" } });
-    const res = await env.call("POST", "/api/voice/speak", { text: "Привет" });
-    expect(res.status).toBe(200);
-    expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("RIFF0000WAVE");
-    expect(fake.requests.find((r) => r.path === "/v1/audio/speech")!.body).toMatchObject({ model: "gpt-4o-mini-tts", voice: "nova", input: "Привет", response_format: "wav" });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Агрегатор", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const models = await (await env.call("GET", "/api/voice/cloud")).json();
+    expect(models.map((m: any) => [m.model, m.provider, m.free, m.voices.length])).toEqual([
+      ["heygen/heygen-voice-1-turbo:free", "Агрегатор", true, 2],
+      ["google/gemini-3.8-flash-tts", "Агрегатор", false, 30],
+    ]);
+
+    await env.call("PATCH", "/api/settings", { cloudVoice: { providerId: provider.id, model: "heygen/heygen-voice-1-turbo:free", voice: "bram" } });
+    const mp3 = await env.call("POST", "/api/voice/speak", { text: "Привет" });
+    expect(mp3.status).toBe(200);
+    expect(mp3.headers.get("content-type")).toBe("audio/mpeg");
+    expect(Buffer.from(await mp3.arrayBuffer()).toString()).toBe("ID3-mp3-bytes");
+    expect(fake.requests.filter((r) => r.path === "/v1/audio/speech").at(-1)!.body).toEqual({ model: "heygen/heygen-voice-1-turbo:free", voice: "bram", input: "Привет", response_format: "mp3" });
+
+    await env.call("PATCH", "/api/settings", { cloudVoice: { providerId: provider.id, model: "google/gemini-3.8-flash-tts", voice: "Kore" } });
+    const wav = await env.call("POST", "/api/voice/speak", { text: "Привет" });
+    expect(wav.headers.get("content-type")).toBe("audio/wav");
+    expect(Buffer.from(await wav.arrayBuffer()).subarray(0, 4).toString()).toBe("RIFF");
+    expect(fake.requests.filter((r) => r.path === "/v1/audio/speech").at(-1)!.body.response_format).toBe("pcm");
+
     refuse = true;
     const refused = await env.call("POST", "/api/voice/speak", { text: "Привет" });
     expect(refused.status).toBe(502);
-    expect((await refused.json()).error.detail).toContain("exceeded your current quota");
+    expect((await refused.json()).error.detail).toContain("Insufficient credits");
   });
 });

@@ -1,6 +1,6 @@
-import { cloudVoices, type LocalSpeechStatus, type LocalVoiceId } from "@drimvox/shared";
+import type { CloudSpeechModel, LocalSpeechStatus, LocalVoiceId } from "@drimvox/shared";
 import { useEffect, useRef, useState } from "react";
-import { ok } from "../api";
+import { authHeaders, ok } from "../api";
 import { useApp } from "../context";
 import { Segmented } from "./Segmented";
 import { Setting } from "./Setting";
@@ -48,21 +48,25 @@ export function SpeechVoiceSetting() {
 const NONE = "none";
 
 /**
- * A provider's voice that reads answers instead of the Piper or system one (asked for: voices from the cloud): Gemini's
- * and OpenAI's voices of the providers connected, and a sample to hear it before choosing.
+ * A provider's voice that reads answers instead of the Piper or system one (asked for: voices from every provider that
+ * has them): the speech models of the connected providers, then a voice of the chosen one, and a sample to hear it.
  */
 export function CloudVoiceSetting() {
-  const { api, t, settings, updateSettings, providers } = useApp();
+  const { t, settings, updateSettings, token } = useApp();
+  const [models, setModels] = useState<CloudSpeechModel[] | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
   const [problem, setProblem] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => audio.current?.pause(), []);
-  const options = providers.flatMap((p) =>
-    p.preset === "google" || p.preset === "openai"
-      ? cloudVoices[p.preset].map((v) => ({ value: `${p.id}|${v.id}`, label: `${v.id} · ${p.name}`, hint: t(`settings.cloudVoiceKind.${v.kind}`) }))
-      : [],
-  );
-  const chosen = settings.cloudVoice ? `${settings.cloudVoice.providerId}|${settings.cloudVoice.voice}` : NONE;
+  useEffect(() => {
+    void fetch("/api/voice/cloud", { headers: authHeaders(token) })
+      .then((r) => (r.ok ? (r.json() as Promise<CloudSpeechModel[]>) : []))
+      .then(setModels)
+      .catch(() => setModels([]));
+  }, [token]);
+  const chosen = settings.cloudVoice;
+  const key = (m: { providerId: string; model: string }) => `${m.providerId}|${m.model}`;
+  const model = chosen ? models?.find((m) => key(m) === key(chosen)) : undefined;
 
   async function sample() {
     if (state === "playing") {
@@ -73,7 +77,7 @@ export function CloudVoiceSetting() {
     setProblem(null);
     setState("loading");
     try {
-      const res = await api.voice.speak.$post({ json: { text: t("settings.cloudVoiceSample") } });
+      const res = await fetch("/api/voice/speak", { method: "POST", headers: { ...authHeaders(token), "content-type": "application/json" }, body: JSON.stringify({ text: t("settings.cloudVoiceSample") }) });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: { detail?: string } } | null;
         throw new Error(body?.error?.detail ?? String(res.status));
@@ -95,21 +99,40 @@ export function CloudVoiceSetting() {
 
   return (
     <Setting id="cloud-voice-label" title={t("settings.cloudVoice")} about={t("settings.cloudVoiceHint")}>
-      {options.length === 0 ? (
+      {models === null ? (
+        <p className="muted">{t("settings.cloudVoiceLooking")}</p>
+      ) : models.length === 0 ? (
         <p className="muted">{t("settings.cloudVoiceNone")}</p>
       ) : (
-        <div className="speech-voice">
+        <div className="cloud-voice">
           <Dropdown<string>
-            label={t("settings.cloudVoice")}
-            value={chosen}
-            options={[{ value: NONE, label: t("settings.cloudVoiceOff") }, ...options]}
+            label={t("settings.cloudVoiceModel")}
+            search={t("settings.cloudVoiceSearch")}
+            value={chosen ? key(chosen) : NONE}
+            options={[
+              { value: NONE, label: t("settings.cloudVoiceOff") },
+              ...models.map((m) => ({ value: key(m), label: m.name, hint: `${m.provider}${m.free ? ` · ${t("settings.cloudVoiceFree")}` : ""} · ${t("settings.cloudVoiceCount", { n: m.voices.length })}` })),
+            ]}
             onChange={(value) => {
               setProblem(null);
-              const [providerId, voice] = value.split("|");
-              void updateSettings({ cloudVoice: value === NONE || !providerId || !voice ? null : { providerId, voice } });
+              const next = models.find((m) => key(m) === value);
+              // A new model starts on its first voice; the same voice is kept when the new model has it.
+              void updateSettings({ cloudVoice: next ? { providerId: next.providerId, model: next.model, voice: next.voices.includes(chosen?.voice ?? "") ? chosen!.voice : next.voices[0]! } : null });
             }}
           />
-          {settings.cloudVoice && (
+          {chosen && model && (
+            <Dropdown<string>
+              label={t("settings.cloudVoiceVoice")}
+              search={model.voices.length > 12 ? t("settings.cloudVoiceSearch") : undefined}
+              value={chosen.voice}
+              options={model.voices.map((v) => ({ value: v, label: v }))}
+              onChange={(voice) => {
+                setProblem(null);
+                void updateSettings({ cloudVoice: { ...chosen, voice } });
+              }}
+            />
+          )}
+          {chosen && (
             <button type="button" className="btn" disabled={state === "loading"} onClick={() => void sample()}>
               {t(state === "loading" ? "voice.preparing" : state === "playing" ? "voice.silence" : "settings.cloudVoiceListen")}
             </button>

@@ -56,7 +56,7 @@ import { proxyRoutes } from "./routes/proxy";
 import { searchRoutes } from "./routes/search";
 import { monthUsage } from "./budget";
 import { transcribe } from "./voice";
-import { speakCloud } from "./voice-cloud";
+import { speakCloud, speechModels } from "./voice-cloud";
 import { useLocalAudio } from "./local/audio/service";
 import { z } from "zod";
 import { describeError } from "./providers/errors";
@@ -314,6 +314,16 @@ export function createCore(o: AppOptions) {
         return c.json({ error: describeError(err) }, 502);
       }
     })
+    // The speech models and voices of every connected provider that has them (asked for: voices from all providers).
+    .get("/voice/cloud", async (c) => {
+      const found = await Promise.all(
+        providers.list().map(async (p) => {
+          const conn = providers.connection(p.id);
+          return conn && p.billing !== "subscription" ? (await speechModels(conn)).map((m) => ({ ...m, providerId: p.id, provider: p.name })) : [];
+        }),
+      );
+      return c.json(found.flat(), 200);
+    })
     // An answer read aloud by the Piper voice from the settings (docs/specs/local-speech.md), as a WAV.
     // Or by a provider's voice, when one is chosen (asked for: voices from the cloud).
     .post("/voice/speak", zValidator("json", speakSchema), async (c) => {
@@ -323,7 +333,11 @@ export function createCore(o: AppOptions) {
       try {
         const words = speechText(c.req.valid("json").text);
         if (!words) return c.json({ error: { code: "nothing_to_read" as const } }, 400);
-        const wav = cloud && cloudVoice ? await speakCloud(cloud, cloudVoice.voice, words) : await local.speech.speak(voice!, words);
+        if (cloud && cloudVoice) {
+          const said = await speakCloud(cloud, cloudVoice.model, cloudVoice.voice, words);
+          return c.body(new Uint8Array(said.audio), 200, { "Content-Type": said.type });
+        }
+        const wav = await local.speech.speak(voice!, words);
         return c.body(new Uint8Array(wav), 200, { "Content-Type": "audio/wav" });
       } catch (err) {
         return c.json({ error: { code: "speech_failed" as const, detail: err instanceof Error ? err.message : String(err) } }, 502);

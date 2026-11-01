@@ -405,8 +405,8 @@ test("offers Piper's voices on the audio tab and in the settings", async () => {
   await openSection(page, "Настройки");
   await page.getByRole("tab", { name: "Модели и деньги" }).click();
   await expect(page.getByRole("region", { name: "Голос для чтения ответов" })).toContainText("Скачать голоса Piper");
-  // Voices from the cloud (asked for): they need Gemini or OpenAI connected, and say so.
-  await expect(page.getByRole("region", { name: "Облачный голос" })).toContainText("Подключи Gemini или OpenAI");
+  // Voices from the cloud (asked for): those of every connected provider that has them; with none connected, said so.
+  await expect(page.getByRole("region", { name: "Облачный голос" })).toContainText("У подключённых провайдеров нет моделей речи");
 });
 
 // Seen again and again: a model list fixed to open downwards ran off the window near the bottom of a page.

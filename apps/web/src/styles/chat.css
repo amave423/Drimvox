@@ -408,3 +408,4 @@
 .file-view-body img { display: block; max-width: 100%; margin: 0 auto; }
 .file-view-body pre { margin: 0; }
 .margin-sec.is-pencil { color: var(--pencil); }
+.cloud-voice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
