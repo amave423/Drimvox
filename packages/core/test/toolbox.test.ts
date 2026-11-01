@@ -305,11 +305,11 @@ describe("a real browser", () => {
       expect(await call(design, "page_match_design", { design: "design.png", width: 1280 })).toMatch(/^0\.\d% differs from the design at 1280 px/);
       await driver.command("Runtime.evaluate", { expression: "document.getElementById('t').style.marginLeft = '600px'" });
       expect(await call(design, "page_match_design", { design: "design.png", width: 1280 })).toMatch(/[1-9]\d*\.\d% differs from the design at 1280 px\. Most in: 75–150 px/);
-      // A diagram from Mermaid (needs the internet for Mermaid the first time; offline it says so).
+      // A diagram from Mermaid: the copy the chat uses, no internet needed.
       const drawn = await call(design, "render_diagram", { code: "flowchart LR\n  A[Запись] --> B[Приём]", output: "docs/flow.svg" });
       // Cyrillic labels stay Cyrillic (seen: without a charset they came out garbled).
-      if (drawn.startsWith("Saved")) expect(readFileSync(join(folder, "docs/flow.svg"), "utf8")).toMatch(/^<svg[\s\S]*Приём/);
-      else expect(drawn).toMatch(/internet|could not draw/);
+      expect(drawn).toBe("Saved docs/flow.svg.");
+      expect(readFileSync(join(folder, "docs/flow.svg"), "utf8")).toMatch(/^<svg[\s\S]*Приём/);
 
       // The text on a picture, read by Windows itself when no model that sees is set.
       if (process.platform === "win32") {

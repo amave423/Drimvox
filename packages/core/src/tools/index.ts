@@ -10,7 +10,7 @@ import { imageTools } from "./images";
 import { loadTools } from "./load";
 import { devEnvironmentTools } from "./devenv";
 import { desktopTools } from "./desktop";
-import { compareTools } from "./compare";
+import { compareTools, mermaidScript } from "./compare";
 import { downloadTools } from "./downloads";
 import { emailTools } from "./email";
 import { sshTools, type SshServers } from "./ssh";
@@ -20,6 +20,8 @@ export interface ToolboxDeps {
   ssh: SshServers;
   /** The agent's browser, where there is one: before and after of its page. */
   browser: BrowserDriver | null;
+  /** The built UI, which carries the Mermaid script for diagrams. */
+  webDir?: string;
 }
 
 /**
@@ -38,7 +40,7 @@ export function toolbox(
     ...sshTools(d.ssh, ws, o.hooks),
     ...(o.folder ? auditTools(o.folder, o.hooks) : {}),
     ...(ws ? mediaTools(d.dataDir, ws, o.hooks) : {}),
-    ...(d.browser?.available() ? compareTools(d.browser, join(d.dataDir, "snapshots"), o.hooks, o.see, ws ?? undefined) : {}),
+    ...(d.browser?.available() ? compareTools(d.browser, join(d.dataDir, "snapshots"), o.hooks, o.see, ws ?? undefined, mermaidScript(d.webDir)) : {}),
     ...(ws ? imageTools(ws, o.hooks) : {}),
     ...loadTools(o.hooks),
     ...devEnvironmentTools(o.hooks),

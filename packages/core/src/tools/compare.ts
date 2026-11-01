@@ -1,5 +1,6 @@
 import { tool, type ToolSet } from "ai";
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import pixelmatch from "pixelmatch";
@@ -10,8 +11,19 @@ import type { BrowserDriver } from "../browser/driver";
 import type { Workspace } from "../agent/workspace";
 import { resize } from "./images";
 
-/** Mermaid, pinned, loaded by the page that draws a diagram. */
-const MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js";
+/**
+ * The Mermaid the chat draws with (docs/specs/tools.md): the copy in the built UI, or in node_modules when run from
+ * the sources. Not fetched from the internet.
+ */
+export function mermaidScript(webDir?: string): string | null {
+  const built = webDir ? join(webDir, "vendor", "mermaid.min.js") : null;
+  if (built && existsSync(built)) return built;
+  try {
+    return createRequire(join(process.cwd(), "package.json")).resolve("mermaid/dist/mermaid.min.js");
+  } catch {
+    return null;
+  }
+}
 
 /** Changes smaller than this share of the page count as none (anti-aliasing, a blinking caret). */
 const NOISE = 0.001;
@@ -27,6 +39,7 @@ export function compareTools(
   hooks: Pick<ToolHooks, "onCall">,
   see?: (png: Buffer, question: string, signal?: AbortSignal) => Promise<string>,
   ws?: Workspace,
+  mermaid: string | null = mermaidScript(),
 ): ToolSet {
   const file = (name: string, width: number, kind: "before" | "diff" | "after") => join(dir, `${name.replace(/[^\w.-]+/g, "_").slice(0, 60)}-${width}-${kind}.png`);
   const run = async (name: string, input: string, work: () => Promise<string>) => {
@@ -160,11 +173,14 @@ export function compareTools(
             inputSchema: z.object({ code: z.string().min(1).max(50_000).describe("Mermaid code, such as: flowchart LR; A-->B"), output: z.string().min(1).describe("Where to save, inside the folder: .svg or .png") }),
             execute: ({ code, output }) =>
               run("render_diagram", output, async () => {
-                const page = `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff"><pre class="mermaid">${code.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre><script src="${MERMAID}"></script><script>mermaid.initialize({ startOnLoad: false, theme: "default" }); mermaid.run().then(() => (document.body.dataset.done = "1")).catch((e) => (document.body.dataset.error = String(e && e.message || e)));</script></body></html>`;
+                if (!mermaid) throw new Error("Mermaid is not found in this build of Drimvox.");
+                const page = `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff"><pre class="mermaid">${code.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre></body></html>`;
                 const before = driver.state().active;
                 await driver.newTab(`data:text/html;base64,${Buffer.from(page).toString("base64")}`);
                 const tab = driver.state().active;
                 try {
+                  await driver.command("Runtime.evaluate", { expression: readFileSync(mermaid, "utf8") });
+                  await driver.command("Runtime.evaluate", { expression: 'mermaid.initialize({ startOnLoad: false, theme: "default" }); mermaid.run().then(() => (document.body.dataset.done = "1")).catch((e) => (document.body.dataset.error = String((e && e.message) || e)));' });
                   let state: { done?: string; error?: string } = {};
                   for (let i = 0; i < 80 && !state.done && !state.error; i++) {
                     await new Promise((r) => setTimeout(r, 250));
@@ -172,7 +188,7 @@ export function compareTools(
                     state = r?.result?.value ?? {};
                   }
                   if (state.error) throw new Error(`Mermaid could not draw it: ${state.error}`);
-                  if (!state.done) throw new Error("The diagram did not draw in time (it needs the internet for Mermaid the first time).");
+                  if (!state.done) throw new Error("The diagram did not draw in time.");
                   const target = ws.resolve(output);
                   mkdirSync(dirname(target), { recursive: true });
                   if (extname(target).toLowerCase() === ".svg") {

@@ -237,7 +237,7 @@ export function createCore(o: AppOptions) {
   // Other computers over SSH, downloads, mail, audits, before and after (tools/index.ts).
   const sshServers = new SshServers(o.db, cipher);
   setMailApi(o.mailApi);
-  const tools = { dataDir: o.dataDir, ssh: sshServers, browser: browser.driver };
+  const tools = { dataDir: o.dataDir, ssh: sshServers, browser: browser.driver, webDir: o.webDir };
   const projectWork = new ProjectWork({
     repo: workRepo,
     runner,
