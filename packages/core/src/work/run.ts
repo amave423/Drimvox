@@ -20,6 +20,7 @@ import { askAboutPictures, type Vision } from "../visual/look";
 import { VISUAL_HINT, visualTools, type VisualKit } from "../visual/tools";
 import { existingRules, nudgeMessage, projectRules } from "./prompt";
 import type { ProjectGit } from "./project-git";
+import { changedSince, checkpoint, dropCheckpoint } from "../chats/checkpoint";
 import { writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
 import { polishWorkMessage, reviewProjectDesign } from "./design-review";
@@ -260,6 +261,9 @@ export class WorkRun {
   ): Promise<{ kind: "natural" | "steps" | "budget" | "limit" | "stopped" } | { kind: "error"; error: ProviderError }> {
     const signal = this.controller.signal;
     const answer = this.d.chats.addMessage({ chatId: this.chatId, role: "assistant", content: "", status: "streaming", providerId: conn.id, model });
+    // The folder as it was before this answer: "Undo" under it brings it back, as in a chat with a folder (asked for).
+    const checkpointRef = `refs/drimvox/chat/${this.chatId}/${answer.id}`;
+    const snapshot = await checkpoint(this.folder, checkpointRef).catch(() => null);
     const activity: ActivityEntry[] = [];
     let content = "";
     let input = 0;
@@ -452,6 +456,10 @@ export class WorkRun {
     const error = outcome.kind === "error" ? outcome.error : null;
     // From here the answer's cost is in its message: not counted twice.
     this.stretch.costUsd = 0;
+    if (snapshot) {
+      if (await changedSince(this.folder, snapshot).catch(() => false)) this.d.chats.setCheckpoint(answer.id, snapshot);
+      else await dropCheckpoint(this.folder, checkpointRef).catch(() => {});
+    }
     this.d.chats.finishAnswer(answer.id, {
       content,
       reasoning: null,

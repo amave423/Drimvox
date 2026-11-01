@@ -713,6 +713,18 @@ describe("a project's git rules", () => {
     expect(git(folder, "branch", "--list", branch)).toContain(branch);
   });
 
+  // Asked for: a project's answer is undone like a chat's — the folder back as it was before it.
+  it("undoes an answer of the agent: the files back as they were before it", async () => {
+    const s = await ready([call("write_file", { path: "index.html", content: "<h1>Сломано</h1>\n" }), call("write_file", { path: "new.js", content: "x\n" }), { text: "Готово." }], { commit: "never" });
+    const work = await ask(s, "Поменяй заголовок", 3);
+    const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
+    const answer = chat.messages.find((m: any) => m.role === "assistant" && m.canUndo);
+    expect(answer).toBeTruthy();
+    expect((await env.call("POST", `/api/chats/${work.chatId}/messages/${answer.id}/undo`)).status).toBe(200);
+    expect(readFileSync(join(folder, "index.html"), "utf8")).toBe("<h1>Клиника</h1>\n");
+    expect(existsSync(join(folder, "new.js"))).toBe(false);
+  });
+
   it("commits nothing when the rules say so, and the agent is told git is the user's", async () => {
     const s = await ready([call("write_file", { path: "a.txt", content: "a\n" }), { text: "Готово." }], { commit: "never" });
     await ask(s, "Сделай a", 2);

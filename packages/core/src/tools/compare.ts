@@ -1,12 +1,17 @@
 import { tool, type ToolSet } from "ai";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, extname, join } from "node:path";
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import { z } from "zod";
 import type { ToolHooks } from "../agent/tools";
 import type { BrowserDriver } from "../browser/driver";
+import type { Workspace } from "../agent/workspace";
+import { resize } from "./images";
+
+/** Mermaid, pinned, loaded by the page that draws a diagram. */
+const MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js";
 
 /** Changes smaller than this share of the page count as none (anti-aliasing, a blinking caret). */
 const NOISE = 0.001;
@@ -21,6 +26,7 @@ export function compareTools(
   dir: string,
   hooks: Pick<ToolHooks, "onCall">,
   see?: (png: Buffer, question: string, signal?: AbortSignal) => Promise<string>,
+  ws?: Workspace,
 ): ToolSet {
   const file = (name: string, width: number, kind: "before" | "diff" | "after") => join(dir, `${name.replace(/[^\w.-]+/g, "_").slice(0, 60)}-${width}-${kind}.png`);
   const run = async (name: string, input: string, work: () => Promise<string>) => {
@@ -107,5 +113,86 @@ export function compareTools(
           return said ? `${summary}\n${said}` : summary;
         }),
     }),
+    ...(ws
+      ? {
+          page_match_design: tool({
+            description:
+              "Compare the page shown in the browser with a design picture in the folder (a PNG exported from Figma or a mock-up): the design is scaled to the page's width, then how much differs and where, a difference picture, and what a model that sees says differs (spacing, sizes, colours, missing parts).",
+            inputSchema: z.object({ design: z.string().min(1).describe("The design's PNG in the folder"), width: z.number().int().min(320).max(1920).optional().describe("The page's width to compare at: the design's own width by default") }),
+            execute: ({ design, width: w }, o: { abortSignal?: AbortSignal }) =>
+              run("page_match_design", design, async () => {
+                const mock = PNG.sync.read(readFileSync(ws.resolve(design)));
+                const at = w ?? Math.min(1920, Math.max(320, mock.width));
+                const page = PNG.sync.read(await shoot(at));
+                const scaled = mock.width === page.width ? mock : resize(mock, page.width, Math.round((mock.height * page.width) / mock.width));
+                const height = Math.min(scaled.height, page.height);
+                const crop = (img: PNG) => {
+                  const out = new PNG({ width: page.width, height });
+                  PNG.bitblt(img, out, 0, 0, page.width, height, 0, 0);
+                  return out;
+                };
+                const a = crop(scaled);
+                const b = crop(page);
+                const diff = new PNG({ width: page.width, height });
+                const changed = pixelmatch(a.data, b.data, diff.data, page.width, height, { threshold: 0.15 });
+                mkdirSync(dir, { recursive: true });
+                const diffFile = join(dir, `design-${Date.now()}-diff.png`);
+                writeFileSync(diffFile, PNG.sync.write(diff));
+                // Where it differs most: the page in eight bands, top to bottom.
+                const bands = Array.from({ length: 8 }, () => 0);
+                for (let y = 0; y < height; y++) {
+                  for (let x = 0; x < page.width; x += 2) {
+                    const i = (y * page.width + x) * 4;
+                    if (diff.data[i] === 255 && diff.data[i + 1] === 0) bands[Math.min(7, Math.floor((y / height) * 8))]!++;
+                  }
+                }
+                const worst = bands.map((n, i) => ({ n, i })).sort((x, y) => y.n - x.n).filter((x) => x.n > 0).slice(0, 3).map((x) => `${Math.round((x.i / 8) * height)}–${Math.round(((x.i + 1) / 8) * height)} px`);
+                const heights = Math.abs(scaled.height - page.height) > 20 ? ` The page is ${page.height} px tall, the design ${scaled.height} px at this width.` : "";
+                const summary = `${((changed / (page.width * height)) * 100).toFixed(1)}% differs from the design at ${page.width} px.${worst.length ? ` Most in: ${worst.join(", ")} from the top.` : ""}${heights}`;
+                if (!see) return summary;
+                const said = await see(PNG.sync.write(diff), "This is a difference picture between a design and the built web page: red marks pixels that differ. Say briefly which parts differ and how (spacing, sizes, colours, missing or extra parts).", o.abortSignal).catch(() => "");
+                return said ? `${summary}\n${said}` : summary;
+              }),
+          }),
+          render_diagram: tool({
+            description:
+              "Draw a diagram from Mermaid code (flowchart, sequence, class, ER, gantt, state…) and save it in the folder as .svg or .png — for the README, a report or docs.",
+            inputSchema: z.object({ code: z.string().min(1).max(50_000).describe("Mermaid code, such as: flowchart LR; A-->B"), output: z.string().min(1).describe("Where to save, inside the folder: .svg or .png") }),
+            execute: ({ code, output }) =>
+              run("render_diagram", output, async () => {
+                const page = `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff"><pre class="mermaid">${code.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre><script src="${MERMAID}"></script><script>mermaid.initialize({ startOnLoad: false, theme: "default" }); mermaid.run().then(() => (document.body.dataset.done = "1")).catch((e) => (document.body.dataset.error = String(e && e.message || e)));</script></body></html>`;
+                const before = driver.state().active;
+                await driver.newTab(`data:text/html;base64,${Buffer.from(page).toString("base64")}`);
+                const tab = driver.state().active;
+                try {
+                  let state: { done?: string; error?: string } = {};
+                  for (let i = 0; i < 80 && !state.done && !state.error; i++) {
+                    await new Promise((r) => setTimeout(r, 250));
+                    const r = (await driver.command("Runtime.evaluate", { expression: "({ done: document.body.dataset.done, error: document.body.dataset.error })", returnByValue: true }).catch(() => null)) as { result?: { value?: typeof state } } | null;
+                    state = r?.result?.value ?? {};
+                  }
+                  if (state.error) throw new Error(`Mermaid could not draw it: ${state.error}`);
+                  if (!state.done) throw new Error("The diagram did not draw in time (it needs the internet for Mermaid the first time).");
+                  const target = ws.resolve(output);
+                  mkdirSync(dirname(target), { recursive: true });
+                  if (extname(target).toLowerCase() === ".svg") {
+                    const svg = (await driver.command("Runtime.evaluate", { expression: "document.querySelector('.mermaid svg').outerHTML", returnByValue: true })) as { result: { value: string } };
+                    writeFileSync(target, svg.result.value);
+                  } else {
+                    const box = (await driver.command("Runtime.evaluate", { expression: "(() => { const r = document.querySelector('.mermaid svg').getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })()", returnByValue: true })) as { result: { value: [number, number, number, number] } };
+                    const [x, y, w, h] = box.result.value;
+                    const shot = (await driver.command("Page.captureScreenshot", { format: "png", clip: { x, y, width: Math.ceil(w), height: Math.ceil(h), scale: 2 }, captureBeyondViewport: true })) as { data: string };
+                    writeFileSync(target, Buffer.from(shot.data, "base64"));
+                  }
+                  return `Saved ${output}.`;
+                } finally {
+                  // Back to the page the agent was on: its tab is shown again, the diagram's is gone.
+                  if (tab && tab !== before) await driver.close(tab).catch(() => {});
+                  if (before && driver.state().active !== before) await driver.select(before).catch(() => {});
+                }
+              }),
+          }),
+        }
+      : {}),
   };
 }

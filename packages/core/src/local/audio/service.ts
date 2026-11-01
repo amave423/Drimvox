@@ -1,6 +1,6 @@
 import type { HfAudioFile, HfAudioRepo, LocalAudioStatus, LocalPull } from "@drimvox/shared";
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fetchVia } from "../../proxy";
 import { downloadFile, fileByPath, type Route, removePartial } from "../hf-download";
@@ -218,6 +218,35 @@ export class LocalAudio {
     rmSync(this.engineDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     for (const [id, a] of this.pulls) if (a.pull.done) this.pulls.delete(id);
     return true;
+  }
+
+  /**
+   * A long WAV file (16 kHz mono) written down by the best downloaded model: its text and, when asked, subtitles (SRT).
+   * For the media tools (docs/specs/tools.md); dictation uses transcribe below.
+   */
+  async transcribeFile(wav: string, srt: boolean, timeoutMs = 60 * 60_000): Promise<{ text: string; srt: string | null; model: string }> {
+    const model = [...this.installed()].sort((a, b) => b.bytes - a.bytes)[0];
+    if (!model) throw new Error("No speech model is downloaded: download one in Local models → Audio, then try again.");
+    const found = findCli(this.engineDir);
+    const cli = this.o.cliCommand ?? [found ?? ""];
+    if (!cli[0]) throw new Error("The speech engine is not downloaded: download a model in Local models → Audio.");
+    const cwd = found ? dirname(found) : this.d.dir;
+    const base = join(this.d.dir, `media-${Date.now()}`);
+    try {
+      const out = await new Promise<string>((resolve, reject) =>
+        execFile(
+          cli[0]!,
+          [...cli.slice(1), "-m", relative(cwd, this.pathOf(model)), "-f", relative(cwd, wav), "-l", "auto", "-np", ...(srt ? ["-osrt", "-of", relative(cwd, base)] : ["-nt"])],
+          { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
+          (err, stdout) => (err ? reject(err) : resolve(String(stdout))),
+        ),
+      );
+      const subtitles = srt && existsSync(`${base}.srt`) ? readFileSync(`${base}.srt`, "utf8") : null;
+      const text = (srt ? out.replace(/^\[[^\]]*\]\s*/gm, "") : out).replace(/\s+/g, " ").trim();
+      return { text, srt: subtitles, model: model.name };
+    } finally {
+      rmSync(`${base}.srt`, { force: true });
+    }
   }
 
   /** A WAV recording written down by the model, in the language it is spoken in. */

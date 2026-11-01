@@ -20,7 +20,7 @@ export const skillCreateSchema = z
 export const skillImportSchema = z.object({ path: z.string().min(1).max(1000) }).strict();
 
 /** Drimvox's own ready skills (docs/specs/catalog.md). */
-export const builtinSkills = ["docx", "xlsx", "pptx", "pdf", "security-review", "seo-performance", "accessibility", "nextjs", "fastapi", "docker", "project-docs", "email-html"] as const;
+export const builtinSkills = ["docx", "xlsx", "pptx", "pdf", "security-review", "seo-performance", "accessibility", "nextjs", "fastapi", "docker", "project-docs", "email-html", "dotnet-desktop", "avalonia", "java-desktop", "desktop-installers"] as const;
 
 /** A ready skill: a folder of a GitHub repository with SKILL.md, or one of Drimvox's own. */
 export const skillInstallSchema = z

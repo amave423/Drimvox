@@ -484,7 +484,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                 kind={chat?.kind}
                 // Still being written: its actions so far, as they come; once done, folded.
                 actions={toActions(live?.messageId === m.id ? live.activity : m.activity)}
-                onUndo={draft || chat?.itemId ? undefined : () => void undo(m.id)}
+                onUndo={draft || chat?.itemId || running ? undefined : () => void undo(m.id)}
                 // Seen after coming back to the chat: the requests this answer waits on, to answer here.
                 approvals={m.status === "streaming" && !draft ? chat?.approvals.map((a) => ({ ...a, state: "open" as const })) : undefined}
                 onApprove={approve}

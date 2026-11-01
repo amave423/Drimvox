@@ -1,5 +1,5 @@
 import { builtinSkills, type McpServerView, type SkillView, type McpTrust } from "@drimvox/shared";
-import { siAnthropic, siDocker, siFastapi, siFigma, siGithub, siGmail, siGooglesearchconsole, siMarkdown, siModelcontextprotocol, siNextdotjs, siNotion, siOwasp, siPostgresql, siSentry, siShadcnui, siSqlite, siStripe, siSupabase, siUpstash } from "simple-icons";
+import { siAnthropic, siAvaloniaui, siDocker, siDotnet, siFastapi, siFigma, siGithub, siGmail, siGooglesearchconsole, siMarkdown, siModelcontextprotocol, siNextdotjs, siNotion, siOpenjdk, siOwasp, siPostgresql, siSentry, siShadcnui, siSqlite, siStripe, siSupabase, siUpstash } from "simple-icons";
 
 /** What the card is about: the catalog's filter. */
 export type CatalogCategory = "web" | "code" | "design" | "docs";
@@ -87,6 +87,7 @@ const glyph = {
   wand: "M3 21l4-4M12 3l2.5 2.5L19 9l-3.5-3.5L12 3zM12 9l6 6M18 15l3 3",
   gear: "M12 3a9 9 0 0 1 9 9 9 9 0 0 1-1.5 4.9L16 21h-8l-3.5-4.1A9 9 0 0 1 3 12a9 9 0 0 1 9-9zm0 3a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
   cycles: "M12 4a8 8 0 0 0-4 14.9V17a10 10 0 0 1 8 0v-2.1A8 8 0 0 0 12 4zm0 16a8 8 0 0 0 4-14.9V7a10 10 0 0 1-8 0v2.1A8 8 0 0 0 12 20z",
+  box: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9",
 };
 const drawn = (path: string): CatalogLogo => ({ path, stroke: true });
 const brand = (icon: { path: string }): CatalogLogo => ({ path: icon.path });
@@ -135,6 +136,10 @@ export const CATALOG: CatalogEntry[] = [
   { kind: "skill", id: "docker", vendor: "Drimvox", category: "code", logo: brand(siDocker), link: "https://docs.docker.com/", license: "MIT", skill: "docker", source: { kind: "builtin", id: "docker" } },
   { kind: "skill", id: "project-docs", vendor: "Drimvox", category: "docs", logo: brand(siMarkdown), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "project-docs", source: { kind: "builtin", id: "project-docs" } },
   { kind: "skill", id: "email-html", vendor: "Drimvox", category: "docs", logo: brand(siGmail), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "email-html", source: { kind: "builtin", id: "email-html" } },
+  { kind: "skill", id: "dotnet-desktop", vendor: "Drimvox", category: "code", logo: brand(siDotnet), link: "https://learn.microsoft.com/dotnet/desktop/wpf/", license: "MIT", skill: "dotnet-desktop", source: { kind: "builtin", id: "dotnet-desktop" } },
+  { kind: "skill", id: "avalonia", vendor: "Drimvox", category: "code", logo: brand(siAvaloniaui), link: "https://docs.avaloniaui.net/", license: "MIT", skill: "avalonia", source: { kind: "builtin", id: "avalonia" } },
+  { kind: "skill", id: "java-desktop", vendor: "Drimvox", category: "code", logo: brand(siOpenjdk), link: "https://openjfx.io/", license: "MIT", skill: "java-desktop", source: { kind: "builtin", id: "java-desktop" } },
+  { kind: "skill", id: "desktop-installers", vendor: "Drimvox", category: "code", logo: drawn(glyph.box), link: "https://github.com/amave423/Drimvox", license: "MIT", skill: "desktop-installers", source: { kind: "builtin", id: "desktop-installers" } },
 ];
 
 /** The user's own server or skill that a card stands for, if any. */

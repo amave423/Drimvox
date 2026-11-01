@@ -110,7 +110,7 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   // Skills and servers each on their own tab.
   await page.getByRole("tab", { name: "Скиллы" }).click();
   const cards = page.locator(".catalog-card");
-  await expect(cards).toHaveCount(24);
+  await expect(cards).toHaveCount(28);
   for (const name of ["Дизайн интерфейсов", "Сначала тест", "Документы Word", "Проверка безопасности", "SEO и скорость", "Docker", "HTML-письма"]) await expect(page.locator(".catalog-grid")).toContainText(name);
   // A filter by what the card is about.
   await page.getByRole("button", { name: "Документы", exact: true }).click();

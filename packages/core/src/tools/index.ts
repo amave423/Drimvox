@@ -5,6 +5,11 @@ import { Workspace } from "../agent/workspace";
 import type { BrowserDriver } from "../browser/driver";
 import type { Vision } from "../visual/look";
 import { auditTools } from "./audit";
+import { mediaTools } from "./media";
+import { imageTools } from "./images";
+import { loadTools } from "./load";
+import { devEnvironmentTools } from "./devenv";
+import { desktopTools } from "./desktop";
 import { compareTools } from "./compare";
 import { downloadTools } from "./downloads";
 import { emailTools } from "./email";
@@ -32,6 +37,11 @@ export function toolbox(
     ...emailTools(o.hooks),
     ...sshTools(d.ssh, ws, o.hooks),
     ...(o.folder ? auditTools(o.folder, o.hooks) : {}),
-    ...(d.browser?.available() ? compareTools(d.browser, join(d.dataDir, "snapshots"), o.hooks, o.see) : {}),
+    ...(ws ? mediaTools(d.dataDir, ws, o.hooks) : {}),
+    ...(d.browser?.available() ? compareTools(d.browser, join(d.dataDir, "snapshots"), o.hooks, o.see, ws ?? undefined) : {}),
+    ...(ws ? imageTools(ws, o.hooks) : {}),
+    ...loadTools(o.hooks),
+    ...devEnvironmentTools(o.hooks),
+    ...desktopTools(d.dataDir, ws, o.hooks, o.see),
   };
 }

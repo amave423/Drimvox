@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttp, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -16,6 +16,10 @@ import { downloadTools, downloadsDir } from "../src/tools/downloads";
 import { emailTools, setMailApi } from "../src/tools/email";
 import { readImageText } from "../src/tools/ocr";
 import { SshServers, sshTools } from "../src/tools/ssh";
+import { loadTools } from "../src/tools/load";
+import { devEnvironmentTools } from "../src/tools/devenv";
+import { imageTools } from "../src/tools/images";
+import { PNG } from "pngjs";
 import { createTestEnv, type TestEnv } from "./env";
 
 // docs/specs/tools.md: tools beyond files and the web, asked for one by one.
@@ -209,6 +213,57 @@ describe("dependencies' vulnerabilities", () => {
   });
 });
 
+describe("a load test", () => {
+  it("loads the project's own server and says how it held; refuses someone else's site", async () => {
+    let served = 0;
+    http = createHttp((req, res) => {
+      served++;
+      if (req.url === "/fail") return res.writeHead(500), res.end();
+      setTimeout(() => (res.writeHead(200), res.end("ok")), 5);
+    });
+    await new Promise<void>((r) => http!.listen(0, "127.0.0.1", r));
+    const url = `http://127.0.0.1:${(http.address() as AddressInfo).port}/`;
+    const tools = loadTools(hooks);
+    const report = await call(tools, "load_test", { url, users: 10, seconds: 2 });
+    expect(report).toMatch(/^\d+ requests in \d+\.\d s with 10 at once: \d+\.\d per second\./);
+    expect(report).toMatch(/median \d+ ms, 95% under \d+ ms/);
+    expect(report).toContain("200 × ");
+    expect(served).toBeGreaterThan(20);
+    expect(await call(tools, "load_test", { url: `${url}fail`, users: 2, seconds: 2 })).toMatch(/500 × \d+ — 100\.0% failed/);
+    expect(await call(tools, "load_test", { url: "https://example.com/", users: 2, seconds: 2 })).toMatch(/only addresses of this computer/);
+  });
+});
+
+describe("the development environment", () => {
+  it("says what is installed, with versions, and how to install what is not", async () => {
+    const text = await call(devEnvironmentTools(hooks), "dev_environment", {});
+    expect(text).toMatch(/Node\.js: v\d+/);
+    for (const name of [".NET SDK", "Java (JDK)", "Gradle", "Docker"]) expect(text).toContain(`${name}:`);
+  });
+});
+
+describe("icons from a logo", () => {
+  it("makes favicons, an .ico, phone and app icons, a link preview and the tags", async () => {
+    const folder = temp("drimvox-icons-");
+    const logo = new PNG({ width: 512, height: 512 });
+    for (let i = 0; i < 512 * 512; i++) logo.data.set([20, 120, 200, i % 512 < 256 ? 255 : 0], i * 4);
+    writeFileSync(join(folder, "logo.png"), PNG.sync.write(logo));
+    const text = await call(imageTools(new Workspace(folder), hooks), "icons_from_logo", { logo: "logo.png", background: "#ffffff", name: "Клиника" });
+    expect(text).toContain('<link rel="icon" href="/favicon.ico" sizes="any">');
+    const size = (file: string) => {
+      const png = PNG.sync.read(readFileSync(join(folder, "public", file)));
+      return [png.width, png.height];
+    };
+    expect(size("favicon-32x32.png")).toEqual([32, 32]);
+    expect(size("apple-touch-icon.png")).toEqual([180, 180]);
+    expect(size("icon-512.png")).toEqual([512, 512]);
+    expect(size("og-image.png")).toEqual([1200, 630]);
+    const ico = readFileSync(join(folder, "public", "favicon.ico"));
+    expect([ico.readUInt16LE(2), ico.readUInt16LE(4)]).toEqual([1, 3]);
+    expect(JSON.parse(readFileSync(join(folder, "public", "site.webmanifest"), "utf8"))).toMatchObject({ name: "Клиника", icons: [{ sizes: "192x192" }, { sizes: "512x512" }] });
+  });
+});
+
 describe("a real browser", () => {
   let driver: AgentBrowser | undefined;
   let profile = "";
@@ -240,6 +295,21 @@ describe("a real browser", () => {
       expect(await call(tools, "page_compare", { name: "home" })).toBe("No visible change at 1280 px.");
       await driver.command("Runtime.evaluate", { expression: "document.getElementById('t').style.marginLeft = '400px'" });
       expect(await call(tools, "page_compare", { name: "home" })).toMatch(/% of the page changed at 1280 px\. Changed between \d+ and \d+ px from the top\./);
+
+      // The page against a design: the same page as the design matches; a moved heading differs, in the right band.
+      const folder = temp("drimvox-design-");
+      await driver.command("Runtime.evaluate", { expression: "document.getElementById('t').style.marginLeft = '40px'" });
+      const self = (await driver.command("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: 0, y: 0, width: 1280, height: 600, scale: 1 } })) as { data: string };
+      writeFileSync(join(folder, "design.png"), Buffer.from(self.data, "base64"));
+      const design = compareTools(driver, snaps, hooks, undefined, new Workspace(folder));
+      expect(await call(design, "page_match_design", { design: "design.png", width: 1280 })).toMatch(/^0\.\d% differs from the design at 1280 px/);
+      await driver.command("Runtime.evaluate", { expression: "document.getElementById('t').style.marginLeft = '600px'" });
+      expect(await call(design, "page_match_design", { design: "design.png", width: 1280 })).toMatch(/[1-9]\d*\.\d% differs from the design at 1280 px\. Most in: 75–150 px/);
+      // A diagram from Mermaid (needs the internet for Mermaid the first time; offline it says so).
+      const drawn = await call(design, "render_diagram", { code: "flowchart LR\n  A[Запись] --> B[Приём]", output: "docs/flow.svg" });
+      // Cyrillic labels stay Cyrillic (seen: without a charset they came out garbled).
+      if (drawn.startsWith("Saved")) expect(readFileSync(join(folder, "docs/flow.svg"), "utf8")).toMatch(/^<svg[\s\S]*Приём/);
+      else expect(drawn).toMatch(/internet|could not draw/);
 
       // The text on a picture, read by Windows itself when no model that sees is set.
       if (process.platform === "win32") {
