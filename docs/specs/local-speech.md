@@ -26,8 +26,9 @@
 провайдера с ключом, кроме локальных, по подписке и тех, у кого речи нет:
 - OpenAI-совместимые (OpenRouter, RouterAI, OpenAI, свои адреса): `GET /models?output_modalities=speech` (OpenRouter
   без этого вопроса модели речи не показывает), модели с `output_modalities: ["speech"]` (или `tts` в названии, если
-  каталог модальностей не пишет). Голоса — из `supported_voices` каталога (OpenRouter), иначе по семейству: Gemini (30),
-  OpenAI, Grok, ElevenLabs, HeyGen. Модели без известных голосов (Fish Audio: голоса там делает сам пользователь) не
+  каталог модальностей не пишет, как у Groq, Together и DeepInfra: по названию — `tts`, Orpheus, Kokoro). Голоса — из
+  `supported_voices` каталога (OpenRouter), иначе по семейству: Gemini (30), OpenAI, Grok, ElevenLabs, HeyGen, Kokoro,
+  Voxtral, Orpheus (у Groq свои голоса). Модели без известных голосов (Fish Audio: голоса там делает сам пользователь) не
   показываются. Читают через `POST /audio/speech`: mp3, а если провайдер отвечает, что модель умеет только `pcm`
   (видели у HeyGen), — заново в `pcm`; Gemini — сразу `pcm`. PCM (16 бит, 24 кГц, моно) оборачивается в WAV.
 - Gemini напрямую: модели с `tts` из списка моделей ключа, 30 голосов, `generateContent` с `responseModalities: AUDIO`.

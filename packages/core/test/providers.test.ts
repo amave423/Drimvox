@@ -39,7 +39,7 @@ describe("connecting providers", () => {
 
   // Asked for: more popular providers as cards; each fills its own address and asks for a key.
   it("connects the popular OpenAI-style providers by their cards", async () => {
-    for (const id of ["groq", "cerebras", "mistral", "together", "fireworks", "zai", "moonshot", "qwen", "minimax", "huggingface", "sambanova", "opencode", "deepinfra", "novita", "chutes", "nebius", "hyperbolic", "cohere", "featherless", "nscale", "requesty", "aimlapi", "siliconflow", "inferencenet", "vercel", "baseten", "llama", "inception"] as const) {
+    for (const id of ["groq", "cerebras", "mistral", "together", "fireworks", "zai", "moonshot", "qwen", "minimax", "huggingface", "sambanova", "opencode", "deepinfra", "novita", "chutes", "nebius", "hyperbolic", "cohere", "featherless", "nscale", "requesty", "aimlapi", "siliconflow", "inferencenet", "vercel", "baseten", "llama", "inception", "perplexity", "venice", "poe", "byteplus", "hunyuan", "friendli", "nous", "arcee", "upstage", "writer", "parasail", "scaleway"] as const) {
       expect(presets[id]).toMatchObject({ keyRequired: true, editableUrl: false });
       expect(presets[id].baseUrl).toMatch(/^https:\/\//);
       expect(presets[id].keyUrl).toMatch(/^https:\/\//);
@@ -49,10 +49,12 @@ describe("connecting providers", () => {
     }
   });
 
-  // Pollinations answers without a key (a key only raises its limits).
-  it("connects Pollinations without a key", async () => {
-    expect(presets.pollinations.keyRequired).toBe(false);
-    expect((await env.call("POST", "/api/providers", { preset: "pollinations" })).status).toBe(201);
+  // Pollinations, LLM7 and OVHcloud answer without a key (a key only raises their limits).
+  it("connects Pollinations, LLM7 and OVHcloud without a key", async () => {
+    for (const id of ["pollinations", "llm7", "ovhcloud"] as const) {
+      expect(presets[id].keyRequired).toBe(false);
+      expect((await env.call("POST", "/api/providers", { preset: id })).status).toBe(201);
+    }
   });
 
   it("never returns the key", async () => {

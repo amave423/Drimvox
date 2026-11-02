@@ -137,7 +137,9 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
   let models: ModelInfo[];
   if (NATIVE.includes(conn.preset)) models = await nativeModels(conn);
   else {
-    const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
+    // Perplexity answers at its root but lists its models under /v1.
+    const listUrl = conn.preset === "perplexity" ? `${conn.baseUrl}/v1/models` : `${conn.baseUrl}/models`;
+    const body = (await fetchJson(listUrl, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
     const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
     models = normalizeModels(conn.preset, items, await usdPer(conn.currency));
     if (conn.preset === "ollama") models = (await withOllamaDetails(conn, models)).map((m) => (m.name === m.id ? { ...m, name: localModelTitle(m.id).title } : m));

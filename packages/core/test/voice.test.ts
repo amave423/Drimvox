@@ -157,4 +157,29 @@ describe("a provider's voice reads answers", () => {
     expect(refused.status).toBe(502);
     expect((await refused.json()).error.detail).toContain("Insufficient credits");
   });
+
+  // Groq, Together and DeepInfra list their speech models without saying what they make: known by the name, with the
+  // voices of their family; some speak PCM only and say so, and are asked again in PCM.
+  it("finds speech models a catalog does not mark, and asks again in PCM when told to", async () => {
+    fake = await startFakeProvider({
+      authorized: (h) => h.authorization === `Bearer ${KEY}`,
+      handle: (method, path, body) => {
+        if (method === "GET" && path === "/v1/models") return { json: { data: [{ id: "canopylabs/orpheus-v1-english" }, { id: "hexgrad/Kokoro-82M" }, { id: "llama-3.3-70b" }, { id: "whisper-large-v3" }] } };
+        if (method === "POST" && path === "/v1/audio/speech")
+          return body.response_format === "mp3" ? { status: 400, json: { error: { message: 'This model only supports response_format "pcm".' } } } : { bytes: Buffer.alloc(480, 3), contentType: "audio/pcm" };
+        return undefined;
+      },
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const models = await (await env.call("GET", "/api/voice/cloud")).json();
+    expect(models.map((m: any) => [m.model, m.voices[0]])).toEqual([
+      ["canopylabs/orpheus-v1-english", "autumn"],
+      ["hexgrad/Kokoro-82M", "af_heart"],
+    ]);
+    await env.call("PATCH", "/api/settings", { cloudVoice: { providerId: provider.id, model: "canopylabs/orpheus-v1-english", voice: "autumn" } });
+    const res = await env.call("POST", "/api/voice/speak", { text: "Hello" });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("audio/wav");
+    expect(fake.requests.filter((r) => r.path === "/v1/audio/speech").map((r) => r.body.response_format)).toEqual(["mp3", "pcm"]);
+  });
 });

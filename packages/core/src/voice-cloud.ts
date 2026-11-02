@@ -16,7 +16,15 @@ const FAMILIES: [RegExp, string[]][] = [
   [/grok.*(voice|tts)/i, ["eve", "ara", "rex", "sal", "leo"]],
   [/^elevenlabs\//i, ["george", "sarah", "adam", "alice", "bella", "bill", "brian", "callum", "charlie", "chris", "daniel", "eric", "harry", "jessica", "laura", "liam", "lily", "matilda", "river", "roger", "will"]],
   [/^heygen\//i, ["nadine", "tabitha", "bram", "gareth", "noelle", "meredith", "sabrina", "lucian", "weston", "vincent"]],
+  [/kokoro/i, ["af_heart", "af_bella", "af_nicole", "af_sarah", "af_sky", "am_adam", "am_michael", "am_eric", "bf_emma", "bf_isabella", "bm_george", "bm_lewis", "ef_dora", "em_alex", "ff_siwis", "if_sara", "im_nicola", "pf_dora", "pm_alex", "jf_alpha", "zf_xiaoxiao", "zm_yunxi"]],
+  [/voxtral.*tts/i, ["en_paul_neutral", "en_paul_cheerful", "en_paul_confident", "gb_oliver_neutral", "gb_oliver_cheerful", "gb_jane_neutral", "gb_jane_confident", "fr_marie_neutral", "fr_marie_happy"]],
+  // Groq's Orpheus has its own voices; Canopy's own and the others' have these.
+  [/orpheus-v1/i, ["autumn", "diana", "hannah", "austin", "daniel", "troy"]],
+  [/orpheus/i, ["tara", "leah", "jess", "leo", "dan", "mia", "zac"]],
 ];
+
+/** Speech models by name, where the catalog does not say what a model makes. */
+const SPEECH_ID = /(^|[/-])tts([-.]|$)|tts-1|orpheus|kokoro/i;
 
 /** Providers that never have voices: on this computer, by subscription, or a chain of chat models. */
 const NO_VOICES = new Set(["ollama", "lmstudio", "sdcpp", "whispercpp", "anthropic", "deepseek"]);
@@ -80,6 +88,8 @@ interface CatalogEntry {
   architecture?: { output_modalities?: string[] };
   pricing?: { prompt?: string | number };
   supported_voices?: unknown;
+  /** Together marks its models with a type. */
+  type?: string;
 }
 
 /** The speech models of one provider, from its own catalog, with their voices; none when it has no such models. */
@@ -99,7 +109,7 @@ async function catalog(conn: Connection): Promise<Omit<CloudSpeechModel, "provid
   if (!res.ok) throw await failure(res);
   const entries = ((await res.json()) as { data?: CatalogEntry[] }).data ?? [];
   return entries
-    .filter((e) => (e.architecture?.output_modalities ? e.architecture.output_modalities.includes("speech") : /(^|[/-])tts([-.]|$)|tts-1/i.test(e.id)))
+    .filter((e) => (e.architecture?.output_modalities ? e.architecture.output_modalities.includes("speech") : e.type === "tts" || SPEECH_ID.test(e.id)))
     .map((e) => {
       const listedVoices = Array.isArray(e.supported_voices) ? e.supported_voices.filter((v): v is string => typeof v === "string") : [];
       return { model: e.id, name: e.name ?? e.id, free: Number(e.pricing?.prompt ?? NaN) === 0, voices: listedVoices.length ? listedVoices : (familyVoices(e.id) ?? []) };
