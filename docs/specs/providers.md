@@ -22,8 +22,14 @@
 - Часть бесплатна (`free: "some"`): Gemini (Flash, Flash-Lite, Gemma), OpenRouter (`:free`), LLM7 (модели Turbo — без
   ключа; проверено живым запросом, Pro просят ключ и деньги), Kilo Code Gateway (17 бесплатных без ключа — проверено),
   Vercel (модели «Free» и $5 в месяц), Hugging Face (небольшой кредит в месяц), Pollinations.
-- Не добавлены: GitHub Models (вместо списка моделей отвечает «OK»), ModelScope и SiliconFlow (нужна китайская
-  верификация), Gonka (SMS), международный Z.AI бесплатных моделей не даёт (бесплатные Flash — у китайского Zhipu).
+- Добавлены во второй круг (попросили: и неофициальных, у кого есть бесплатные модели; найдены по подборкам SoftHive, Хабра и
+  airassvet, у каждого проверен адрес): Ollama Cloud и Gonka (всё бесплатно с лимитом), Zhipu (open.bigmodel.cn, модели
+  Flash), OrcaRouter (7 моделей «-free» в открытом каталоге), TeamoRouter, NaraRouter (бесплатно после привязки Telegram),
+  Agnes AI; у OpenCode Zen — 7 моделей «-free» (цены в его каталоге — `cost` за миллион, как у models.dev).
+- Не добавлены: FreeRouter (сервер не отвечает), Glhf.chat (ошибка 526), Cline (пускает только свою программу), Token
+  Harbor (бесплатно только 7 дней), ModelScope (не открывается отсюда; нужна китайская верификация), Aion Labs (в
+  каталоге только платные цены), GitHub Models (вместо списка моделей отвечает «OK»), SiliconFlow (нужна китайская
+  верификация), международный Z.AI бесплатных моделей не даёт (бесплатные Flash — у китайского Zhipu).
 
 ## Каталоги (`providers/catalog.ts`, `media/catalog.ts`)
 

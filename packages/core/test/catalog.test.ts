@@ -180,6 +180,23 @@ describe("normalizeModels", () => {
     expect(groq.map((m) => [m.id, m.priceIn, m.freeTier])).toEqual([["openai/gpt-oss-120b", 0.15, true]]);
   });
 
+  // Checked live (2026-11): OpenCode Zen gives prices as models.dev's "cost" per million, OrcaRouter marks its free
+  // models "-free" with a zero per-request price only, Zhipu's Flash models are free.
+  it("reads OpenCode's costs, OrcaRouter's free models and Zhipu's free Flash", () => {
+    const zen = normalizeModels("opencode", [{ id: "glm-5.3", cost: { input: 0.6, output: 2.2 } }, { id: "glm-5.3-flash-free" }]);
+    expect(zen.map((m) => [m.id, m.priceIn, m.priceOut])).toEqual([
+      ["glm-5.3", 0.6, 2.2],
+      ["glm-5.3-flash-free", 0, 0],
+    ]);
+    const orca = normalizeModels("orcarouter", [{ id: "deepseek/deepseek-v4-flash-free", pricing: { request: "0.000000" } }]);
+    expect([orca[0]!.priceIn, orca[0]!.priceOut]).toEqual([0, 0]);
+    const zhipu = normalizeModels("zhipu", [{ id: "glm-4.7-flash" }, { id: "glm-4.7-flashx" }]);
+    expect(zhipu.map((m) => [m.id, m.freeTier ?? false])).toEqual([
+      ["glm-4.7-flash", true],
+      ["glm-4.7-flashx", false],
+    ]);
+  });
+
   it("sorts by name and drops entries without an id", () => {
     const models = normalizeModels("custom", [{ id: "b" }, { name: "no id" }, { id: "a" }]);
     expect(models.map((m) => m.id)).toEqual(["a", "b"]);

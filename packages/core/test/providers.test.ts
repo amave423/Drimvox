@@ -39,7 +39,7 @@ describe("connecting providers", () => {
 
   // Asked for: more popular providers as cards; each fills its own address and asks for a key.
   it("connects the popular OpenAI-style providers by their cards", async () => {
-    for (const id of ["groq", "cerebras", "mistral", "together", "fireworks", "zai", "moonshot", "qwen", "minimax", "huggingface", "sambanova", "opencode", "deepinfra", "novita", "chutes", "nebius", "hyperbolic", "cohere", "featherless", "nscale", "requesty", "aimlapi", "siliconflow", "inferencenet", "vercel", "baseten", "llama", "inception", "perplexity", "venice", "poe", "byteplus", "hunyuan", "friendli", "nous", "arcee", "upstage", "writer", "parasail", "scaleway"] as const) {
+    for (const id of ["groq", "cerebras", "mistral", "together", "fireworks", "zai", "moonshot", "qwen", "minimax", "huggingface", "sambanova", "opencode", "deepinfra", "novita", "chutes", "nebius", "hyperbolic", "cohere", "featherless", "nscale", "requesty", "aimlapi", "siliconflow", "inferencenet", "vercel", "baseten", "llama", "inception", "perplexity", "venice", "poe", "byteplus", "hunyuan", "friendli", "nous", "arcee", "upstage", "writer", "parasail", "scaleway", "ollamacloud", "zhipu", "orcarouter", "teamorouter", "nararouter", "agnes", "gonka"] as const) {
       expect(presets[id]).toMatchObject({ keyRequired: true, editableUrl: false });
       expect(presets[id].baseUrl).toMatch(/^https:\/\//);
       expect(presets[id].keyUrl).toMatch(/^https:\/\//);

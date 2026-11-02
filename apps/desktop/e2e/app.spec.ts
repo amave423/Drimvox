@@ -403,6 +403,8 @@ test("groups the providers by what is free, and says on each card what is", asyn
   await expect(group("Бесплатно с лимитами").getByRole("radio", { name: /Groq/ })).toContainText("Все модели бесплатно");
   await expect(group("Есть бесплатные модели").getByRole("radio", { name: /OpenRouter/ })).toContainText("free");
   await expect(group("Есть бесплатные модели").getByRole("radio", { name: /Kilo Code/ })).toContainText("без ключа");
+  await expect(group("Бесплатно с лимитами").getByRole("radio", { name: /Ollama Cloud/ })).toBeVisible();
+  await expect(group("Есть бесплатные модели").getByRole("radio", { name: /OrcaRouter/ })).toContainText("-free");
   await expect(group("Только платные").getByRole("radio", { name: /^DeepSeek/ })).toBeVisible();
   await expect(group("Только платные").getByRole("radio", { name: /^Groq/ })).toHaveCount(0);
   await expect(group("Свой сервер").getByRole("radio", { name: /OpenAI-совместимый/ })).toBeVisible();

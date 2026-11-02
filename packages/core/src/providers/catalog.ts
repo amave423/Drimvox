@@ -49,7 +49,7 @@ const namedFree = /[-:/_]free$/i;
 /** Catalogs that say what kind each model is (Vercel's `type`, LLM7's `model_type`): only these kinds chat. */
 const chatKinds = /^(language|chat|llm|text)$/i;
 /** Providers whose every model is free up to a limit on a key without billing (docs/specs/providers.md, checked 2026-11). */
-const allFreeTier = new Set<PresetId>(["groq", "cerebras", "mistral", "cohere", "cloudflare", "ovhcloud"]);
+const allFreeTier = new Set<PresetId>(["groq", "cerebras", "mistral", "cohere", "cloudflare", "ovhcloud", "ollamacloud", "gonka"]);
 
 /** The cheapest live provider's prices behind a Hugging Face model, per 1M tokens, and whether one serves it free. */
 function huggingFacePrices(raw: Raw): { in: number | null; out: number | null; free: boolean } {
@@ -68,6 +68,8 @@ function freeTierOf(preset: PresetId, raw: Raw): boolean {
   // LLM7: its Turbo models answer free, even without a key (checked live); Pro ones need a paid key.
   if (preset === "llm7") return raw.tier === "turbo" && raw.usage_based_only !== true;
   if (preset === "huggingface") return huggingFacePrices(raw).free;
+  // Zhipu's Flash models (GLM-4.7-Flash, GLM-4.6V-Flash…) are free; FlashX are not.
+  if (preset === "zhipu") return typeof raw.id === "string" && /-flash$/i.test(raw.id);
   return raw.isFree === true || (Array.isArray(raw.tags) && raw.tags.includes("free"));
 }
 
@@ -101,8 +103,11 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     // Hugging Face give theirs per million tokens already (seen: 260 of Vercel's and LLM7's prices were "unknown").
     const perUnit = typeof pricing.unit === "string" && /1M/i.test(pricing.unit) ? 1_000_000 : 1;
     const hf = preset === "huggingface" ? huggingFacePrices(raw) : null;
-    let priceIn = hf ? perMillion(hf.in === null ? null : hf.in / 1_000_000, toUsd) : perMillion(scaled(pricing.prompt ?? pricing.input, perUnit), toUsd);
-    let priceOut = hf ? perMillion(hf.out === null ? null : hf.out / 1_000_000, toUsd) : perMillion(scaled(pricing.completion ?? pricing.output, perUnit), toUsd);
+    // models.dev's shape (OpenCode Zen): "cost" per million tokens.
+    const cost = (raw.cost ?? {}) as Raw;
+    const perM = (v: unknown) => (typeof v === "number" ? v / 1_000_000 : null);
+    let priceIn = hf ? perMillion(hf.in === null ? null : hf.in / 1_000_000, toUsd) : perMillion(scaled(pricing.prompt ?? pricing.input, perUnit) ?? perM(cost.input), toUsd);
+    let priceOut = hf ? perMillion(hf.out === null ? null : hf.out / 1_000_000, toUsd) : perMillion(scaled(pricing.completion ?? pricing.output, perUnit) ?? perM(cost.output), toUsd);
     let priceCacheRead = perMillion(scaled(pricing.input_cache_read, perUnit), toUsd);
     let priceEstimated = false;
     // Paid per request (music, some search models) with no token price: not free, and its token price says nothing.
