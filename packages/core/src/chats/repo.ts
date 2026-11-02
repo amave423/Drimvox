@@ -97,7 +97,7 @@ export class ChatRepo {
         `select c.*,
            exists(select 1 from messages m where m.chat_id = c.id and m.status = 'streaming') as answering,
            coalesce((select max(m.created_at) from messages m where m.chat_id = c.id and m.role = 'assistant' and m.status != 'streaming'), 0) > coalesce(c.seen_at, 0) as unread
-         from chats c order by c.updated_at desc`,
+         from chats c order by c.updated_at desc, c.rowid desc`,
       )
       .all() as unknown as ChatRow[];
     return rows.map(toChat);
