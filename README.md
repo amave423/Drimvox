@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/amave423/Drimvox/releases/latest"><img src="https://img.shields.io/github/v/release/amave423/Drimvox?label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F&color=2b4c7e&style=flat-square" alt="Версия"></a>
   <a href="https://github.com/amave423/Drimvox/releases"><img src="https://img.shields.io/github/downloads/amave423/Drimvox/total?label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D1%8F&color=2f6b45&style=flat-square" alt="Скачивания"></a>
-  <img src="https://img.shields.io/badge/Windows%20%C2%B7%20Linux-6b6a63?style=flat-square" alt="Windows и Linux">
+  <img src="https://img.shields.io/badge/Windows%20%C2%B7%20Linux%20%C2%B7%20macOS-6b6a63?style=flat-square" alt="Windows, Linux и macOS">
   <a href="#лицензия"><img src="https://img.shields.io/badge/license-FSL--1.1--MIT-6b6a63?style=flat-square" alt="Лицензия FSL-1.1-MIT"></a>
 </p>
 
@@ -25,7 +25,7 @@
 телефоне, исправит и покажет готовый результат. Вы платите напрямую сервисам нейросетей — по своему ключу, по
 подписке Claude или ChatGPT — или работаете бесплатно: на бесплатных моделях провайдеров и на своём компьютере.
 
-*Drimvox is a desktop app for Windows and Linux: chat with any AI model, or hand an agent a whole project — it
+*Drimvox is a desktop app for Windows, Linux and macOS: chat with any AI model, or hand an agent a whole project — it
 interviews you, writes a plan and builds it by itself right in your folder, checking its pages on a desktop and a
 phone. Works with your own API keys, your Claude or ChatGPT subscription, free models or local ones.*
 
@@ -127,6 +127,24 @@ phone. Works with your own API keys, your Claude or ChatGPT subscription, free m
 
 **Linux** — `Drimvox-<версия>-x86_64.AppImage` (любой дистрибутив: `chmod +x` и запустить) или
 `Drimvox-<версия>-amd64.deb` для Ubuntu и Debian: `sudo apt install ./Drimvox-<версия>-amd64.deb`.
+
+**macOS** (Apple Silicon: M1 и новее) — `Drimvox-<версия>-mac-arm64.dmg`: открыть и перетащить Drimvox в «Программы».
+
+<details>
+<summary>macOS не открывает Drimvox</summary>
+
+Drimvox пока не подписан Apple, поэтому при первом запуске macOS предупреждает:
+
+- **«Не удаётся проверить разработчика»**: «Системные настройки» → «Конфиденциальность и безопасность» → внизу
+  «Drimvox заблокирован…» → «Всё равно открыть», затем подтвердить паролем.
+- **«Приложение повреждено и не может быть открыто»** — так macOS называет неподписанное скачанное приложение. В
+  «Терминале»: `xattr -cr /Applications/Drimvox.app`, потом открыть снова.
+
+Обновления на Mac Drimvox находит сам, но ставить их нужно вручную: он покажет новую версию и ссылку на неё.
+Окна других программ агент на Mac не видит (это есть только на Windows), а речь распознают облачные модели —
+локального whisper под Mac пока нет.
+
+</details>
 
 **Обновления** Drimvox скачивает сам и предлагает перезапуститься; «Настройки» → «Обновления» показывает, как идёт.
 Ключи, чаты и проекты при обновлении сохраняются.

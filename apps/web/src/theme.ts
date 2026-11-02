@@ -10,6 +10,8 @@ export function resolveTheme(theme: Theme, systemDark: boolean): ResolvedTheme {
 export function applyTheme(resolved: ResolvedTheme): void {
   const root = document.documentElement;
   root.dataset.theme = resolved;
+  // The desktop app on macOS: its window buttons sit on the left of the top bar (docs/specs/macos.md).
+  root.classList.toggle("is-mac-window", !!window.drimvox && /Mac/i.test(navigator.platform));
   const css = getComputedStyle(root);
   window.drimvox?.setTitleBar({
     background: css.getPropertyValue("--paper").trim(),

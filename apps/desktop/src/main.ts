@@ -525,8 +525,11 @@ async function createWindow(view?: "local" | "local-images") {
     title: "Drimvox",
     backgroundColor: dark ? "#1b1b19" : "#e4e5e0",
     titleBarStyle: "hidden",
-    // A little lower than the 44px bar, so its bottom line runs under the window buttons at any display scale.
-    titleBarOverlay: { color: dark ? "#222220" : "#eeefea", symbolColor: dark ? "#e9e8e2" : "#22211e", height: 42 },
+    // A little lower than the 44px bar, so its bottom line runs under the window buttons at any display scale. macOS has
+    // its own buttons on the left instead, set in the middle of the bar (the page leaves room for them).
+    ...(process.platform === "darwin"
+      ? { trafficLightPosition: { x: 16, y: 15 } }
+      : { titleBarOverlay: { color: dark ? "#222220" : "#eeefea", symbolColor: dark ? "#e9e8e2" : "#22211e", height: 42 } }),
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -561,6 +564,10 @@ async function createWindow(view?: "local" | "local-images") {
 }
 
 app.on("window-all-closed", () => app.quit());
+// macOS: a click on the Dock's icon brings back the window left in the tray.
+app.on("activate", () => {
+  if (win && !win.isDestroyed()) win.show();
+});
 let quitting = false;
 let stopping = false;
 app.on("before-quit", (event) => {

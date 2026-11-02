@@ -25,7 +25,7 @@ const CHECK_EVERY_MS = 3600_000;
 
 /**
  * Updates from the GitHub releases of the repository: the installed Windows app and the AppImage download the new
- * version by themselves and install it on restart; a .deb only says where to get it. Nothing runs unpackaged.
+ * version by themselves and install it on restart; a .deb and macOS only say where to get it. Nothing runs unpackaged.
  */
 export function startUpdates(
   window: () => BrowserWindow | null,
@@ -53,8 +53,9 @@ export function startUpdates(
   autoUpdater.logger = { info: (m: unknown) => log("info", m), warn: (m: unknown) => log("warn", m), error: (m: unknown) => log("error", m), debug: () => {} };
   log("info", `Drimvox ${app.getVersion()} looks for updates`);
 
-  // Only Windows' installer and the AppImage can replace themselves; a .deb needs root.
-  const manual = process.platform === "linux" && !process.env.APPIMAGE;
+  // Only Windows' installer and the AppImage can replace themselves; a .deb needs root, and macOS takes an update only
+  // from an app signed by Apple, which Drimvox is not yet (docs/specs/macos.md).
+  const manual = (process.platform === "linux" && !process.env.APPIMAGE) || process.platform === "darwin";
   autoUpdater.autoDownload = !manual;
   autoUpdater.autoInstallOnAppQuit = true;
   const tell = (state: UpdateState) => {

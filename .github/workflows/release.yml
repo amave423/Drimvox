@@ -28,7 +28,8 @@ jobs:
       fail-fast: false
       matrix:
         # A fixed Ubuntu: the AppImage runs on systems no older than the one it was built on.
-        os: [windows-latest, ubuntu-24.04]
+        # macOS: Apple Silicon (docs/specs/macos.md).
+        os: [windows-latest, ubuntu-24.04, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

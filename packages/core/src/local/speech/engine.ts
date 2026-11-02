@@ -15,7 +15,11 @@ export function piperUrl(platform: string = process.platform, arch: string = pro
         ? "piper_linux_x86_64.tar.gz"
         : platform === "linux" && arch === "arm64"
           ? "piper_linux_aarch64.tar.gz"
-          : null;
+          : platform === "darwin"
+            ? arch === "arm64"
+              ? "piper_macos_aarch64.tar.gz"
+              : "piper_macos_x64.tar.gz"
+            : null;
   return asset ? `${RELEASES}/${PIPER_TAG}/${asset}` : null;
 }
 

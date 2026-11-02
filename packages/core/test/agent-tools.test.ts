@@ -15,7 +15,9 @@ beforeEach(() => {
   ws = new Workspace(root);
 });
 
-afterEach(() => rmSync(root, { recursive: true, force: true }));
+// A command stopped at its timeout lets go of the folder a moment later on Windows (seen: EPERM now and then in the full
+// verify): the removal tries again for a while.
+afterEach(() => rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
 
 describe("workspace", () => {
   it("keeps every path inside the copy", () => {

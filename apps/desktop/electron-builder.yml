@@ -1,4 +1,4 @@
-# Installers: Windows (NSIS, per user), Linux (AppImage and .deb). Releases go to GitHub, where the app looks for updates.
+# Installers: Windows (NSIS, per user), Linux (AppImage and .deb), macOS (dmg, Apple Silicon). Releases go to GitHub, where the app looks for updates.
 # Build with `npm run dist` (this computer's system) or let .github/workflows/release.yml build both on a version tag.
 appId: com.drimvox.app
 productName: Drimvox
@@ -58,6 +58,21 @@ linux:
   maintainer: amave423 <artem123antropov@mail.ru>
   synopsis: A team of AI agents writes code under your review
   artifactName: Drimvox-${version}-${arch}.${ext}
+# macOS on Apple Silicon (docs/specs/macos.md). Not signed by Apple yet: an ad-hoc signature ("-") lets it run at all on
+# Apple Silicon; the first start goes through "Open Anyway". The zip is what electron-updater would need once signed.
+mac:
+  target:
+    - target: dmg
+      arch: arm64
+    - target: zip
+      arch: arm64
+  category: public.app-category.developer-tools
+  artifactName: Drimvox-${version}-mac-${arch}.${ext}
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+dmg:
+  title: Drimvox ${version}
 deb:
   depends:
     - libnotify4
