@@ -48,7 +48,8 @@ export function compareTools(
     await driver.command("Emulation.setDeviceMetricsOverride", { width, height: width < 768 ? 844 : 900, deviceScaleFactor: 1, mobile: false });
     await new Promise((r) => setTimeout(r, 600));
     try {
-      const size = (await driver.command("Runtime.evaluate", { expression: "[innerWidth, document.documentElement.scrollHeight]", returnByValue: true })) as { result: { value: [number, number] } };
+      // A short page is as tall as the emulated window, whatever the real one is (seen on a Mac: 860 one time, 900 the next).
+      const size = (await driver.command("Runtime.evaluate", { expression: "[innerWidth, Math.max(document.documentElement.scrollHeight, innerHeight)]", returnByValue: true })) as { result: { value: [number, number] } };
       const [w, h] = size.result.value;
       const shot = (await driver.command("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: w, height: Math.min(h, 8000), scale: 1 }, captureBeyondViewport: true })) as { data: string };
       return Buffer.from(shot.data, "base64");
