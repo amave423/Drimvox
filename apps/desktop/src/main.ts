@@ -516,9 +516,12 @@ async function createWindow(view?: "local" | "local-images") {
   const dark = nativeTheme.shouldUseDarkColors;
   // About 80% of the screen's width, as Claude Code opens (asked for); the height as before, within the screen.
   const area = screen.getPrimaryDisplay().workAreaSize;
+  // Tests may fix the size ("1600x1000"): a Mac runner's small screen gave the narrow layout (docs/specs/macos.md).
+  const fixed = /^(\d+)x(\d+)$/.exec(process.env.DRIMVOX_TEST_WINDOW ?? "");
   win = new BrowserWindow({
-    width: Math.max(960, Math.min(area.width, Math.round(area.width * 0.8))),
-    height: Math.min(860, area.height),
+    width: fixed ? Number(fixed[1]) : Math.max(960, Math.min(area.width, Math.round(area.width * 0.8))),
+    height: fixed ? Number(fixed[2]) : Math.min(860, area.height),
+    ...(fixed ? { enableLargerThanScreen: true } : {}),
     minWidth: 960,
     minHeight: 600,
     show: false,

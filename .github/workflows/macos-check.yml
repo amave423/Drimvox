@@ -21,6 +21,8 @@ jobs:
       - name: Build the app (dmg, not published)
         working-directory: apps/desktop
         run: npx electron-builder --mac --publish never
+      - name: The screen
+        run: system_profiler SPDisplaysDataType | grep -i resolution || true
       - run: npx playwright test
       - name: Keep what failed
         if: failure()

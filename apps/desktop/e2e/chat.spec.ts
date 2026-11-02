@@ -447,7 +447,8 @@ test("dictation shows a live wave with the time, then writes the words into the 
   await expect(live.locator(".dictate-time")).toHaveText("0:01", { timeout: 5000 });
   // The bars follow the microphone (its fake one beeps once a second): some stand taller than the resting line.
   expect(await live.locator(".dictate-wave span").evaluateAll((bars) => bars.filter((b) => !/scaleY\(0\.08\)/.test((b as HTMLElement).style.transform)).length)).toBeGreaterThan(0);
-  await live.click();
+  // The pill never stops moving (the wave, the time): pressed as a click on it, not after waiting for it to be still.
+  await live.dispatchEvent("click");
   await expect(live).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: /Сообщение/ })).toHaveValue("Запиши Иванову на четверг");
   // The recording went to the model as WAV, with the language told.
