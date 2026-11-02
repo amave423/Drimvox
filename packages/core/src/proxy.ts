@@ -3,6 +3,20 @@ import { ProxyAgent, fetch as proxiedFetch } from "undici";
 import type { Database } from "./db";
 import { describeError, ProviderFailure } from "./providers/errors";
 import type { Cipher } from "./secrets";
+import { Socket } from "node:net";
+
+// undici sets a type of service on every request's socket, and macOS refuses it on some (seen on a Mac: EINVAL thrown
+// outside any request, which would bring the core down). It is only a hint to the network: refused, the request goes on.
+const setTos = (Socket.prototype as { setTypeOfService?: (tos: number) => Socket }).setTypeOfService;
+if (setTos) {
+  (Socket.prototype as { setTypeOfService?: (tos: number) => Socket }).setTypeOfService = function (this: Socket, tos: number) {
+    try {
+      return setTos.call(this, tos);
+    } catch {
+      return this;
+    }
+  };
+}
 
 /** Kept next to the settings, encrypted: the address may hold a password. */
 const KEY = "proxy";

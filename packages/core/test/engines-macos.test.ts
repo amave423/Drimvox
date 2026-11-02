@@ -15,3 +15,15 @@ describe("engines on macOS", () => {
     expect(whisperUrl("darwin", "arm64")).toBeNull();
   });
 });
+
+describe("a type of service the system refuses", () => {
+  it("does not throw out of a request's socket (seen on a Mac: EINVAL from undici on every request)", async () => {
+    await import("../src/proxy");
+    const { Socket } = await import("node:net");
+    const socket = new Socket() as InstanceType<typeof Socket> & { setTypeOfService?: (tos: number) => unknown };
+    if (!socket.setTypeOfService) return;
+    // Not connected: the system refuses it on every platform, as macOS does on some connected sockets.
+    expect(() => socket.setTypeOfService!(0)).not.toThrow();
+    socket.destroy();
+  });
+});
