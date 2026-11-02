@@ -20,7 +20,8 @@
     "bench": "node scripts/bench.mjs",
     "live-local-media": "node scripts/live-local-media.mjs",
     "server": "npm run build -w @drimvox/web && npm run build -w @drimvox/server && node apps/server/dist/server.mjs",
-    "server:install": "bash scripts/install-server.sh"
+    "server:install": "bash scripts/install-server.sh",
+    "screenshots": "npm run build && playwright test -c playwright.shots.config.ts"
   },
   "engines": {
     "node": ">=22.13"

@@ -423,7 +423,7 @@ export const en: Record<keyof typeof ru, string> = {
   "side.addProject": "+ Project",
   "side.projectsEmpty": "Connect a project folder so an agent can work in it.",
 
-  "project.copyNote": "The agent works right in the project folder: what it does is in your files at once. It asks before risky commands. Git stays yours: the agent does not commit.",
+  "project.copyNote": "The agent works right in the project folder: what it does is in your files at once. It asks before risky commands. How it works with git is below.",
   "project.notRepoTitle": "Turn on version history (git)?",
   "project.notRepoBody": "Drimvox keeps the project's version history with git, right in this folder on your computer. Nothing goes to GitHub or the internet. Drimvox makes a first commit of every file in the folder in your name. The agent needs this to start.",
   "project.initGit": "Turn on git",
