@@ -49,9 +49,9 @@ describe("connecting providers", () => {
     }
   });
 
-  // Pollinations, LLM7 and OVHcloud answer without a key (a key only raises their limits).
-  it("connects Pollinations, LLM7 and OVHcloud without a key", async () => {
-    for (const id of ["pollinations", "llm7", "ovhcloud"] as const) {
+  // Pollinations, LLM7, OVHcloud and Kilo answer without a key (a key only raises their limits).
+  it("connects Pollinations, LLM7, OVHcloud and Kilo without a key", async () => {
+    for (const id of ["pollinations", "llm7", "ovhcloud", "kilo"] as const) {
       expect(presets[id].keyRequired).toBe(false);
       expect((await env.call("POST", "/api/providers", { preset: id })).status).toBe(201);
     }

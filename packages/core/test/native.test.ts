@@ -264,3 +264,43 @@ describe("a provider that gives no prices", () => {
     expect(flat.every((m) => m.priceIn === 0 && m.priceOut === 0)).toBe(true);
   });
 });
+
+// Seen live (2026-11): Vercel and LLM7 list their picture models in /models with each model's kind, and the app said
+// they had none. Cloudflare lists its models at /ai/models/search, not /ai/v1/models.
+describe("catalogs that say each model's kind, and Cloudflare's list", () => {
+  it("offers Vercel's picture makers through the images API and its talking picture models through the chat", async () => {
+    vendor = await startFakeProvider({
+      routes: {
+        "/v1/models": {
+          data: [
+            { id: "bfl/flux-pro-1.1", name: "FLUX1.1 [pro]", type: "image", pricing: { image: "0.04" } },
+            { id: "google/gemini-3.1-flash-image", name: "Nano Banana 2", type: "language", modalities: { output: ["text", "image"] }, pricing: { input: "0.0000005", output: "0.000003" } },
+            { id: "alibaba/wan-v2.5", type: "video", pricing: {} },
+            { id: "callstack/apex", type: "language", pricing: { input: "0.0000005", output: "0.000003" } },
+          ],
+        },
+      },
+    });
+    const id = await connect("vercel", vendor.baseUrl);
+    const images = await (await env.call("GET", `/api/providers/${id}/media-models?kind=image`)).json();
+    expect(images.map((m: any) => [m.id, m.openaiImages ?? false, m.viaChat, m.pricing.lines[0]?.costUsd ?? null])).toEqual([
+      ["bfl/flux-pro-1.1", true, false, 0.04],
+      ["google/gemini-3.1-flash-image", false, true, null],
+    ]);
+    // Clips have no common API there yet: none offered rather than offered and failing.
+    expect(await (await env.call("GET", `/api/providers/${id}/media-models?kind=video`)).json()).toEqual([]);
+    const chat = await (await env.call("GET", `/api/providers/${id}/models`)).json();
+    expect(chat.map((m: any) => m.id)).toEqual(["callstack/apex"]);
+  });
+
+  it("lists Cloudflare's text models from its search, with every one free up to the daily limit", async () => {
+    vendor = await startFakeProvider({
+      routes: { "/client/v4/accounts/abc/ai/models/search": { result: [{ name: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", task: { name: "Text Generation" } }] } },
+    });
+    const base = vendor.baseUrl.replace(/\/v1$/, "");
+    const res = await env.call("POST", "/api/providers", { preset: "cloudflare", apiKey: KEY, baseUrl: `${base}/client/v4/accounts/abc/ai/v1` });
+    expect(res.status).toBe(201);
+    const models = await (await env.call("GET", `/api/providers/${(await res.json()).id}/models`)).json();
+    expect(models).toEqual([expect.objectContaining({ id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", freeTier: true })]);
+  });
+});

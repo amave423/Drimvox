@@ -394,6 +394,23 @@ test("opens the window about 80% of the screen wide", async () => {
   expect(Math.abs(win.height - Math.min(860, area.height))).toBeLessThanOrEqual(6);
 });
 
+// Asked for: who has free models at a glance, apart from those with paid ones only, and what exactly is free.
+test("groups the providers by what is free, and says on each card what is", async () => {
+  app = await launch();
+  const page = await app.firstWindow();
+  await openSection(page, "Ключи и модели");
+  const group = (name: string) => page.getByRole("region", { name });
+  await expect(group("Бесплатно с лимитами").getByRole("radio", { name: /Groq/ })).toContainText("Все модели бесплатно");
+  await expect(group("Есть бесплатные модели").getByRole("radio", { name: /OpenRouter/ })).toContainText("free");
+  await expect(group("Есть бесплатные модели").getByRole("radio", { name: /Kilo Code/ })).toContainText("без ключа");
+  await expect(group("Только платные").getByRole("radio", { name: /^DeepSeek/ })).toBeVisible();
+  await expect(group("Только платные").getByRole("radio", { name: /^Groq/ })).toHaveCount(0);
+  await expect(group("Свой сервер").getByRole("radio", { name: /OpenAI-совместимый/ })).toBeVisible();
+  // Cloudflare needs the account's id in the address, and says where to find it.
+  await group("Бесплатно с лимитами").getByRole("radio", { name: /Cloudflare/ }).click();
+  await expect(page.getByText("Замени ACCOUNT_ID в адресе")).toBeVisible();
+});
+
 // Asked for: reading answers aloud with Piper's voices instead of the system's.
 test("offers Piper's voices on the audio tab and in the settings", async () => {
   app = await launch();

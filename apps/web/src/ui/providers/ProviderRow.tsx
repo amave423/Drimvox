@@ -10,6 +10,7 @@ import { Toggle } from "../Toggle";
 import { presetName } from "./presetName";
 import { AllModels } from "./AllModels";
 import { ProviderLogo } from "./ProviderLogo";
+import { isFree } from "../../lib/models";
 
 type Mode = "idle" | "replaceKey" | "confirmRemove";
 
@@ -108,6 +109,8 @@ export function ProviderRow({ provider, proxySet }: { provider: ProviderView; pr
         {check && "models" in check && (
           <span className="facts">
             <span className="is-ok">✓ {t("providers.models", { count: check.models.length })}</span>
+            {/* How many cost nothing, or nothing up to a limit (asked for: it was not clear which ones are free). */}
+            {check.models.some((m) => isFree(m) || m.freeTier) && <span className="is-ok">{t("providers.freeModels", { count: check.models.filter((m) => isFree(m) || m.freeTier).length })}</span>}
             {balance && <span>{t("providers.balance", { amount: formatBalance(balance, settings.locale) })}</span>}
             {provider.billing === "credits" && <span>{t("providers.billing.credits")}</span>}
             {provider.billing === "free" && <span>{t("providers.billing.free")}</span>}

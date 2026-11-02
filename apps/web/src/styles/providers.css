@@ -29,6 +29,13 @@
 .preset-name { font-weight: 500; font-size: 14.5px; }
 .provider-initial { font: 600 15px var(--font-ui); background: linear-gradient(135deg, var(--brand-from), var(--brand-to)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .preset-hint { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+/* What is free at a provider, on its card (asked for: who has free models at a glance). */
+.preset-free { display: block; margin-top: 4px; color: var(--ok); font-size: 12px; line-height: 1.35; }
+.preset-group + .preset-group { margin-top: 22px; }
+.preset-group-head { display: grid; gap: 2px; margin: 0 0 10px; }
+.preset-group-head p { margin: 0; font-size: 13px; }
+.preset-group-title { margin: 0; font-size: 15px; font-weight: 600; }
+.preset-group-title.is-free { color: var(--ok); }
 
 .connect { display: grid; gap: 16px; }
 .connect-form { display: grid; gap: 12px; max-width: 520px; }

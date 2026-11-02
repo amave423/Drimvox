@@ -26,7 +26,9 @@ export async function listMediaModels(conn: Connection, kind: MediaKind): Promis
   if (conn.preset === "google") return kind === "image" ? cached(conn, kind, () => geminiImageModels(conn)) : [];
   if (conn.preset === "nvidia") return kind === "image" ? NVIDIA_IMAGES.map(nvidiaModel) : [];
   const how = style(conn);
-  if (!how) return [];
+  // Catalogs that say each model's kind (Vercel, LLM7): their picture models draw through OpenAI's images API, or in a
+  // chat when they also talk (seen: the app said they had no picture models). Their clips have no common API yet.
+  if (!how) return kind === "image" ? cached(conn, kind, () => typedImageModels(conn)) : [];
   const key = `${conn.cacheKey}|${kind}`;
   const hit = lists.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.models;
@@ -137,6 +139,41 @@ async function imagePrices(conn: Connection, id: string): Promise<PriceLine[]> {
   }
   prices.set(key, { at: Date.now(), lines });
   return lines;
+}
+
+/** Picture models of a catalog that says each model's kind: Vercel's `type`/`modalities`, LLM7's `model_type`. */
+async function typedImageModels(conn: Connection): Promise<MediaModel[]> {
+  const body = (await fetchJson(`${conn.baseUrl}/models`, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
+  const items = (Array.isArray(body?.data) ? body.data : []).filter((i): i is Raw => !!i && typeof i === "object" && typeof (i as Raw).id === "string");
+  const factor = await usdPer(conn.currency);
+  return items
+    .flatMap((i): MediaModel[] => {
+      const kind = i.type ?? i.model_type;
+      const out = strings((i.modalities as { output?: unknown } | undefined)?.output);
+      const endpoints = strings(i.schema_endpoints);
+      const drawer = kind === "image" && (endpoints.length === 0 || endpoints.includes("openai"));
+      const talker = (kind === "language" || kind === "chat") && out.includes("image");
+      if (!drawer && !talker) return [];
+      const pricing = (i.pricing ?? {}) as Raw;
+      // A price per picture: Vercel's "image", LLM7's "price" per "image".
+      const each = Number(pricing.image ?? (pricing.unit === "image" ? pricing.price : NaN));
+      return [
+        {
+          id: i.id as string,
+          name: typeof i.name === "string" && i.name ? i.name : (i.id as string),
+          kind: "image",
+          aspectRatios: talker ? ASPECTS : [],
+          resolutions: [],
+          durations: [],
+          audio: false,
+          viaChat: talker,
+          openaiImages: drawer,
+          photos: null,
+          pricing: { lines: Number.isFinite(each) ? [{ billable: "output_image", unit: "image", costUsd: round(each * factor), variant: null }] : [], skus: {} },
+        },
+      ];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Picture models of a custom server's one list of models, told by their names. */

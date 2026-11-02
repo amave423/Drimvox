@@ -42,6 +42,8 @@ export const presetIds = [
   "llama",
   "inception",
   "pollinations",
+  "kilo",
+  "cloudflare",
   "perplexity",
   "venice",
   "poe",
@@ -80,6 +82,11 @@ export interface Preset {
   cli?: { command: string; install: string; /** When Windows installs it another way. */ installWindows?: string };
   /** What the provider's prices and costs are in. Drimvox converts rubles to dollars internally. */
   currency: "USD" | "RUB";
+  /**
+   * Free use (asked for: show who has free models, apart from those who have none): "all" — every model free up to a
+   * limit; "some" — some of its models are free. Checked 2026-11 against the providers' own pages and catalogs.
+   */
+  free?: "all" | "some";
 }
 
 /** How much of a subscription's window is used, as its CLI reported it on the last run. */
@@ -110,6 +117,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "some",
   },
   routerai: {
     id: "routerai",
@@ -191,6 +200,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "some",
   },
   xai: {
     id: "xai",
@@ -221,6 +232,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "credits",
     currency: "USD",
+
+    free: "all",
   },
   // Popular OpenAI-style providers, many with a free tier (asked for: more providers as cards).
   groq: {
@@ -232,6 +245,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "all",
   },
   cerebras: {
     id: "cerebras",
@@ -242,6 +257,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "all",
   },
   mistral: {
     id: "mistral",
@@ -252,6 +269,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "all",
   },
   together: {
     id: "together",
@@ -322,6 +341,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "some",
   },
   sambanova: {
     id: "sambanova",
@@ -402,6 +423,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "all",
   },
   featherless: {
     id: "featherless",
@@ -472,6 +495,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "some",
   },
   baseten: {
     id: "baseten",
@@ -512,6 +537,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "some",
   },
   perplexity: {
     id: "perplexity",
@@ -552,6 +579,8 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "some",
   },
   byteplus: {
     id: "byteplus",
@@ -652,6 +681,31 @@ export const presets: Record<PresetId, Preset> = {
     editableUrl: false,
     billing: "paid",
     currency: "USD",
+
+    free: "all",
+  },
+  kilo: {
+    id: "kilo",
+    name: "Kilo Code Gateway",
+    baseUrl: "https://api.kilo.ai/api/gateway",
+    keyRequired: false,
+    keyUrl: "https://app.kilo.ai",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
+    free: "some",
+  },
+  cloudflare: {
+    id: "cloudflare",
+    name: "Cloudflare Workers AI",
+    // The account's id goes into the address; the form shows it to fill in.
+    baseUrl: "https://api.cloudflare.com/client/v4/accounts/ACCOUNT_ID/ai/v1",
+    keyRequired: true,
+    keyUrl: "https://dash.cloudflare.com/profile/api-tokens",
+    editableUrl: true,
+    billing: "paid",
+    currency: "USD",
+    free: "all",
   },
   ollama: {
     id: "ollama",

@@ -142,6 +142,44 @@ describe("normalizeModels", () => {
     expect(price).toEqual({ "glm-5.3-flash-free": 0, "deepseek/deepseek-v4:free": 0, "freedom-7b": null, "paid-free": 1 });
   });
 
+  // Seen live on the owner's providers (2026-11): Vercel and LLM7 write prices as input/output, LLM7 per million tokens,
+  // Hugging Face under each provider behind a model; Groq's whole catalog is free up to a limit, LLM7's Turbo models
+  // answer free; both list models that do not chat.
+  it("reads the prices and free models of Vercel, LLM7, Hugging Face and Groq", () => {
+    const vercel = normalizeModels("vercel", [
+      { id: "callstack/apex", type: "language", pricing: { input: "0.0000005", output: "0.000003" } },
+      { id: "reflection/beam-free", type: "language", tags: ["free"], pricing: { input: "0", output: "0" } },
+      { id: "google/gemini-3.1-flash-image", type: "language", modalities: { output: ["text", "image"] }, pricing: { input: "0.0000005", output: "0.000003" } },
+      { id: "bfl/flux-2-pro", type: "image", pricing: {} },
+      { id: "openai/text-embedding-3", type: "embedding", pricing: { input: "0.00000002" } },
+    ]);
+    expect(vercel.map((m) => [m.id, m.priceIn, m.priceOut])).toEqual([
+      ["callstack/apex", 0.5, 3],
+      ["reflection/beam-free", 0, 0],
+    ]);
+    const llm7 = normalizeModels("llm7", [
+      { id: "codestral-latest", model_type: "chat", tier: "turbo", usage_based_only: false, pricing: { input: 0.01, output: 0.02, unit: "1M tokens" } },
+      { id: "gemini-3-flash", model_type: "chat", tier: "pro", pricing: { input: 0.5, output: 3, unit: "1M tokens" } },
+      { id: "gpt-image-2", model_type: "image", tier: "pro", pricing: { price: 0.02, unit: "image" } },
+    ]);
+    expect(llm7.map((m) => [m.id, m.priceIn, m.priceOut, m.freeTier ?? false])).toEqual([
+      ["codestral-latest", 0.01, 0.02, true],
+      ["gemini-3-flash", 0.5, 3, false],
+    ]);
+    const [hf] = normalizeModels("huggingface", [
+      {
+        id: "deepseek-ai/DeepSeek-V4.1-Flash",
+        providers: [
+          { provider: "novita", status: "live", pricing: { input: 0.3, output: 1.2 }, is_free: false },
+          { provider: "baseten", status: "live", pricing: { input: 0.25, output: 1.1 }, is_free: false },
+        ],
+      },
+    ]);
+    expect([hf!.priceIn, hf!.priceOut, hf!.freeTier ?? false]).toEqual([0.25, 1.1, false]);
+    const groq = normalizeModels("groq", [{ id: "openai/gpt-oss-120b", pricing: { prompt: "0.00000015", completion: "0.0000006" } }, { id: "whisper-large-v3", output_modalities: ["transcription"] }]);
+    expect(groq.map((m) => [m.id, m.priceIn, m.freeTier])).toEqual([["openai/gpt-oss-120b", 0.15, true]]);
+  });
+
   it("sorts by name and drops entries without an id", () => {
     const models = normalizeModels("custom", [{ id: "b" }, { name: "no id" }, { id: "a" }]);
     expect(models.map((m) => m.id)).toEqual(["a", "b"]);

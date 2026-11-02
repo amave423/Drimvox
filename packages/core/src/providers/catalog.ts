@@ -46,6 +46,30 @@ type Raw = Record<string, unknown>;
  * Models that cannot chat (embeddings, speech, pictures, video) are left out; they live elsewhere.
  */
 const namedFree = /[-:/_]free$/i;
+/** Catalogs that say what kind each model is (Vercel's `type`, LLM7's `model_type`): only these kinds chat. */
+const chatKinds = /^(language|chat|llm|text)$/i;
+/** Providers whose every model is free up to a limit on a key without billing (docs/specs/providers.md, checked 2026-11). */
+const allFreeTier = new Set<PresetId>(["groq", "cerebras", "mistral", "cohere", "cloudflare", "ovhcloud"]);
+
+/** The cheapest live provider's prices behind a Hugging Face model, per 1M tokens, and whether one serves it free. */
+function huggingFacePrices(raw: Raw): { in: number | null; out: number | null; free: boolean } {
+  const live = (Array.isArray(raw.providers) ? raw.providers : []).filter((p): p is Raw => !!p && typeof p === "object" && (p as Raw).status !== "offline");
+  const free = live.some((p) => p.is_free === true);
+  const priced = live
+    .map((p) => p.pricing as { input?: unknown; output?: unknown } | undefined)
+    .filter((x): x is { input: number; output: number } => typeof x?.input === "number" && typeof x?.output === "number")
+    .sort((a, b) => a.input + a.output - (b.input + b.output));
+  return { in: priced[0]?.input ?? null, out: priced[0]?.output ?? null, free };
+}
+
+/** Whether a model is free up to a limit, by what its provider's catalog says (beyond a zero price). */
+function freeTierOf(preset: PresetId, raw: Raw): boolean {
+  if (allFreeTier.has(preset)) return true;
+  // LLM7: its Turbo models answer free, even without a key (checked live); Pro ones need a paid key.
+  if (preset === "llm7") return raw.tier === "turbo" && raw.usage_based_only !== true;
+  if (preset === "huggingface") return huggingFacePrices(raw).free;
+  return raw.isFree === true || (Array.isArray(raw.tags) && raw.tags.includes("free"));
+}
 
 export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): ModelInfo[] {
   // Local models cost nothing; NVIDIA's hosted models run on free developer credits, not money.
@@ -62,16 +86,24 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     if (notChat.test(raw.id)) continue;
     // Music and speech models list text among their outputs too; a chat with them fails.
     // OpenRouter and its kin say it under "architecture"; DeepSeek's own API at the top level.
-    const out = (raw.architecture as { output_modalities?: unknown } | undefined)?.output_modalities ?? raw.output_modalities;
+    // Vercel says it under "modalities".
+    const out = (raw.architecture as { output_modalities?: unknown } | undefined)?.output_modalities ?? raw.output_modalities ?? (raw.modalities as { output?: unknown } | undefined)?.output;
     // Picture makers that also answer in text (Gemini "-image", Nano Banana, GPT-5 Image) live on the Pictures tab only
     // (seen: they were listed among the text models too).
     if (Array.isArray(out) && (!out.includes("text") || out.includes("audio") || out.includes("image") || out.includes("video"))) continue;
     // A catalog that does not say: picture and video makers by their names go to their own tabs (seen live).
     if (!Array.isArray(out) && mediaKindByName(id)) continue;
+    const kind = raw.type ?? raw.model_type;
+    if (typeof kind === "string" && !chatKinds.test(kind)) continue;
 
-    let priceIn = perMillion((raw.pricing as Raw | undefined)?.prompt, toUsd);
-    let priceOut = perMillion((raw.pricing as Raw | undefined)?.completion, toUsd);
-    let priceCacheRead = perMillion((raw.pricing as Raw | undefined)?.input_cache_read, toUsd);
+    const pricing = (raw.pricing ?? {}) as Raw;
+    // Per token as OpenAI and OpenRouter write it ("prompt"/"completion"), or "input"/"output" (Vercel, LLM7); LLM7 and
+    // Hugging Face give theirs per million tokens already (seen: 260 of Vercel's and LLM7's prices were "unknown").
+    const perUnit = typeof pricing.unit === "string" && /1M/i.test(pricing.unit) ? 1_000_000 : 1;
+    const hf = preset === "huggingface" ? huggingFacePrices(raw) : null;
+    let priceIn = hf ? perMillion(hf.in === null ? null : hf.in / 1_000_000, toUsd) : perMillion(scaled(pricing.prompt ?? pricing.input, perUnit), toUsd);
+    let priceOut = hf ? perMillion(hf.out === null ? null : hf.out / 1_000_000, toUsd) : perMillion(scaled(pricing.completion ?? pricing.output, perUnit), toUsd);
+    let priceCacheRead = perMillion(scaled(pricing.input_cache_read, perUnit), toUsd);
     let priceEstimated = false;
     // Paid per request (music, some search models) with no token price: not free, and its token price says nothing.
     const perRequest = perMillion((raw.pricing as Raw | undefined)?.request, toUsd);
@@ -90,6 +122,7 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
       priceOut = 0;
     }
 
+    const freeTier = !(priceIn === 0 && priceOut === 0) && freeTierOf(preset, raw);
     const params = raw.supported_parameters;
     const inputs = (raw.architecture as { input_modalities?: unknown } | undefined)?.input_modalities ?? raw.input_modalities;
     models.push({
@@ -103,9 +136,17 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
       tools: Array.isArray(params) ? params.includes("tools") : null,
       vision: Array.isArray(inputs) ? inputs.includes("image") : null,
       ...(Array.isArray(inputs) && inputs.includes("audio") ? { audio: true } : {}),
+      ...(freeTier ? { freeTier: true } : {}),
     });
   }
   return models.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** A price given per `unit` tokens, as a price per token. */
+function scaled(value: unknown, unit: number): unknown {
+  if (unit === 1) return value;
+  const n = typeof value === "string" || typeof value === "number" ? Number(value) : NaN;
+  return Number.isFinite(n) ? n / unit : value;
 }
 
 /** Prices arrive per token, as strings or numbers; "-1" means "varies". */
@@ -138,9 +179,22 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
   if (NATIVE.includes(conn.preset)) models = await nativeModels(conn);
   else {
     // Perplexity answers at its root but lists its models under /v1.
-    const listUrl = conn.preset === "perplexity" ? `${conn.baseUrl}/v1/models` : `${conn.baseUrl}/models`;
-    const body = (await fetchJson(listUrl, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown };
-    const items = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+    // Cloudflare answers at /ai/v1 but lists its models at /ai/models/search, by task.
+    const listUrl =
+      conn.preset === "perplexity"
+        ? `${conn.baseUrl}/v1/models`
+        : conn.preset === "cloudflare"
+          ? `${conn.baseUrl.replace(/\/v1\/?$/, "")}/models/search?task=Text%20Generation&per_page=200`
+          : `${conn.baseUrl}/models`;
+    const body = (await fetchJson(listUrl, conn.apiKey, 15_000, {}, conn.fetch)) as { data?: unknown; result?: unknown };
+    const items =
+      conn.preset === "cloudflare" && Array.isArray(body?.result)
+        ? (body.result as Raw[]).map((m) => ({ id: m.name, name: m.name, context_length: undefined }))
+        : Array.isArray(body)
+          ? body
+          : Array.isArray(body?.data)
+            ? body.data
+            : [];
     models = normalizeModels(conn.preset, items, await usdPer(conn.currency));
     if (conn.preset === "ollama") models = (await withOllamaDetails(conn, models)).map((m) => (m.name === m.id ? { ...m, name: localModelTitle(m.id).title } : m));
     // A flat fee: nothing per answer. OpenRouter and RouterAI price their own models; a model without a price there is
