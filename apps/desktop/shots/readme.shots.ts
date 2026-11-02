@@ -81,7 +81,7 @@ async function banner(page: Page, name: string, dark: boolean) {
                 <div style="font-family:'Source Serif 4',serif;font-weight:600;font-size:64px;line-height:1;color:${t.fg};letter-spacing:-0.5px">Drimvox</div>
               </div>
               <div style="font-family:Onest,sans-serif;font-size:24px;line-height:1.4;color:${t.fg};max-width:600px">Нейросети и ИИ-агент в одном приложении: чат с любой моделью или целый проект, который агент делает сам.</div>
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:${t.muted}">Windows · Linux · свои ключи, подписки или локальные модели</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:${t.muted}">Windows · Linux · macOS · свои ключи, подписки или локальные модели</div>
             </div>
             <div style="width:270px;display:flex;flex-direction:column;justify-content:center;gap:16px;font-family:Onest,sans-serif;font-size:16px;line-height:1.45">
               <div style="border-left:2px solid ${t.ink};padding-left:14px;color:${t.ink}">Опрос → план → работа<br>с проверками на телефоне</div>
