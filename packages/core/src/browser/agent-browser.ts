@@ -376,6 +376,12 @@ export class AgentBrowser implements BrowserDriver {
     try {
       const { windowId } = (await this.send("Browser.getWindowForTarget", { targetId: target })) as { windowId: number };
       await this.send("Browser.setWindowBounds", { windowId, bounds: { width, height } });
+      // On macOS the window's size takes in its frame, and the page got that much less (seen: 433 of 520 px): the window
+      // grows by what its frame takes.
+      await this.send("Emulation.clearDeviceMetricsOverride", {}, session).catch(() => {});
+      const inner = (await this.send("Runtime.evaluate", { expression: "[innerWidth, innerHeight]", returnByValue: true }, session)) as { result?: { value?: [number, number] } };
+      const [w, h] = inner.result?.value ?? [width, height];
+      if (w < width || h < height) await this.send("Browser.setWindowBounds", { windowId, bounds: { width: width + Math.max(0, width - w), height: height + Math.max(0, height - h) } });
     } catch {
       // Some builds keep the window's size; the page's own size below is what counts.
     }

@@ -22,7 +22,8 @@ afterEach(() => rmSync(root, { recursive: true, force: true, maxRetries: 20, ret
 describe("workspace", () => {
   it("keeps every path inside the copy", () => {
     expect(() => ws.resolve("../outside.txt")).toThrow(/outside/);
-    expect(() => ws.resolve("C:\\Windows\\win.ini")).toThrow(/outside/);
+    // A drive letter is a path only on Windows; elsewhere this is a plain file name inside the copy.
+    if (process.platform === "win32") expect(() => ws.resolve("C:\\Windows\\win.ini")).toThrow(/outside/);
     expect(() => ws.resolve("/etc/passwd")).toThrow(/outside/);
     expect(ws.resolve("src/app.ts")).toBe(join(root, "src", "app.ts"));
   });

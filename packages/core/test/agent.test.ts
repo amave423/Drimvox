@@ -96,7 +96,11 @@ describe("projects", () => {
       const added = await (await env.call("POST", "/api/projects", { path: plain })).json();
       const project = await (await env.call("POST", `/api/projects/${added.id}/init-git`)).json();
       expect(project.gitState).toBe("ready");
-      expect(git(plain, "log", "--format=%an")).toBe(userInfo().username);
+      // Windows' git refuses to commit without a name, and Drimvox gives the user's; macOS's git takes the account's
+      // full name by itself (seen on a Mac runner: "Anka" for the user "runner"). Either way the commit is made.
+      const author = git(plain, "log", "--format=%an");
+      if (process.platform === "win32") expect(author).toBe(userInfo().username);
+      else expect(author).toMatch(/\S/);
     } finally {
       for (const k of keys) {
         if (saved[k] === undefined) delete process.env[k];
