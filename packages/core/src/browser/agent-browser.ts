@@ -27,6 +27,8 @@ type Listener = { frame(f: BrowserFrame): void; state(s: BrowserState): void };
 
 const WIDTH = 1280;
 const HEIGHT = 860;
+/** After a tab is chosen, another that goes somewhere does not take the panel for this long. */
+const CHOSEN_MS = 2000;
 /**
  * The agent's own browser (asked for: not a window jumping in front, but a panel in Drimvox, like Claude's): Chrome or
  * Edge without a window, with a profile of its own that keeps sign-ins and passed checks. The Playwright server drives
@@ -40,6 +42,8 @@ export class AgentBrowser implements BrowserDriver {
   private readonly pending = new Map<number, { resolve(v: unknown): void; reject(e: Error): void }>();
   private readonly pages: { id: string; url: string; title: string }[] = [];
   private active: string | null = null;
+  /** When a tab was last chosen by select(). */
+  private chosenAt = 0;
   private session: string | null = null;
   private readonly listeners = new Set<Listener>();
   private readonly stateListeners = new Set<(s: BrowserState) => void>();
@@ -183,6 +187,7 @@ export class AgentBrowser implements BrowserDriver {
   /** Shows another tab in the panel and brings it to the front of the browser. */
   async select(id: string): Promise<void> {
     if (!this.pages.some((p) => p.id === id)) return;
+    this.chosenAt = Date.now();
     await this.send("Target.activateTarget", { targetId: id }).catch(() => {});
     await this.follow(id);
     await this.refresh();
@@ -294,8 +299,9 @@ export class AgentBrowser implements BrowserDriver {
       if (known) {
         const moved = known.url !== info.url;
         Object.assign(known, { url: info.url, title: info.title });
-        // The tab the agent works in is the one that just went somewhere.
-        if (moved && info.url !== "about:blank") void this.follow(info.targetId);
+        // The tab the agent works in is the one that just went somewhere, unless a tab was just chosen (seen on a Mac: the
+        // other tab finished loading right after the choice and took the panel back).
+        if (moved && info.url !== "about:blank" && Date.now() - this.chosenAt > CHOSEN_MS) void this.follow(info.targetId);
       } else {
         this.pages.push({ id: info.targetId, url: info.url, title: info.title });
         void this.follow(info.targetId);
