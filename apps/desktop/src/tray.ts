@@ -3,7 +3,8 @@ import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 let tray: Tray | null = null;
-let menuTexts: { open: string; quit: string } | null = null;
+type TrayTexts = { open: string; quit: string; hidden: string; hiddenBody: string };
+let menuTexts: (() => TrayTexts) | null = null;
 let showWindow: (() => void) | null = null;
 let update: { label: string; install: () => void } | null = null;
 /** Drimvox's own notification card (notices.ts), as every other notification comes (asked for: none of Windows' plain ones). */
@@ -16,12 +17,13 @@ export function notifyWith(show: (title: string, body: string) => void): void {
 /** The tray's menu: open, restart into a downloaded update when there is one, quit. */
 function rebuildMenu(): void {
   if (!tray || !menuTexts) return;
+  const texts = menuTexts();
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: menuTexts.open, click: () => showWindow?.() },
+      { label: texts.open, click: () => showWindow?.() },
       ...(update ? [{ label: update.label, click: update.install }] : []),
       { type: "separator" },
-      { label: menuTexts.quit, click: () => app.quit() },
+      { label: texts.quit, click: () => app.quit() },
     ]),
   );
 }
@@ -44,7 +46,12 @@ function icon() {
  * Closing the window leaves Drimvox in the tray (seen: agents and the started site stopped with the window): it goes on
  * working there; the tray's "Quit" ends it, and the core stops what it started. Said once, the first time.
  */
-export function keepInTray(win: () => BrowserWindow | null, quitting: () => boolean, texts: { open: string; quit: string; hidden: string; hiddenBody: string }): (target: BrowserWindow) => void {
+/** The tray's menu in the app's language again, after the window said it changed. */
+export function relabelTray(): void {
+  rebuildMenu();
+}
+
+export function keepInTray(win: () => BrowserWindow | null, quitting: () => boolean, texts: () => TrayTexts): (target: BrowserWindow) => void {
   const show = () => {
     const w = win();
     if (!w) return;
@@ -53,7 +60,7 @@ export function keepInTray(win: () => BrowserWindow | null, quitting: () => bool
     w.focus();
   };
   showWindow = show;
-  menuTexts = { open: texts.open, quit: texts.quit };
+  menuTexts = texts;
   if (!tray) {
     tray = new Tray(icon());
     tray.setToolTip("Drimvox");
@@ -72,7 +79,7 @@ export function keepInTray(win: () => BrowserWindow | null, quitting: () => bool
       } catch {
         // Said again next time.
       }
-      notify(texts.hidden, texts.hiddenBody);
+      notify(texts().hidden, texts().hiddenBody);
     });
   };
 }

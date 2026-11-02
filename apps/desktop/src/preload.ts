@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("drimvox", {
   getToken: (): Promise<string> => ipcRenderer.invoke("drimvox:token"),
   setTitleBar: (colors: { background: string; symbols: string }) => ipcRenderer.send("drimvox:titlebar", colors),
+  setLanguage: (locale: string) => ipcRenderer.send("drimvox:language", locale),
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke("drimvox:pick-folder"),
   pickKey: (): Promise<string | null> => ipcRenderer.invoke("drimvox:pick-key"),
   savePdf: (name: string): Promise<string | null> => ipcRenderer.invoke("drimvox:save-pdf", name),

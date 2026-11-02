@@ -112,7 +112,8 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(models.getByRole("button", { name: /Planner/ })).toHaveCount(1);
   await expect(models.getByRole("button", { name: /Coder/ })).toHaveCount(2);
   // Small tasks go to an existing project now: no switch for them here (asked for).
-  await expect(page.getByRole("switch")).toHaveCount(0);
+  // On the form, that is: the project panel beside it has the git rules' switches (seen on a wide window).
+  await expect(page.locator(".workshop-main").getByRole("switch")).toHaveCount(0);
   await page.getByRole("button", { name: "Начать опрос" }).click();
 
   // The plan comes right under the interview: read it, then "Go".

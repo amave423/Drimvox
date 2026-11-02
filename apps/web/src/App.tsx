@@ -76,6 +76,8 @@ export function App({ api, token, initialSettings, status }: Props) {
   setDisplayCurrency(usdRub > 0 ? settings.currency : "USD", usdRub);
 
   useEffect(() => applyTheme(resolveTheme(settings.theme, systemDark)), [settings.theme, systemDark]);
+  // The tray's menu and notices in the app's language, not the system's.
+  useEffect(() => window.drimvox?.setLanguage?.(settings.locale), [settings.locale]);
   useEffect(() => {
     document.documentElement.lang = settings.locale;
   }, [settings.locale]);

@@ -2,6 +2,7 @@
 interface DrimvoxBridge {
   getToken(): Promise<string>;
   setTitleBar(colors: { background: string; symbols: string }): void;
+  setLanguage?(locale: string): void;
   /** Native folder picker; null when the user cancels. */
   pickFolder(): Promise<string | null>;
   /** An SSH key file, the picker opening in ~/.ssh. */

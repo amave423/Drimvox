@@ -9,7 +9,7 @@ import { MAX_WAIT_MS, PAGE_HEIGHT_SCRIPT, PAGE_TEXT_SCRIPT, pageActionScript, ty
 import { INSTALLER_ID } from "./installer-id";
 import { loadSecretKey } from "./keyring";
 import { startUpdates } from "./updates";
-import { keepInTray, notifyWith, offerUpdate } from "./tray";
+import { keepInTray, notifyWith, offerUpdate, relabelTray } from "./tray";
 import { noticeRequest, setupNotices, showNotice, type NoticeRequest } from "./notices";
 import { AgentView } from "./agent-view";
 
@@ -501,6 +501,13 @@ function registerIpc() {
     if (request) void showNotice(origin, request, {});
   });
 
+  // The window says its language (Russian unless chosen otherwise); the tray speaks it too.
+  ipcMain.on("drimvox:language", (event, locale: unknown) => {
+    if (!fromOurPage(event.senderFrame?.url) || (locale !== "ru" && locale !== "en")) return;
+    language = locale;
+    relabelTray();
+  });
+
   const hex = /^#[0-9a-f]{6}$/i;
   ipcMain.on("drimvox:titlebar", (event, colors: { background?: unknown; symbols?: unknown }) => {
     const { background, symbols } = colors ?? {};
@@ -544,13 +551,13 @@ async function createWindow(view?: "local" | "local-images") {
   });
 
   attachContextMenu(win.webContents);
-  const ru = app.getLocale().startsWith("ru");
   keepInTray(
     () => win,
     () => quitting,
-    ru
-      ? { open: "Открыть Drimvox", quit: "Выйти", hidden: "Drimvox работает в фоне", hiddenBody: "Агенты и запущенные проекты продолжают работать. Открыть или выйти — значок в трее." }
-      : { open: "Open Drimvox", quit: "Quit", hidden: "Drimvox runs in the background", hiddenBody: "Agents and started projects go on. Open or quit from the tray icon." },
+    () =>
+      language === "ru"
+        ? { open: "Открыть Drimvox", quit: "Выйти", hidden: "Drimvox работает в фоне", hiddenBody: "Агенты и запущенные проекты продолжают работать. Открыть или выйти — значок в трее." }
+        : { open: "Open Drimvox", quit: "Quit", hidden: "Drimvox runs in the background", hiddenBody: "Agents and started projects go on. Open or quit from the tray icon." },
   )(win);
   win.once("ready-to-show", () => win?.show());
   win.on("closed", () => (win = null));
@@ -572,6 +579,8 @@ app.on("activate", () => {
   if (win && !win.isDestroyed()) win.show();
 });
 let quitting = false;
+/** The app's language, as the window last said; Russian, the app's own default, until it does. */
+let language: "ru" | "en" = "ru";
 let stopping = false;
 app.on("before-quit", (event) => {
   // The window closes for good now, not into the tray.
