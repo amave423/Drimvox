@@ -280,11 +280,13 @@ describe("commands that keep hanging", () => {
   it("stops running commands after three timeouts in a row", async () => {
     const { folderTools } = await import("../src/chats/folder");
     const tools = folderTools(root, async () => {}, async () => true);
-    const run = (command: string) =>
-      (tools.run_command!.execute as (input: unknown, o: unknown) => Promise<string>)({ command, timeout_seconds: 1 }, { toolCallId: "t", messages: [] });
+    // A hanging command gets one second; a quick one gets room, since starting a process can take over a second when
+    // the machine is busy (seen: the quick command timed out now and then during the full verify, failing the test).
+    const run = (command: string, seconds = 1) =>
+      (tools.run_command!.execute as (input: unknown, o: unknown) => Promise<string>)({ command, timeout_seconds: seconds }, { toolCallId: "t", messages: [] });
     const hang = `node -e "setTimeout(() => {}, 20000)"`;
     for (let i = 0; i < 3; i++) expect(await run(hang)).toMatch(/Timed out after 1s/);
-    const refused = await run("node -e \"console.log(1)\"");
+    const refused = await run("node -e \"console.log(1)\"", 60);
     expect(refused).toMatch(/hung three times in a row/);
     expect(refused).not.toMatch(/Exit code/);
   }, 30_000);
@@ -292,12 +294,14 @@ describe("commands that keep hanging", () => {
   it("counts only timeouts in a row", async () => {
     const { folderTools } = await import("../src/chats/folder");
     const tools = folderTools(root, async () => {}, async () => true);
-    const run = (command: string) =>
-      (tools.run_command!.execute as (input: unknown, o: unknown) => Promise<string>)({ command, timeout_seconds: 1 }, { toolCallId: "t", messages: [] });
+    // A hanging command gets one second; a quick one gets room, since starting a process can take over a second when
+    // the machine is busy (seen: the quick command timed out now and then during the full verify, failing the test).
+    const run = (command: string, seconds = 1) =>
+      (tools.run_command!.execute as (input: unknown, o: unknown) => Promise<string>)({ command, timeout_seconds: seconds }, { toolCallId: "t", messages: [] });
     const hang = `node -e "setTimeout(() => {}, 20000)"`;
     await run(hang);
     await run(hang);
-    expect(await run("node -e \"console.log(1)\"")).toMatch(/Exit code: 0/);
+    expect(await run("node -e \"console.log(1)\"", 60)).toMatch(/Exit code: 0/);
     expect(await run(hang)).toMatch(/Timed out/);
   }, 30_000);
 });

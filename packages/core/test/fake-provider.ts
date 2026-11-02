@@ -43,8 +43,11 @@ export interface FakeProviderOptions {
   usage?: FakeUsage;
   /** Delay between streamed chunks, ms. */
   delayMs?: number;
-  /** What the model answers when Drimvox asks it to name a chat; without it that request fails. */
-  title?: string;
+  /**
+   * What the model answers when Drimvox asks it to name a chat; without it that request fails. A function names it per
+   * model, and its null is a busy model's 429, so a model that is busy is busy for every request.
+   */
+  title?: string | ((model: string) => string | null);
   /** Why the streamed answer ends; "stop" by default, "length" when the model ran out of room. */
   finishReason?: string;
   /** Answer chat requests with this status and an OpenAI-style error body. */
@@ -94,12 +97,14 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
     // Drimvox asks aside for a chat's name; it is not part of the scripted conversation (nor of its requests).
     if (naming) {
       if (!o.title) return json(500, { error: { message: "no title in this test" } });
+      const title = typeof o.title === "function" ? o.title(String(JSON.parse(body || "{}").model ?? "")) : o.title;
+      if (title === null) return json(429, { error: { message: "Rate limit" } });
       return json(200, {
         id: "t",
         object: "chat.completion",
         created: 1,
         model: "m",
-        choices: [{ index: 0, message: { role: "assistant", content: o.title }, finish_reason: "stop" }],
+        choices: [{ index: 0, message: { role: "assistant", content: title }, finish_reason: "stop" }],
         usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 },
       });
     }

@@ -163,8 +163,9 @@ test("a chain of free models: made in the settings, picked on its tab, the next 
       { id: "b-works:free", name: "B Works", pricing: { prompt: "0", completion: "0" } },
     ],
     respond: (body) => (body.model === "a-busy:free" ? { fail: { status: 429, message: "Rate limit" } } : { text: "Ответила B" }),
-    // The chat's name is asked of the chain too: answered, so the model that answered does not rest.
-    title: "Шишки",
+    // The chat's name is asked of the chain too, at the same time as the answer. The busy model is busy for that too
+    // (seen: when it named the chat after its 429, it no longer rested and the test failed now and then).
+    title: (model) => (model === "a-busy:free" ? null : "Шишки"),
   });
   const page = await launch();
   await connect(page);

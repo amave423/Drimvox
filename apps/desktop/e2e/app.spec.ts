@@ -268,10 +268,14 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
     const edge = (await pane.locator(".browser-edge").boundingBox())!;
     await page.mouse.move(edge.x + edge.width / 2, edge.y + edge.height / 2);
     await page.mouse.down();
+    // The tab steps aside first (off the window), or it takes the pointer as it passes over it (seen under the full
+    // verify's load: the moves went to the tab and the panel never widened).
+    await expect.poll(async () => (await tabBounds())?.x ?? -1).toBeLessThan(0);
     await page.mouse.move(edge.x - 150, edge.y + edge.height / 2, { steps: 5 });
     await page.mouse.up();
+    // The new width comes with the next render (seen: read at once under the full verify's load, it was still the old one).
+    await expect.poll(async () => (await pane.locator(".browser-view").boundingBox())!.width).toBeGreaterThan(box.width + 100);
     const wider = (await pane.locator(".browser-view").boundingBox())!;
-    expect(wider.width).toBeGreaterThan(box.width + 100);
     await expect.poll(async () => (await tabBounds())?.width).toBe(Math.round(wider.width));
     // Its grip is a slider for the keyboard too.
     const grip = pane.getByRole("button", { name: /Ширина браузера/ });

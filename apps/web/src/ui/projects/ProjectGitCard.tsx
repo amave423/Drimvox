@@ -1,5 +1,5 @@
 import { gitCommitModes, gitMessageStyles, gitTargets, type ProjectGitRules, type ProjectGitState, type ProjectView } from "@drimvox/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
@@ -16,14 +16,18 @@ export function ProjectGitCard({ project, busy }: { project: ProjectView; busy: 
   const [state, setState] = useState<ProjectGitState | null>(null);
   const [failed, setFailed] = useState(false);
   const [working, setWorking] = useState(false);
+  /** Changes the user made: a look started before the latest one must not bring the old rules back. */
+  const edits = useRef(0);
 
   async function load() {
+    const seen = edits.current;
     const view = await api.projects[":id"].git
       .$get({ param: { id: project.id } })
       .then((r) => ok<{ rules: ProjectGitRules; state: ProjectGitState }>(r))
       .catch(() => null);
     if (view) {
-      setRules(view.rules);
+      // Seen: the run stopped while a rule was being picked, and the look started then put the old rule back.
+      if (edits.current === seen) setRules(view.rules);
       setState(view.state);
     }
   }
@@ -33,6 +37,7 @@ export function ProjectGitCard({ project, busy }: { project: ProjectView; busy: 
   async function save(patch: Partial<ProjectGitRules>) {
     if (!rules) return;
     const next = { ...rules, ...patch };
+    edits.current++;
     setRules(next);
     await api.projects[":id"].git.rules.$put({ param: { id: project.id }, json: next }).catch(() => null);
   }
