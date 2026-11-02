@@ -16,6 +16,11 @@ import { Workspace } from "./workspace";
 
 export const MAX_STEPS = 60;
 
+/** Rounds a pass may go on for after the provider cut an answer by its output limit. */
+const MAX_CUTS = 2;
+const CUT_NOTE =
+  "Your last message was cut off by the output limit, and nothing in its unfinished part was done. Go on from there. Write a big file in parts: write_file with the first part, then edit_file to add the rest.";
+
 export interface RunInput {
   conn: Connection;
   model: string;
@@ -81,7 +86,6 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   const usdPerUnit = i.conn.currency === "RUB" ? 1 / (await usdRub()) : 1;
   const stepCost = (step: { usage: Parameters<typeof usageOf>[0]; providerMetadata?: unknown }) =>
     billedUsd(step.providerMetadata, usdPerUnit) ?? costOf(i.price, i.conn.preset, usageOf(step.usage)) ?? 0;
-  const overBudget: StopCondition<ToolSet> = ({ steps: done }) => i.spentUsd + done.reduce((sum, s) => sum + stepCost(s), 0) >= i.budgetUsd;
 
   // A model that sends nothing for too long is treated like a provider error. While a tool runs (a long command,
   // a question to the user) the model is not the one keeping quiet: the clock stands still until the last tool ends.
@@ -118,97 +122,113 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   // The project's notes (AGENTS.md) start every request, read afresh: the agent's own update shows at the next step.
   const system = () => [i.system ?? systemPrompt(i.worktree), i.system ? "" : i.instructions, notesBlock(i.worktree)].filter(Boolean).join("\n\n");
 
-  resetClock();
-  try {
-    const result = streamText({
-      model: languageModel(i.conn, i.model),
-      system: system(),
-      messages: i.messages,
-      tools,
-      experimental_repairToolCall: repairToolJson,
-      ...(i.only ? { activeTools: [i.only], toolChoice: "required" as const } : {}),
-      // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
-      providerOptions: i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : undefined,
-      // Near the model's context, the older work becomes one summary; see memory.ts.
-      prepareStep: async ({ messages }) => {
-        let sent = withMemory(messages, memory);
-        const limit = memoryLimit(i.price);
-        const upTo = i.onMemory && sizeOf(sent) > limit ? cutPoint(messages, memory, limit) : null;
-        if (upTo !== null) {
-          running++;
-          clearTimeout(timer);
-          try {
-            const r = await remember(i.conn, i.model, i.worktree, messages, memory, upTo, i.signal);
-            const cost = costOf(i.price, i.conn.preset, usageOf({ inputTokens: r.inputTokens, outputTokens: r.outputTokens })) ?? 0;
-            spent += cost;
-            memory = r.memory;
-            i.onMemory!(memory, { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd: cost });
-            sent = withMemory(messages, memory);
-          } catch {
-            // Without a summary the whole conversation goes; the next step tries again.
-          } finally {
-            running--;
-            resetClock();
+  // A round cut by the provider's output limit goes on from what it said and did (seen live: "Now I write the styles…",
+  // and the answer ended there, counted as done, the file never written).
+  const start = [...i.messages];
+  const said: ModelMessage[] = [];
+  let cut = false;
+  for (let round = 0; round <= MAX_CUTS; round++) {
+    if (round > 0 && (!cut || finished || error || i.signal.aborted || silence.signal.aborted)) break;
+    if (round > 0 && (spent >= i.budgetUsd || steps >= (i.maxSteps ?? MAX_STEPS) || i.stopWhen?.())) break;
+    const messages: ModelMessage[] = round === 0 ? start : [...start, ...said, { role: "user", content: CUT_NOTE }];
+    const stepsBefore = steps;
+    const spentBefore = spent;
+    const overBudget: StopCondition<ToolSet> = ({ steps: done }) => spentBefore + done.reduce((sum, s) => sum + stepCost(s), 0) >= i.budgetUsd;
+    cut = false;
+    resetClock();
+    try {
+      const result = streamText({
+        model: languageModel(i.conn, i.model),
+        system: system(),
+        messages,
+        tools,
+        experimental_repairToolCall: repairToolJson,
+        ...(i.only ? { activeTools: [i.only], toolChoice: "required" as const } : {}),
+        // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
+        providerOptions: i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : undefined,
+        // Near the model's context, the older work becomes one summary; see memory.ts.
+        prepareStep: async ({ messages }) => {
+          let sent = withMemory(messages, memory);
+          const limit = memoryLimit(i.price);
+          const upTo = i.onMemory && sizeOf(sent) > limit ? cutPoint(messages, memory, limit) : null;
+          if (upTo !== null) {
+            running++;
+            clearTimeout(timer);
+            try {
+              const r = await remember(i.conn, i.model, i.worktree, messages, memory, upTo, i.signal);
+              const cost = costOf(i.price, i.conn.preset, usageOf({ inputTokens: r.inputTokens, outputTokens: r.outputTokens })) ?? 0;
+              spent += cost;
+              memory = r.memory;
+              i.onMemory!(memory, { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd: cost });
+              sent = withMemory(messages, memory);
+            } catch {
+              // Without a summary the whole conversation goes; the next step tries again.
+            } finally {
+              running--;
+              resetClock();
+            }
           }
-        }
-        // Within one pass every step resent every file and output read before (seen in the user's runs: 3 million input
-        // tokens per answer). Older outputs go shortened, on a copy; the newest steps and the skills stay whole.
-        if (sent.length > KEEP_WHOLE) {
-          sent = structuredClone(sent);
-          compactHistory(sent);
-        }
-        const note = i.remind?.();
-        if (note) sent = [...sent, { role: "user", content: note }];
-        // The same text as long as the notes stay the same: the provider's cache holds.
-        return { system: system(), ...(sent === messages ? {} : { messages: sent }) };
-      },
-      stopWhen: [
-        hasToolCall("finish"),
-        ...(i.stopTools ?? []).map((name) => hasToolCall(name)),
-        isStepCount(i.maxSteps ?? MAX_STEPS),
-        overBudget,
-        ...(i.stopWhen ? [() => i.stopWhen!()] : []),
-      ],
-      // Busy providers (429, 5xx) are tried again after 2, 4, 8 and 16 seconds: an agent is in no hurry,
-      // and some keys allow one request at a time, which a team of agents runs into.
-      maxRetries: 4,
-      abortSignal: AbortSignal.any([i.signal, silence.signal]),
-      onError: () => {},
-      onStepEnd: (step) => {
-        steps++;
-        const input = step.usage.inputTokens ?? 0;
-        const output = step.usage.outputTokens ?? 0;
-        const cost = stepCost(step);
-        spent += cost;
-        i.onStep({
-          messages: step.response.messages as ModelMessage[],
-          inputTokens: input,
-          outputTokens: output,
-          costUsd: cost,
-          priced: billedUsd(step.providerMetadata, usdPerUnit) !== null || (i.price?.priceIn != null && i.price.priceOut != null),
-        });
-      },
-    });
+          // Within one pass every step resent every file and output read before (seen in the user's runs: 3 million input
+          // tokens per answer). Older outputs go shortened, on a copy; the newest steps and the skills stay whole.
+          if (sent.length > KEEP_WHOLE) {
+            sent = structuredClone(sent);
+            compactHistory(sent);
+          }
+          const note = i.remind?.();
+          if (note) sent = [...sent, { role: "user", content: note }];
+          // The same text as long as the notes stay the same: the provider's cache holds.
+          return { system: system(), ...(sent === messages ? {} : { messages: sent }) };
+        },
+        stopWhen: [
+          hasToolCall("finish"),
+          ...(i.stopTools ?? []).map((name) => hasToolCall(name)),
+          isStepCount((i.maxSteps ?? MAX_STEPS) - stepsBefore),
+          overBudget,
+          ...(i.stopWhen ? [() => i.stopWhen!()] : []),
+        ],
+        // Busy providers (429, 5xx) are tried again after 2, 4, 8 and 16 seconds: an agent is in no hurry,
+        // and some keys allow one request at a time, which a team of agents runs into.
+        maxRetries: 4,
+        abortSignal: AbortSignal.any([i.signal, silence.signal]),
+        onError: () => {},
+        onStepEnd: (step) => {
+          steps++;
+          cut = step.finishReason === "length";
+          said.push(...(step.response.messages as ModelMessage[]));
+          const input = step.usage.inputTokens ?? 0;
+          const output = step.usage.outputTokens ?? 0;
+          const cost = stepCost(step);
+          spent += cost;
+          i.onStep({
+            messages: step.response.messages as ModelMessage[],
+            inputTokens: input,
+            outputTokens: output,
+            costUsd: cost,
+            priced: billedUsd(step.providerMetadata, usdPerUnit) !== null || (i.price?.priceIn != null && i.price.priceOut != null),
+          });
+        },
+      });
 
-    let text = "";
-    for await (const part of result.fullStream) {
-      resetClock();
-      if (part.type === "text-delta") text += part.text;
-      else if (part.type === "text-end" && text.trim()) {
-        i.onText(text.trim());
-        lastText = text.trim();
-        text = "";
-      } else if (part.type === "tool-error" && !reported.has(part.toolCallId)) {
-        // Calls the SDK rejected before running them (unknown tool, bad arguments) still belong in the feed.
-        const message = part.error instanceof Error ? part.error.message : String(part.error);
-        i.hooks.onCall({ callId: part.toolCallId, name: part.toolName, input: part.input });
-        i.hooks.onResult({ callId: part.toolCallId, name: part.toolName, ok: false, output: `Error: ${message}` });
-      } else if (part.type === "error") error = describeError(part.error);
+      let text = "";
+      for await (const part of result.fullStream) {
+        resetClock();
+        if (part.type === "text-delta") text += part.text;
+        else if (part.type === "text-end" && text.trim()) {
+          i.onText(text.trim());
+          lastText = text.trim();
+          text = "";
+        } else if (part.type === "tool-error" && !reported.has(part.toolCallId)) {
+          // Calls the SDK rejected before running them (unknown tool, bad arguments) still belong in the feed.
+          const message = part.error instanceof Error ? part.error.message : String(part.error);
+          i.hooks.onCall({ callId: part.toolCallId, name: part.toolName, input: part.input });
+          i.hooks.onResult({ callId: part.toolCallId, name: part.toolName, ok: false, output: `Error: ${message}` });
+        } else if (part.type === "error") error = describeError(part.error);
+      }
+    } catch (err) {
+      if (!i.signal.aborted && !silence.signal.aborted) error = describeError(err);
+    } finally {
+      clearTimeout(timer);
     }
-  } catch (err) {
-    if (!i.signal.aborted && !silence.signal.aborted) error = describeError(err);
-  } finally {
-    clearTimeout(timer);
   }
 
   if (i.signal.aborted) return { kind: "stopped" };

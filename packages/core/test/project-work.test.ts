@@ -643,6 +643,23 @@ describe("a ready project", () => {
     const again = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
     expect(again.messages.at(-1).content).toBe("Это главная страница.");
   });
+
+  // Seen live: "Now I write the styles…", then the provider's output limit cut the answer, and the run counted it as done.
+  it("goes on when the provider cuts an answer by its length, and asks for big files in parts", async () => {
+    const s = await setup({
+      coder: [
+        { text: "Теперь пишу стили…", finishReason: "length" },
+        call("write_file", { path: "styles.css", content: "body {}\n" }),
+        { text: "Стили готовы." },
+      ],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай стили", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done");
+    expect(readFileSync(join(folder, "styles.css"), "utf8")).toBe("body {}\n");
+    expect(requestsOf("coder")).toHaveLength(3);
+    expect(JSON.stringify(requestsOf("coder")[1]!.body.messages)).toContain("cut off by the output limit");
+  });
 });
 
 // Asked for: the agent works with git by the project's rules — a branch, commits on its word, accept or reject.
