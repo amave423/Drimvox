@@ -1,6 +1,6 @@
 {
   "name": "@drimvox/desktop",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "private": true,
   "type": "module",
   "description": "Drimvox desktop app",
