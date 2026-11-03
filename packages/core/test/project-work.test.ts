@@ -666,6 +666,31 @@ describe("a ready project", () => {
     await new Promise((r) => setTimeout(r, 1500));
   });
 
+  // Seen live (1.8.4): GLM's output limit cut a step in the middle of its tool calls; the calls went back to the model
+  // without results, the provider refused every request after ("Tool results are missing"), and nothing more was done.
+  it("goes on after an answer cut in the middle of its tool calls, and the next message works too", async () => {
+    const s = await setup({
+      coder: [
+        { toolCalls: [{ name: "write_file", args: { path: "index.html", content: "<h1>Погода</h1>\n" } }, { name: "write_file", args: { path: "app.js", content: "" } }], finishReason: "length" },
+        call("write_file", { path: "index.html", content: "<h1>Погода</h1>\n" }),
+        { text: "Сайт готов." },
+        { text: "Всё работает." },
+      ],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай сайт погоды", model: s.ref("coder") });
+    const work = await until(s.project.id, (w) => w.status !== "running" && requestsOf("coder").length >= 3);
+    expect(work).toMatchObject({ status: "done", reason: null });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Проверь", model: s.ref("coder") });
+    expect(await until(s.project.id, (w) => w.status !== "running" && requestsOf("coder").length >= 4)).toMatchObject({ status: "done", reason: null });
+    // No tool call goes to the model without its result.
+    for (const r of requestsOf("coder")) {
+      const msgs = r.body.messages as any[];
+      const answered = new Set(msgs.filter((m) => m.role === "tool").map((m) => m.tool_call_id));
+      for (const m of msgs) for (const c of m.tool_calls ?? []) expect(answered.has(c.id)).toBe(true);
+    }
+  });
+
   // Said in a video on agents: a request late in a long conversation costs several times one at its start; one task, one
   // conversation.
   it("starts again with a clean context: a new conversation, the old one kept, the project's notes still there", async () => {

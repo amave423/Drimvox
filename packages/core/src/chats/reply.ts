@@ -12,7 +12,7 @@ import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai";
 import { cliReply } from "../cli/chat";
 import { isCli } from "../cli/kinds";
 import { FAIR_USE_HINT, WEB_HINT, webTools } from "../internet/tools";
-import { repairToolJson } from "../agent/repair";
+import { answeredOnly, repairToolJson } from "../agent/repair";
 import { compactHistory } from "../work/compact";
 import { deferTools } from "../agent/deferred";
 import type { WebAccess } from "../internet/web";
@@ -180,7 +180,7 @@ export async function reply(i: ReplyInput): Promise<void> {
         ]
           .filter(Boolean)
           .join("\n"),
-        messages: round === 0 ? history : [...history, ...said, { role: "user" as const, content: CONTINUE }],
+        messages: answeredOnly(round === 0 ? history : [...history, ...said, { role: "user" as const, content: CONTINUE }]),
         ...(Object.keys(tools).length
           ? {
               tools: deferral.tools,

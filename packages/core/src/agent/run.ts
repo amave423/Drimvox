@@ -11,7 +11,7 @@ import { buildTools, type ToolHooks } from "./tools";
 import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory, type Remembered } from "./memory";
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
-import { repairToolJson } from "./repair";
+import { answeredOnly, repairToolJson } from "./repair";
 import { deferTools } from "./deferred";
 import { Workspace } from "./workspace";
 
@@ -145,13 +145,13 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
 
   // A round cut by the provider's output limit goes on from what it said and did (seen live: "Now I write the styles…",
   // and the answer ended there, counted as done, the file never written).
-  const start = [...i.messages];
+  const start = answeredOnly([...i.messages]);
   const said: ModelMessage[] = [];
   let cut = false;
   for (let round = 0; round <= MAX_CUTS; round++) {
     if (round > 0 && (!cut || finished || error || i.signal.aborted || silence.signal.aborted)) break;
     if (round > 0 && (spent >= i.budgetUsd || steps >= (i.maxSteps ?? MAX_STEPS) || i.stopWhen?.())) break;
-    const messages: ModelMessage[] = round === 0 ? start : [...start, ...said, { role: "user", content: CUT_NOTE }];
+    const messages: ModelMessage[] = round === 0 ? start : answeredOnly([...start, ...said, { role: "user", content: CUT_NOTE }]);
     const stepsBefore = steps;
     const spentBefore = spent;
     const overBudget: StopCondition<ToolSet> = ({ steps: done }) => spentBefore + done.reduce((sum, s) => sum + stepCost(s), 0) >= i.budgetUsd;
