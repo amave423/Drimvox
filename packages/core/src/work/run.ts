@@ -40,8 +40,6 @@ const CHECKLIST_NOTE = "Tick off in the checklist what is done by now with updat
 const MAX_ERRORS = 2;
 /** Times a failing test run sends the agent back before the report says it fails. */
 const MAX_CHECK_ROUNDS = 2;
-/** The latest part of the model's thinking kept with an answer: enough to see what it thinks, not a whole run's worth. */
-const MAX_REASONING = 20_000;
 const RETRY_MS = 5000;
 /** Looks at pages per answer: the desktop and the phone, scenarios, and again after fixes. */
 const LOOKS = {
@@ -286,15 +284,12 @@ export class WorkRun {
     const snapshot = await checkpoint(this.folder, checkpointRef).catch(() => null);
     const activity: ActivityEntry[] = [];
     let content = "";
-    // The model's thinking, its latest part: shown while it thinks (a long think left the screen empty).
-    let reasoning = "";
-    let thoughtAt = 0;
     let input = 0;
     let output = 0;
     let cached = 0;
     let cost = 0;
     let priced = true;
-    const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: reasoning || null, activity });
+    const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
     const onCall = (name: string, what: string) => {
       if (name === "use_skill") this.skillsOpened.add(what);
       this.sinceChecklist = name === "update_checklist" ? 0 : this.sinceChecklist + 1;
@@ -484,13 +479,6 @@ export class WorkRun {
         content = content ? `${content}\n\n${text}` : text;
         save();
       },
-      onReasoning: (text) => {
-        reasoning = (reasoning + text).slice(-MAX_REASONING);
-        // Saved a few times a second, not at every word.
-        if (Date.now() - thoughtAt < 500) return;
-        thoughtAt = Date.now();
-        save();
-      },
       onStep: (step) => {
         messages.push(...step.messages);
         input += step.inputTokens;
@@ -519,7 +507,7 @@ export class WorkRun {
     }
     this.d.chats.finishAnswer(answer.id, {
       content,
-      reasoning: reasoning || null,
+      reasoning: null,
       status: stopped ? "stopped" : error ? "error" : "done",
       inputTokens: input,
       outputTokens: output,

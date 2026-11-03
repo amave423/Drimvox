@@ -13,6 +13,7 @@ import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
 import { deferTools } from "./deferred";
+import { thinkingOptions } from "../chats/thinking";
 import { Workspace } from "./workspace";
 
 export const MAX_STEPS = 60;
@@ -24,9 +25,12 @@ type Summary = { result: Promise<Remembered | null>; done: Remembered | null | u
 const EARLY_SUMMARY = 0.85;
 
 /** Rounds a pass may go on for after the provider cut an answer by its output limit. */
-const MAX_CUTS = 2;
+const MAX_CUTS = 3;
+// Seen in a manual test: after a cut GLM said "I write in parts" and wrote three files in one step again, cut again.
 const CUT_NOTE =
-  "Your last message was cut off by the output limit, and nothing in its unfinished part was done. Go on from there. Write a big file in parts: write_file with the first part, then edit_file to add the rest.";
+  "Your last message was cut off by the output limit (your thinking counts toward it too), and nothing in its unfinished " +
+  "part was done. Go on from there, thinking briefly. Write one file per step, at most about 200 lines in one write_file; " +
+  "then add the rest with edit_file, appending after its last lines.";
 
 export interface RunInput {
   conn: Connection;
@@ -69,8 +73,6 @@ export interface RunInput {
   idleTimeoutMs: number;
   hooks: Omit<ToolHooks, "onFinish">;
   onText(text: string): void;
-  /** What the model thinks before it speaks, as it comes (seen live: a model thought for two minutes, and the screen stayed empty). */
-  onReasoning?(text: string): void;
   /** After every finished step: the messages it produced and its usage. */
   onStep(step: { messages: ModelMessage[]; inputTokens: number; outputTokens: number; cachedTokens: number; costUsd: number; priced: boolean }): void;
 }
@@ -166,7 +168,9 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         experimental_repairToolCall: repairToolJson,
         ...(i.only ? { activeTools: [i.only], toolChoice: "required" as const } : {}),
         // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
-        providerOptions: i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : undefined,
+        // After a cut the model thinks less: its thinking takes the same output limit (seen in a manual test).
+        providerOptions:
+          i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : round > 0 ? thinkingOptions(i.conn.preset, "low") : undefined,
         // Near the model's context, the older work becomes one summary; see memory.ts.
         prepareStep: async ({ messages }) => {
           // A summary written in the background meanwhile takes over the older work now.
@@ -251,7 +255,6 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       for await (const part of result.fullStream) {
         resetClock();
         if (part.type === "text-delta") text += part.text;
-        else if (part.type === "reasoning-delta") i.onReasoning?.(part.text);
         else if (part.type === "text-end" && text.trim()) {
           i.onText(text.trim());
           lastText = text.trim();
@@ -277,6 +280,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   if (done) return { kind: "finished", ...done };
   if (spent >= i.budgetUsd) return { kind: "budget" };
   if (steps >= (i.maxSteps ?? MAX_STEPS)) return { kind: "steps" };
+  // Cut by the output limit every time it went on: not done, and said so (seen: "done" with nothing written).
+  if (cut) return { kind: "error", error: { code: "cut_off", detail: `The model's answer was cut by its output limit ${MAX_CUTS + 1} times in a row.` } };
   // The model ended with plain text instead of calling finish: take its last words as the summary.
   return { kind: "finished", summary: lastText || "—", commitMessage: null };
 }

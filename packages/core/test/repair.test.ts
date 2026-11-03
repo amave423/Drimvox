@@ -15,6 +15,12 @@ describe("tool input with its brackets wrong", () => {
     expect(JSON.parse(balanceJson('{"t": "a } ] \\" {"}}')!)).toEqual({ t: 'a } ] " {' });
   });
 
+  // Seen in a manual test: GLM's output limit cut a write_file in the middle of the file's text. Closed, it would write
+  // half a file; such a call is a cut, not a bracket too many, and is not run.
+  it("does not close a text cut in the middle: that is an answer cut by its length", () => {
+    expect(balanceJson('{"path": "styles.css", "content": "body { color: red; }\\n.card { pad')).toBeNull();
+  });
+
   it("gives up on what brackets cannot fix", () => {
     expect(balanceJson('{"id": look}')).toBeNull();
   });

@@ -26,7 +26,9 @@ export function balanceJson(text: string): string | null {
     }
     out += ch;
   }
-  if (inString) out += '"';
+  // A text that ends unclosed was cut, not mistyped (seen in a manual test: the output limit cut a write_file in the middle
+  // of the file): closing it would run the call with half its text.
+  if (inString) return null;
   out += open.reverse().join("");
   try {
     JSON.parse(out);

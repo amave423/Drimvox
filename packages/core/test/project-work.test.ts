@@ -666,6 +666,21 @@ describe("a ready project", () => {
     await new Promise((r) => setTimeout(r, 1500));
   });
 
+  // Seen in a manual test: GLM was cut by its output limit three times in a row (its long thinking counts too), and the
+  // run said "done" with nothing written. After a cut it thinks less; cut every time, the run stops and says why.
+  it("thinks less after a cut, and stops saying why when every answer is cut", async () => {
+    const cut = { text: "Пишу весь сайт…", finishReason: "length" };
+    const s = await setup({ coder: Array.from({ length: 8 }, () => cut) });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай сайт погоды", model: s.ref("coder") });
+    const work = await until(s.project.id, (w) => w.status !== "running" && w.status !== "idle");
+    expect(work).toMatchObject({ status: "paused", reason: "error" });
+    expect(work.detail).toMatch(/cut by its output limit 4 times in a row/);
+    expect(JSON.stringify(requestsOf("coder")[0]!.body)).not.toContain('"effort":"low"');
+    expect(JSON.stringify(requestsOf("coder")[1]!.body)).toContain('"effort":"low"');
+    expect(JSON.stringify(requestsOf("coder")[1]!.body.messages)).toMatch(/at most about 200 lines/);
+  }, 60_000);
+
   // Seen live (1.8.4): GLM's output limit cut a step in the middle of its tool calls; the calls went back to the model
   // without results, the provider refused every request after ("Tool results are missing"), and nothing more was done.
   it("goes on after an answer cut in the middle of its tool calls, and the next message works too", async () => {

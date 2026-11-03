@@ -8,7 +8,8 @@ import { todayLine } from "../now";
 export const BATCH_HINT =
   "Work in few steps: every step costs a full round to the model. Make the calls that do not depend on each other in the same " +
   "step: read the files you need together, run independent searches together, and make all the edits you already know in " +
-  "one edit_file call with edits.";
+  "one edit_file call with edits. Big new files are the exception: one per step, at most about 200 lines in one write_file, " +
+  "the rest added with edit_file (the output limit cuts a longer answer, and nothing in it is done).";
 
 /**
  * After two failed fixes of the same error a third one sinks deeper into the agent's own guesses (said in a video on agent
