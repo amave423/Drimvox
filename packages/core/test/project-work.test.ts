@@ -671,16 +671,17 @@ describe("a ready project", () => {
     const s = await setup({
       coder: [
         { ...call("list_files", { path: "." }), usage: { prompt_tokens: 1000, completion_tokens: 50 } },
-        { ...call("list_files", { path: "." }), delayMs: 1500, usage: { prompt_tokens: 3000, completion_tokens: 100 } },
-        { text: "Готово.", usage: { prompt_tokens: 5000, completion_tokens: 20 } },
+        // Asked for: what came from the provider's cache, the cheap part of what is read again.
+        { ...call("list_files", { path: "." }), delayMs: 1500, usage: { prompt_tokens: 3000, completion_tokens: 100, prompt_tokens_details: { cached_tokens: 900 } } },
+        { text: "Готово.", usage: { prompt_tokens: 5000, completion_tokens: 20, prompt_tokens_details: { cached_tokens: 2900 } } },
       ],
     });
     await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Посмотри файлы", model: s.ref("coder") });
     const during = await until(s.project.id, (w) => w.status === "running" && w.tokens.context === 1000);
-    expect(during.tokens).toMatchObject({ input: 1000, output: 50 });
+    expect(during.tokens).toMatchObject({ input: 1000, output: 50, cached: 0 });
     const done = await until(s.project.id, (w) => w.status === "done");
-    expect(done.tokens).toEqual({ input: 9000, output: 170, context: 5000 });
+    expect(done.tokens).toEqual({ input: 9000, output: 170, cached: 3800, context: 5000 });
   });
 
   // Seen live: "Now I write the styles…", then the provider's output limit cut the answer, and the run counted it as done.

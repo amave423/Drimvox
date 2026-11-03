@@ -878,6 +878,8 @@ export const en: Record<keyof typeof ru, string> = {
   "workTokens.title": "Context and tokens",
   "workTokens.contextOnly": "{used} in the latest step",
   "workTokens.read": "Read by the model",
+  "workTokens.cached": "of it from the cache",
+  "workTokens.cachedShare": "{tokens} · {share}%",
   "workTokens.written": "Written by the model",
   "workTokens.spent": "Spent",
   "workTokens.note": "The bar is how much of the model's context the latest step took. \"Read\" is larger: at every step the model reads the whole conversation, the files and the tools' answers again; many providers charge less for what they read again.",

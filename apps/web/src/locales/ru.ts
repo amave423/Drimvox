@@ -878,6 +878,8 @@ export const ru = {
   "workTokens.title": "Контекст и токены",
   "workTokens.contextOnly": "{used} в последнем шаге",
   "workTokens.read": "Прочитано моделью",
+  "workTokens.cached": "из них из кэша",
+  "workTokens.cachedShare": "{tokens} · {share} %",
   "workTokens.written": "Написано моделью",
   "workTokens.spent": "Потрачено",
   "workTokens.note": "Полоса — сколько контекста модели занял последний шаг. «Прочитано» больше: на каждом шаге модель заново читает весь разговор, файлы и ответы инструментов; у многих провайдеров повторно прочитанное дешевле.",

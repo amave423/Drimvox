@@ -65,7 +65,7 @@ export interface RunInput {
   /** What the model thinks before it speaks, as it comes (seen live: a model thought for two minutes, and the screen stayed empty). */
   onReasoning?(text: string): void;
   /** After every finished step: the messages it produced and its usage. */
-  onStep(step: { messages: ModelMessage[]; inputTokens: number; outputTokens: number; costUsd: number; priced: boolean }): void;
+  onStep(step: { messages: ModelMessage[]; inputTokens: number; outputTokens: number; cachedTokens: number; costUsd: number; priced: boolean }): void;
 }
 
 export type RunOutcome =
@@ -205,6 +205,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
             messages: step.response.messages as ModelMessage[],
             inputTokens: input,
             outputTokens: output,
+            cachedTokens: usageOf(step.usage).cacheRead,
             costUsd: cost,
             priced: billedUsd(step.providerMetadata, usdPerUnit) !== null || (i.price?.priceIn != null && i.price.priceOut != null),
           });

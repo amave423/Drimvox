@@ -227,4 +227,5 @@
 .work-tokens-list { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 4px 0 0; font-size: 13px; }
 .work-tokens-list dt { color: var(--muted); }
 .work-tokens-list dd { margin: 0; text-align: right; }
+.work-tokens-list .work-tokens-sub { padding-left: 12px; }
 .work-tokens-note { margin: 2px 0 0; font-size: 12px; line-height: 1.45; }

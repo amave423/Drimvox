@@ -78,9 +78,10 @@ export interface ProjectWorkView {
   actions: number;
   /**
    * Tokens since the work started (asked for: what they went to). `input` counts what every step sent the model, the
-   * whole conversation again each time; `output` what it wrote; `context` what the latest step sent: how full it is now.
+   * whole conversation again each time; `cached` the part of it the provider served from its cache, for less; `output`
+   * what it wrote; `context` what the latest step sent: how full it is now.
    */
-  tokens: { input: number; output: number; context: number | null };
+  tokens: { input: number; output: number; cached: number; context: number | null };
   /** The run waits for the user's permission on a command. */
   waitingApproval: boolean;
   /** The strong model took over. */

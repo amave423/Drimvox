@@ -141,14 +141,15 @@ export class ProjectWorkRepo {
     }));
   }
 
-  spending(chatId: string, since: number): { spentUsd: number; actions: number; inputTokens: number; outputTokens: number } {
+  spending(chatId: string, since: number): { spentUsd: number; actions: number; inputTokens: number; outputTokens: number; cachedTokens: number } {
     const rows = this.db.sql
-      .prepare("select cost_usd, input_tokens, output_tokens, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?")
-      .all(chatId, since) as { cost_usd: number | null; input_tokens: number | null; output_tokens: number | null; activity: string | null }[];
+      .prepare("select cost_usd, input_tokens, output_tokens, cached_tokens, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?")
+      .all(chatId, since) as { cost_usd: number | null; input_tokens: number | null; output_tokens: number | null; cached_tokens: number | null; activity: string | null }[];
     return {
       spentUsd: rows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0),
       inputTokens: rows.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0),
       outputTokens: rows.reduce((sum, r) => sum + (r.output_tokens ?? 0), 0),
+      cachedTokens: rows.reduce((sum, r) => sum + (r.cached_tokens ?? 0), 0),
       actions: rows.reduce((sum, r) => sum + (r.activity ? (JSON.parse(r.activity) as unknown[]).length : 0), 0),
     };
   }

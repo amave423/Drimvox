@@ -281,6 +281,8 @@ const migrations: string[] = [
   `insert or ignore into providers (id, preset, name, base_url, secret, created_at, updated_at) values ('chain', 'custom', 'Цепочки', 'drimvox://chain', null, 0, 0);`,
   // How much of the model's context a project's latest step took: the workshop's context bar, as a chat has.
   `alter table project_work add column context_tokens integer;`,
+  // Of an answer's input, what came from the provider's cache (asked for: whether the cache works, and how much).
+  `alter table messages add column cached_tokens integer;`,
 ];
 
 export interface Database {

@@ -131,18 +131,19 @@ export class WorkRun {
   }
 
   /** The stretch going on now: when it began, the time worked before it, and what its answer has cost so far. */
-  private stretch = { since: 0, base: 0, costUsd: 0, inputTokens: 0, outputTokens: 0 };
+  private stretch = { since: 0, base: 0, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
 
   /**
    * Time and money including the stretch going on now (seen live: the panel said "0 min, 0 ₽" for minutes, as both were
    * counted only when an answer of many steps ended).
    */
-  progress(): { workedMs: number; inFlightUsd: number; inputTokens: number; outputTokens: number } {
+  progress(): { workedMs: number; inFlightUsd: number; inputTokens: number; outputTokens: number; cachedTokens: number } {
     return {
       workedMs: this.stretch.since ? this.stretch.base + (Date.now() - this.stretch.since) : this.row().workedMs,
       inFlightUsd: this.stretch.costUsd,
       inputTokens: this.stretch.inputTokens,
       outputTokens: this.stretch.outputTokens,
+      cachedTokens: this.stretch.cachedTokens,
     };
   }
 
@@ -158,7 +159,7 @@ export class WorkRun {
     let workedBase = this.row().workedMs;
     let since = Date.now();
     const worked = () => workedBase + (Date.now() - since);
-    this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0 };
+    this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
     let nudges = 0;
     let errors = 0;
     let doneBefore = this.row().checklist.filter((i) => i.done).length;
@@ -195,7 +196,7 @@ export class WorkRun {
         this.d.repo.update(this.projectId, { workedMs: worked() });
         workedBase = worked();
         since = Date.now();
-        this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0 };
+        this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
         if (signal.aborted || outcome.kind === "stopped") return stopWith("stopped", "user");
         if (this.finished) return stopWith("done", null);
         if (outcome.kind === "error") {
@@ -280,6 +281,7 @@ export class WorkRun {
     let thoughtAt = 0;
     let input = 0;
     let output = 0;
+    let cached = 0;
     let cost = 0;
     let priced = true;
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: reasoning || null, activity });
@@ -467,10 +469,12 @@ export class WorkRun {
         messages.push(...step.messages);
         input += step.inputTokens;
         output += step.outputTokens;
+        cached += step.cachedTokens;
         cost += step.costUsd;
         this.stretch.costUsd = cost;
         this.stretch.inputTokens = input;
         this.stretch.outputTokens = output;
+        this.stretch.cachedTokens = cached;
         // What this step sent is what the model holds now: the context bar.
         if (step.inputTokens) this.d.repo.update(this.projectId, { contextTokens: step.inputTokens });
         if (!step.priced) priced = false;
@@ -482,6 +486,7 @@ export class WorkRun {
     this.stretch.costUsd = 0;
     this.stretch.inputTokens = 0;
     this.stretch.outputTokens = 0;
+    this.stretch.cachedTokens = 0;
     if (snapshot) {
       if (await changedSince(this.folder, snapshot).catch(() => false)) this.d.chats.setCheckpoint(answer.id, snapshot);
       else await dropCheckpoint(this.folder, checkpointRef).catch(() => {});
@@ -492,6 +497,7 @@ export class WorkRun {
       status: stopped ? "stopped" : error ? "error" : "done",
       inputTokens: input,
       outputTokens: output,
+      cachedTokens: cached,
       costUsd: priced || cost > 0 ? cost : null,
       error,
       activity,

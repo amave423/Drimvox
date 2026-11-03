@@ -127,7 +127,8 @@ describe("a chat with a folder", () => {
   // Seen in the user's chats: one answer with 22 pages took 1.2 million input tokens, every step resending all of them.
   it("sends older outputs of a long answer shortened and the newest ones whole", async () => {
     writeFileSync(join(folder, "big.txt"), "строка данных\n".repeat(1000));
-    const listing = Array.from({ length: 9 }, () => call("list_files", { path: "." }));
+    // Enough steps for the line between shortened and whole, which moves by a stride, to pass the first read.
+    const listing = Array.from({ length: 17 }, () => call("list_files", { path: "." }));
     const chat = await chatWith([call("read_file", { path: "big.txt" }), ...listing, call("read_file", { path: "big.txt" }), { text: "Прочитал." }]);
     await connect(chat.id, folder);
     await readEvents(await send(chat.id, "Прочитай big.txt"));

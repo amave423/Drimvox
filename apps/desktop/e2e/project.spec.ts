@@ -282,6 +282,7 @@ test("a stopped project goes on with Continue, and the timeline shows the answer
   const tokens = page.getByRole("region", { name: "Контекст и токены" });
   await expect(tokens).toContainText("Прочитано моделью");
   await expect(tokens).toContainText("Написано моделью");
+  await expect(tokens).toContainText("из них из кэша");
 
   // Opened again, the project shows its latest messages, not its first (seen live: it opened at the very top).
   await page.getByRole("button", { name: "Чат", exact: true }).click();

@@ -12,7 +12,7 @@ export function WorkTokens({ work }: { work: ProjectWorkView }) {
   const { t, settings } = useApp();
   const ref = work.escalated && work.models?.strong ? work.models.strong : (work.models?.work ?? null);
   const model = useModelInfo(ref);
-  const { input, output, context } = work.tokens;
+  const { input, output, cached, context } = work.tokens;
   if (!work.startedAt || (input === 0 && output === 0 && context === null)) return null;
   const tokens = (n: number) => formatTokens(n, settings.locale);
   const size = model?.contextLength ?? null;
@@ -32,6 +32,9 @@ export function WorkTokens({ work }: { work: ProjectWorkView }) {
       <dl className="work-tokens-list">
         <dt>{t("workTokens.read")}</dt>
         <dd className="mono">{tokens(input)}</dd>
+        {/* What the provider served from its cache, for less: none at all means the cache does not work here. */}
+        <dt className="work-tokens-sub">{t("workTokens.cached")}</dt>
+        <dd className="mono">{input > 0 ? t("workTokens.cachedShare", { tokens: tokens(cached), share: Math.round((cached / input) * 100) }) : tokens(cached)}</dd>
         <dt>{t("workTokens.written")}</dt>
         <dd className="mono">{tokens(output)}</dd>
         <dt>{t("workTokens.spent")}</dt>

@@ -77,6 +77,8 @@ export interface FinishedAnswer {
   status: MessageStatus;
   inputTokens: number | null;
   outputTokens: number | null;
+  /** Of the input, what came from the provider's cache. */
+  cachedTokens?: number | null;
   costUsd: number | null;
   error: ProviderError | null;
   /** The tools called while answering. */
@@ -298,7 +300,7 @@ export class ChatRepo {
       .prepare(
         `update messages set content = :content, reasoning = :reasoning, status = :status, input_tokens = :input_tokens,
          output_tokens = :output_tokens, cost_usd = :cost_usd, error_code = :error_code, error_detail = :error_detail,
-         activity = :activity
+         activity = :activity, cached_tokens = :cached_tokens
          where id = :id`,
       )
       .run({
@@ -312,6 +314,7 @@ export class ChatRepo {
         error_code: a.error?.code ?? null,
         error_detail: a.error?.detail ?? null,
         activity: a.activity?.length ? JSON.stringify(a.activity) : null,
+        cached_tokens: a.cachedTokens ?? null,
       });
     return this.message(id)!;
   }

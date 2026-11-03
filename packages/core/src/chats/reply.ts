@@ -87,6 +87,8 @@ export interface ReplyInput {
 const KEEP_WHOLE = 16;
 /** What is left of an older page, file or command output: enough to remember what it was and its gist. */
 const OUTPUT_KEPT = 2_000;
+/** The line between shortened and whole moves by this many messages: the beginning repeats, and the provider's cache holds. */
+const STRIDE = 8;
 
 /**
  * Within one answer every step used to resend every page and file read before (seen in the user's chats: one answer
@@ -96,7 +98,7 @@ const OUTPUT_KEPT = 2_000;
 function shortened(messages: ModelMessage[]): ModelMessage[] {
   if (messages.length <= KEEP_WHOLE) return messages;
   const copy = structuredClone(messages);
-  compactHistory(copy, KEEP_WHOLE, OUTPUT_KEPT);
+  compactHistory(copy, KEEP_WHOLE, STRIDE, OUTPUT_KEPT);
   return copy;
 }
 

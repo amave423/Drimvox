@@ -156,7 +156,7 @@ export async function runCliTurn(i: CliTurnInput): Promise<RunOutcome> {
   if (done) {
     const reply: ModelMessage[] = done.text ? [{ role: "assistant", content: done.text }] : [];
     // A subscription: the tokens are counted, the money is not Drimvox's to count.
-    i.onStep({ messages: reply, inputTokens: done.inputTokens, outputTokens: done.outputTokens, costUsd: 0, priced: true });
+    i.onStep({ messages: reply, inputTokens: done.inputTokens, outputTokens: done.outputTokens, cachedTokens: 0, costUsd: 0, priced: true });
   }
   if (result.stopped) return { kind: "stopped" };
   if (result.error || !done) return { kind: "error", error: result.error ?? { code: "provider_error" } };

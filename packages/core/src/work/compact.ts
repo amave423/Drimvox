@@ -2,6 +2,12 @@ import type { ModelMessage } from "ai";
 
 /** The newest messages kept whole: the agent's last steps, which it still reasons about. */
 export const KEEP_WHOLE = 40;
+/**
+ * How far the line between trimmed and whole moves at a time. A request whose beginning repeats is served from the
+ * provider's cache (measured on RouterAI with GLM: 8704 of 8795 tokens, 4.6 times cheaper); moved one step at a time,
+ * the line changed the beginning at every step.
+ */
+export const STRIDE = 20;
 /** What is left of an older tool's output or a long argument. */
 const OUTPUT_KEPT = 600;
 const INPUT_KEPT = 400;
@@ -21,9 +27,10 @@ const cut = (text: string, keep: number) => (text.length > keep + NOTE.length ? 
  * Tool outputs and long arguments (a written file's text) older than the last `keepWhole` messages are trimmed; the
  * words of the user and of the agent, and what each step did, stay. Returns how many characters were cut.
  */
-export function compactHistory(messages: ModelMessage[], keepWhole = KEEP_WHOLE, outputKept = OUTPUT_KEPT): number {
+export function compactHistory(messages: ModelMessage[], keepWhole = KEEP_WHOLE, stride = STRIDE, outputKept = OUTPUT_KEPT): number {
   let saved = 0;
-  const end = Math.max(0, messages.length - keepWhole);
+  // Between keepWhole and keepWhole + stride newest messages stay whole; the rest is the same from step to step.
+  const end = Math.floor(Math.max(0, messages.length - keepWhole) / stride) * stride;
   for (let i = 0; i < end; i++) {
     const m = messages[i]!;
     if (!Array.isArray(m.content)) continue;
