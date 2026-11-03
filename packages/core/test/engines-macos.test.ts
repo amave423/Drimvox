@@ -14,6 +14,12 @@ describe("engines on macOS", () => {
     expect(engineUrl("darwin", "arm64")).toBeTruthy();
     expect(whisperUrl("darwin", "arm64")).toBeNull();
   });
+
+  // Asked for: a build for Intel Macs too. Pictures on the computer are for Apple Silicon only; the rest works there.
+  it("says an Intel Mac has no pictures on the computer, and has its voice", () => {
+    expect(engineUrl("darwin", "x64")).toBeNull();
+    expect(piperUrl("darwin", "x64")).toBeTruthy();
+  });
 });
 
 describe("a type of service the system refuses", () => {

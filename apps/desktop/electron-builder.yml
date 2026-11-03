@@ -58,14 +58,15 @@ linux:
   maintainer: amave423 <artem123antropov@mail.ru>
   synopsis: A team of AI agents writes code under your review
   artifactName: Drimvox-${version}-${arch}.${ext}
-# macOS on Apple Silicon (docs/specs/macos.md). Not signed by Apple yet: an ad-hoc signature ("-") lets it run at all on
-# Apple Silicon; the first start goes through "Open Anyway". The zip is what electron-updater would need once signed.
+# macOS on Apple Silicon and on Intel (asked for: an Intel Mac cannot run an arm64 build; docs/specs/macos.md). Not
+# signed by Apple yet: an ad-hoc signature ("-") lets it run at all on Apple Silicon; the first start goes through "Open
+# Anyway". The zip is what electron-updater would need once signed.
 mac:
   target:
     - target: dmg
-      arch: arm64
+      arch: [arm64, x64]
     - target: zip
-      arch: arm64
+      arch: [arm64, x64]
   category: public.app-category.developer-tools
   artifactName: Drimvox-${version}-mac-${arch}.${ext}
   identity: "-"

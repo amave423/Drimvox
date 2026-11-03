@@ -7,7 +7,9 @@
 ## Как устроено
 
 - **Сборка** (`apps/desktop/electron-builder.yml`, раздел `mac`): `.dmg` для установки и `.zip`, для Apple Silicon
-  (arm64). Подпись — ad-hoc (`identity: "-"`): без неё Apple Silicon вообще не запускает приложение; подписи Apple
+  (arm64) и для Intel (x64, попросили: сборку arm64 Intel-Мак не запускает). Intel-сборку собирает тот же Мак на
+  Apple Silicon; проверить её на настоящем Intel-Маке негде (у GitHub таких машин почти не осталось). На Intel нет
+  картинок на компьютере (stable-diffusion.cpp под Mac собран только для Apple Silicon). Подпись — ad-hoc (`identity: "-"`): без неё Apple Silicon вообще не запускает приложение; подписи Apple
   нет, поэтому первый запуск — через «Всё равно открыть» или `xattr -cr` (написано в README). Собирает машина macOS в
   GitHub Actions вместе с Windows и Linux при выпуске версии; отдельная проверка всего на Mac —
   `.github/workflows/macos-check.yml` (запуск вручную: типы, юнит-тесты, dmg, тесты на настоящем окне).

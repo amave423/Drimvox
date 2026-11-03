@@ -128,7 +128,7 @@ phone. Works with your own API keys, your Claude or ChatGPT subscription, free m
 **Linux** — `Drimvox-<версия>-x86_64.AppImage` (любой дистрибутив: `chmod +x` и запустить) или
 `Drimvox-<версия>-amd64.deb` для Ubuntu и Debian: `sudo apt install ./Drimvox-<версия>-amd64.deb`.
 
-**macOS** (Apple Silicon: M1 и новее) — `Drimvox-<версия>-mac-arm64.dmg`: открыть и перетащить Drimvox в «Программы».
+**macOS** — Apple Silicon (M1 и новее): `Drimvox-<версия>-mac-arm64.dmg`; Intel: `Drimvox-<версия>-mac-x64.dmg`. Открыть и перетащить Drimvox в «Программы».
 
 <details>
 <summary>macOS не открывает Drimvox</summary>
