@@ -146,7 +146,7 @@ export async function reply(i: ReplyInput): Promise<void> {
   const limit = i.folder ? memoryLimit(await findModel(i.conn, i.model)) : 0;
   let extraUsage = { inputTokens: 0, outputTokens: 0 };
   const tools: ToolSet = {
-    ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }) : {}),
+    ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }, { owner: i.chatId }) : {}),
     ...i.extraTools,
   };
   // Research takes room: the internet, or tools of the user's servers (seen: a browser server stopped at 8 steps).

@@ -2,7 +2,7 @@ import { tool, type ToolSet } from "ai";
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { z } from "zod";
-import type { Browser } from "./browser";
+import type { BrowserView } from "./browser";
 import { placeScript } from "./page-scripts";
 import type { ToolRun } from "./tools";
 
@@ -92,7 +92,7 @@ const AUDIT_SCRIPT = `JSON.stringify((() => {
  * Chrome DevTools and Playwright, built in (asked for): the console and errors, requests, a script in the page, a file
  * into a form, the page as a PDF, a phone or a slow network, speed and accessibility, hovering and waiting.
  */
-export function devtoolsTools(browser: Browser, o: { folder?: string }, run: ToolRun, read: (signal?: AbortSignal) => Promise<string>): ToolSet {
+export function devtoolsTools(browser: BrowserView, o: { folder?: string }, run: ToolRun, read: (signal?: AbortSignal) => Promise<string>): ToolSet {
   const d = browser.driver;
 
   async function evaluate(expression: string): Promise<unknown> {

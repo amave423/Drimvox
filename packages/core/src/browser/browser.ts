@@ -1,7 +1,11 @@
 import type { BrowserDriver, BrowserState } from "./driver";
+import { OwnTab } from "./own-tab";
 
 /** How long the agent waits for the user to pass a check in the browser before it goes on without. */
 const ASK_MS = 30 * 60_000;
+
+/** What an agent's browser tools use: the shared browser, or one agent's own tab in it (Browser.own). */
+export type BrowserView = Pick<Browser, "driver" | "state" | "askUser" | "done">;
 
 /**
  * The agent's browser as Drimvox shares it: whatever drives it, plus what the agent waits for the user to do there (a
@@ -10,6 +14,8 @@ const ASK_MS = 30 * 60_000;
 export class Browser {
   private waiting: { reason: string; done(): void } | null = null;
   private readonly listeners = new Set<(s: BrowserState) => void>();
+  /** Each agent's own tab, by its chat or task: the same one in its next answer. */
+  private readonly tabs = new Map<string, OwnTab>();
 
   constructor(readonly driver: BrowserDriver) {
     driver.onState(() => this.broadcast());
@@ -22,6 +28,26 @@ export class Browser {
   onState(listener: (s: BrowserState) => void): () => void {
     this.listeners.add(listener);
     return () => void this.listeners.delete(listener);
+  }
+
+  /** The browser as one agent sees it: its tools drive its own tab, whatever the panel shows. */
+  own(owner: string): BrowserView {
+    let tab = this.tabs.get(owner);
+    if (!tab) {
+      tab = new OwnTab(this.driver, (id) => [...this.tabs.values()].some((t) => t !== tab && t.id === id));
+      this.tabs.set(owner, tab);
+    }
+    const mine = tab;
+    return {
+      driver: mine,
+      state: () => ({ ...mine.state(), waiting: this.waiting?.reason ?? null }),
+      // The user does what the agent asks in the agent's tab.
+      askUser: async (reason, signal) => {
+        await mine.show();
+        return this.askUser(reason, signal);
+      },
+      done: () => this.done(),
+    };
   }
 
   /** Waits until the user says they did what `reason` asks, the agent is stopped, or half an hour passes. */

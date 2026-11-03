@@ -20,6 +20,7 @@ interface Row {
   report: string | null;
   site_command: string | null;
   site_url: string | null;
+  context_tokens: number | null;
 }
 
 export interface WorkRow {
@@ -42,6 +43,8 @@ export interface WorkRow {
   report: string | null;
   /** How to start what it made, and where to open it. */
   site: { command: string; url: string } | null;
+  /** What the latest step sent the model: how full its context is now. */
+  contextTokens: number | null;
 }
 
 const toWork = (r: Row): WorkRow => ({
@@ -62,6 +65,7 @@ const toWork = (r: Row): WorkRow => ({
   startedAt: r.started_at,
   report: r.report ?? null,
   site: r.site_command && r.site_url ? { command: r.site_command, url: r.site_url } : null,
+  contextTokens: r.context_tokens ?? null,
 });
 
 /** Screenshots kept per project: the newest; older ones stay on disk with the task screenshots. */
@@ -110,6 +114,7 @@ export class ProjectWorkRepo {
     if (patch.escalated !== undefined) columns.escalated = patch.escalated ? 1 : 0;
     if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
     if (patch.report !== undefined) columns.report = patch.report;
+    if (patch.contextTokens !== undefined) columns.context_tokens = patch.contextTokens;
     if (patch.site !== undefined) {
       columns.site_command = patch.site?.command ?? null;
       columns.site_url = patch.site?.url ?? null;
@@ -136,12 +141,14 @@ export class ProjectWorkRepo {
     }));
   }
 
-  spending(chatId: string, since: number): { spentUsd: number; actions: number } {
+  spending(chatId: string, since: number): { spentUsd: number; actions: number; inputTokens: number; outputTokens: number } {
     const rows = this.db.sql
-      .prepare("select cost_usd, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?")
-      .all(chatId, since) as { cost_usd: number | null; activity: string | null }[];
+      .prepare("select cost_usd, input_tokens, output_tokens, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?")
+      .all(chatId, since) as { cost_usd: number | null; input_tokens: number | null; output_tokens: number | null; activity: string | null }[];
     return {
       spentUsd: rows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0),
+      inputTokens: rows.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0),
+      outputTokens: rows.reduce((sum, r) => sum + (r.output_tokens ?? 0), 0),
       actions: rows.reduce((sum, r) => sum + (r.activity ? (JSON.parse(r.activity) as unknown[]).length : 0), 0),
     };
   }

@@ -123,6 +123,20 @@ export class ProjectRepo {
   remove(id: string): boolean {
     return Number(this.db.sql.prepare("delete from projects where id = ?").run(id).changes) > 0;
   }
+
+  /** The project's conversations, whose marks in git tell its folder (relocate.ts). */
+  chatIds(id: string): string[] {
+    return (this.db.sql.prepare("select id from chats where project_id = ?").all(id) as { id: string }[]).map((r) => r.id);
+  }
+
+  /** The project's folder is elsewhere now (renamed or moved): the project and its conversations follow it. */
+  move(id: string, path: string): Omit<ProjectView, "gitState"> | null {
+    const old = this.get(id);
+    if (!old) return null;
+    this.db.sql.prepare("update projects set path = ? where id = ?").run(path, id);
+    this.db.sql.prepare("update chats set folder = ? where project_id = ? or folder = ?").run(path, id, old.path);
+    return this.get(id);
+  }
 }
 
 export type TaskPatch = Partial<

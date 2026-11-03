@@ -80,6 +80,7 @@ export function WorkshopBar({ projectId }: { projectId: string }) {
 }
 
 function pillOf(stage: Stage, w: ProjectWorkView | null): { key: MessageKey; tone: "run" | "ok" | "wait" | "idle" } {
+  if (stage === "folder") return { key: "workshop.state.folder", tone: "wait" };
   if (stage === "git") return { key: "workshop.state.git", tone: "wait" };
   if (!w || stage === "start" || stage === "loading") return { key: "workshop.state.new", tone: "idle" };
   if (stage === "interview") return { key: "workshop.state.interview", tone: "run" };

@@ -95,8 +95,10 @@ export function ChainsSection() {
   };
   // Those that answer first, the fastest first; those found not answering are not offered (seen: 40 of NVIDIA's 61).
   const rank = { ok: 0, unknown: 1, checking: 1, busy: 2, gone: 3 } as const;
+  const inChain = (f: { providerId: string; model: string }) => !!current?.models.some((m) => m.providerId === f.providerId && m.model === f.model);
+  // The chain's own models stay in the list, ticked: a click takes one out again (asked for: several picked in one go).
   const offered = free
-    .filter((f) => current && f.check.state !== "gone" && !current.models.some((m) => m.providerId === f.providerId && m.model === f.model) && (!current.toolsOnly || f.tools === true))
+    .filter((f) => current && (inChain(f) || (f.check.state !== "gone" && (!current.toolsOnly || f.tools === true))))
     .sort((a, b) => rank[a.check.state] - rank[b.check.state] || (a.check.ms ?? 1e9) - (b.check.ms ?? 1e9));
 
   return (
@@ -186,9 +188,14 @@ export function ChainsSection() {
                 placeholder={offered.length ? t("chains.add") : t("chains.noFree")}
                 search={t("model.search")}
                 options={offered.map((f, i) => ({ value: String(i), label: `${f.providerName} / ${f.name}`, hint: `${stateOf(f, t).text}${f.flat ? ` · ${t("chains.flat")}` : ""}` }))}
+                chosen={offered.flatMap((f, i) => (inChain(f) ? [String(i)] : []))}
                 onChange={(v) => {
                   const f = offered[Number(v)];
-                  if (f) change({ models: [...current.models, { providerId: f.providerId, model: f.model }] });
+                  if (!f) return;
+                  const models = inChain(f)
+                    ? current.models.filter((m) => m.providerId !== f.providerId || m.model !== f.model)
+                    : [...current.models, { providerId: f.providerId, model: f.model }];
+                  change({ models });
                 }}
               />
             )}

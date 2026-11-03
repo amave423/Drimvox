@@ -7,7 +7,7 @@ function useCurrent(list: RefObject<HTMLDivElement | null>, count: number) {
   useEffect(() => {
     const root = list.current;
     if (!root) return;
-    const scroller = root.closest(".desk, .workshop-chat-body, .sheet-scroll") ?? document.scrollingElement;
+    const scroller = root.closest(".workshop-feed, .desk, .sheet-scroll") ?? document.scrollingElement;
     const look = () => {
       const marks = [...root.querySelectorAll(".msg-user-wrap")];
       const line = window.innerHeight / 3;

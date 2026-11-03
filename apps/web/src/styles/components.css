@@ -268,6 +268,11 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .dropdown-list .is-active button { background: var(--paper); }
 .dropdown-list [aria-selected="true"] button { color: var(--ink); }
 .dropdown-empty { margin: 4px 8px; font-size: 13px; }
+/* Several at once: a tick box before each, the label and its hint beside it. */
+.dropdown-list.is-multi button { grid-template-columns: 18px 1fr; column-gap: 8px; align-items: center; }
+.dropdown-list.is-multi button small { grid-column: 2; }
+.dropdown-tick { grid-row: span 2; width: 16px; height: 16px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; line-height: 1; color: var(--sheet); }
+.dropdown-list.is-multi [aria-selected="true"] .dropdown-tick { background: var(--ink); border-color: var(--ink); }
 
 /* Saved SSH servers (SshSection.tsx). */
 .ssh-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }

@@ -1,3 +1,4 @@
+import { MissingFolder } from "./MissingFolder";
 import { CHAIN_PROVIDER_ID } from "@drimvox/shared";
 import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
@@ -18,13 +19,14 @@ import { WorkshopResult } from "./WorkshopResult";
 
 export const LAST_PROJECT_KEY = "drimvox.lastProject";
 
-export type Stage = "git" | "loading" | "start" | "interview" | "plan" | "work" | "talk";
+export type Stage = "folder" | "git" | "loading" | "start" | "interview" | "plan" | "work" | "talk";
 
 /**
  * Where a project's work is: git first, the start, the interview, the plan, then the work itself. A ready project is a
  * conversation from the first message (asked for: like the chat with a folder).
  */
 export function stageOf(project: ProjectView, work: ProjectWorkView | null, fresh = false): Stage {
+  if (project.gitState === "missing") return "folder";
   if (project.gitState === "not_repo") return "git";
   if (!work) return "loading";
   if (project.kind === "existing") return work.chatId && work.startedAt ? "work" : "talk";
@@ -43,7 +45,7 @@ type Part = "work" | "plan" | "questions";
  * top bar (WorkshopBar), the projects and the checklist in the sidebar.
  */
 export function Workshop({ projectId }: { projectId: string }) {
-  const { t, projects, providers, reloadTasks, reloadWorks } = useApp();
+  const { t, projects, providers, reloadTasks, reloadWorks, reloadProjects } = useApp();
   const project = projects.find((p) => p.id === projectId);
   const { work, reload } = useProjectWork(projectId);
   const [fresh, setFresh] = useState(false);
@@ -56,6 +58,8 @@ export function Workshop({ projectId }: { projectId: string }) {
   // The top bar and the sidebar show this work's state and checklist: kept in step with what the workshop sees.
   const doneItems = work?.checklist.filter((i) => i.done).length;
   useEffect(reloadWorks, [work?.status, work?.checklist.length, doneItems, work?.spentUsd, work?.questions.length]);
+  // Its folder looked at again on every opening: renamed meanwhile, it is followed or asked for.
+  useEffect(() => void reloadProjects(), [projectId]);
   // The last project opened is where the projects' mode comes back to.
   useEffect(() => {
     try {
@@ -73,6 +77,7 @@ export function Workshop({ projectId }: { projectId: string }) {
     <div className="workshop">
       <div className={`workshop-body${split.dragging ? " is-dragging" : ""}`} ref={split.body} style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${split.width}px` }}>
         <section className="workshop-main" aria-label={t("workshop.work")}>
+          {stage === "folder" && <MissingFolder project={project} />}
           {stage === "git" && <GitNotice project={project} />}
           {stage === "loading" && <p className="muted workshop-pad">{t("model.loading")}</p>}
           {stage === "start" && (

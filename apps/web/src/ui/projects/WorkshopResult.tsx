@@ -8,6 +8,7 @@ import { StatusChip } from "../tasks/StatusDot";
 import { GithubPublish } from "./GithubPublish";
 import { ProjectGitCard } from "./ProjectGitCard";
 import { ChangesTab, RunTab } from "./Workspace";
+import { WorkTokens } from "./WorkTokens";
 
 type Part = "result" | "changes" | "project";
 // The project first (asked for), then what changed, then what came of it.
@@ -29,7 +30,12 @@ export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView 
       <div className="workshop-result-body">
         {part === "result" && (work?.startedAt ? <ResultPart work={work} onChanged={p.onChanged} /> : <p className="muted">{t("workshop.noResult")}</p>)}
         {part === "changes" && (work ? <ChangesTab work={work} /> : null)}
-        {part === "project" && <ProjectPart project={p.project} onNew={p.onNew} busy={work?.status === "running"} locked={!!work?.startedAt} />}
+        {part === "project" && (
+          <>
+            {work && <WorkTokens work={work} />}
+            <ProjectPart project={p.project} onNew={p.onNew} busy={work?.status === "running"} locked={!!work?.startedAt} />
+          </>
+        )}
       </div>
     </aside>
   );

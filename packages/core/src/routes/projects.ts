@@ -1,10 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
 import { findSkills, projectSkillRoots, toSkillView } from "../skills/skills";
-import { projectCreateSchema, projectPeekSchema, projectRenameSchema, taskCreateSchema, type ProjectView } from "@drimvox/shared";
+import { projectCreateSchema, projectMoveSchema, projectPeekSchema, projectRenameSchema, taskCreateSchema, type ProjectView } from "@drimvox/shared";
 import { Hono } from "hono";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { GitError, initWithCommit, isRepoRoot, removeWorktree } from "../agent/git";
+import { findMovedFolder } from "../agent/relocate";
 import type { ProjectRepo, TaskRepo } from "../agent/repo";
 import type { AgentRunner } from "../agent/runner";
 import type { ProviderRepo } from "../providers/repo";
@@ -12,10 +13,16 @@ import type { ProviderRepo } from "../providers/repo";
 const notFound = { error: { code: "not_found" } } as const;
 
 export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers: ProviderRepo, runner: AgentRunner, kindLocked: (projectId: string) => boolean = () => false) {
-  const withGit = async (p: Omit<ProjectView, "gitState">): Promise<ProjectView> => ({
-    ...p,
-    gitState: existsSync(p.path) && (await isRepoRoot(p.path)) ? "ready" : "not_repo",
-  });
+  const withGit = async (p: Omit<ProjectView, "gitState">): Promise<ProjectView> => {
+    if (!existsSync(p.path)) {
+      // Renamed or moved beside where it was: found by its conversations' marks in git, and followed.
+      const found = await findMovedFolder(p.path, projects.chatIds(p.id));
+      const moved = found && !projects.findByPath(found) ? projects.move(p.id, found) : null;
+      if (!moved) return { ...p, gitState: "missing" };
+      p = moved;
+    }
+    return { ...p, gitState: (await isRepoRoot(p.path)) ? "ready" : "not_repo" };
+  };
 
   const gitFailure = (err: unknown) => {
     if (err instanceof GitError) return { error: { code: err.code, detail: err.message } };
@@ -55,6 +62,16 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
       const project = name ? projects.rename(id, name) : projects.get(id);
       if (!project) return c.json(notFound, 404);
       return c.json(await withGit(project), 200);
+    })
+    // The folder in its new place, shown by the user when Drimvox did not find it.
+    .post("/:id/move", zValidator("json", projectMoveSchema), async (c) => {
+      const id = c.req.param("id");
+      if (!projects.get(id)) return c.json(notFound, 404);
+      const path = resolve(c.req.valid("json").path);
+      if (!existsSync(path) || !statSync(path).isDirectory()) return c.json({ error: { code: "not_found" as const } }, 400);
+      const other = projects.findByPath(path);
+      if (other && other.id !== id) return c.json({ error: { code: "taken" as const } }, 409);
+      return c.json(await withGit(projects.move(id, path)!), 200);
     })
     .post("/:id/init-git", async (c) => {
       const project = projects.get(c.req.param("id"));

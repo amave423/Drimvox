@@ -27,17 +27,21 @@ export interface BrowserDriver {
   state(): BrowserState;
   /** Every change of the tabs; returns the way to stop listening. */
   onState(listener: (state: BrowserState) => void): () => void;
-  /** Opens an address in the shown tab; starts the browser and makes a tab first if needed. */
-  open(url: string): Promise<void>;
-  newTab(url?: string): Promise<void>;
+  /**
+   * Opens an address in tab `tab`, or the shown one; starts the browser and makes a tab first if needed. The same `tab`
+   * below: an agent works in its own tab while another is shown (seen live: three projects at once drove one tab).
+   */
+  open(url: string, tab?: string): Promise<void>;
+  /** A new tab, shown at once; its id. */
+  newTab(url?: string): Promise<string>;
   select(id: string): Promise<void>;
   close(id: string): Promise<void>;
-  back(): Promise<void>;
-  reload(): Promise<void>;
-  /** A DevTools command in the shown tab's page; starts the browser and makes a tab first if needed. */
-  command(method: string, params?: Record<string, unknown>): Promise<unknown>;
+  back(tab?: string): Promise<void>;
+  reload(tab?: string): Promise<void>;
+  /** A DevTools command in a tab's page (the shown one when not given); starts the browser and makes a tab first if needed. */
+  command(method: string, params?: Record<string, unknown>, tab?: string): Promise<unknown>;
   /** The page back at the panel's size after a look at another width; where the panel sets no size, nothing to do. */
-  restoreSize?(): Promise<void>;
+  restoreSize?(tab?: string): Promise<void>;
   /** The proxy for the listed sites only, the rest directly (the desktop's browser); null: everything directly. */
   useProxy?(proxy: string | null, hosts: string[]): Promise<void>;
   /** A site that did not open directly but opened through the proxy: to remember; returns the way to stop listening. */

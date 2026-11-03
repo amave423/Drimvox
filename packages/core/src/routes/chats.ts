@@ -368,6 +368,7 @@ export function chatRoutes(
           const seeing = await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel, listModels);
           return toolbox(work.toolbox!, {
             folder: chat.folder,
+            owner: chat.id,
             vision: seeing,
             hooks: {
               onCall: (call) => void emit({ type: "tool", name: call.name, input: describeInput(call.input) }),

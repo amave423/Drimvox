@@ -89,19 +89,19 @@ export class AgentView {
     const str = (i: number) => (typeof args[i] === "string" ? (args[i] as string) : "");
     switch (op) {
       case "open":
-        return this.open(str(0));
+        return this.open(str(0), str(1));
       case "newTab":
-        return void this.newTab(str(0) || "about:blank");
+        return this.newTab(str(0) || "about:blank").id;
       case "select":
         return this.select(str(0));
       case "close":
         return this.close(str(0));
       case "back":
-        return void this.shown()?.view.webContents.navigationHistory.goBack();
+        return void this.tab(str(0))?.view.webContents.navigationHistory.goBack();
       case "reload":
-        return void this.shown()?.view.webContents.reload();
+        return void this.tab(str(0))?.view.webContents.reload();
       case "command":
-        return this.command(str(0), (args[1] ?? {}) as Record<string, unknown>);
+        return this.command(str(0), (args[1] ?? {}) as Record<string, unknown>, str(2));
       case "stop":
         for (const t of [...this.tabs]) this.close(t.id);
         return;
@@ -140,6 +140,11 @@ export class AgentView {
     return this.tabs.find((t) => t.id === this.active) ?? null;
   }
 
+  /** Tab `id`, where an agent works while another may be shown; the shown one when none is named. */
+  private tab(id: string) {
+    return (id && this.tabs.find((t) => t.id === id)) || this.shown();
+  }
+
   private session(): Session {
     if (this.profile) return this.profile;
     const s = session.fromPartition("persist:agent-browser");
@@ -153,8 +158,8 @@ export class AgentView {
     return s;
   }
 
-  private async open(url: string): Promise<void> {
-    const tab = this.shown() ?? this.newTab("about:blank");
+  private async open(url: string, id: string): Promise<void> {
+    const tab = this.tab(id) ?? this.newTab("about:blank");
     await tab.view.webContents.loadURL(url).catch(() => {
       // A page that failed or was left for another still shows; the agent reads what is there.
     });
@@ -243,8 +248,8 @@ export class AgentView {
     this.changed(this.state());
   }
 
-  private async command(method: string, params: Record<string, unknown>): Promise<unknown> {
-    const tab = this.shown() ?? this.newTab("about:blank");
+  private async command(method: string, params: Record<string, unknown>, id: string): Promise<unknown> {
+    const tab = this.tab(id) ?? this.newTab("about:blank");
     const tools = tab.view.webContents.debugger;
     if (!tools.isAttached()) {
       tools.attach("1.3");
@@ -255,20 +260,23 @@ export class AgentView {
   }
 
   /**
-   * The shown tab over the panel's page box, in front of the interface; out of sight, it stays in the window but past its
-   * left edge, at a desktop's size, so it keeps drawing and the agent works on. Other tabs leave the window.
+   * The shown tab over the panel's page box, in front of the interface. Out of sight, a tab stays in the window but past
+   * its left edge, at a desktop's size, so it keeps drawing: an agent works on in its own tab while another is shown.
    */
   private layout(): void {
     const win = this.window();
     if (!win || win.isDestroyed()) return;
     const root = win.contentView;
+    const p = this.place;
     for (const t of this.tabs) {
-      if (t.id !== this.active) root.removeChildView(t.view);
+      if (t.id === this.active) continue;
+      root.addChildView(t.view);
+      t.view.setBounds({ x: -UNSEEN.width - 50, y: 0, ...UNSEEN });
     }
     const shown = this.shown();
     if (!shown) return;
+    // Added last, so it is on top of the interface.
     root.addChildView(shown.view);
-    const p = this.place;
     shown.view.setBounds(p ? { x: Math.round(p.x), y: Math.round(p.y), width: Math.round(p.width), height: Math.round(p.height) } : { x: -UNSEEN.width - 50, y: 0, ...UNSEEN });
   }
 }

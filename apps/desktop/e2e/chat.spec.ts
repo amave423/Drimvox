@@ -178,10 +178,17 @@ test("a chain of free models: made in the settings, picked on its tab, the next 
   await expect(list).toContainText("Авто: для чата");
   await list.getByRole("button", { name: "+ Новая цепочка" }).click();
   await expect(list.getByRole("button", { name: /Моя цепочка 1/ })).toHaveAttribute("aria-current", "true");
-  for (const model of ["A Busy", "B Works"]) {
-    await page.getByRole("button", { name: "+ Добавить бесплатную модель" }).click();
-    await page.getByRole("option", { name: new RegExp(`Тестовый / ${model}`) }).click();
-  }
+  // Several in one go (asked for): the list stays open, the chosen ones ticked; a second click takes one out again.
+  await page.getByRole("button", { name: "+ Добавить бесплатную модель" }).click();
+  const offered = page.getByRole("listbox", { name: "+ Добавить бесплатную модель" });
+  for (const model of ["A Busy", "B Works"]) await offered.getByRole("option", { name: new RegExp(`Тестовый / ${model}`) }).click();
+  await expect(offered.getByRole("option", { selected: true })).toHaveCount(2);
+  await expect(page.locator(".chain-link")).toHaveCount(2);
+  await offered.getByRole("option", { name: /Тестовый \/ B Works/ }).click();
+  await expect(page.locator(".chain-link")).toHaveCount(1);
+  await offered.getByRole("option", { name: /Тестовый \/ B Works/ }).click();
+  await page.keyboard.press("Escape");
+  await expect(offered).toHaveCount(0);
   await expect(page.locator(".chain-link")).toHaveCount(2);
   await expect(page.locator(".chain-link").first()).toContainText("A Busy");
 

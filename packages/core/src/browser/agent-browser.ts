@@ -45,6 +45,8 @@ export class AgentBrowser implements BrowserDriver {
   /** When a tab was last chosen by select(). */
   private chosenAt = 0;
   private session: string | null = null;
+  /** Sessions in tabs an agent works in while the panel shows another, by tab. */
+  private readonly sessions = new Map<string, string>();
   private readonly listeners = new Set<Listener>();
   private readonly stateListeners = new Set<(s: BrowserState) => void>();
   private lastFrame: BrowserFrame | null = null;
@@ -145,22 +147,39 @@ export class AgentBrowser implements BrowserDriver {
     return () => void this.stateListeners.delete(listener);
   }
 
-  async command(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    await this.endpoint();
-    await this.ensurePage();
-    if (!this.session) throw new Error("The browser has no tab");
-    return this.send(method, params, this.session);
+  async command(method: string, params: Record<string, unknown> = {}, tab?: string): Promise<unknown> {
+    return this.send(method, params, await this.sessionIn(tab));
   }
 
-  restoreSize(): Promise<void> {
-    return this.applySize();
+  async restoreSize(tab?: string): Promise<void> {
+    if (!tab || tab === this.active) return this.applySize();
+    const { width, height } = this.size;
+    await this.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false }, await this.sessionIn(tab));
   }
 
-  /** Opens an address in the current tab; starts the browser first if needed. */
-  async open(url: string): Promise<void> {
+  /** Opens an address in a tab, the shown one when not given; starts the browser first if needed. */
+  async open(url: string, tab?: string): Promise<void> {
+    await this.send("Page.navigate", { url }, await this.sessionIn(tab));
+  }
+
+  /**
+   * A session in tab `tab`: the panel's own when it shows that tab (or no tab is named), else one of its own, attached
+   * once and kept until the tab closes — an agent works on in its tab while the panel shows another's.
+   */
+  private async sessionIn(tab?: string): Promise<string> {
     await this.endpoint();
-    await this.ensurePage();
-    if (this.session) await this.send("Page.navigate", { url }, this.session);
+    if (!tab || (tab === this.active && this.session)) {
+      await this.ensurePage();
+      if (!this.session) throw new Error("The browser has no tab");
+      return this.session;
+    }
+    const known = this.sessions.get(tab);
+    if (known) return known;
+    const { sessionId } = (await this.send("Target.attachToTarget", { targetId: tab, flatten: true })) as { sessionId: string };
+    this.sessions.set(tab, sessionId);
+    const { width, height } = this.size;
+    await this.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false }, sessionId).catch(() => {});
+    return sessionId;
   }
 
   /** The page takes the panel's size, in CSS pixels, with the screen's density for sharp pictures. */
@@ -178,10 +197,11 @@ export class AgentBrowser implements BrowserDriver {
   }
 
   /** A new tab, shown at once. */
-  async newTab(url = "about:blank"): Promise<void> {
+  async newTab(url = "about:blank"): Promise<string> {
     await this.endpoint();
     const { targetId } = (await this.send("Target.createTarget", { url })) as { targetId: string };
     await this.follow(targetId);
+    return targetId;
   }
 
   /** Shows another tab in the panel and brings it to the front of the browser. */
@@ -198,12 +218,12 @@ export class AgentBrowser implements BrowserDriver {
     await this.send("Target.closeTarget", { targetId: id });
   }
 
-  async back(): Promise<void> {
-    if (this.session) await this.send("Runtime.evaluate", { expression: "history.back()" }, this.session);
+  async back(tab?: string): Promise<void> {
+    await this.send("Runtime.evaluate", { expression: "history.back()" }, await this.sessionIn(tab));
   }
 
-  async reload(): Promise<void> {
-    if (this.session) await this.send("Page.reload", {}, this.session);
+  async reload(tab?: string): Promise<void> {
+    await this.send("Page.reload", {}, await this.sessionIn(tab));
   }
 
   async stop(): Promise<void> {
@@ -311,6 +331,7 @@ export class AgentBrowser implements BrowserDriver {
       const id = params.targetId as string;
       const i = this.pages.findIndex((p) => p.id === id);
       if (i >= 0) this.pages.splice(i, 1);
+      this.sessions.delete(id);
       if (this.active === id) void this.follow(this.pages.at(-1)?.id ?? null);
       this.broadcastState();
     } else if ((m.method === "Page.loadEventFired" || m.method === "Page.domContentEventFired") && m.sessionId === this.session) {

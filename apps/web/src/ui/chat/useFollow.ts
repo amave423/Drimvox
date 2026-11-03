@@ -15,7 +15,9 @@ export function useFollow(
   settled: unknown,
 ) {
   const following = useRef(true);
-  const desk = () => end.current?.closest<HTMLElement>(".desk") ?? null;
+  // In a project's workshop the timeline scrolls in its own box, not the desk (seen live: opening a project showed its
+  // very first message).
+  const desk = () => end.current?.closest<HTMLElement>(".workshop-feed, .desk") ?? null;
   const toBottom = () => {
     const d = desk();
     if (d) d.scrollTop = d.scrollHeight;

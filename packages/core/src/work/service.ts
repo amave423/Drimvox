@@ -49,7 +49,7 @@ export class ProjectWork {
   view(projectId: string): ProjectWorkView {
     const row = this.o.repo.get(projectId);
     const chatId = row?.chatId ?? null;
-    const spending = chatId && row?.startedAt ? this.o.repo.spending(chatId, row.startedAt) : { spentUsd: 0, actions: 0 };
+    const spending = chatId && row?.startedAt ? this.o.repo.spending(chatId, row.startedAt) : { spentUsd: 0, actions: 0, inputTokens: 0, outputTokens: 0 };
     const live = this.runs.get(projectId);
     return {
       projectId,
@@ -71,6 +71,11 @@ export class ProjectWork {
       spentUsd: spending.spentUsd + (live?.progress().inFlightUsd ?? 0),
       workedMs: live ? live.progress().workedMs : (row?.workedMs ?? 0),
       actions: spending.actions,
+      tokens: {
+        input: spending.inputTokens + (live?.progress().inputTokens ?? 0),
+        output: spending.outputTokens + (live?.progress().outputTokens ?? 0),
+        context: row?.contextTokens ?? null,
+      },
       waitingApproval: !!chatId && !!live && this.o.approvals.open(chatId).length > 0,
       escalated: row?.escalated ?? false,
       startedAt: row?.startedAt ?? null,

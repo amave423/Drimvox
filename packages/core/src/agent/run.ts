@@ -62,6 +62,8 @@ export interface RunInput {
   idleTimeoutMs: number;
   hooks: Omit<ToolHooks, "onFinish">;
   onText(text: string): void;
+  /** What the model thinks before it speaks, as it comes (seen live: a model thought for two minutes, and the screen stayed empty). */
+  onReasoning?(text: string): void;
   /** After every finished step: the messages it produced and its usage. */
   onStep(step: { messages: ModelMessage[]; inputTokens: number; outputTokens: number; costUsd: number; priced: boolean }): void;
 }
@@ -213,6 +215,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       for await (const part of result.fullStream) {
         resetClock();
         if (part.type === "text-delta") text += part.text;
+        else if (part.type === "reasoning-delta") i.onReasoning?.(part.text);
         else if (part.type === "text-end" && text.trim()) {
           i.onText(text.trim());
           lastText = text.trim();

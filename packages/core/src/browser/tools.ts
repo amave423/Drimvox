@@ -1,7 +1,7 @@
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { clipPage, isPublicAddress } from "../internet/web";
-import type { Browser } from "./browser";
+import type { BrowserView } from "./browser";
 import { devtoolsTools, watchScript } from "./devtools";
 import { keyPress } from "./driver";
 import { chooseScript, focusScript, placeScript, READ_SCRIPT } from "./page-scripts";
@@ -40,7 +40,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Asks a model that sees pictures about one: what browser_look needs; absent, there is no browser_look. */
 export type See = (png: Buffer, question: string, signal?: AbortSignal) => Promise<string>;
 
-export function browserTools(browser: Browser, o: { local: boolean; see?: See; folder?: string }, run: ToolRun): ToolSet {
+export function browserTools(browser: BrowserView, o: { local: boolean; see?: See; folder?: string }, run: ToolRun): ToolSet {
   const d = browser.driver;
   let looks = 0;
 

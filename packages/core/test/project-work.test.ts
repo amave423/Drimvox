@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -644,6 +644,45 @@ describe("a ready project", () => {
     expect(again.messages.at(-1).content).toBe("Это главная страница.");
   });
 
+  // Seen live: the agent started the same server three times, as each answer's end stopped it.
+  it("keeps a server the agent started running between the user's messages, and asks for no endless polishing", async () => {
+    const s = await setup({
+      coder: [
+        call("start_background", { command: 'node -e "setInterval(() => {}, 1000)"' }),
+        { text: "Сервер запущен." },
+        call("read_background", { id: 1 }),
+        call("stop_background", { id: 1 }),
+        { text: "Всё ещё работал, остановил." },
+      ],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Запусти сайт", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done");
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("no endless polishing");
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Он работает?", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length === 5);
+    expect(JSON.stringify(requestsOf("coder")[3]!.body.messages)).toContain("Process 1 (running)");
+    // The process lets go of the folder before it is removed.
+    await new Promise((r) => setTimeout(r, 1500));
+  });
+
+  // Asked for: how full the model's context is, as in a chat, and what the tokens went to.
+  it("tells the tokens the model read and wrote, and how much of its context the latest step took", async () => {
+    const s = await setup({
+      coder: [
+        { ...call("list_files", { path: "." }), usage: { prompt_tokens: 1000, completion_tokens: 50 } },
+        { ...call("list_files", { path: "." }), delayMs: 1500, usage: { prompt_tokens: 3000, completion_tokens: 100 } },
+        { text: "Готово.", usage: { prompt_tokens: 5000, completion_tokens: 20 } },
+      ],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Посмотри файлы", model: s.ref("coder") });
+    const during = await until(s.project.id, (w) => w.status === "running" && w.tokens.context === 1000);
+    expect(during.tokens).toMatchObject({ input: 1000, output: 50 });
+    const done = await until(s.project.id, (w) => w.status === "done");
+    expect(done.tokens).toEqual({ input: 9000, output: 170, context: 5000 });
+  });
+
   // Seen live: "Now I write the styles…", then the provider's output limit cut the answer, and the run counted it as done.
   it("goes on when the provider cuts an answer by its length, and asks for big files in parts", async () => {
     const s = await setup({
@@ -749,5 +788,35 @@ describe("a project's git rules", () => {
     expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
     expect(JSON.stringify(requestsOf("coder")[0]!.body.tools ?? []).includes("commit_changes")).toBe(false);
     expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("Never commit or push");
+  });
+});
+
+// Seen live: three project folders renamed on the desktop, and every project asked to turn git on again.
+describe("a project whose folder was renamed or moved", () => {
+  it("finds the folder by the marks its conversation left in git, and moves the project and its conversation there", async () => {
+    const s = await setup({ coder: [call("write_file", { path: "rates.js", content: "1\n" }), { text: "Готово." }] });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай курсы", model: s.ref("coder") });
+    const work = await until(s.project.id, (w) => w.status === "done");
+    const moved = `${folder}-переименована`;
+    renameSync(folder, moved);
+    folder = moved;
+    const list = (await (await env.call("GET", "/api/projects")).json()) as any[];
+    expect(list.find((p) => p.id === s.project.id)).toMatchObject({ path: moved, gitState: "ready" });
+    const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
+    expect(chat.folder).toBe(moved);
+  });
+
+  it("says a folder it cannot find is missing, and takes its new place from the user", async () => {
+    const s = await setup({});
+    const other = makeRepo({ "index.html": "<h1>Клиника</h1>\n" });
+    rmSync(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    folder = other;
+    const list = (await (await env.call("GET", "/api/projects")).json()) as any[];
+    expect(list.find((p) => p.id === s.project.id)).toMatchObject({ gitState: "missing" });
+    expect((await env.call("POST", `/api/projects/${s.project.id}/move`, { path: join(other, "nope") })).status).toBe(400);
+    const res = await env.call("POST", `/api/projects/${s.project.id}/move`, { path: other });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ path: other, gitState: "ready" });
   });
 });

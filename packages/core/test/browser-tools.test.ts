@@ -94,6 +94,41 @@ describe("the agent's browser tools", () => {
     60_000,
   );
 
+  // Seen live: three projects at once, and one agent's screenshot "took someone else's tab" — they all drove the shown one.
+  it.skipIf(!findBrowser())(
+    "gives every agent a tab of its own: two at once read and look at their own pages",
+    async () => {
+      site = createServer((req, res) => {
+        const path = (req.url ?? "/").split("?")[0]!;
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(path === "/found" ? `<title>Найдено</title><p>Ищем: ${new URL(req.url!, "http://x").searchParams.get("q")}</p>` : (PAGES[path] ?? ""));
+      });
+      await new Promise<void>((r) => site!.listen(0, "127.0.0.1", r));
+      const url = `http://127.0.0.1:${(site.address() as AddressInfo).port}/`;
+      profile = mkdtempSync(join(tmpdir(), "drimvox-owners-"));
+      driver = new AgentBrowser({ profileDir: profile });
+      const browser = new Browser(driver);
+      const run: ToolRun = async (_id, _name, _input, work) => work();
+      const toolsOf = (owner: string) => browserTools(browser.own(owner), { local: true }, run);
+      const a = toolsOf("project-a");
+      const b = toolsOf("project-b");
+      const call = (tools: ReturnType<typeof toolsOf>, name: string, input: unknown) =>
+        (tools[name]!.execute as (i: unknown, o: unknown) => Promise<string>)(input, { toolCallId: name, messages: [] });
+
+      expect(await call(a, "browser_open", { url })).toContain("Что ищем");
+      expect(await call(b, "browser_open", { url: `${url}far` })).toContain("Вторая страница");
+      // The panel shows the tab that went somewhere last; the first agent still reads and types in its own.
+      expect(await call(a, "browser_read", {})).toContain("Что ищем");
+      expect(await call(a, "browser_type", { ref: 1, text: "кедр", submit: true })).toContain("Ищем: кедр");
+      expect(await call(b, "browser_read", {})).toContain("Вторая страница");
+      expect(driver.state().tabs).toHaveLength(2);
+      // The same agent again (its next answer) goes on in its tab, not a new one.
+      expect(await call(toolsOf("project-a"), "browser_read", {})).toContain("Ищем: кедр");
+      expect(driver.state().tabs).toHaveLength(2);
+    },
+    60_000,
+  );
+
   // Asked for: Chrome DevTools and Playwright built in, so their MCP servers can go.
   it.skipIf(!findBrowser())(
     "has DevTools built in: console, requests, a script, a phone and a slow network, speed, accessibility, hover, wait, a file and a PDF",

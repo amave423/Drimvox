@@ -9,6 +9,9 @@ export const projectCreateSchema = z.object({ path: z.string().trim().min(1).max
 /** A folder looked at before it is added: whether there is anything in it, to guess a ready project. */
 export const projectPeekSchema = z.object({ path: z.string().trim().min(1).max(1000) }).strict();
 /** A project's own name instead of its folder's, or its kind changed later. */
+/** A project's folder in its new place, after it was renamed or moved. */
+export const projectMoveSchema = z.object({ path: z.string().trim().min(1).max(1000) }).strict();
+
 export const projectRenameSchema = z
   .object({ name: z.string().trim().min(1).max(120).optional(), kind: projectKindSchema.optional() })
   .strict()
@@ -19,7 +22,8 @@ export interface ProjectView {
   name: string;
   path: string;
   /** "not_repo": the folder has no git yet; Drimvox offers to start it. */
-  gitState: "ready" | "not_repo";
+  /** "missing": the folder is gone (renamed or moved where Drimvox could not find it); the user shows the new place. */
+  gitState: "ready" | "not_repo" | "missing";
   kind: ProjectKind;
   createdAt: number;
 }

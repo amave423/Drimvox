@@ -2,7 +2,7 @@ import type { ToolSet } from "ai";
 import { join } from "node:path";
 import type { ToolHooks } from "../agent/tools";
 import { Workspace } from "../agent/workspace";
-import type { BrowserDriver } from "../browser/driver";
+import type { Browser } from "../browser/browser";
 import type { Vision } from "../visual/look";
 import { auditTools } from "./audit";
 import { mediaTools } from "./media";
@@ -19,7 +19,7 @@ export interface ToolboxDeps {
   dataDir: string;
   ssh: SshServers;
   /** The agent's browser, where there is one: before and after of its page. */
-  browser: BrowserDriver | null;
+  browser: Browser | null;
   /** The built UI, which carries the Mermaid script for diagrams. */
   webDir?: string;
 }
@@ -31,16 +31,24 @@ export interface ToolboxDeps {
  */
 export function toolbox(
   d: ToolboxDeps,
-  o: { folder: string | null; vision: Vision | null; hooks: Pick<ToolHooks, "onCall" | "askApproval">; see?: (png: Buffer, question: string, signal?: AbortSignal) => Promise<string> },
+  o: {
+    folder: string | null;
+    vision: Vision | null;
+    hooks: Pick<ToolHooks, "onCall" | "askApproval">;
+    see?: (png: Buffer, question: string, signal?: AbortSignal) => Promise<string>;
+    /** The chat or task whose own tab of the browser the tools use (Browser.own). */
+    owner?: string;
+  },
 ): ToolSet {
   const ws = o.folder ? new Workspace(o.folder) : null;
+  const browser = d.browser ? (o.owner ? d.browser.own(o.owner).driver : d.browser.driver) : null;
   return {
     ...downloadTools(d.dataDir, ws, o.vision, o.hooks),
     ...emailTools(o.hooks),
     ...sshTools(d.ssh, ws, o.hooks),
     ...(o.folder ? auditTools(o.folder, o.hooks) : {}),
     ...(ws ? mediaTools(d.dataDir, ws, o.hooks) : {}),
-    ...(d.browser?.available() ? compareTools(d.browser, join(d.dataDir, "snapshots"), o.hooks, o.see, ws ?? undefined, mermaidScript(d.webDir)) : {}),
+    ...(browser?.available() ? compareTools(browser, join(d.dataDir, "snapshots"), o.hooks, o.see, ws ?? undefined, mermaidScript(d.webDir)) : {}),
     ...(ws ? imageTools(ws, o.hooks) : {}),
     ...loadTools(o.hooks),
     ...devEnvironmentTools(o.hooks),

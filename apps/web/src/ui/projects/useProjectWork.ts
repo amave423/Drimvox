@@ -8,8 +8,11 @@ const POLL_MS = 1500;
 
 /** A project's work (docs/specs/project-work.md), kept fresh while something is going on. */
 export function useProjectWork(projectId: string | null) {
-  const { api } = useApp();
+  const { api, works } = useApp();
   const [work, setWork] = useState<ProjectWorkView | null>(null);
+  // The app's own list of works, fresh after Continue or Stop in the workshop's bar: a run started there shows here too
+  // (seen live: the bar said the agent works, the timeline stayed still until the user wrote again).
+  const listed = works.find((w) => w.projectId === projectId)?.status;
 
   const load = useCallback(async () => {
     if (!projectId) return null;
@@ -25,6 +28,10 @@ export function useProjectWork(projectId: string | null) {
     setWork(null);
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (listed && work && listed !== work.status) void load();
+  }, [listed]);
 
   const live = work?.status === "running" || work?.status === "planning";
   useEffect(() => {

@@ -36,6 +36,8 @@ export const CHECKLIST_EVERY = 25;
 const CHECKLIST_NOTE = "Tick off in the checklist what is done by now with update_checklist, then go on.";
 /** Provider errors in a row before the run stops and waits. */
 const MAX_ERRORS = 2;
+/** The latest part of the model's thinking kept with an answer: enough to see what it thinks, not a whole run's worth. */
+const MAX_REASONING = 20_000;
 const RETRY_MS = 5000;
 /** Looks at pages per answer: the desktop and the phone, scenarios, and again after fixes. */
 const LOOKS = {
@@ -129,14 +131,19 @@ export class WorkRun {
   }
 
   /** The stretch going on now: when it began, the time worked before it, and what its answer has cost so far. */
-  private stretch = { since: 0, base: 0, costUsd: 0 };
+  private stretch = { since: 0, base: 0, costUsd: 0, inputTokens: 0, outputTokens: 0 };
 
   /**
    * Time and money including the stretch going on now (seen live: the panel said "0 min, 0 ₽" for minutes, as both were
    * counted only when an answer of many steps ended).
    */
-  progress(): { workedMs: number; inFlightUsd: number } {
-    return { workedMs: this.stretch.since ? this.stretch.base + (Date.now() - this.stretch.since) : this.row().workedMs, inFlightUsd: this.stretch.costUsd };
+  progress(): { workedMs: number; inFlightUsd: number; inputTokens: number; outputTokens: number } {
+    return {
+      workedMs: this.stretch.since ? this.stretch.base + (Date.now() - this.stretch.since) : this.row().workedMs,
+      inFlightUsd: this.stretch.costUsd,
+      inputTokens: this.stretch.inputTokens,
+      outputTokens: this.stretch.outputTokens,
+    };
   }
 
   private spent(): number {
@@ -151,7 +158,7 @@ export class WorkRun {
     let workedBase = this.row().workedMs;
     let since = Date.now();
     const worked = () => workedBase + (Date.now() - since);
-    this.stretch = { since, base: workedBase, costUsd: 0 };
+    this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0 };
     let nudges = 0;
     let errors = 0;
     let doneBefore = this.row().checklist.filter((i) => i.done).length;
@@ -188,7 +195,7 @@ export class WorkRun {
         this.d.repo.update(this.projectId, { workedMs: worked() });
         workedBase = worked();
         since = Date.now();
-        this.stretch = { since, base: workedBase, costUsd: 0 };
+        this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0 };
         if (signal.aborted || outcome.kind === "stopped") return stopWith("stopped", "user");
         if (this.finished) return stopWith("done", null);
         if (outcome.kind === "error") {
@@ -229,8 +236,10 @@ export class WorkRun {
         return stopWith("paused", "stuck");
       }
     } finally {
-      // A dev server the agent started does not hold the port once the run is over.
-      this.d.visualKit.background.stopAll(this.chatId);
+      // A dev server the agent started does not hold the port once the run is over. In a ready project, talked to as in a
+      // chat, it stays between messages (seen live: the agent started the same server three times over).
+      const how = (final as { status: string } | null)?.status;
+      if (!(this.chatMode && how === "done" && !this.row().site)) this.d.visualKit.background.stopAll(this.chatId);
       // The project's state for whoever picks it up next, in Drimvox or another program (AGENTS.md, notes.ts).
       try {
         const row = this.row();
@@ -266,11 +275,14 @@ export class WorkRun {
     const snapshot = await checkpoint(this.folder, checkpointRef).catch(() => null);
     const activity: ActivityEntry[] = [];
     let content = "";
+    // The model's thinking, its latest part: shown while it thinks (a long think left the screen empty).
+    let reasoning = "";
+    let thoughtAt = 0;
     let input = 0;
     let output = 0;
     let cost = 0;
     let priced = true;
-    const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
+    const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: reasoning || null, activity });
     const onCall = (name: string, what: string) => {
       if (name === "use_skill") this.skillsOpened.add(what);
       this.sinceChecklist = name === "update_checklist" ? 0 : this.sinceChecklist + 1;
@@ -309,12 +321,13 @@ export class WorkRun {
             folder: this.folder,
             vision,
             hooks,
+            owner: this.chatId,
             see: vision ? async (png, question, signal) => (await askAboutPictures(vision, [{ data: png, mediaType: "image/png" }], question, signal)).text : undefined,
           })
         : {}),
       ...imageTools,
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
-      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true, vision, onSpend: (usd) => (cost += usd), folder: this.folder }),
+      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true, vision, onSpend: (usd) => (cost += usd), folder: this.folder, owner: this.chatId }),
       ...skillTools(skills, this.folder, hooks),
       ...visualTools(
         {
@@ -443,12 +456,23 @@ export class WorkRun {
         content = content ? `${content}\n\n${text}` : text;
         save();
       },
+      onReasoning: (text) => {
+        reasoning = (reasoning + text).slice(-MAX_REASONING);
+        // Saved a few times a second, not at every word.
+        if (Date.now() - thoughtAt < 500) return;
+        thoughtAt = Date.now();
+        save();
+      },
       onStep: (step) => {
         messages.push(...step.messages);
         input += step.inputTokens;
         output += step.outputTokens;
         cost += step.costUsd;
         this.stretch.costUsd = cost;
+        this.stretch.inputTokens = input;
+        this.stretch.outputTokens = output;
+        // What this step sent is what the model holds now: the context bar.
+        if (step.inputTokens) this.d.repo.update(this.projectId, { contextTokens: step.inputTokens });
         if (!step.priced) priced = false;
       },
     });
@@ -456,13 +480,15 @@ export class WorkRun {
     const error = outcome.kind === "error" ? outcome.error : null;
     // From here the answer's cost is in its message: not counted twice.
     this.stretch.costUsd = 0;
+    this.stretch.inputTokens = 0;
+    this.stretch.outputTokens = 0;
     if (snapshot) {
       if (await changedSince(this.folder, snapshot).catch(() => false)) this.d.chats.setCheckpoint(answer.id, snapshot);
       else await dropCheckpoint(this.folder, checkpointRef).catch(() => {});
     }
     this.d.chats.finishAnswer(answer.id, {
       content,
-      reasoning: null,
+      reasoning: reasoning || null,
       status: stopped ? "stopped" : error ? "error" : "done",
       inputTokens: input,
       outputTokens: output,

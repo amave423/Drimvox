@@ -2,7 +2,7 @@ import { _electron as electron, expect, test, type ElectronApplication, type Pag
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -258,6 +258,61 @@ test("a ready project: asked on adding, talked to as in a chat, its plan on the 
   await expect(page.getByRole("heading", { name: "Над чем поработаем?" })).toBeVisible();
   await expect(page.locator(".side-project")).toHaveCount(0);
   expect(readFileSync(join(repo, "README.md"), "utf8")).toContain("Клиника");
+});
+
+// Seen live: after Continue the bar said the agent works, and the timeline stayed still until the user wrote again.
+test("a stopped project goes on with Continue, and the timeline shows the answer without a message", async () => {
+  const long = Array.from({ length: 60 }, (_, i) => `Строка отчёта ${i + 1}.`).join("\n\n");
+  const page = await launch([{ text: "Начинаю долгую работу.", delayMs: 8000 }, { text: `Продолжаю с того места.\n\n${long}` }]);
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await page.getByRole("button", { name: "+ Проект" }).click();
+  await page.getByRole("dialog", { name: "Какой это проект?" }).getByRole("button", { name: "Продолжить" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("option", { name: /Coder/ }).click();
+  await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сделай сайт");
+  await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
+  const bar = page.locator(".workshop-bar-top");
+  // Stopped once the model is asked for real: the slow first answer is the one cut.
+  await expect.poll(() => fake!.requests.filter((r) => r.path.endsWith("/chat/completions")).length).toBe(1);
+  await bar.getByRole("button", { name: "Стоп" }).click();
+  await bar.getByRole("button", { name: "Продолжить" }).click();
+  await expect(page.locator(".timeline")).toContainText("Продолжаю с того места.", { timeout: 30_000 });
+  await expect(page.locator(".timeline .msg-user")).toHaveCount(2);
+  // What the tokens went to, beside the work (asked for: as a chat shows its context).
+  const tokens = page.getByRole("region", { name: "Контекст и токены" });
+  await expect(tokens).toContainText("Прочитано моделью");
+  await expect(tokens).toContainText("Написано моделью");
+
+  // Opened again, the project shows its latest messages, not its first (seen live: it opened at the very top).
+  await page.getByRole("button", { name: "Чат", exact: true }).click();
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await page.locator(".side-project").first().click();
+  await expect(page.locator(".timeline")).toContainText("Строка отчёта 60.");
+  const atBottom = () => page.locator(".workshop-feed").evaluate((el) => el.scrollHeight > el.clientHeight + 200 && el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+  await expect.poll(atBottom).toBe(true);
+});
+
+// Seen live: project folders renamed, and every project asked to turn git on again.
+test("a project whose folder is gone asks where it is now, and goes on there", async () => {
+  const page = await launch([]);
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await page.getByRole("button", { name: "+ Проект" }).click();
+  await page.getByRole("dialog", { name: "Какой это проект?" }).getByRole("button", { name: "Продолжить" }).click();
+  await expect(page.getByRole("heading", { name: "Что сделать в проекте?" })).toBeVisible();
+  const moved = `${repo}-moved`;
+  renameSync(repo, moved);
+  try {
+    await page.getByRole("button", { name: "Чат", exact: true }).click();
+    await page.getByRole("button", { name: "Проекты", exact: true }).click();
+    await page.locator(".side-project").first().click();
+    await expect(page.getByRole("heading", { name: "Папка проекта не найдена" })).toBeVisible();
+    await expect(page.locator(".workshop-pill")).toHaveText("Папка не найдена");
+  } finally {
+    // The folder picker of the tests answers with the first place.
+    renameSync(moved, repo);
+  }
+  await page.getByRole("button", { name: "Указать папку…" }).click();
+  await expect(page.getByRole("heading", { name: "Что сделать в проекте?" })).toBeVisible();
 });
 
 // Asked for: many screenshots are gone through with a switch, not opened and closed one by one; the result panel has none

@@ -17,13 +17,18 @@ interface Props<T extends string> {
   /** A search field over the list, for long lists. */
   search?: string;
   disabled?: boolean;
+  /**
+   * Several at once (asked for: a chain's models picked in one go): the list stays open, the chosen ones are ticked, and
+   * a click on one ticks or unticks it through onChange.
+   */
+  chosen?: T[];
 }
 
 /**
  * A choice from a list in Drimvox's own look (asked for: the browser's square lists did not fit the app): a button with the
  * chosen value, a rounded panel of options like the model picker's, the keyboard and Escape as in any list.
  */
-export function Dropdown<T extends string>({ value, options, onChange, label, placeholder, search, disabled }: Props<T>) {
+export function Dropdown<T extends string>({ value, options, onChange, label, placeholder, search, disabled, chosen: ticked }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -43,6 +48,7 @@ export function Dropdown<T extends string>({ value, options, onChange, label, pl
   const pick = (o: DropdownOption<T> | undefined) => {
     if (!o) return;
     onChange(o.value);
+    if (ticked) return;
     setOpen(false);
     setQuery("");
   };
@@ -81,10 +87,15 @@ export function Dropdown<T extends string>({ value, options, onChange, label, pl
           {search !== undefined && (
             <input className="field-input" placeholder={search} aria-label={search} value={query} autoFocus onChange={(e) => (setQuery(e.target.value), setActive(0))} />
           )}
-          <ul className="dropdown-list" role="listbox" id={id} aria-label={label}>
+          <ul className={`dropdown-list${ticked ? " is-multi" : ""}`} role="listbox" id={id} aria-label={label} aria-multiselectable={ticked ? true : undefined}>
             {shown.map((o, i) => (
-              <li key={o.value} role="option" aria-selected={o.value === value} className={i === active ? "is-active" : undefined}>
+              <li key={o.value} role="option" aria-selected={ticked ? ticked.includes(o.value) : o.value === value} className={i === active ? "is-active" : undefined}>
                 <button type="button" onClick={() => pick(o)} onMouseEnter={() => setActive(i)}>
+                  {ticked && (
+                    <span className="dropdown-tick" aria-hidden>
+                      {ticked.includes(o.value) ? "✓" : ""}
+                    </span>
+                  )}
                   <span>{o.label}</span>
                   {o.hint && <small>{o.hint}</small>}
                 </button>

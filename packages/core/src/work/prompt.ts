@@ -106,6 +106,10 @@ export function existingRules(canLook: boolean, git = "- Never commit or push: g
     "- Change only what the task needs; no unrelated refactoring, no new dependencies without a reason.",
     git,
     "- Keep the project's notes current with update_notes when you learn how the project works.",
+    // Seen live: a currency converter was ready in 12 minutes, then polished for 15 more (78 edits, 15 looks).
+    "- Do the task, then stop: no endless polishing. Look at each changed page once on each width, again only after a real",
+    "  fix; a look that finds only matters of taste is not a reason for another round. Do not read a file again that you",
+    "  just read or wrote. A server you started stays running between the user's messages: open its address again first.",
     "End your turn with a short reply: what you changed and how to check it, or the answer. finish_work is not needed;",
     "call it only when the user asked to make something to open (a site or a server) and it is ready, with start.",
   ].join("\n");

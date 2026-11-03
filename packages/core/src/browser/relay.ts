@@ -47,12 +47,12 @@ export class RelayBrowser implements BrowserDriver {
     return () => void this.listeners.delete(listener);
   }
 
-  async open(url: string): Promise<void> {
-    await this.call("open", [url]);
+  async open(url: string, tab?: string): Promise<void> {
+    await this.call("open", [url, tab]);
   }
 
-  async newTab(url = "about:blank"): Promise<void> {
-    await this.call("newTab", [url]);
+  async newTab(url = "about:blank"): Promise<string> {
+    return String(await this.call("newTab", [url]));
   }
 
   async select(id: string): Promise<void> {
@@ -63,16 +63,16 @@ export class RelayBrowser implements BrowserDriver {
     await this.call("close", [id]);
   }
 
-  async back(): Promise<void> {
-    await this.call("back", []);
+  async back(tab?: string): Promise<void> {
+    await this.call("back", [tab]);
   }
 
-  async reload(): Promise<void> {
-    await this.call("reload", []);
+  async reload(tab?: string): Promise<void> {
+    await this.call("reload", [tab]);
   }
 
-  command(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    return this.call("command", [method, params]);
+  command(method: string, params: Record<string, unknown> = {}, tab?: string): Promise<unknown> {
+    return this.call("command", [method, params, tab]);
   }
 
   async stop(): Promise<void> {
