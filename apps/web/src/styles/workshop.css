@@ -229,3 +229,5 @@
 .work-tokens-list dd { margin: 0; text-align: right; }
 .work-tokens-list .work-tokens-sub { padding-left: 12px; }
 .work-tokens-note { margin: 2px 0 0; font-size: 12px; line-height: 1.45; }
+.work-tokens-fresh { display: grid; gap: 6px; justify-items: start; margin-top: 6px; }
+.work-tokens-long { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--fg); }

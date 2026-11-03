@@ -432,9 +432,20 @@ describe("what a local model can do", () => {
     const { providerId } = await (await env.call("POST", "/api/local/connect")).json();
     const models = await (await env.call("GET", `/api/providers/${providerId}/models`)).json();
     const of = (id: string) => models.find((m: any) => m.id === id);
-    expect(of("llama3.2:3b")).toMatchObject({ tools: false, vision: false, contextLength: 131072 });
+    // The window Drimvox gave the Ollama it started, not the model's own 131 072 (seen in a video: Ollama keeps a small
+    // window and quietly cuts the start of a longer request, while the agent thought it had room).
+    expect(of("llama3.2:3b")).toMatchObject({ tools: false, vision: false, contextLength: 16384 });
     expect(of("qwen3:8b")).toMatchObject({ tools: true, vision: false });
     expect(of("gemma4:e4b")).toMatchObject({ tools: true, vision: true });
+  });
+
+  it("counts on Ollama's own small window for an Ollama the user started", async () => {
+    userOllama = spawn(process.execPath, [FAKE], { env: { ...process.env, OLLAMA_HOST: `127.0.0.1:${port}`, FAKE_OLLAMA_MODELS: JSON.stringify(["qwen3:8b"]) }, stdio: "ignore" });
+    await until(answers, (up) => up);
+    setup({ models: ["qwen3:8b"] });
+    const { providerId } = await (await env.call("POST", "/api/local/connect")).json();
+    const models = await (await env.call("GET", `/api/providers/${providerId}/models`)).json();
+    expect(models.find((m: any) => m.id === "qwen3:8b")).toMatchObject({ contextLength: 4096 });
   });
 
   // Seen live: llama3.2:3b with search on answered "привет" by writing a search call as text.

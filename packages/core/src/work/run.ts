@@ -27,6 +27,7 @@ import { polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
 import { projectMap } from "../agent/repo-map";
+import { checksFailedMessage, checksReport, projectChecks, runChecks } from "./checks";
 
 /** Steps one answer of the run takes before the next answer goes on with the same context. */
 export const SEGMENT_STEPS = 60;
@@ -37,6 +38,8 @@ export const CHECKLIST_EVERY = 25;
 const CHECKLIST_NOTE = "Tick off in the checklist what is done by now with update_checklist, then go on.";
 /** Provider errors in a row before the run stops and waits. */
 const MAX_ERRORS = 2;
+/** Times a failing test run sends the agent back before the report says it fails. */
+const MAX_CHECK_ROUNDS = 2;
 /** The latest part of the model's thinking kept with an answer: enough to see what it thinks, not a whole run's worth. */
 const MAX_REASONING = 20_000;
 const RETRY_MS = 5000;
@@ -96,6 +99,10 @@ export class WorkRun {
   /** Whether the code was reviewed in this run: once, before it is done. */
   private codeReviewed = false;
   private designReviewed = false;
+  /** How many times Drimvox's own run of the project's tests sent the agent back. */
+  private checkRounds = 0;
+  /** The tests just sent the agent back from finish_work: the run goes on even in a ready project. */
+  private sentBack = false;
   /** Actions since the checklist was last updated. */
   private sinceChecklist = 0;
 
@@ -214,8 +221,10 @@ export class WorkRun {
         }
         if (outcome.kind === "budget") return stopWith("paused", "budget");
         if (outcome.kind === "limit" || outcome.kind === "steps") continue;
-        // As in a chat: the answer is the end of the turn; the next message goes on.
-        if (this.chatMode) return stopWith("done", null);
+        // As in a chat: the answer is the end of the turn; the next message goes on. Unless the project's own tests sent
+        // the agent back from finish_work: it fixes them first.
+        if (this.chatMode && !this.sentBack) return stopWith("done", null);
+        this.sentBack = false;
 
         // The model stopped on its own without finish_work: remind it, unless it keeps stopping without progress.
         const checklist = this.row().checklist;
@@ -355,6 +364,20 @@ export class WorkRun {
         finish: (report, start) => {
           this.finished = true;
           this.d.repo.update(this.projectId, { report, site: start });
+        },
+        checks: async () => {
+          const commands = projectChecks(this.folder, plan);
+          if (!commands.length) return null;
+          onCall("run_checks", commands.join("; "));
+          const results = await runChecks(this.folder, commands, this.controller.signal);
+          this.checkRounds++;
+          // Twice back to the agent at most; then the report says honestly what still fails.
+          if (results.some((r) => !r.ok) && this.checkRounds <= MAX_CHECK_ROUNDS) {
+            this.sentBack = true;
+            return { fix: checksFailedMessage(results) };
+          }
+          const asked = this.d.chats.history(this.chatId).filter((m) => m.role === "user").at(-1)?.content ?? plan?.context ?? "";
+          return { report: checksReport(results, /[а-яё]/i.test(asked)) };
         },
         codeReview: async () => {
           if (this.codeReviewed || this.chatMode) return null;

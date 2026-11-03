@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, runCommand } from "../src/agent/commands";
 import { parseDiff } from "../src/agent/diff";
-import { BATCH_HINT, feedbackMessage, systemPrompt } from "../src/agent/prompt";
+import { BATCH_HINT, STUCK_HINT, feedbackMessage, systemPrompt } from "../src/agent/prompt";
 import { existingRules, projectRules } from "../src/work/prompt";
 import { folderHint } from "../src/chats/folder";
 import { Workspace } from "../src/agent/workspace";
@@ -321,6 +321,7 @@ describe("systemPrompt", () => {
   it("asks every agent to make independent calls in one step", () => {
     for (const prompt of [systemPrompt("/repo", "linux"), projectRules(null, true), existingRules(true), folderHint("/repo", "linux")]) {
       expect(prompt).toContain(BATCH_HINT);
+      expect(prompt).toContain(STUCK_HINT);
     }
   });
 });
@@ -340,6 +341,20 @@ describe("commands that keep hanging", () => {
     const refused = await run("node -e \"console.log(1)\"", 60);
     expect(refused).toMatch(/hung three times in a row/);
     expect(refused).not.toMatch(/Exit code/);
+  }, 30_000);
+
+  // Said in a video on agents: after two failed fixes of the same error, a third one sinks deeper; go back and rethink.
+  it("says when a command failed exactly as before, and asks to go back instead of patching again", async () => {
+    const { folderTools } = await import("../src/chats/folder");
+    const tools = folderTools(root, async () => {}, async () => true);
+    const run = (command: string) =>
+      (tools.run_command!.execute as (input: unknown, o: unknown) => Promise<string>)({ command, timeout_seconds: 60 }, { toolCallId: "t", messages: [] });
+    const failing = `node -e "console.error('TypeError: x is undefined'); process.exit(1)"`;
+    expect(await run(failing)).not.toMatch(/same way/);
+    expect(await run(failing)).toMatch(/failed the same way as before/);
+    // Passing in between starts the count again.
+    await run(`node -e "console.log(1)"`);
+    expect(await run(failing)).not.toMatch(/same way/);
   }, 30_000);
 
   it("counts only timeouts in a row", async () => {

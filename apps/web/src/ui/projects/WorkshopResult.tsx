@@ -19,7 +19,13 @@ const PARTS: Part[] = ["project", "changes", "result"];
  * the page, large, the started result and the report), the folder's changes, and the project itself.
  */
 export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView | null; open: boolean; onChanged(): void; onNew?: () => void }) {
-  const { t } = useApp();
+  const { api, t, reloadWorks } = useApp();
+  // A ready project's next task in a new conversation; the old one is kept.
+  async function fresh() {
+    await api.projects[":id"].work.fresh.$post({ param: { id: p.project.id } }).catch(() => null);
+    p.onChanged();
+    reloadWorks();
+  }
   const [part, setPart] = useState<Part>("project");
   const { work } = p;
   return (
@@ -32,7 +38,7 @@ export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView 
         {part === "changes" && (work ? <ChangesTab work={work} /> : null)}
         {part === "project" && (
           <>
-            {work && <WorkTokens work={work} />}
+            {work && <WorkTokens work={work} onFresh={p.project.kind === "existing" ? () => void fresh() : undefined} />}
             <ProjectPart project={p.project} onNew={p.onNew} busy={work?.status === "running"} locked={!!work?.startedAt} />
           </>
         )}

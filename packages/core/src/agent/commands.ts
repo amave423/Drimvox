@@ -141,10 +141,11 @@ const HEAD_LIMIT = 2_000;
 const FULL_LIMIT = 5_000_000;
 
 /** Starts a command in the user's shell: PowerShell on Windows, sh elsewhere (in its own process group). */
-export function spawnShell(command: string, cwd: string): ChildProcessWithoutNullStreams {
+export function spawnShell(command: string, cwd: string, env?: Record<string, string>): ChildProcessWithoutNullStreams {
+  const withEnv = env ? { env: { ...process.env, ...env } } : {};
   return process.platform === "win32"
-    ? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], { cwd, windowsHide: true })
-    : spawn("/bin/sh", ["-c", command], { cwd, detached: true });
+    ? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], { cwd, windowsHide: true, ...withEnv })
+    : spawn("/bin/sh", ["-c", command], { cwd, detached: true, ...withEnv });
 }
 
 /** Stops a command and everything it started, such as a dev server's workers. */
@@ -164,11 +165,11 @@ export function killTree(child: ChildProcess): void {
 const LINGER_MS = 2_000;
 
 /** Runs a shell command in `cwd`; keeps the tail of the output and kills the whole tree on timeout. */
-export function runCommand(command: string, cwd: string, timeoutMs: number, signal?: AbortSignal): Promise<CommandResult> {
+export function runCommand(command: string, cwd: string, timeoutMs: number, signal?: AbortSignal, env?: Record<string, string>): Promise<CommandResult> {
   return new Promise((done) => {
     // A second back: the clock of a process's start is coarser than this one.
     const startedAt = new Date(Date.now() - 1000);
-    const child = spawnShell(command, cwd);
+    const child = spawnShell(command, cwd, env);
 
     let output = "";
     let full = "";

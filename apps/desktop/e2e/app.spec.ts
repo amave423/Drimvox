@@ -408,6 +408,11 @@ test("groups the providers by what is free, and says on each card what is", asyn
   const group = (name: string) => page.getByRole("region", { name });
   await expect(group("Бесплатно с лимитами").getByRole("radio", { name: /Groq/ })).toContainText("Все модели бесплатно");
   await expect(group("Есть бесплатные модели").getByRole("radio", { name: /OpenRouter/ })).toContainText("free");
+  // Said in a video on agents: what goes to these free models may be used to train them; the user should know.
+  for (const name of [/OpenRouter/, /NVIDIA/, /Google/]) {
+    await expect(page.getByRole("radio", { name }).first().locator(".preset-trains")).toContainText("могут учиться на ваших запросах");
+  }
+  await expect(group("Бесплатно с лимитами").getByRole("radio", { name: /Groq/ }).locator(".preset-trains")).toHaveCount(0);
   await expect(group("Есть бесплатные модели").getByRole("radio", { name: /Kilo Code/ })).toContainText("без ключа");
   await expect(group("Бесплатно с лимитами").getByRole("radio", { name: /Ollama Cloud/ })).toBeVisible();
   await expect(group("Есть бесплатные модели").getByRole("radio", { name: /OrcaRouter/ })).toContainText("-free");

@@ -10,6 +10,14 @@ export const BATCH_HINT =
   "step: read the files you need together, run independent searches together, and make all the edits you already know in " +
   "one edit_file call with edits.";
 
+/**
+ * After two failed fixes of the same error a third one sinks deeper into the agent's own guesses (said in a video on agent
+ * work, and seen here: 78 edits of one page). Go back and think again instead.
+ */
+export const STUCK_HINT =
+  "When the same error stays after two of your fixes, do not try a third patch: undo your changes to that part (back to " +
+  "the last version that worked), find the real cause by reading the code and the raw error, then fix it anew.";
+
 /** System prompt of the Solo agent. English for the model; it answers the user in their language. */
 export function systemPrompt(root: string, platform = process.platform): string {
   // Models default to bash habits; Windows PowerShell 5.1 cannot even parse `&&`.
@@ -24,6 +32,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
     "",
     "How to work:",
     `- ${BATCH_HINT}`,
+    `- ${STUCK_HINT}`,
     "- Explore first: list_files, read_file and search before editing. Read a file before you change it.",
     "- Read a file whole, once, and keep it in mind; read code with read_file and search, never with run_command (no Get-Content, Select-String, cat or node -e to look at files).",
     "- Make focused changes that do exactly what was asked. Prefer edit_file for existing files; use write_file for new files.",

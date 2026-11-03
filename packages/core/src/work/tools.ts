@@ -11,6 +11,11 @@ export interface WorkToolHooks {
   finish(report: string, start: { command: string; url: string } | null): void;
   /** Before it is done, once: Drimvox's look at the result; notes for a round of polish, or null to finish. */
   review(start: { command: string; url: string } | null): Promise<string | null>;
+  /**
+   * Before it is done: Drimvox runs the project's tests itself. `fix`: they failed, the raw output goes back to the agent;
+   * `report`: what they said, for the report; null when there is nothing to run.
+   */
+  checks?(): Promise<{ fix: string } | { report: string } | null>;
   /** Before it is done, once: another model reads the code for security and access problems; the fixes to make, or null. */
   codeReview?(): Promise<string | null>;
   /** Before it is done, once: the skills the agent has not opened, which may be meant for this moment; null when none. */
@@ -88,12 +93,15 @@ export function workTools(h: WorkToolHooks): ToolSet {
         const skills = h.skillsLeft?.();
         if (skills) return skills;
         // Seen live: a team board let anyone listen to any board over WebSocket; the coder's own tests never looked there.
+        // Said in a video on agents: the raw output of the tests, not the model's word that all is fixed.
+        const checked = await h.checks?.();
+        if (checked && "fix" in checked) return checked.fix;
         const fixes = await h.codeReview?.();
         if (fixes) return fixes;
         const site = start ? { command: clip(start.command, 500), url: start.url.trim() } : null;
         const polish = await h.review(site);
         if (polish) return polish;
-        h.finish(clip(report, 8000), site);
+        h.finish(checked ? `${clip(report, 8000)}\n\n${clip(checked.report, 6000)}` : clip(report, 8000), site);
         h.onCall("finish_work", "");
         return "Done. The user sees the report: stop now, write nothing more.";
       },

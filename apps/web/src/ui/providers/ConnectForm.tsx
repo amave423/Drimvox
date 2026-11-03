@@ -100,6 +100,7 @@ export function ConnectForm({ kind }: { kind: "key" | "subscription" }) {
                   <span className="preset-name">{presetName(t, id)}</span>
                   <span className="preset-hint">{t(`providers.hint.${id}` as MessageKey)}</span>
                   {presets[id].free && <span className="preset-free">{t(`providers.free.${id}` as MessageKey)}</span>}
+                  {presets[id].trainsOnFree && <span className="preset-trains">{t("providers.trainsOnFree")}</span>}
                 </span>
               </button>
             ))}

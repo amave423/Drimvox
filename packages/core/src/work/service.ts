@@ -200,6 +200,16 @@ export class ProjectWork {
     return { chatId: this.message(projectId, "Продолжай.").chatId };
   }
 
+  /**
+   * The next message starts a new conversation (said in a video on agents: a request late in a long conversation costs
+   * several times one at its start). The old one is kept; what the next agent must know is in the project's notes.
+   */
+  fresh(projectId: string): ProjectWorkView {
+    if (this.runs.has(projectId)) throw new WorkRefused("busy");
+    this.o.repo.update(projectId, { chatId: null, startedAt: null, workedMs: 0, checklist: [], questions: [], report: null, contextTokens: null, escalated: false });
+    return this.view(projectId);
+  }
+
   stop(projectId: string): boolean {
     const live = this.runs.get(projectId);
     live?.controller.abort();

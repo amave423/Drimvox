@@ -94,6 +94,11 @@ export interface Preset {
    * limit; "some" — some of its models are free. Checked 2026-11 against the providers' own pages and catalogs.
    */
   free?: "all" | "some";
+  /**
+   * Its free use may train the provider's models on what is sent (said in a video on agents, and in the providers' own
+   * terms): OpenRouter's free models (most of their hosts), NVIDIA's trial, Google AI Studio's free tier.
+   */
+  trainsOnFree?: true;
 }
 
 /** How much of a subscription's window is used, as its CLI reported it on the last run. */
@@ -126,6 +131,8 @@ export const presets: Record<PresetId, Preset> = {
     currency: "USD",
 
     free: "some",
+
+    trainsOnFree: true,
   },
   routerai: {
     id: "routerai",
@@ -209,6 +216,8 @@ export const presets: Record<PresetId, Preset> = {
     currency: "USD",
 
     free: "some",
+
+    trainsOnFree: true,
   },
   xai: {
     id: "xai",
@@ -241,6 +250,8 @@ export const presets: Record<PresetId, Preset> = {
     currency: "USD",
 
     free: "all",
+
+    trainsOnFree: true,
   },
   // Popular OpenAI-style providers, many with a free tier (asked for: more providers as cards).
   groq: {

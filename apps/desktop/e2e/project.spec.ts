@@ -291,6 +291,11 @@ test("a stopped project goes on with Continue, and the timeline shows the answer
   await expect(page.locator(".timeline")).toContainText("Строка отчёта 60.");
   const atBottom = () => page.locator(".workshop-feed").evaluate((el) => el.scrollHeight > el.clientHeight + 200 && el.scrollHeight - el.scrollTop - el.clientHeight < 80);
   await expect.poll(atBottom).toBe(true);
+
+  // The next task in a new conversation (said in a video on agents: late requests in a long one cost several times more).
+  await page.getByRole("region", { name: "Контекст и токены" }).getByRole("button", { name: "Начать с чистого контекста" }).click();
+  await expect(page.getByRole("heading", { name: "Что сделать в проекте?" })).toBeVisible();
+  await expect(page.locator(".timeline")).toHaveCount(0);
 });
 
 // Seen live: project folders renamed, and every project asked to turn git on again.

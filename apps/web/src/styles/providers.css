@@ -31,6 +31,7 @@
 .preset-hint { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
 /* What is free at a provider, on its card (asked for: who has free models at a glance). */
 .preset-free { display: block; margin-top: 4px; color: var(--ok); font-size: 12px; line-height: 1.35; }
+.preset-trains { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .preset-group + .preset-group { margin-top: 22px; }
 .preset-group-head { display: grid; gap: 2px; margin: 0 0 10px; }
 .preset-group-head p { margin: 0; font-size: 13px; }

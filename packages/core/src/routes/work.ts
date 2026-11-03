@@ -82,6 +82,16 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
         return c.json(refused(err), 409);
       }
     })
+    // A clean context for the next task: a new conversation; the old one stays, the project's notes go on.
+    .post("/:id/work/fresh", (c) => {
+      const id = c.req.param("id");
+      if (!projects.get(id)) return c.json(notFound, 404);
+      try {
+        return c.json(work.fresh(id), 200);
+      } catch (err) {
+        return c.json(refused(err), 409);
+      }
+    })
     .post("/:id/work/site/start", (c) => {
       const id = c.req.param("id");
       if (!projects.get(id)) return c.json(notFound, 404);

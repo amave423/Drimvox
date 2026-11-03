@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { writeNotes } from "./notes";
+import { STUCK_HINT } from "./prompt";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { classifyCommand, runCommand, type CommandVerdict } from "./commands";
@@ -86,6 +87,8 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
   // Commands that ran out of time, one after another (seen live: a hidden Word hung every command for two hours and the
   // model kept killing it and trying again). After a few in a row this answer runs no more commands.
   let hungInARow = 0;
+  // The last command that failed and how: the same failure again is said outright.
+  let lastFailure: string | null = null;
   const run_command = wrap(
     "run_command",
     "Run a shell command in the project folder, e.g. tests or a build. Returns the exit code and the end of the output.",
@@ -111,7 +114,13 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
       const head = result.timedOut ? `Timed out after ${timeout_seconds}s` : `Exit code: ${result.exitCode}`;
       // A long output whole in a file (as OpenCode does): the agent reads its middle instead of running the command again.
       const kept = result.full ? keepOutput(ws, result.full) : null;
-      const note = kept ? `\n(The output is long; saved whole to ${kept.path} (${kept.lines} lines): read_file it with offset for the part you need.)` : "";
+      // The same failure as last time: the agent's fixes did not help, and a third patch sinks deeper (STUCK_HINT).
+      const failure = result.exitCode !== 0 && !result.timedOut ? `${command}\n${result.output.slice(-2000)}` : null;
+      const again = failure !== null && failure === lastFailure;
+      lastFailure = failure;
+      const note =
+        (kept ? `\n(The output is long; saved whole to ${kept.path} (${kept.lines} lines): read_file it with offset for the part you need.)` : "") +
+        (again ? `\n(This command failed the same way as before your last changes. ${STUCK_HINT})` : "");
       return { ok: result.exitCode === 0 && !result.timedOut, output: `${head}\n${result.output}${note}` };
     },
   );
@@ -151,7 +160,7 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
     run_command,
     update_notes: wrap(
       "update_notes",
-      "Rewrite your section of the project's AGENTS.md: what any agent working here next must know (the goal, decisions, how to build, test and run, what is done and what is next, pitfalls). Short and current, not a diary; it starts every request.",
+      "Rewrite your section of the project's AGENTS.md: what any agent working here next must know (the goal, decisions, how to build, test and run, what is done and what is next, pitfalls). Short and current, not a diary; it starts every request. Leave out what the files show by themselves (the folders, the code, the dependencies): only what is not visible there.",
       z.object({ notes: z.string().min(1) }),
       async ({ notes }) => {
         writeNotes(ws.root, notes);

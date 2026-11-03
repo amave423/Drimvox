@@ -1,3 +1,4 @@
+import { rememberOllamaWindow } from "../providers/ollama-details";
 import type { LocalHardware, LocalModel, LocalPull } from "@drimvox/shared";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
@@ -121,8 +122,11 @@ export class OllamaManager {
   private async start(): Promise<boolean> {
     const [file, ...args] = this.o.command!;
     const host = new URL(this.o.apiUrl).host;
+    const window = contextFor(await this.o.hardware());
+    // The agent counts on this window, not the model's own (ollama-details.ts).
+    rememberOllamaWindow(this.o.apiUrl, window);
     const child = spawn(file!, [...args, "serve"], {
-      env: { ...process.env, ...this.o.commandEnv, OLLAMA_HOST: host, OLLAMA_CONTEXT_LENGTH: String(contextFor(await this.o.hardware())) },
+      env: { ...process.env, ...this.o.commandEnv, OLLAMA_HOST: host, OLLAMA_CONTEXT_LENGTH: String(window) },
       stdio: "ignore",
       windowsHide: true,
     });

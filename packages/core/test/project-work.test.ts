@@ -666,6 +666,48 @@ describe("a ready project", () => {
     await new Promise((r) => setTimeout(r, 1500));
   });
 
+  // Said in a video on agents: a request late in a long conversation costs several times one at its start; one task, one
+  // conversation.
+  it("starts again with a clean context: a new conversation, the old one kept, the project's notes still there", async () => {
+    const s = await setup({ coder: [call("update_notes", { notes: "Сайт клиники, запуск: npm run dev" }), { text: "Первая задача готова." }, { text: "Вторая готова." }] });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Первая задача", model: s.ref("coder") });
+    const first = await until(s.project.id, (w) => w.status === "done");
+    const res = await env.call("POST", `/api/projects/${s.project.id}/work/fresh`);
+    expect(res.status).toBe(200);
+    expect(await workOf(s.project.id)).toMatchObject({ chatId: null, startedAt: null, checklist: [], tokens: { input: 0, output: 0, context: null } });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Вторая задача", model: s.ref("coder") });
+    const second = await until(s.project.id, (w) => w.status === "done" && w.chatId !== null);
+    expect(second.chatId).not.toBe(first.chatId);
+    const sent = JSON.stringify(requestsOf("coder").at(-1)!.body.messages);
+    // Not the old conversation; the project's notes and state (its last goal among them) go on.
+    expect(sent).not.toContain("Первая задача готова.");
+    expect(sent).toContain("Сайт клиники, запуск: npm run dev");
+    expect((await env.call("GET", `/api/chats/${first.chatId}`)).status).toBe(200);
+  });
+
+  // Said in a video on agents: take the raw output of the tests, not the model's word that all is fixed.
+  it("runs the project's tests itself before the work is done: a failure goes back to the agent, a pass into the report", async () => {
+    writeFileSync(join(folder, "package.json"), JSON.stringify({ name: "shop", scripts: { test: "node check.js" } }));
+    writeFileSync(join(folder, "check.js"), "console.error('FAIL: сумма неверна'); process.exit(1);\n");
+    git(folder, "add", "-A");
+    git(folder, "commit", "-q", "-m", "Tests");
+    const s = await setup({
+      coder: [
+        call("finish_work", { report: "Всё починил, тесты проходят." }),
+        call("write_file", { path: "check.js", content: "console.log('ok: 3 tests');\n" }),
+        call("finish_work", { report: "Починил сумму." }),
+      ],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Почини сумму", model: s.ref("coder") });
+    const work = await until(s.project.id, (w) => w.status === "done");
+    expect(JSON.stringify(requestsOf("coder")[1]!.body.messages)).toContain("FAIL: сумма неверна");
+    expect(work.report).toContain("Починил сумму.");
+    expect(work.report).toMatch(/npm test.*прошли/);
+    expect(work.report).toContain("ok: 3 tests");
+  });
+
   // As Codex's tool_search: rarely needed tools are not sent with every step; the model loads them when it needs them.
   it("sends the rare tools only after the model asks for them", async () => {
     const s = await setup({

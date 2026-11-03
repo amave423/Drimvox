@@ -1,7 +1,7 @@
 import type { AttachmentView, StreamEvent } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import { BATCH_HINT } from "../agent/prompt";
+import { BATCH_HINT, STUCK_HINT } from "../agent/prompt";
 import { buildTools, type ToolHooks } from "../agent/tools";
 import { Workspace } from "../agent/workspace";
 import { askAboutPictures, type Vision } from "../visual/look";
@@ -110,6 +110,7 @@ export function folderHint(folder: string, platform = process.platform): string 
     "briefly what you changed. Never commit or push: the user keeps git. Keep the project's notes current with update_notes",
     "when you learn something the next conversation must know.",
     BATCH_HINT,
+    STUCK_HINT,
     // Seen live: a model drove a hidden Word through COM; it waited for an answer nobody could give, for two hours.
     "Office files (.docx, .xlsx, .pptx) are made with libraries: python-docx, openpyxl, python-pptx (or docx, exceljs,",
     "pptxgenjs in Node). Never drive Word, Excel, PowerPoint or Outlook through COM automation or New-Object -ComObject:",

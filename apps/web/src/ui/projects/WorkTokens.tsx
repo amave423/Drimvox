@@ -8,7 +8,11 @@ import { useModelInfo } from "../chat/ModelNote";
  * run it was unclear how and on what they were spent). Every step sends the whole conversation again, so what was read
  * grows far past the context itself; the note says so.
  */
-export function WorkTokens({ work }: { work: ProjectWorkView }) {
+/** The context counts as long from here: each message reads it whole again, so a new task costs far more in it. */
+const LONG_SHARE = 0.4;
+const LONG_TOKENS = 60_000;
+
+export function WorkTokens({ work, onFresh }: { work: ProjectWorkView; /** A ready project's next task in a new conversation. */ onFresh?: () => void }) {
   const { t, settings } = useApp();
   const ref = work.escalated && work.models?.strong ? work.models.strong : (work.models?.work ?? null);
   const model = useModelInfo(ref);
@@ -41,6 +45,15 @@ export function WorkTokens({ work }: { work: ProjectWorkView }) {
         <dd className="mono">{formatUsd(work.spentUsd)}</dd>
       </dl>
       <p className="muted work-tokens-note">{t("workTokens.note")}</p>
+      {onFresh && work.status !== "running" && (
+        <div className="work-tokens-fresh">
+          {/* Said in a video on agents: a request late in a long conversation costs several times one at its start. */}
+          {context !== null && (size ? context / size >= LONG_SHARE : context >= LONG_TOKENS) && <p className="work-tokens-long">{t("workTokens.long")}</p>}
+          <button className="btn is-small" onClick={onFresh}>
+            {t("workTokens.fresh")}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
