@@ -1,5 +1,6 @@
 import { WEB_HINT } from "../internet/tools";
 import { todayLine } from "../now";
+import { ASSETS_HINT } from "./design";
 
 /**
  * Independent calls in one step (as Codex's and Claude Code's prompts ask): every step sends the whole conversation to the
@@ -34,6 +35,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
     "How to work:",
     `- ${BATCH_HINT}`,
     `- ${STUCK_HINT}`,
+    `- ${ASSETS_HINT}`,
     "- Explore first: list_files, read_file and search before editing. Read a file before you change it.",
     "- Read a file whole, once, and keep it in mind; read code with read_file and search, never with run_command (no Get-Content, Select-String, cat or node -e to look at files).",
     "- Make focused changes that do exactly what was asked. Prefer edit_file for existing files; use write_file for new files.",

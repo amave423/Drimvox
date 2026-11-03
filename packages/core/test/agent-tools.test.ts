@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, runCommand } from "../src/agent/commands";
 import { parseDiff } from "../src/agent/diff";
 import { BATCH_HINT, STUCK_HINT, feedbackMessage, systemPrompt } from "../src/agent/prompt";
+import { ASSETS_HINT } from "../src/agent/design";
 import { existingRules, projectRules } from "../src/work/prompt";
 import { folderHint } from "../src/chats/folder";
 import { Workspace } from "../src/agent/workspace";
@@ -322,6 +323,8 @@ describe("systemPrompt", () => {
     for (const prompt of [systemPrompt("/repo", "linux"), projectRules(null, true), existingRules(true), folderHint("/repo", "linux")]) {
       expect(prompt).toContain(BATCH_HINT);
       expect(prompt).toContain(STUCK_HINT);
+      // Asked for: icons from libraries and real pictures, not emoji (seen: flags and weather as emoji in every converter).
+      expect(prompt).toContain(ASSETS_HINT);
     }
   });
 });

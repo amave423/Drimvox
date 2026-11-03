@@ -16,6 +16,19 @@ export const CLICHES = [
   "a destructive button (delete) louder than the main action",
 ];
 
+/**
+ * Icons and pictures in whatever the agent builds, a ready project or a chat with a folder too (asked for: every currency
+ * converter had flags and weather as emoji; Codex drew its icons as SVG).
+ */
+export const ASSETS_HINT =
+  "When you build an interface, never use emoji as icons, bullets, flags or decoration. Take icons from a library: Lucide " +
+  "(lucide, lucide-react), Tabler Icons, Phosphor or Heroicons, installed with the project's package manager or pasted as " +
+  "their SVG; flags from flag-icons. What no library has (a logo, an illustration, an animated scene) draw yourself as " +
+  "SVG, then look at it on the page (browser_look or look_at_page) and fix what looks wrong. Pictures the page needs " +
+  "(photos, detailed illustrations): make them with generate_image when you have it, or take " +
+  "free photos (Unsplash, Pexels) and save them in the project's assets folder, the source named in README. No grey " +
+  "placeholders, and no images linked from other sites at random.";
+
 const CRAFT = [
   "one scale for text sizes and one for spacing (steps of 4 px), used everywhere",
   "text contrast of at least WCAG AA",
