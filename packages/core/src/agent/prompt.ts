@@ -1,5 +1,15 @@
 import { WEB_HINT } from "../internet/tools";
 import { todayLine } from "../now";
+
+/**
+ * Independent calls in one step (as Codex's and Claude Code's prompts ask): every step sends the whole conversation to the
+ * model again (seen live: 247 actions, one a step, for a currency converter).
+ */
+export const BATCH_HINT =
+  "Work in few steps: every step costs a full round to the model. Make the calls that do not depend on each other in the same " +
+  "step: read the files you need together, run independent searches together, and make all the edits you already know in " +
+  "one edit_file call with edits.";
+
 /** System prompt of the Solo agent. English for the model; it answers the user in their language. */
 export function systemPrompt(root: string, platform = process.platform): string {
   // Models default to bash habits; Windows PowerShell 5.1 cannot even parse `&&`.
@@ -13,6 +23,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
     `Commands run with ${shell}, in that folder. The user's own working folder is not touched until they accept your work.`,
     "",
     "How to work:",
+    `- ${BATCH_HINT}`,
     "- Explore first: list_files, read_file and search before editing. Read a file before you change it.",
     "- Read a file whole, once, and keep it in mind; read code with read_file and search, never with run_command (no Get-Content, Select-String, cat or node -e to look at files).",
     "- Make focused changes that do exactly what was asked. Prefer edit_file for existing files; use write_file for new files.",

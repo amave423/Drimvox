@@ -130,9 +130,15 @@ export interface CommandResult {
   exitCode: number | null;
   output: string;
   timedOut: boolean;
+  /** The whole output, when `output` shows only part of it (up to FULL_LIMIT). */
+  full?: string;
 }
 
 const OUTPUT_LIMIT = 12_000;
+/** Of a long output, the start shown before its end: the command's first errors are often there. */
+const HEAD_LIMIT = 2_000;
+/** The whole output kept for a file, at most this much. */
+const FULL_LIMIT = 5_000_000;
 
 /** Starts a command in the user's shell: PowerShell on Windows, sh elsewhere (in its own process group). */
 export function spawnShell(command: string, cwd: string): ChildProcessWithoutNullStreams {
@@ -165,8 +171,11 @@ export function runCommand(command: string, cwd: string, timeoutMs: number, sign
     const child = spawnShell(command, cwd);
 
     let output = "";
+    let full = "";
     const append = (chunk: Buffer) => {
-      output += chunk.toString("utf8");
+      const text = chunk.toString("utf8");
+      output += text;
+      if (full.length < FULL_LIMIT) full += text;
       if (output.length > OUTPUT_LIMIT * 2) output = output.slice(-OUTPUT_LIMIT);
     };
     child.stdout.on("data", append);
@@ -181,8 +190,12 @@ export function runCommand(command: string, cwd: string, timeoutMs: number, sign
       signal?.removeEventListener("abort", kill);
       child.stdout.destroy();
       child.stderr.destroy();
-      const tail = output.length > OUTPUT_LIMIT ? `…\n${output.slice(-OUTPUT_LIMIT)}` : output;
-      done({ exitCode, output: tail.trimEnd(), timedOut });
+      if (full.length <= OUTPUT_LIMIT) return done({ exitCode, output: output.trimEnd(), timedOut });
+      // Long: its start and its end, and the whole of it for a file (tools.ts).
+      const end = OUTPUT_LIMIT - HEAD_LIMIT;
+      const skipped = full.length - HEAD_LIMIT - end;
+      const shown = skipped > 0 ? `${full.slice(0, HEAD_LIMIT)}\n… ${skipped} characters skipped …\n${output.slice(-end)}` : full;
+      done({ exitCode, output: shown.trimEnd(), timedOut, full });
     };
     // A program the command started can outlive it and hold its output open (seen live: `chrome --version` on Windows
     // opened the browser and the command never ended, not even at its timeout). Once the shell is gone, or killed,

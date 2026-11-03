@@ -120,10 +120,13 @@ export function filesOf(activity: ActivityEntry[]): { path: string; touch: FileT
   const found = new Map<string, FileTouch>();
   for (const a of activity) {
     const touch = TOUCHES[a.name];
-    const path = a.input.trim().replace(/\\/g, "/").replace(/^\.\//, "");
-    if (!touch || !path || path === "." || path.length > 300) continue;
-    const had = found.get(path);
-    if (!had || RANK[touch] > RANK[had]) found.set(path, touch);
+    // One call may change several files (edit_file's edits): one per line.
+    for (const line of a.input.split("\n")) {
+      const path = line.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+      if (!touch || !path || path === "." || path.length > 300) continue;
+      const had = found.get(path);
+      if (!had || RANK[touch] > RANK[had]) found.set(path, touch);
+    }
   }
   return [...found].map(([path, touch]) => ({ path, touch }));
 }

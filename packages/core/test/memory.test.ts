@@ -19,6 +19,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  slowSummary = 0;
   await env.closeAsync();
   await fake?.close();
   fake = undefined;
@@ -28,13 +29,15 @@ afterEach(async () => {
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
 const isSummarizer = (body: any) => JSON.stringify(body?.messages?.[0] ?? "").includes("working memory");
 const SUMMARY = "SUMMARY: wrote notes.md, read big.txt over and over; next: finish.";
+/** How long the summarizer takes to answer, in milliseconds. */
+let slowSummary = 0;
 
 async function start(coder: FakeTurn[]) {
   const queue = [...coder];
   fake = await startFakeProvider({
     key: KEY,
     models: [{ id: "coder" }],
-    respond: (body) => (isSummarizer(body) ? { text: SUMMARY } : (queue.shift() ?? call("finish", { summary: "Готово", commit_message: "Notes" }))),
+    respond: (body) => (isSummarizer(body) ? { text: SUMMARY, delayMs: slowSummary } : (queue.shift() ?? call("finish", { summary: "Готово", commit_message: "Notes" }))),
   });
   const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
   const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
@@ -80,6 +83,21 @@ describe("the agent's memory", () => {
     expect(new Set(after.map(head)).size).toBe(1);
     expect(JSON.stringify(after[0]![1])).toContain("Запиши заметки");
     expect(JSON.stringify(after[0]![2])).toContain(SUMMARY);
+  });
+
+  // As OpenCode does: the summary is written in the background before the limit, so the agent does not stand and wait.
+  it("starts the summary before the limit and goes on working while it is written", async () => {
+    slowSummary = 3000;
+    const reads = Array.from({ length: 14 }, () => call("read_file", { path: "big.txt" }));
+    const id = await start([call("write_file", { path: "notes.md", content: "# Заметки\n" }), ...reads]);
+    await settle(id);
+    const all = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
+    const asked = all.findIndex((r) => isSummarizer(r.body));
+    expect(asked).toBeGreaterThan(0);
+    // Steps went on after the summary was asked for and before it came.
+    expect(all.slice(asked + 1).some((r) => !isSummarizer(r.body) && !JSON.stringify(r.body.messages).includes(SUMMARY))).toBe(true);
+    expect(coderRequests().some((m) => JSON.stringify(m).includes(SUMMARY))).toBe(true);
+    expect(all.filter((r) => isSummarizer(r.body))).toHaveLength(1);
   });
 
   // Seen live: the time to the minute in the system prompt changed the start of every request each minute, so the

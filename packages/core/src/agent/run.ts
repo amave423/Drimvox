@@ -8,13 +8,20 @@ import { isLocal, NO_LIMIT_MS } from "../budget";
 import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
-import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory } from "./memory";
+import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory, type Remembered } from "./memory";
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { repairToolJson } from "./repair";
+import { deferTools } from "./deferred";
 import { Workspace } from "./workspace";
 
 export const MAX_STEPS = 60;
+
+/** A summary of the older work written in the background, and what came of it (undefined while it is written). */
+type Summary = { result: Promise<Remembered | null>; done: Remembered | null | undefined };
+
+/** The share of the memory's limit at which its summary starts in the background. */
+const EARLY_SUMMARY = 0.85;
 
 /** Rounds a pass may go on for after the provider cut an answer by its output limit. */
 const MAX_CUTS = 2;
@@ -121,6 +128,18 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
     },
   });
 
+  // The rare tools wait until the model loads them (deferred.ts); a step with one tool to call keeps just that one.
+  const deferral = i.only ? null : deferTools(tools);
+
+  // A summary of the older work being written in the background, and what came of it (undefined while it is written).
+  let writing = null as Summary | null;
+  const adopt = (r: Remembered) => {
+    const cost = costOf(i.price, i.conn.preset, usageOf({ inputTokens: r.inputTokens, outputTokens: r.outputTokens })) ?? 0;
+    spent += cost;
+    memory = r.memory;
+    i.onMemory!(memory, { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd: cost });
+  };
+
   // The project's notes (AGENTS.md) start every request, read afresh: the agent's own update shows at the next step.
   const system = () => [i.system ?? systemPrompt(i.worktree), i.system ? "" : i.instructions, notesBlock(i.worktree)].filter(Boolean).join("\n\n");
 
@@ -143,28 +162,43 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         model: languageModel(i.conn, i.model),
         system: system(),
         messages,
-        tools,
+        tools: deferral?.tools ?? tools,
         experimental_repairToolCall: repairToolJson,
         ...(i.only ? { activeTools: [i.only], toolChoice: "required" as const } : {}),
         // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
         providerOptions: i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : undefined,
         // Near the model's context, the older work becomes one summary; see memory.ts.
         prepareStep: async ({ messages }) => {
+          // A summary written in the background meanwhile takes over the older work now.
+          if (writing?.done !== undefined) {
+            if (writing.done) adopt(writing.done);
+            writing = null;
+          }
           let sent = withMemory(messages, memory);
           const limit = memoryLimit(i.price);
-          const upTo = i.onMemory && sizeOf(sent) > limit ? cutPoint(messages, memory, limit) : null;
-          if (upTo !== null) {
+          const size = sizeOf(sent);
+          // Before the limit the summary starts in the background and the agent goes on (as OpenCode does); only at the
+          // limit does it wait for it.
+          if (i.onMemory && !writing && size > limit * EARLY_SUMMARY) {
+            const upTo = cutPoint(messages, memory, limit);
+            if (upTo !== null) {
+              const job: Summary = { result: Promise.resolve(null), done: undefined };
+              job.result = remember(i.conn, i.model, i.worktree, messages, memory, upTo, i.signal).then(
+                (r) => (job.done = r),
+                // Without a summary the whole conversation goes; a later step tries again.
+                () => (job.done = null),
+              );
+              writing = job;
+            }
+          }
+          if (writing && size > limit) {
             running++;
             clearTimeout(timer);
             try {
-              const r = await remember(i.conn, i.model, i.worktree, messages, memory, upTo, i.signal);
-              const cost = costOf(i.price, i.conn.preset, usageOf({ inputTokens: r.inputTokens, outputTokens: r.outputTokens })) ?? 0;
-              spent += cost;
-              memory = r.memory;
-              i.onMemory!(memory, { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd: cost });
+              const r = await writing.result;
+              if (r) adopt(r);
+              writing = null;
               sent = withMemory(messages, memory);
-            } catch {
-              // Without a summary the whole conversation goes; the next step tries again.
             } finally {
               running--;
               resetClock();
@@ -179,7 +213,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           const note = i.remind?.();
           if (note) sent = [...sent, { role: "user", content: note }];
           // The same text as long as the notes stay the same: the provider's cache holds.
-          return { system: system(), ...(sent === messages ? {} : { messages: sent }) };
+          const active = deferral?.active();
+          return { system: system(), ...(active ? { activeTools: active } : {}), ...(sent === messages ? {} : { messages: sent }) };
         },
         stopWhen: [
           hasToolCall("finish"),

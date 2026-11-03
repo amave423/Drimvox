@@ -666,6 +666,38 @@ describe("a ready project", () => {
     await new Promise((r) => setTimeout(r, 1500));
   });
 
+  // As Codex's tool_search: rarely needed tools are not sent with every step; the model loads them when it needs them.
+  it("sends the rare tools only after the model asks for them", async () => {
+    const s = await setup({
+      coder: [call("find_tools", { names: ["email_new", "load_test"] }), call("email_new", {}), { text: "Готово." }],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Заведи почту", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done");
+    const names = (n: number) => (requestsOf("coder")[n]!.body.tools ?? []).map((t: any) => t.function.name) as string[];
+    expect(names(0)).toContain("edit_file");
+    expect(names(0)).toContain("find_tools");
+    expect(names(0)).not.toContain("email_new");
+    const find = (requestsOf("coder")[0]!.body.tools as any[]).find((t) => t.function.name === "find_tools");
+    expect(find.function.description).toContain("email_new");
+    expect(names(1)).toContain("email_new");
+    expect(names(1)).toContain("load_test");
+    expect(names(1).length).toBeLessThan(names(0).length + 3);
+  });
+
+  // As Aider's repo map: a ready project's files and what each defines start the agent's instructions.
+  it("gives the agent of a ready project its map of files", async () => {
+    for (let n = 1; n <= 16; n++) writeFileSync(join(folder, `part${n}.js`), `export function part${n}() {}
+`);
+    git(folder, "add", "-A");
+    git(folder, "commit", "-q", "-m", "Parts");
+    const s = await setup({ coder: [{ text: "Готово." }] });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Что тут есть?", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done");
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("part7.js (1 lines): part7");
+  });
+
   // Asked for: how full the model's context is, as in a chat, and what the tokens went to.
   it("tells the tokens the model read and wrote, and how much of its context the latest step took", async () => {
     const s = await setup({

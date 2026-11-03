@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, runCommand } from "../src/agent/commands";
 import { parseDiff } from "../src/agent/diff";
-import { feedbackMessage, systemPrompt } from "../src/agent/prompt";
+import { BATCH_HINT, feedbackMessage, systemPrompt } from "../src/agent/prompt";
+import { existingRules, projectRules } from "../src/work/prompt";
+import { folderHint } from "../src/chats/folder";
 import { Workspace } from "../src/agent/workspace";
 import { makeRepo } from "./git-repo";
 
@@ -77,6 +79,26 @@ describe("workspace", () => {
     expect(message).toContain("51\tfunction total(items) {");
     expect(message).toContain("45\tconst v44 = 44;");
     expect(message).not.toContain("\tconst v10 = 10;");
+  });
+
+  // Seen live: 78 edit_file calls in one run, each a step that sent the whole conversation again. Codex's apply_patch and
+  // OpenCode's patch change many places in one call.
+  it("makes several edits in several files in one go, all or none", () => {
+    expect(ws.editMany([
+      { path: "src/app.ts", old: "const a = 1;", new: "const a = 10;" },
+      { path: "src/app.ts", old: "const b = 2;", new: "const b = 20;" },
+      { path: "README.md", old: "# Demo", new: "# Демо" },
+    ])).toEqual(["src/app.ts", "README.md"]);
+    expect(readFileSync(join(root, "src/app.ts"), "utf8")).toBe("const a = 10;\nconst b = 20;\n");
+    expect(readFileSync(join(root, "README.md"), "utf8")).toBe("# Демо\n");
+    // One that misses: nothing is written, and the error says which one.
+    expect(() =>
+      ws.editMany([
+        { path: "src/app.ts", old: "const a = 10;", new: "const a = 100;" },
+        { path: "README.md", old: "нет такого", new: "x" },
+      ]),
+    ).toThrow(/Edit 2 of 2 \(README\.md\).*Nothing was changed/s);
+    expect(readFileSync(join(root, "src/app.ts"), "utf8")).toBe("const a = 10;\nconst b = 20;\n");
   });
 
   it("searches file contents", () => {
@@ -210,6 +232,25 @@ describe("runCommand", () => {
     expect(result.output.length).toBeLessThan(13_000);
     expect(result.output).toContain("END");
   });
+
+  // As OpenCode does: a long output is shown by its start and end, and kept whole in a file the agent can read on, instead
+  // of running the command again to see the middle.
+  it("keeps a long output whole in a file the agent can read, and shows its start and end", async () => {
+    const { folderTools } = await import("../src/chats/folder");
+    const tools = folderTools(root, async () => {}, async () => true);
+    const call = (name: string, input: unknown) => (tools[name]!.execute as (i: unknown, o: unknown) => Promise<string>)(input, { toolCallId: "t", messages: [] });
+    const out = await call("run_command", { command: `node -e "for (let i = 1; i <= 3000; i++) console.log('line ' + i)"`, timeout_seconds: 60 });
+    expect(out).toMatch(/^Exit code: 0\nline 1\r?\n/);
+    expect(out).toContain("line 3000");
+    const saved = /saved whole to (\S+?) \(/.exec(out)?.[1];
+    expect(saved).toBe(".drimvox/output/command-1.txt");
+    expect(await call("read_file", { path: saved, offset: 1500, limit: 1 })).toMatch(/^1500\tline 1500\n/);
+    // Out of git and out of the agent's file list.
+    expect(readFileSync(join(root, ".drimvox/.gitignore"), "utf8")).toBe("*\n");
+    expect(ws.listFiles(".", 3)).not.toContain(".drimvox/");
+    // A short output is shown whole, with no file.
+    expect(await call("run_command", { command: `node -e "console.log('short')"`, timeout_seconds: 60 })).not.toContain("saved whole");
+  }, 30_000);
 });
 
 describe("feedbackMessage", () => {
@@ -274,6 +315,13 @@ describe("systemPrompt", () => {
   it("warns about Windows PowerShell 5.1 and its missing &&", () => {
     expect(systemPrompt("C:\repo", "win32")).toContain("Windows PowerShell 5.1 (no && or ||");
     expect(systemPrompt("/repo", "linux")).toContain("sh on a Unix-like system");
+  });
+
+  // Codex's and Claude Code's prompts ask for independent calls in one step; every step sends the whole conversation again.
+  it("asks every agent to make independent calls in one step", () => {
+    for (const prompt of [systemPrompt("/repo", "linux"), projectRules(null, true), existingRules(true), folderHint("/repo", "linux")]) {
+      expect(prompt).toContain(BATCH_HINT);
+    }
   });
 });
 

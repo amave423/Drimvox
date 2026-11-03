@@ -14,6 +14,7 @@ import { isCli } from "../cli/kinds";
 import { FAIR_USE_HINT, WEB_HINT, webTools } from "../internet/tools";
 import { repairToolJson } from "../agent/repair";
 import { compactHistory } from "../work/compact";
+import { deferTools } from "../agent/deferred";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";
@@ -151,6 +152,7 @@ export async function reply(i: ReplyInput): Promise<void> {
     ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }, { owner: i.chatId }) : {}),
     ...i.extraTools,
   };
+  const deferral = deferTools(tools);
   // Research takes room: the internet, or tools of the user's servers (seen: a browser server stopped at 8 steps).
   const steps = i.work?.steps || (i.folder ? FOLDER_STEPS : i.web === "free" || Object.keys(i.extraTools ?? {}).length ? WEB_STEPS : 8);
   const memory = i.folder ? memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) : null;
@@ -181,14 +183,16 @@ export async function reply(i: ReplyInput): Promise<void> {
         messages: round === 0 ? history : [...history, ...said, { role: "user" as const, content: CONTINUE }],
         ...(Object.keys(tools).length
           ? {
-              tools,
+              tools: deferral.tools,
               // Search, read a page or two, call a tool or two, answer.
               stopWhen: isStepCount(steps),
               // Long work in a folder: once the answer nears the model's context, its older part becomes a summary. The
               // last step is for the summary (seen live: all 40 steps went on tools, the answer came empty).
               prepareStep: async (o: { stepNumber: number; messages: ModelMessage[] }) => {
                 const kept: { messages?: ModelMessage[] } = memory ? await memory(o) : {};
-                const base = { messages: shortened(kept.messages ?? o.messages) };
+                // The rare tools wait until the model loads them (agent/deferred.ts).
+                const active = deferral.active();
+                const base = { messages: shortened(kept.messages ?? o.messages), ...(active ? { activeTools: active } : {}) };
                 if (o.stepNumber < steps - 1) return base;
                 lastStep = true;
                 return { ...base, toolChoice: "none" as const, messages: [...(base.messages ?? o.messages), { role: "user" as const, content: LAST_STEP }] };

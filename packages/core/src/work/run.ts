@@ -26,6 +26,7 @@ import { toolbox, type ToolboxDeps } from "../tools";
 import { polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
+import { projectMap } from "../agent/repo-map";
 
 /** Steps one answer of the run takes before the next answer goes on with the same context. */
 export const SEGMENT_STEPS = 60;
@@ -446,6 +447,8 @@ export class WorkRun {
         VISUAL_HINT,
         WEB_HINT,
         skillsInstructions(skills),
+        // A ready project's files and what each defines (as Aider's repo map): fewer steps spent finding the right file.
+        this.chatMode ? await projectMap(this.folder).catch(() => "") : "",
       ]
         .filter(Boolean)
         .join("\n\n"),

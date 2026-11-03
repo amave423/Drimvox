@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { writeNotes } from "./notes";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
@@ -108,7 +109,10 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
       const result = await runCommand(command, ws.root, timeout_seconds * 1000, signal);
       hungInARow = result.timedOut ? hungInARow + 1 : 0;
       const head = result.timedOut ? `Timed out after ${timeout_seconds}s` : `Exit code: ${result.exitCode}`;
-      return { ok: result.exitCode === 0 && !result.timedOut, output: `${head}\n${result.output}` };
+      // A long output whole in a file (as OpenCode does): the agent reads its middle instead of running the command again.
+      const kept = result.full ? keepOutput(ws, result.full) : null;
+      const note = kept ? `\n(The output is long; saved whole to ${kept.path} (${kept.lines} lines): read_file it with offset for the part you need.)` : "";
+      return { ok: result.exitCode === 0 && !result.timedOut, output: `${head}\n${result.output}${note}` };
     },
   );
   if (mode === "review") return { ...readTools, ...stepTools, run_command };
@@ -127,11 +131,21 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
     ),
     edit_file: wrap(
       "edit_file",
-      "Replace one exact fragment of a file. `old` must appear exactly once; include surrounding lines to make it unique.",
-      z.object({ path: z.string(), old: z.string().min(1), new: z.string() }),
-      async ({ path, old, new: replacement }) => {
-        ws.editFile(path, old, replacement);
-        return ok(`Edited ${path}`);
+      "Replace exact fragments of files. One change: path, old, new. Several changes, in one file or several, in one call: " +
+        "edits, a list of {path, old, new} applied in order, all or none. Each `old` must appear exactly once; include " +
+        "surrounding lines to make it unique. Make all the changes you already know in one call, not one call each.",
+      z
+        .object({
+          path: z.string().optional(),
+          old: z.string().min(1).optional(),
+          new: z.string().optional(),
+          edits: z.array(z.object({ path: z.string().optional(), old: z.string().min(1), new: z.string() })).max(50).optional(),
+        })
+        .refine((x) => (x.path && x.old !== undefined && x.new !== undefined) || x.edits?.length, "Give path, old and new, or edits"),
+      async ({ path, old, new: replacement, edits }) => {
+        const all = [...(path && old !== undefined && replacement !== undefined ? [{ path, old, new: replacement }] : []), ...(edits ?? []).map((e) => ({ ...e, path: e.path ?? path ?? "" }))];
+        const files = ws.editMany(all);
+        return ok(all.length === 1 ? `Edited ${files[0]}` : `Made ${all.length} edits in ${files.join(", ")}`);
       },
     ),
     run_command,
@@ -154,6 +168,27 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
       },
     ),
   };
+}
+
+/** Long outputs of commands kept per folder, the newest ones. */
+const KEPT_OUTPUTS = 20;
+
+/** A command's whole output in the folder's .drimvox/output, out of git and of the agent's file list. */
+function keepOutput(ws: Workspace, full: string): { path: string; lines: number } | null {
+  try {
+    const dir = ws.resolve(".drimvox/output");
+    mkdirSync(dir, { recursive: true });
+    const ignore = ws.resolve(".drimvox/.gitignore");
+    if (!existsSync(ignore)) writeFileSync(ignore, "*\n");
+    const numbers = readdirSync(dir).map((f) => Number(/^command-(\d+)\.txt$/.exec(f)?.[1] ?? 0)).filter((n) => n > 0);
+    const next = Math.max(0, ...numbers) + 1;
+    for (const n of numbers.filter((n) => n <= next - KEPT_OUTPUTS)) rmSync(ws.resolve(`.drimvox/output/command-${n}.txt`), { force: true });
+    const path = `.drimvox/output/command-${next}.txt`;
+    writeFileSync(ws.resolve(path), full);
+    return { path, lines: full.split("\n").length };
+  } catch {
+    return null;
+  }
 }
 
 function clip(text: string): string {

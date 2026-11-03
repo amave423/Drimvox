@@ -40,6 +40,8 @@ describe("a chat with a folder", () => {
       call("read_file", { path: "app.js" }),
       call("write_file", { path: "hello.txt", content: "привет\n" }),
       call("edit_file", { path: "app.js", old: "a = 1", new: "a = 2" }),
+      // Several files in one call: the chat's list of files has each of them.
+      call("edit_file", { edits: [{ path: "app.js", old: "a = 2", new: "a = 3" }, { path: "hello.txt", old: "привет", new: "здравствуй" }] }),
       { text: "Создал hello.txt и поменял a." },
     ]);
     const res = await connect(chat.id, folder);
@@ -47,9 +49,9 @@ describe("a chat with a folder", () => {
     expect((await res.json()).folder).toBe(folder);
 
     const events = await readEvents(await send(chat.id, "Создай hello.txt и поменяй a на 2"));
-    expect(events.filter((e: any) => e.type === "tool").map((e: any) => e.name)).toEqual(["read_file", "write_file", "edit_file"]);
-    expect(readFileSync(join(folder, "hello.txt"), "utf8")).toBe("привет\n");
-    expect(readFileSync(join(folder, "app.js"), "utf8")).toBe("export const a = 2;\n");
+    expect(events.filter((e: any) => e.type === "tool").map((e: any) => e.name)).toEqual(["read_file", "write_file", "edit_file", "edit_file"]);
+    expect(readFileSync(join(folder, "hello.txt"), "utf8")).toBe("здравствуй\n");
+    expect(readFileSync(join(folder, "app.js"), "utf8")).toBe("export const a = 3;\n");
     const answer = events.at(-1).message;
     expect(answer).toMatchObject({ content: "Создал hello.txt и поменял a.", canUndo: true });
     // What the model did stays with the answer: a chat opened later still shows it.
@@ -58,6 +60,7 @@ describe("a chat with a folder", () => {
       { name: "read_file", input: "app.js" },
       { name: "write_file", input: "hello.txt" },
       { name: "edit_file", input: "app.js" },
+      { name: "edit_file", input: "app.js\nhello.txt" },
     ]);
     // The files it made or used are attached to the answer, each once, with the most it did; they can be looked at.
     expect(filesOf(saved.activity)).toEqual([
@@ -67,7 +70,7 @@ describe("a chat with a folder", () => {
     const shown = await env.call("GET", `/api/chats/${chat.id}/file?path=hello.txt`);
     expect(shown.status).toBe(200);
     expect(shown.headers.get("content-security-policy")).toBe("sandbox");
-    expect(await shown.text()).toBe("привет\n");
+    expect(await shown.text()).toBe("здравствуй\n");
     expect((await env.call("GET", `/api/chats/${chat.id}/file?path=../outside.txt`)).status).toBe(400);
     expect((await env.call("GET", `/api/chats/${chat.id}/file?path=nothing.txt`)).status).toBe(404);
     // The model works in the user's files; git stays the user's.

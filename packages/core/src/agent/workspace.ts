@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-const SKIP = new Set([".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".next", "target"]);
+const SKIP = new Set([".git", ".drimvox", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".next", "target"]);
 const MAX_READ_LINES = 2000;
 const MAX_SEARCH_RESULTS = 100;
 
@@ -70,18 +70,34 @@ export class Workspace {
    * Windows line endings, because read_file shows the model plain \n; the file keeps its own style.
    */
   editFile(path: string, oldText: string, newText: string): void {
-    const file = this.resolve(path);
-    if (!existsSync(file)) throw new Error(`File not found: ${path}`);
-    const raw = readFileSync(file, "utf8");
-    const crlf = raw.includes("\r\n");
-    const content = crlf ? raw.replace(/\r\n/g, "\n") : raw;
-    const find = oldText.replace(/\r\n/g, "\n");
-    const count = find ? content.split(find).length - 1 : 0;
-    if (count > 1) throw new Error(`Fragment occurs ${count} times in ${path}; include more surrounding lines`);
-    // Seen live: many edits missed by an indent, and every miss sent the agent back to read the file in pieces.
-    const edited = count === 1 ? content.replace(find, () => newText.replace(/\r\n/g, "\n")) : looseEdit(content, find, newText.replace(/\r\n/g, "\n"));
-    if (edited === null) throw new Error(`Fragment not found in ${path}. ${nearby(content, find)}`);
-    writeFileSync(file, crlf ? edited.replace(/\n/g, "\r\n") : edited);
+    this.editMany([{ path, old: oldText, new: newText }]);
+  }
+
+  /**
+   * Several edits, in one file or several, applied in order and written only when every one of them fits (seen live: 78
+   * edit_file calls in one run, each a step that sent the whole conversation again). Returns the files changed.
+   */
+  editMany(edits: { path: string; old: string; new: string }[]): string[] {
+    const files = new Map<string, { file: string; crlf: boolean; content: string }>();
+    edits.forEach((e, i) => {
+      try {
+        let f = files.get(e.path);
+        if (!f) {
+          const file = this.resolve(e.path);
+          if (!existsSync(file)) throw new Error(`File not found: ${e.path}`);
+          const raw = readFileSync(file, "utf8");
+          const crlf = raw.includes("\r\n");
+          f = { file, crlf, content: crlf ? raw.replace(/\r\n/g, "\n") : raw };
+          files.set(e.path, f);
+        }
+        f.content = applyEdit(f.content, e.path, e.old, e.new);
+      } catch (err) {
+        if (edits.length === 1) throw err;
+        throw new Error(`Edit ${i + 1} of ${edits.length} (${e.path}): ${err instanceof Error ? err.message : String(err)} Nothing was changed.`);
+      }
+    });
+    for (const f of files.values()) writeFileSync(f.file, f.crlf ? f.content.replace(/\n/g, "\r\n") : f.content);
+    return [...files.keys()];
   }
 
   /** Lines matching a regular expression (or plain text if it is not a valid one). */
@@ -130,6 +146,20 @@ const indentOf = (line: string) => line.match(/^\s*/)![0];
  * The fragment matched line by line with indentation and trailing spaces ignored, when exactly one place matches;
  * the new text takes the file's indentation there. Null when no place or several do.
  */
+/**
+ * One exact, unique fragment replaced in a file's text (\n endings, as read_file shows it); refuses one that is missing or
+ * ambiguous.
+ */
+function applyEdit(content: string, path: string, oldText: string, newText: string): string {
+  const find = oldText.replace(/\r\n/g, "\n");
+  const count = find ? content.split(find).length - 1 : 0;
+  if (count > 1) throw new Error(`Fragment occurs ${count} times in ${path}; include more surrounding lines`);
+  // Seen live: many edits missed by an indent, and every miss sent the agent back to read the file in pieces.
+  const edited = count === 1 ? content.replace(find, () => newText.replace(/\r\n/g, "\n")) : looseEdit(content, find, newText.replace(/\r\n/g, "\n"));
+  if (edited === null) throw new Error(`Fragment not found in ${path}. ${nearby(content, find)}`);
+  return edited;
+}
+
 function looseEdit(content: string, find: string, replacement: string): string | null {
   const want = find.replace(/\n+$/, "").split("\n");
   if (want.every((l) => l.trim() === "")) return null;
