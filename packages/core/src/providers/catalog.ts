@@ -1,5 +1,5 @@
 import { withOllamaDetails } from "./ollama-details";
-import { localModelTitle, presets, type ModelInfo, type PresetId } from "@drimvox/shared";
+import { localModelTitle, presets, type Availability, type ModelInfo, type PresetId } from "@drimvox/shared";
 import { fetchJson } from "./http";
 import { usdPer } from "../rates";
 import { NATIVE, nativeModels, withCatalogPrices } from "./native";
@@ -45,7 +45,25 @@ type Raw = Record<string, unknown>;
  * Chat models of a catalog. `toUsd` converts the catalog's prices to dollars (RouterAI prices in rubles).
  * Models that cannot chat (embeddings, speech, pictures, video) are left out; they live elsewhere.
  */
-const namedFree = /[-:/_]free$/i;
+const namedFree = /[-:/_]free$|^free[/:_-]/i;
+
+/**
+ * What lists say of a model in their own words (asked for: BlazeAPI's free models showed as paid; seen: is_free, tags
+ * "free" as a string, prices per million under their own names, the model's state).
+ */
+function saysFree(raw: Raw): boolean {
+  const tags = raw.tags;
+  return raw.is_free === true || raw.isFree === true || raw.free === true || (typeof tags === "string" && /\bfree\b/i.test(tags)) || (Array.isArray(tags) && tags.includes("free"));
+}
+
+/** A model a list says is down, closed to this key, or struggling; undefined when it says nothing. */
+function listedState(raw: Raw): Availability | undefined {
+  if (raw.available === false || raw.available_for_account === false || raw.globally_available === false) return "gone";
+  const status = typeof raw.status === "string" ? raw.status.toLowerCase() : "";
+  if (/^(down|offline|unavailable|disabled|maintenance|deprecated|retired)$/.test(status)) return "gone";
+  if (/^(degraded|overloaded|busy|limited|partial_outage)$/.test(status)) return "busy";
+  return undefined;
+}
 /** Catalogs that say what kind each model is (Vercel's `type`, LLM7's `model_type`): only these kinds chat. */
 const chatKinds = /^(language|chat|llm|text)$/i;
 /** Providers whose every model is free up to a limit on a key without billing (docs/specs/providers.md, checked 2026-11). */
@@ -106,8 +124,11 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
     // models.dev's shape (OpenCode Zen): "cost" per million tokens.
     const cost = (raw.cost ?? {}) as Raw;
     const perM = (v: unknown) => (typeof v === "number" ? v / 1_000_000 : null);
-    let priceIn = hf ? perMillion(hf.in === null ? null : hf.in / 1_000_000, toUsd) : perMillion(scaled(pricing.prompt ?? pricing.input, perUnit) ?? perM(cost.input), toUsd);
-    let priceOut = hf ? perMillion(hf.out === null ? null : hf.out / 1_000_000, toUsd) : perMillion(scaled(pricing.completion ?? pricing.output, perUnit) ?? perM(cost.output), toUsd);
+    // Per million under a name of their own (BlazeAPI: price_in_per_m).
+    const ownIn = perM(raw.price_in_per_m ?? raw.input_price_per_million);
+    const ownOut = perM(raw.price_out_per_m ?? raw.output_price_per_million);
+    let priceIn = hf ? perMillion(hf.in === null ? null : hf.in / 1_000_000, toUsd) : perMillion(scaled(pricing.prompt ?? pricing.input, perUnit) ?? perM(cost.input) ?? ownIn, toUsd);
+    let priceOut = hf ? perMillion(hf.out === null ? null : hf.out / 1_000_000, toUsd) : perMillion(scaled(pricing.completion ?? pricing.output, perUnit) ?? perM(cost.output) ?? ownOut, toUsd);
     let priceCacheRead = perMillion(scaled(pricing.input_cache_read, perUnit), toUsd);
     let priceEstimated = false;
     // Paid per request (music, some search models) with no token price: not free, and its token price says nothing.
@@ -122,7 +143,7 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
       priceEstimated = true;
     }
     // A list without prices that marks free models by name ("…-free", "…:free"; seen with Beatapi): those cost nothing.
-    if (priceIn === null && (free || namedFree.test(id))) {
+    if ((priceIn === null && (free || namedFree.test(id))) || saysFree(raw)) {
       priceIn = 0;
       priceOut = 0;
     }
@@ -142,6 +163,7 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
       vision: Array.isArray(inputs) ? inputs.includes("image") : null,
       ...(Array.isArray(inputs) && inputs.includes("audio") ? { audio: true } : {}),
       ...(freeTier ? { freeTier: true } : {}),
+      ...(listedState(raw) ? { available: listedState(raw) } : {}),
     });
   }
   return models.sort((a, b) => a.name.localeCompare(b.name));

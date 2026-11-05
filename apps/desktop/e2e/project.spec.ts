@@ -36,10 +36,20 @@ test.afterEach(async () => {
   app = undefined;
   fake = undefined;
   rmSync(userData, { recursive: true, force: true });
-  rmSync(repo, { recursive: true, force: true });
+  // A process the run started lets go of the folder a moment after it is stopped (Windows).
+  rmSync(repo, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 });
 
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
+
+/** How many programs on this computer have this text in their command line (Windows and elsewhere). */
+function runningCopies(text: string): number {
+  const out =
+    process.platform === "win32"
+      ? execFileSync("powershell", ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | ForEach-Object { $_.CommandLine }"], { encoding: "utf8" })
+      : execFileSync("ps", ["-eo", "args"], { encoding: "utf8" });
+  return out.split(/\r?\n/).filter((line) => line.includes(text) && !line.includes("Get-CimInstance")).length;
+}
 
 async function launch(script: FakeTurn[], sees = false): Promise<Page> {
   const queue = [...script];
@@ -299,6 +309,32 @@ test("a stopped project goes on with Continue, and the timeline shows the answer
 });
 
 // Seen live: project folders renamed, and every project asked to turn git on again.
+// Asked for: what runs in the background is seen and can be stopped (seen live: two servers on one port).
+test("shows what runs in the background beside the browser, and stops it", async () => {
+  const server = 'node -e "setInterval(() => {}, 1000)"';
+  const page = await launch([call("start_background", { command: server }), { text: "Сервер запущен." }]);
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await page.getByRole("button", { name: "+ Проект" }).click();
+  await page.getByRole("dialog", { name: "Какой это проект?" }).getByRole("button", { name: "Продолжить" }).click();
+  await page.getByRole("button", { name: "Выбери модель" }).click();
+  await page.getByRole("option", { name: /Coder/ }).click();
+  await page.getByPlaceholder("Вопрос или задача по проекту").fill("Запусти сайт");
+  await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
+  await expect(page.locator(".timeline")).toContainText("Сервер запущен.", { timeout: 30_000 });
+  const button = page.getByRole("button", { name: "Процессы · 1" });
+  await expect(button).toBeVisible({ timeout: 10_000 });
+  await button.click();
+  const panel = page.getByRole("dialog", { name: "Запущено в фоне" });
+  await expect(panel).toContainText("агент проекта");
+  await expect(panel.locator(".processes-command")).toHaveText(server);
+  await panel.getByRole("button", { name: "Остановить" }).click();
+  await expect(panel).toContainText("Ничего не запущено.", { timeout: 10_000 });
+  // Stopped for real, the program it started too (seen: the shell went and its node stayed, holding the port).
+  await expect.poll(() => runningCopies("setInterval(() => {}, 1000)"), { timeout: 10_000 }).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: /^Процессы/ })).toHaveCount(0);
+});
+
 test("a project whose folder is gone asks where it is now, and goes on there", async () => {
   const page = await launch([]);
   await page.getByRole("button", { name: "Проекты", exact: true }).click();

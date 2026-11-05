@@ -13,6 +13,7 @@ import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
 import { deferTools } from "./deferred";
+import { learnFromAnswer } from "../providers/availability";
 import { thinkingOptions } from "../chats/thinking";
 import { Workspace } from "./workspace";
 
@@ -274,6 +275,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   }
 
   if (i.signal.aborted) return { kind: "stopped" };
+  // What the answer teaches about the model, as a chat's does: busy, gone, no tools (the picker shows it).
+  learnFromAnswer(i.conn, i.model, silence.signal.aborted ? { code: "timeout" } : error);
   if (silence.signal.aborted) return { kind: "error", error: { code: "timeout" } };
   if (error) return { kind: "error", error };
   const done = finished as { summary: string; commitMessage: string } | null;

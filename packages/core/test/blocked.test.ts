@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BlockedSites, connectionFailed, KNOWN_BLOCKED, withBlockedProxy } from "../src/internet/blocked";
+import { BlockedSites, connectionFailed, KNOWN_BLOCKED, proxyHint, withBlockedProxy } from "../src/internet/blocked";
 import type { WebAccess } from "../src/internet/web";
 import { createTestEnv, type TestEnv } from "./env";
 
@@ -45,6 +45,21 @@ describe("sites through the proxy", () => {
     await expect(web.open("https://gone.example/")).rejects.toThrow(/404/);
     expect(sites.has("gone.example")).toBe(false);
     expect(direct).toEqual(["https://ya.ru/", "https://closed.example/a", "https://gone.example/"]);
+  });
+
+  // Seen live: an API opened in the agent's browser through the proxy, not from commands nor in the user's own browser,
+  // and the agent spent 18 commands on the network. The agent is told which sites go through the proxy, and only then.
+  it("tells the agent which sites go through the proxy and that commands and the user's browser do not", () => {
+    const sites = new BlockedSites(env.db);
+    sites.set(["open-meteo.com", "instagram.com"]);
+    const base: WebAccess = { search: async () => [], open: async (url) => page(url, "direct") };
+    let proxy: string | null = "http://127.0.0.1:8080";
+    const web = withBlockedProxy(base, { proxy: () => proxy, sites, openVia: async (url) => page(url, "proxy") });
+    const hint = proxyHint(web);
+    expect(hint).toContain("open-meteo.com");
+    expect(hint).toMatch(/commands you run.*go directly/);
+    proxy = null;
+    expect(proxyHint(web)).toBe("");
   });
 
   it("goes directly when no proxy is set", async () => {

@@ -82,7 +82,9 @@ export function visualTools(d: VisualDeps, limit: LookLimit = { looks: MAX_LOOKS
 
   const tools: ToolSet = {
     start_background: tool({
-      description: "Start a long-running command in the project folder, such as a dev server. Returns its number and first output.",
+      description:
+        "Start a long-running command in the project folder, such as a dev server. Returns its number and first output. What you " +
+        "started stays running between the user's messages; the same command already running is not started again.",
       inputSchema: z.object({ command: z.string().min(1).max(1000) }),
       execute: ({ command }, o: Options) =>
         run(o.toolCallId, "start_background", { command }, async () => {
@@ -90,9 +92,15 @@ export function visualTools(d: VisualDeps, limit: LookLimit = { looks: MAX_LOOKS
           if (verdict.action === "ask" && !(await d.hooks.askApproval(command, verdict.reason, o.abortSignal))) {
             throw new Error("The user denied this command.");
           }
+          const already = d.kit.background.runningAs(d.taskId, command);
+          if (already) return `Not started: this command is already running as process ${already.id}. Use it (read_background ${already.id}), or stop it first with stop_background.
+${d.kit.background.read(d.taskId, already.id)}`;
+          // What else of this agent still runs (seen live: a second server on the port of the first, under another command).
+          const others = d.kit.background.running().filter((r) => r.key === d.taskId);
           const p = d.kit.background.start(d.taskId, command, d.worktree);
           await sleep(3000, o.abortSignal);
-          return `Started process ${p.id} (pid ${p.child.pid}).\n${d.kit.background.read(d.taskId, p.id)}`;
+          const also = others.length ? `\nAlso running from before: ${others.map((r) => `process ${r.id}: ${r.command}`).join("; ")}. Stop one that holds the same port.` : "";
+          return `Started process ${p.id} (pid ${p.child.pid}).${also}\n${d.kit.background.read(d.taskId, p.id)}`;
         }),
     }),
     read_background: tool({

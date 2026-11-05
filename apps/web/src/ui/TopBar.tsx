@@ -5,6 +5,7 @@ import { WorkshopBar } from "./projects/WorkshopBar";
 import { BrowserPane, useBrowserState } from "./BrowserPane";
 import { useEffect, useState } from "react";
 import { noticeLookNow } from "./NoticeSoundSetting";
+import { ProcessesButton } from "./ProcessesButton";
 
 export function TopBar() {
   const { t, view, mode, navigate, chats, projects, tasks } = useApp();
@@ -35,6 +36,7 @@ export function TopBar() {
         )}
       </div>
       {view.kind === "project" && <WorkshopBar projectId={view.projectId} />}
+      <ProcessesButton />
       <BrowserButton />
     </header>
   );

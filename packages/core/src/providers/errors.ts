@@ -48,6 +48,12 @@ export function detailFromBody(body: unknown): string | undefined {
   return undefined;
 }
 
+/** The model cannot call tools (seen with Groq: "`tool calling` is not supported with this model"). */
+const NO_TOOLS = /tool[`'" _-]*(calling|use|choice)?[`'"]* (is |are )?not supported|does ?n[o']t support (tools|tool[ _]?(calling|use)|function[ _]?calling)|function[ _]?calling is not (enabled|supported|available)|tools? (are|is) not (supported|available) (for|with|by) this model/i;
+
+/** The request is larger than the model or its tier takes (seen with Groq: "Request too large … tokens per minute (TPM)"). */
+const TOO_LARGE = /request too large|tokens per minute|\bTPM\b|maximum context length|context[ _]length[ _]exceeded|context window|prompt is too long|too many (input )?tokens|input is too long/i;
+
 /** A provider's words for "busy for a moment", sent as an error in the stream rather than as a status. */
 const BUSY = /temporarily (busy|unavailable|overloaded)|overloaded|server is busy|try again (later|in a few)|retry in a few/i;
 
@@ -63,7 +69,20 @@ export function describeError(err: unknown): ProviderError {
     const detail = detailFromBody(err.data ?? err.responseBody) ?? err.message;
     // A 200 whose body could not be read as an answer: the provider speaks another dialect for this model.
     if (err.statusCode < 300) return withDetail("bad_response", detail);
-    return withDetail(REGION.test(detail) ? "region" : NO_FREE_TIER.test(detail) ? "no_free_tier" : BUSY.test(detail) ? "overloaded" : codeForStatus(err.statusCode), detail);
+    return withDetail(
+      REGION.test(detail)
+        ? "region"
+        : NO_FREE_TIER.test(detail)
+          ? "no_free_tier"
+          : NO_TOOLS.test(detail)
+            ? "no_tools"
+            : TOO_LARGE.test(detail)
+              ? "too_large"
+              : BUSY.test(detail)
+                ? "overloaded"
+                : codeForStatus(err.statusCode),
+      detail,
+    );
   }
   if (err instanceof Error && UNREADABLE.test(err.message)) return withDetail("bad_response", err.message);
   if (err instanceof Error && BUSY.test(err.message)) return withDetail("overloaded", err.message);

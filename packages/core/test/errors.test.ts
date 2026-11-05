@@ -13,6 +13,14 @@ describe("describeError", () => {
   });
 
   // Seen live: a reseller's answer for a model with tools could not be read, and the user saw only "provider error".
+  // Seen live (Groq): a small model refused the chat's tools, and a free tier's tokens per minute were less than one request.
+  it("tells a model that cannot use tools, and a request larger than the model or its free tier takes", () => {
+    expect(describeError(failure(400, "`tool calling` is not supported with this model")).code).toBe("no_tools");
+    expect(describeError(failure(400, "This model does not support function calling")).code).toBe("no_tools");
+    expect(describeError(failure(413, "Request too large for model `openai/gpt-oss-safeguard-20b` in organization on tokens per minute (TPM): Limit 8000, Requested 9500")).code).toBe("too_large");
+    expect(describeError(failure(400, "This model's maximum context length is 8192 tokens")).code).toBe("too_large");
+  });
+
   it("tells an answer that came but could not be read", () => {
     expect(describeError(failure(200, "Failed to process successful response")).code).toBe("bad_response");
     expect(describeError(new Error("Type validation failed: Value: {}")).code).toBe("bad_response");

@@ -4,6 +4,8 @@ import { killTree, spawnShell } from "./commands";
 interface Proc {
   id: number;
   command: string;
+  cwd: string;
+  startedAt: number;
   child: ChildProcessWithoutNullStreams;
   output: string;
   exitCode: number | null | undefined;
@@ -26,7 +28,7 @@ export class Background {
     const running = [...entry.procs.values()].filter((p) => p.exitCode === undefined);
     if (running.length >= MAX_PER_TASK) throw new Error(`At most ${MAX_PER_TASK} background processes; stop one first.`);
     const child = spawnShell(command, cwd);
-    const proc: Proc = { id: entry.next++, command, child, output: "", exitCode: undefined };
+    const proc: Proc = { id: entry.next++, command, cwd, startedAt: Date.now(), child, output: "", exitCode: undefined };
     const append = (chunk: Buffer) => {
       proc.output += chunk.toString("utf8");
       if (proc.output.length > KEEP * 2) proc.output = proc.output.slice(-KEEP);
@@ -40,6 +42,19 @@ export class Background {
     });
     entry.procs.set(proc.id, proc);
     return proc;
+  }
+
+  /** The same command still running for this task (seen live: a second server on the port of the first). */
+  runningAs(taskId: string, command: string): Proc | undefined {
+    const same = (c: string) => c.trim().replace(/\s+/g, " ");
+    return [...(this.tasks.get(taskId)?.procs.values() ?? [])].find((p) => p.exitCode === undefined && same(p.command) === same(command));
+  }
+
+  /** Everything running now, of every task (asked for: to see what runs and stop what is not needed). */
+  running(): { key: string; id: number; command: string; cwd: string; startedAt: number; pid: number | null }[] {
+    return [...this.tasks].flatMap(([key, entry]) =>
+      [...entry.procs.values()].filter((p) => p.exitCode === undefined).map((p) => ({ key, id: p.id, command: p.command, cwd: p.cwd, startedAt: p.startedAt, pid: p.child.pid ?? null })),
+    );
   }
 
   get(taskId: string, id: number): Proc | undefined {

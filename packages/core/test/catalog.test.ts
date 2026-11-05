@@ -23,6 +23,27 @@ describe("normalizeModels", () => {
     expect([free!.priceIn, free!.priceOut]).toEqual([0, 0]);
   });
 
+  // Asked for: BlazeAPI's free models were shown as paid; its list says is_free, tags "free", prices per million and the
+  // model's state, as many lists do in their own words.
+  it("knows free models and their state by the marks lists use, as BlazeAPI's does", () => {
+    const blaze = { object: "model", owned_by: "blazeapi-premium", type: "chat", context_window: 128000, tags: "free", is_free: true, price_in_per_m: 0, price_out_per_m: 0 };
+    const models = normalizeModels("custom", [
+      { ...blaze, id: "free/deepseek-v3.2", status: "degraded" },
+      { ...blaze, id: "free/kimi-k3", status: "ok" },
+      { ...blaze, id: "free/glm-old", available_for_account: false },
+      { id: "glm-5.3", object: "model", is_free: false, price_in_per_m: 0.5, price_out_per_m: 2 },
+      { id: "free/qwen3-coder", object: "model" },
+      { id: "mimo-flash", object: "model", tags: ["fast", "free"] },
+    ]);
+    const of = (id: string) => models.find((m) => m.id === id)!;
+    expect(of("free/deepseek-v3.2")).toMatchObject({ priceIn: 0, priceOut: 0, contextLength: 128000, available: "busy" });
+    expect(of("free/kimi-k3").available).toBeUndefined();
+    expect(of("free/glm-old")).toMatchObject({ priceIn: 0, available: "gone" });
+    expect(of("glm-5.3")).toMatchObject({ priceIn: 0.5, priceOut: 2 });
+    expect(of("free/qwen3-coder")).toMatchObject({ priceIn: 0, priceOut: 0 });
+    expect(of("mimo-flash")).toMatchObject({ priceIn: 0, priceOut: 0 });
+  });
+
   it("reads OpenRouter prices, context and tool support", () => {
     const [model] = normalizeModels("openrouter", [
       {

@@ -54,9 +54,35 @@ export function availabilityOf(conn: Connection, model: string): Availability | 
 
 /** What a chat's error says about the model itself; null when it says nothing (a wrong key, no money, a lost network). */
 export function availabilityFromError(code: ProviderErrorCode): Availability | null {
-  if (code === "model_not_found" || code === "forbidden") return "gone";
+  // Too large for the model or its free tier: Drimvox's requests always are, so it is as good as gone for a while.
+  if (code === "model_not_found" || code === "forbidden" || code === "too_large") return "gone";
   if (code === "rate_limited" || code === "overloaded" || code === "timeout") return "busy";
   return null;
+}
+
+/**
+ * Providers whose answers teach what a model can do: every one on the internet, free ones included (seen: LLM7's busy
+ * and refusing models were never marked, as only providers Drimvox asks itself learned). Not a command-line agent, not a
+ * model on this computer.
+ */
+export function canLearn(conn: Connection): boolean {
+  return !isCli(conn.preset) && conn.preset !== "ollama" && conn.preset !== "lmstudio" && !conn.chain;
+}
+
+/** A model that refused tools: remembered, and the next request sends it none (seen with Groq's allam-2-7b). */
+export function noteNoTools(conn: Connection, model: string): void {
+  noteAvailability(conn, `${NO_TOOLS_KEY}${model}`, "gone");
+}
+
+/** Remembered under this mark, next to the model's own state. */
+const NO_TOOLS_KEY = "no-tools|";
+
+/** What a chat's or an agent's answer teaches about its model. */
+export function learnFromAnswer(conn: Connection, model: string, error: { code: ProviderErrorCode } | null): void {
+  if (!canLearn(conn)) return;
+  if (error?.code === "no_tools") return noteNoTools(conn, model);
+  const learned = error ? availabilityFromError(error.code) : "ok";
+  if (learned) noteAvailability(conn, model, learned);
 }
 
 /**
@@ -68,14 +94,15 @@ export function canCheck(conn: Connection): boolean {
   return !isCli(conn.preset) && !NATIVE.includes(conn.preset) && presets[conn.preset].billing !== "free";
 }
 
-/** A model worth asking: free, or on Google's free tier. */
-const isFreeModel = (conn: Connection, m: ModelInfo) => (conn.preset === "google" ? m.freeTier === true : m.priceIn === 0 && m.priceOut === 0);
+/** A model worth asking: free, or free up to a limit (Google's free tier, LLM7's Turbo models). */
+const isFreeModel = (conn: Connection, m: ModelInfo) => (conn.preset === "google" ? m.freeTier === true : (m.priceIn === 0 && m.priceOut === 0) || m.freeTier === true);
 
 /** The models with what Drimvox knows of them. */
 export function withAvailability(conn: Connection, models: ModelInfo[]): ModelInfo[] {
   return models.map((m) => {
-    const available = availabilityOf(conn, m.id);
-    return available ? { ...m, available } : m;
+    const available = availabilityOf(conn, m.id) ?? m.available;
+    const noTools = availabilityOf(conn, `${NO_TOOLS_KEY}${m.id}`) !== undefined;
+    return { ...m, ...(available ? { available } : {}), ...(noTools ? { tools: false } : {}) };
   });
 }
 

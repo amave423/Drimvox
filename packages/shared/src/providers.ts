@@ -963,6 +963,10 @@ export const providerErrorCodes = [
   "forbidden",
   /** The model is overloaded right now. */
   "overloaded",
+  /** The model cannot call tools; Drimvox remembers and sends it none (seen with Groq's allam). */
+  "no_tools",
+  /** The request is larger than the model's context or its free tier's tokens per minute (seen with Groq). */
+  "too_large",
   /** The provider does not serve the user's country. */
   "region",
   "unknown",

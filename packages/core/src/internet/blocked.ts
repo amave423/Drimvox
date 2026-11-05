@@ -89,5 +89,24 @@ export function withBlockedProxy(base: WebAccess, o: { proxy(): string | null; s
         return page;
       }
     },
+    proxied: () => (o.proxy() ? o.sites.list() : []),
   };
+}
+
+/**
+ * What the agent must know when Drimvox goes through the user's proxy for some sites (seen live: a weather API opened in
+ * the agent's browser and not from commands nor in the user's own browser; the agent spent 18 commands on the network).
+ * Empty when no proxy is set.
+ */
+export function proxyHint(web: WebAccess): string {
+  const sites = web.proxied?.() ?? [];
+  if (!sites.length) return "";
+  const shown = sites.slice(0, 40).join(", ");
+  return (
+    `Drimvox's browser and open_page reach these sites through the user's proxy: ${shown}${sites.length > 40 ? ", …" : ""}. ` +
+    "The commands you run and the user's own browser go directly, without it: a site or an API that opens in the browser " +
+    "may not answer from a command or for the user. When something works in the browser and not elsewhere, do not debug " +
+    "the network: tell the user it may need their VPN or proxy, and prefer a service that answers without one for what " +
+    "the user's own site needs."
+  );
 }

@@ -27,6 +27,7 @@ import { polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
 import { projectMap } from "../agent/repo-map";
+import { proxyHint } from "../internet/blocked";
 import { checksFailedMessage, checksReport, projectChecks, runChecks } from "./checks";
 
 /** Steps one answer of the run takes before the next answer goes on with the same context. */
@@ -461,6 +462,8 @@ export class WorkRun {
       system: [
         nowLine(),
         folderHint(this.folder),
+        // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
+        proxyHint(this.d.web),
         this.chatMode ? existingRules(!!vision && !!this.d.visualKit.screenshot, gitLine) : projectRules(plan, !!vision && !!this.d.visualKit.screenshot, gitLine),
         VISUAL_HINT,
         WEB_HINT,

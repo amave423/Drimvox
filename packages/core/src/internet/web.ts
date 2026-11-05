@@ -31,6 +31,8 @@ export interface WebAccess {
   show?(url: string, reason: string, signal?: AbortSignal): Promise<Page>;
   /** The agent's own browser, which the user sees in the panel: where there is one, it replaces render and show. */
   browser?: Browser;
+  /** The sites Drimvox opens through the user's proxy now; none when no proxy is set. */
+  proxied?(): string[];
 }
 
 /** Shows a page to the user (WebAccess.show): what the desktop app gives the core. */

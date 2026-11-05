@@ -62,6 +62,28 @@ describe("free models that answer", () => {
     expect(asked().length).toBe(before);
   });
 
+  // Seen live (Groq, LLM7): a model refused the chat's tools; busy models were not marked for long.
+  it("learns from a chat that a model is busy, and that it cannot use tools", async () => {
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [{ id: "busy-one" }, { id: "plain-one", supported_parameters: ["tools"] }],
+      respond: (body) =>
+        body.model === "busy-one"
+          ? { fail: { status: 503, message: "This model is temporarily busy" } }
+          : body.tools
+            ? { fail: { status: 400, message: "`tool calling` is not supported with this model" } }
+            : { text: "hi" },
+    });
+    const provider = (await (await env.call("POST", "/api/providers", { preset: "custom", name: "Free", baseUrl: fake.baseUrl, apiKey: KEY })).json()) as { id: string };
+    for (const model of ["busy-one", "plain-one"]) {
+      const chat = await (await env.call("POST", "/api/chats", { providerId: provider.id, model })).json();
+      await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Привет", web: "free" }));
+    }
+    const all = (await (await env.call("GET", `/api/providers/${provider.id}/models`)).json()) as any[];
+    expect(all.find((m) => m.id === "busy-one").available).toBe("busy");
+    expect(all.find((m) => m.id === "plain-one").tools).toBe(false);
+  });
+
   it("learns from a chat that a model is gone", async () => {
     const provider = await setup();
     const chat = await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "gone:free" })).json();

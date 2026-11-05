@@ -5,7 +5,7 @@ import { notesBlock } from "../agent/notes";
 import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
 import { FOLDER_STEPS, folderHint } from "./folder";
 import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory } from "../agent/memory";
-import { availabilityFromError, canCheck, noteAvailability } from "../providers/availability";
+import { learnFromAnswer } from "../providers/availability";
 import type { ModelInfo, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { ThinkingLevel, WebMode } from "@drimvox/shared";
 import { isStepCount, streamText, type ModelMessage, type ToolSet } from "ai";
@@ -14,6 +14,7 @@ import { isCli } from "../cli/kinds";
 import { FAIR_USE_HINT, WEB_HINT, webTools } from "../internet/tools";
 import { answeredOnly, repairToolJson } from "../agent/repair";
 import { compactHistory } from "../work/compact";
+import { proxyHint } from "../internet/blocked";
 import { deferTools } from "../agent/deferred";
 import type { WebAccess } from "../internet/web";
 import { findModel } from "../providers/catalog";
@@ -175,6 +176,8 @@ export async function reply(i: ReplyInput): Promise<void> {
           Object.keys(tools).length && i.web !== "free" ? FAIR_USE_HINT : "",
           i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
           i.folder ? folderHint(i.folder) : "",
+          // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
+          i.folder && i.web === "free" ? proxyHint(i.webAccess) : "",
           i.folder ? notesBlock(i.folder) : "",
           i.work?.system ?? "",
         ]
@@ -259,8 +262,7 @@ export async function reply(i: ReplyInput): Promise<void> {
   // finished). The answer stays a done one, so "go on" brings it back to the model, with a note under it.
   const cutOff = !stopped && !error && finishReason === "length" && text !== "";
   // What this answer says about the model: the picker hides free models that are gone.
-  const learned = stopped ? null : error ? availabilityFromError(error.code) : "ok";
-  if (learned && canCheck(i.conn)) noteAvailability(i.conn, i.model, learned);
+  if (!stopped) learnFromAnswer(i.conn, i.model, error);
   // The summaries written for the memory are paid for too.
   if (usage && (extraUsage.inputTokens || extraUsage.outputTokens)) {
     usage = { ...usage, inputTokens: (usage.inputTokens ?? 0) + extraUsage.inputTokens, outputTokens: (usage.outputTokens ?? 0) + extraUsage.outputTokens };

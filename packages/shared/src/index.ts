@@ -17,6 +17,7 @@ export * from "./local-speech";
 export * from "./page";
 export * from "./backlog";
 export * from "./project-work";
+export * from "./processes";
 export * from "./github";
 export * from "./speech-text";
 export * from "./project-git";

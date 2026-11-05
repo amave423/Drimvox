@@ -748,6 +748,33 @@ describe("a ready project", () => {
     expect(work.report).toContain("ok: 3 tests");
   });
 
+  // Asked for: what runs in the background is shown and can be stopped. Seen live: two servers on one port, as the agent
+  // started its server again not knowing it still ran.
+  it("lists the processes running in the background, stops one, and does not start the same command twice", async () => {
+    const server = 'node -e "setInterval(() => {}, 1000)"';
+    const s = await setup({
+      coder: [
+        call("start_background", { command: server }),
+        call("start_background", { command: server }),
+        call("start_background", { command: 'node -e "setTimeout(() => {}, 100)"' }),
+        { text: "Сервер запущен." },
+      ],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Запусти сайт", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done");
+    expect(JSON.stringify(requestsOf("coder")[2]!.body.messages)).toMatch(/already running as process 1/);
+    // Another command of the same agent hears what still runs from before.
+    expect(JSON.stringify(requestsOf("coder")[3]!.body.messages)).toMatch(/Also running from before: process 1/);
+    const listed = (await (await env.call("GET", "/api/processes")).json()) as any[];
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ id: 1, command: server, owner: { kind: "project", projectId: s.project.id } });
+    expect(listed[0].owner.name).toBeTruthy();
+    expect((await env.call("POST", "/api/processes/stop", { key: listed[0].key, id: 1 })).status).toBe(200);
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(await (await env.call("GET", "/api/processes")).json()).toEqual([]);
+  });
+
   // As Codex's tool_search: rarely needed tools are not sent with every step; the model loads them when it needs them.
   it("sends the rare tools only after the model asks for them", async () => {
     const s = await setup({

@@ -6,6 +6,7 @@ import { BacklogRepo } from "./backlog/repo";
 import { ProjectWorkRepo } from "./work/repo";
 import { ProjectWork } from "./work/service";
 import { workRoutes } from "./routes/work";
+import { processRoutes } from "./routes/processes";
 import { resolveVision } from "./visual/look";
 import { findModel, listModels } from "./providers/catalog";
 import { zValidator } from "@hono/zod-validator";
@@ -367,6 +368,22 @@ export function createCore(o: AppOptions) {
     .route("/chains", chainRoutes(chains, freeWatch))
     .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo, projectGit))
     .route("/tasks", taskRoutes(tasks, runner, shots, backlogService))
+    .route(
+      "/processes",
+      processRoutes(visualKit.background, {
+        projectOfChat: (chatId) => {
+          const row = workRepo.byChat(chatId);
+          const project = row ? projects.get(row.projectId) : null;
+          return project ? { id: project.id, name: project.name } : null;
+        },
+        project: (id) => projects.get(id),
+        chat: (id) => chats.get(id),
+        task: (id) => {
+          const row = tasks.row(id);
+          return row ? { title: row.title } : null;
+        },
+      }),
+    )
     .route("/github", githubRoutes(github, projects))
     // Every project's work at once: the window's notifications (docs/specs/project-work.md).
     .get("/work", (c) => c.json(projectWork.list()));
