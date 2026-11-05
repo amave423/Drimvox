@@ -20,6 +20,13 @@ describe("how much a model thinks, as each provider is told", () => {
     expect(thinkingOptions("google", "off")).toEqual({ google: { thinkingConfig: { thinkingBudget: 0 } } });
   });
 
+  // Asked for: local models always thought their most; Ollama passes the effort to the model's template.
+  it("tells Ollama and LM Studio the effort, and turns thinking off with none", () => {
+    expect(thinkingOptions("ollama", "off")).toEqual({ ollama: { reasoningEffort: "none" } });
+    expect(thinkingOptions("ollama", "medium")).toEqual({ ollama: { reasoningEffort: "medium" } });
+    expect(thinkingOptions("lmstudio", "low")).toEqual({ lmstudio: { reasoningEffort: "low" } });
+  });
+
   it("leaves the provider's own choice on auto", () => {
     expect(thinkingOptions("routerai", "auto")).toBeUndefined();
   });
@@ -56,5 +63,31 @@ describe("thinking in a chat", () => {
     const c = await chat([{ reasoning: "Думаю, думаю, думаю…" }]);
     const events = await readEvents(await env.call("POST", `/api/chats/${c.id}/messages`, { content: "Что это за игра?" }));
     expect(events.at(-1).message).toMatchObject({ status: "error", error: { code: "no_answer" } });
+  });
+});
+
+describe("thinking on a local model", () => {
+  // Seen live: a Qwen 3.8 template took "low" and "medium" and refused "high"; the answer must still come.
+  it("sends the level to Ollama, and asks again without it when the model refuses that level", async () => {
+    const sent: any[] = [];
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [{ id: "qwen" }],
+      chunks: [{ text: "391" }],
+      handle: (method, path, body) => {
+        if (method !== "POST" || !path.endsWith("/chat/completions")) return undefined;
+        sent.push(body);
+        if (body?.reasoning_effort === "high") return { status: 500, json: { error: { message: "Jinja Exception: Unexpected reasoning effort high. Supported types are xhigh (default), medium, and low." } } };
+        return undefined;
+      },
+    });
+    env.setPresetUrl("ollama", `${fake.baseUrl}`);
+    const provider = await (await env.call("POST", "/api/providers", { preset: "ollama", apiKey: KEY })).json();
+    const c = await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "qwen" })).json();
+    const events = await readEvents(await env.call("POST", `/api/chats/${c.id}/messages`, { content: "17*23?", thinking: "high" }));
+    expect(events.at(-1).message).toMatchObject({ status: "done", content: "391" });
+    expect(sent.map((b) => b.reasoning_effort ?? null)).toEqual(["high", null]);
+    await readEvents(await env.call("POST", `/api/chats/${c.id}/messages`, { content: "Ещё", thinking: "off" }));
+    expect(sent.at(-1).reasoning_effort).toBe("none");
   });
 });

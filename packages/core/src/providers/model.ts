@@ -23,11 +23,28 @@ export function languageModel(conn: Connection, modelId: string): LanguageModel 
     baseURL: conn.baseUrl,
     apiKey,
     includeUsage: true,
-    fetch,
+    fetch: conn.preset === "ollama" || conn.preset === "lmstudio" ? withoutEffort(fetch ?? globalThis.fetch) : fetch,
     headers: conn.preset === "openrouter" ? { "X-Title": "Drimvox" } : undefined,
     metadataExtractor: billed,
   });
   return provider.chatModel(modelId);
+}
+
+/**
+ * A local model's request asked again without its thinking level when the model refuses that level. Seen live: a
+ * Qwen 3.8 template took "none", "low" and "medium" and failed on "high" ("Supported types are xhigh, medium, and low");
+ * a model that does not think at all refuses any level. Without one, the model thinks its own way.
+ */
+export function withoutEffort(fetchFn: typeof fetch): typeof fetch {
+  return async (input, init) => {
+    const res = await fetchFn(input, init);
+    if (res.ok || typeof init?.body !== "string" || !init.body.includes('"reasoning_effort"')) return res;
+    const said = await res.clone().text().catch(() => "");
+    if (!/reasoning|think/i.test(said)) return res;
+    const body = JSON.parse(init.body) as Record<string, unknown>;
+    delete body.reasoning_effort;
+    return fetchFn(input, { ...init, body: JSON.stringify(body) });
+  };
 }
 
 /** `usage.cost`: what the request cost in the account's currency, as OpenRouter and RouterAI send it. */

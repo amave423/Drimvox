@@ -247,8 +247,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   const searchProvider = providerSearch && preset ? presets[preset].name : null;
   const asked = web === "provider" && !providerSearch ? "free" : web;
   const webMode = noTools && asked === "free" ? "off" : asked;
-  // Command-line agents and local models think their own way: no switch for them.
-  const thinks = !!preset && !["claude-code", "codex", "gemini-cli", "antigravity", "ollama", "lmstudio"].includes(preset);
+  // Command-line agents think their own way: no switch for them. Local models have one (asked for).
+  const thinks = !!preset && !["claude-code", "codex", "gemini-cli", "antigravity"].includes(preset);
   // What differs from the usual shows on the options button itself: no internet, another thinking level, a folder.
   const changedOptions = [
     ...(webMode === "off" ? [t("web.off")] : webMode === "provider" && searchProvider ? [t("web.provider", { name: searchProvider })] : []),

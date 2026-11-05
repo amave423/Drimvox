@@ -28,8 +28,13 @@ export function thinkingOptions(preset: PresetId, level: ThinkingLevel): Provide
       return level === "off" ? undefined : { xai: { reasoningEffort: level === "high" ? "high" : "low" } };
     case "google":
       return { google: { thinkingConfig: { thinkingBudget: level === "off" ? 0 : BUDGET[level] } } };
+    case "ollama":
+    case "lmstudio":
+      // Local models (asked for: they always thought their most). Ollama hands the effort to the model's own template,
+      // "none" turns thinking off; a template that knows no such level is asked again without one (`withoutEffort`).
+      return { [preset]: { reasoningEffort: level === "off" ? "none" : level } };
     default:
-      // Local models and command-line agents keep their own way of thinking.
+      // Command-line agents keep their own way of thinking.
       return undefined;
   }
 }
