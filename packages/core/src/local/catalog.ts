@@ -54,9 +54,20 @@ export function variantsOf(repo: string, files: HfFile[], hw: LocalHardware, ins
   return variants;
 }
 
+/**
+ * The name Ollama takes for a model: no part of it longer than 80 characters. Seen live: a repository named with 85
+ * ("Qwen3.8-27B-TURBO-Fable-Cold-Fusion-…-MTP-GGUF") downloaded whole, and Ollama refused to make the model ("invalid
+ * model name"). The repository's name is cut to fit; the download itself still asks Hugging Face by the whole name.
+ */
+export function ollamaName(model: string): string {
+  const fit = (part: string) => (part.length > 80 ? part.slice(0, 80).replace(/[-_.]+$/, "") : part);
+  const [path, tag] = model.split(":") as [string, string | undefined];
+  return path.split("/").map(fit).join("/") + (tag ? `:${fit(tag)}` : "");
+}
+
 /** Ollama lists hf.co models in lower case and adds :latest to names without a tag. */
 export function sameModel(a: string, b: string): boolean {
-  const norm = (m: string) => (m.includes(":") ? m : `${m}:latest`).toLowerCase();
+  const norm = (m: string) => ollamaName(m.includes(":") ? m : `${m}:latest`).toLowerCase();
   return norm(a) === norm(b);
 }
 

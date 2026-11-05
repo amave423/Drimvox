@@ -50,6 +50,16 @@ describe("connecting providers", () => {
   });
 
   // Pollinations, LLM7, OVHcloud and Kilo answer without a key (a key only raises their limits).
+  // Asked for: more subscriptions than the CLIs — the vendors' coding plans, reached by their own key and address.
+  it("connects the coding plans by their key, on their own address, paid by the plan's fee", async () => {
+    for (const id of ["zai-coding", "kimi-coding", "qwen-coding"] as const) {
+      expect((await env.call("POST", "/api/providers", { preset: id })).status).toBe(400);
+      const made = await (await env.call("POST", "/api/providers", { preset: id, apiKey: KEY })).json();
+      expect(made).toMatchObject({ preset: id, baseUrl: presets[id].baseUrl, flat: true, hasKey: true });
+    }
+    expect(presets["zai-coding"].baseUrl).toBe("https://api.z.ai/api/coding/paas/v4");
+  });
+
   it("connects Pollinations, LLM7, OVHcloud and Kilo without a key", async () => {
     for (const id of ["pollinations", "llm7", "ovhcloud", "kilo"] as const) {
       expect(presets[id].keyRequired).toBe(false);

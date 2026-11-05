@@ -61,6 +61,11 @@ test("connects Claude Code without a key, names its models and chats through it"
   const subscriptions = page.locator(".sheet-body");
   await expect(page.getByRole("radiogroup", { name: "Подключить провайдера" }).getByRole("radio", { name: /Claude Code/ })).toHaveCount(0);
   await page.getByRole("tab", { name: /По подписке/ }).click();
+  // The vendors' coding plans are subscriptions too (asked for), connected by their own key.
+  await subscriptions.getByRole("radio", { name: /Kimi Code/ }).click();
+  await expect(page.getByLabel(/Ключ API/)).toBeVisible();
+  await expect(subscriptions.getByRole("radio", { name: /GLM Coding Plan/ })).toBeVisible();
+  await expect(subscriptions.getByRole("radio", { name: /Alibaba Coding Plan/ })).toBeVisible();
   await subscriptions.getByRole("radio", { name: /Claude Code/ }).click();
   await expect(page.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
   await expect(page.getByLabel(/Ключ API/)).toHaveCount(0);

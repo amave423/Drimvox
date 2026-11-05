@@ -113,7 +113,8 @@ export class ProviderRepo {
       created_at: now,
       updated_at: now,
       use_proxy: 0,
-      flat: 0,
+      // A coding subscription is paid by its fee, not by tokens.
+      flat: preset.plan ? 1 : 0,
     };
     this.db.sql
       .prepare(

@@ -7,6 +7,9 @@ export const presetIds = [
   "codex",
   "gemini-cli",
   "antigravity",
+  "zai-coding",
+  "kimi-coding",
+  "qwen-coding",
   "anthropic",
   "openai",
   "google",
@@ -99,6 +102,12 @@ export interface Preset {
    * terms): OpenRouter's free models (most of their hosts), NVIDIA's trial, Google AI Studio's free tier.
    */
   trainsOnFree?: true;
+  /**
+   * A coding subscription reached by its own key and address (GLM Coding Plan, Kimi Code, Alibaba Coding Plan): listed
+   * with the subscriptions, paid by a flat fee, worked by Drimvox's own agent with all its tools (asked for: more
+   * subscriptions than the CLIs).
+   */
+  plan?: true;
 }
 
 /** How much of a subscription's window is used, as its CLI reported it on the last run. */
@@ -184,6 +193,40 @@ export const presets: Record<PresetId, Preset> = {
     currency: "USD",
     // Google's own installers (antigravity.google/docs/getting-started, CLI tab).
     cli: { command: "agy", install: "curl -fsSL https://antigravity.google/cli/install.sh | bash", installWindows: "irm https://antigravity.google/cli/install.ps1 | iex" },
+  },
+  // The vendors' coding subscriptions take their own key on their own address, OpenAI-compatible (2026-11).
+  "zai-coding": {
+    id: "zai-coding",
+    name: "GLM Coding Plan (Z Code)",
+    baseUrl: "https://api.z.ai/api/coding/paas/v4",
+    keyRequired: true,
+    keyUrl: "https://z.ai/manage-apikey/apikey-list",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
+    plan: true,
+  },
+  "kimi-coding": {
+    id: "kimi-coding",
+    name: "Kimi Code",
+    baseUrl: "https://api.kimi.com/coding/v1",
+    keyRequired: true,
+    keyUrl: "https://www.kimi.com/code/console",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
+    plan: true,
+  },
+  "qwen-coding": {
+    id: "qwen-coding",
+    name: "Alibaba Coding Plan (Qwen)",
+    baseUrl: "https://coding-intl.dashscope.aliyuncs.com/v1",
+    keyRequired: true,
+    keyUrl: "https://modelstudio.console.alibabacloud.com/?tab=coding-plan",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
+    plan: true,
   },
   anthropic: {
     id: "anthropic",

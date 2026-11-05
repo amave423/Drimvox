@@ -1,3 +1,4 @@
+import { presets, type PresetId } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { ConnectForm } from "./ConnectForm";
@@ -18,8 +19,10 @@ export function ProvidersSheet() {
   // Models on this computer live in "Local models": Ollama and the picture engine are run from there (seen: Ollama in the
   // keys' list looked out of place, and opening the list woke it).
   const own = providers.filter((p) => p.preset !== "ollama" && p.preset !== "sdcpp" && p.preset !== "whispercpp");
-  const bySubscription = own.filter((p) => p.billing === "subscription");
-  const byKey = own.filter((p) => p.billing !== "subscription");
+  // Coding plans are subscriptions too, though reached by a key.
+  const subscribed = (p: (typeof own)[number]) => p.billing === "subscription" || !!presets[p.preset as PresetId]?.plan;
+  const bySubscription = own.filter(subscribed);
+  const byKey = own.filter((p) => !subscribed(p));
   // By key or by subscription, each on its own tab; the way to connect comes first (seen: with many providers it was
   // far down the page).
   const [tab, setTab] = useState<"key" | "subscription">("key");

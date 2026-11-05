@@ -5,6 +5,7 @@ import { request as httpsRequest } from "node:https";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { ollamaName } from "./catalog";
 import { downloadInPieces, hasPieces, SEGMENT_MIN, SEGMENTS } from "./segments";
 
 /** Where GGUF files come from. Hugging Face redirects to its CDN, which some networks cannot reach (seen from Russia). */
@@ -243,7 +244,7 @@ export async function downloadHf(d: HfDownload): Promise<void> {
   const res = await fetch(`${d.ollamaUrl}/api/create`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model: d.model, files: { [file.path]: digest }, stream: true }),
+    body: JSON.stringify({ model: ollamaName(d.model), files: { [file.path]: digest }, stream: true }),
     signal: d.signal,
   });
   if (!res.ok || !res.body) throw new HfDownloadError(`Ollama answered ${res.status}`);

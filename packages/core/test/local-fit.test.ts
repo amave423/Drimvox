@@ -2,7 +2,7 @@ import type { LocalHardware } from "@drimvox/shared";
 import { describe, expect, it } from "vitest";
 import { fitOf, GB, recommend } from "../src/local/fit";
 import { parseNvidiaSmi, parseWindowsVideo } from "../src/local/hardware";
-import { variantsOf } from "../src/local/catalog";
+import { ollamaName, sameModel, variantsOf } from "../src/local/catalog";
 
 const desktop: LocalHardware = { ramBytes: 32 * GB, gpu: { name: "RTX 3080", vramBytes: 10 * GB }, unified: false };
 const laptop: LocalHardware = { ramBytes: 8 * GB, gpu: null, unified: false };
@@ -109,5 +109,19 @@ describe("variantsOf", () => {
   it("marks what is already downloaded", () => {
     const variants = variantsOf("unsloth/Model-12B-GGUF", tree, desktop, ["hf.co/unsloth/Model-12B-GGUF:Q4_K_M"]);
     expect(variants.find((v) => v.quant === "Q4_K_M")?.installed).toBe(true);
+  });
+});
+
+// Seen live: a repository named with 85 characters downloaded whole, and Ollama refused the model ("invalid model name").
+describe("ollamaName", () => {
+  const long = "hf.co/DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF:IQ4_XS";
+
+  it("cuts a part longer than Ollama takes, and leaves the others alone", () => {
+    expect(ollamaName(long)).toBe("hf.co/DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP:IQ4_XS");
+    expect(ollamaName("hf.co/unsloth/Model-12B-GGUF:Q4_K_M")).toBe("hf.co/unsloth/Model-12B-GGUF:Q4_K_M");
+  });
+
+  it("knows the cut name in Ollama's list as the variant downloaded", () => {
+    expect(sameModel("hf.co/davidau/qwen3.8-27b-turbo-fable-cold-fusion-735-882-heretic-uncensored-neo-coder-max-mtp:IQ4_XS", long)).toBe(true);
   });
 });

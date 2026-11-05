@@ -15,12 +15,15 @@ interface Problem {
  * The cards in groups (asked for: who has free models, apart from who has none): every model free up to a limit, some
  * models free, paid only. Subscriptions stay one group of their own.
  */
+/** Paid by a subscription: a CLI on the user's account, or a coding plan reached by its own key. */
+const subscribed = (id: PresetId) => presets[id].billing === "subscription" || !!presets[id].plan;
+
 function groups(kind: "key" | "subscription"): { id: "all" | "some" | "paid" | "own" | "subscription"; ids: PresetId[] }[] {
   const shown = presetIds.filter(
     // Gemini CLI no longer serves personal Google accounts (Google, 2026-06-18): Antigravity CLI replaces it.
     // stable-diffusion.cpp is made by Drimvox itself when a picture model is downloaded.
     // Ollama is installed and run from "Local models".
-    (id) => id !== "gemini-cli" && id !== "sdcpp" && id !== "whispercpp" && id !== "ollama" && (presets[id].billing === "subscription") === (kind === "subscription"),
+    (id) => id !== "gemini-cli" && id !== "sdcpp" && id !== "whispercpp" && id !== "ollama" && subscribed(id) === (kind === "subscription"),
   );
   if (kind === "subscription") return [{ id: "subscription", ids: shown }];
   // A server of one's own (LM Studio on this computer, any address) is neither free nor paid by itself.

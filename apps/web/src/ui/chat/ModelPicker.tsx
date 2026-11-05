@@ -76,12 +76,15 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const onComputer = providers.filter(local);
   const bySubscription = providers.filter((p) => p.billing === "subscription");
   const [open, setOpen] = useState(false);
-  const [chosenProvider, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
+  // Nothing chosen yet: the first provider by key, then by subscription, then this computer's (seen: with Ollama connected
+  // the list opened on its local models).
+  const first = (byKey[0] ?? bySubscription[0] ?? providers[0])?.id;
+  const [chosenProvider, setProviderId] = useState(value?.providerId ?? first);
   // A provider that is not offered (no model that hears) gives way to the first that is.
   const providerId =
     providers.some((p) => p.id === chosenProvider) || chosenProvider === FAVORITES || (chainsTab && chosenProvider === CHAIN_PROVIDER_ID)
       ? chosenProvider
-      : providers[0]?.id;
+      : first;
   // Local models and programs on a subscription only talk: no tabs for pictures and video there (seen: empty tabs).
   const preset = providers.find((p) => p.id === providerId)?.preset;
   const talkOnly = preset === "ollama" || preset === "lmstudio" || providers.find((p) => p.id === providerId)?.billing === "subscription";
