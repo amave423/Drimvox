@@ -1,5 +1,5 @@
-import type { DiffFile, ProjectWorkView, WorkReport } from "@drimvox/shared";
-import { useCallback, useEffect, useState } from "react";
+import type { ProjectWorkView, WorkReport } from "@drimvox/shared";
+import { useEffect, useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
@@ -7,51 +7,6 @@ import { formatUsd } from "../../lib/format";
 import { activityLine } from "../chat/activityLine";
 import { Markdown } from "../chat/Markdown";
 import { hoursAndMinutes } from "./useProjectWork";
-import { DiffView } from "../tasks/DiffView";
-import { PlanDetails } from "./PlanDetails";
-
-/** The plan the work follows, read only: corrections go to the agent as messages. */
-export function PlanTab({ work }: { work: ProjectWorkView }) {
-  const { t } = useApp();
-  if (!work.plan) return <p className="muted">{t("projectWork.noPlan")}</p>;
-  return (
-    <section className="work-tab-body">
-      <PlanDetails plan={work.plan} />
-      <p className="muted">{t("projectWork.planChangeHint")}</p>
-    </section>
-  );
-}
-
-/** What the agent changed in the folder since the last commit; the user commits. */
-export function ChangesTab({ work }: { work: ProjectWorkView }) {
-  const { api, t } = useApp();
-  const [files, setFiles] = useState<DiffFile[] | null>(null);
-  const load = useCallback(async () => {
-    const next = await api.projects[":id"].work.changes
-      .$get({ param: { id: work.projectId } })
-      .then((r) => ok<DiffFile[]>(r))
-      .catch(() => null);
-    setFiles(next ?? []);
-  }, [api, work.projectId]);
-  useEffect(() => void load(), [load]);
-  // While the agent works the folder changes: the list follows it now and then.
-  const running = work.status === "running";
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => void load(), 5000);
-    return () => clearInterval(timer);
-  }, [running, load]);
-
-  if (!files) return <p className="muted">{t("projectWork.changesLoading")}</p>;
-  return (
-    <section className="work-tab-body">
-      <p className="muted">
-        {files.length ? t("projectWork.changesCount", { n: files.length }) : t("projectWork.changesNone")} {t("projectWork.changesHint")}
-      </p>
-      {files.length > 0 && <DiffView files={files} comments={[]} folded />}
-    </section>
-  );
-}
 
 /** The agent's report and the result Drimvox started: where to open it, stop and start it again. */
 export function RunTab({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
@@ -79,7 +34,9 @@ export function RunTab({ work, onChanged }: { work: ProjectWorkView; onChanged()
  */
 function PublishSiteCard({ projectId }: { projectId: string }) {
   const { api, t } = useApp();
-  const [state, setState] = useState<{ kind: "idle" | "busy" } | { kind: "done"; url: string } | { kind: "failed"; code: string; detail?: string }>({ kind: "idle" });
+  const [state, setState] = useState<{ kind: "idle" | "busy" } | { kind: "done"; url: string } | { kind: "failed"; code: string; detail?: string }>({
+    kind: "idle",
+  });
   async function publish() {
     setState({ kind: "busy" });
     const res = await api.github.projects[":id"].site.$post({ param: { id: projectId } }).catch(() => null);
@@ -99,7 +56,13 @@ function PublishSiteCard({ projectId }: { projectId: string }) {
           </a>
         </p>
       )}
-      {state.kind === "failed" && <p className="is-pencil-text">{t(`publish.error.${["no_remote", "github_login", "no_site", "push_failed"].includes(state.code) ? state.code : "other"}` as MessageKey, { detail: state.detail ?? "" })}</p>}
+      {state.kind === "failed" && (
+        <p className="is-pencil-text">
+          {t(`publish.error.${["no_remote", "github_login", "no_site", "push_failed"].includes(state.code) ? state.code : "other"}` as MessageKey, {
+            detail: state.detail ?? "",
+          })}
+        </p>
+      )}
       <div className="actions">
         <button className="btn is-primary" disabled={state.kind === "busy"} onClick={() => void publish()}>
           {state.kind === "busy" ? t("publish.busy") : state.kind === "done" ? t("publish.again") : t("publish.go")}
@@ -195,7 +158,11 @@ export function SiteCard({ work, onChanged }: { work: ProjectWorkView; onChanged
             {t("projectWork.siteOpen")}
           </a>
         )}
-        <button className={running ? "btn" : "btn is-primary"} disabled={busy || work.status === "running"} onClick={() => void act(running ? "stop" : "start")}>
+        <button
+          className={running ? "btn" : "btn is-primary"}
+          disabled={busy || work.status === "running"}
+          onClick={() => void act(running ? "stop" : "start")}
+        >
           {t(running ? "projectWork.siteStop" : "projectWork.siteStart")}
         </button>
       </div>

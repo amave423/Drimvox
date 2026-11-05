@@ -17,7 +17,8 @@ interface Props {
   /** The model picker, under the text field. */
   picker: ReactNode;
   /** What goes into the Options panel, and what differs from the usual (shown on its button). */
-  options: { rows: OptionRow[]; changed: string[] };
+  /** `wide`: rows with a line of explanation and models of their own (a project's box). */
+  options: { rows: OptionRow[]; changed: string[]; wide?: boolean };
   /** A row between the text field and the controls, e.g. picture options. */
   extra?: ReactNode;
   /** Next to the send button, e.g. what a picture will cost. */
@@ -175,6 +176,7 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
                   : options.rows
               }
               changed={options.changed}
+              wide={options.wide}
             />
           )}
         </div>

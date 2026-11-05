@@ -21,7 +21,7 @@ function SlidersIcon() {
  * The chat's options in one place: the internet, thinking, the folder (seen: four pills under the message box looked
  * crowded). The button names what differs from the usual, so a connected folder is never hidden.
  */
-export function ChatOptions({ rows, changed, narrow = false }: { rows: OptionRow[]; changed: string[]; narrow?: boolean }) {
+export function ChatOptions({ rows, changed, narrow = false, wide = false }: { rows: OptionRow[]; changed: string[]; narrow?: boolean; wide?: boolean }) {
   const { t } = useApp();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -55,7 +55,11 @@ export function ChatOptions({ rows, changed, narrow = false }: { rows: OptionRow
         <span aria-hidden>▾</span>
       </button>
       {open && (
-        <div className={`picker-panel is-above options-panel${narrow ? " is-narrow" : ""}`} role="dialog" aria-label={t("options.label")}>
+        <div
+          className={`picker-panel is-above options-panel${narrow ? " is-narrow" : ""}${wide ? " is-wide" : ""}`}
+          role="dialog"
+          aria-label={t("options.label")}
+        >
           {rows.map((r) => (
             <div key={r.label} className="options-row">
               <span className="muted">{r.label}</span>

@@ -57,7 +57,8 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
       const id = c.req.param("id");
       if (!projects.get(id)) return c.json(notFound, 404);
       try {
-        return c.json(work.message(id, c.req.valid("json").content), 200);
+        const { content, thinking } = c.req.valid("json");
+        return c.json(work.message(id, content, thinking), 200);
       } catch (err) {
         return c.json(refused(err), 409);
       }
@@ -65,10 +66,10 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
     .post("/:id/work/chat", zValidator("json", projectWorkChatSchema), (c) => {
       const id = c.req.param("id");
       if (!projects.get(id)) return c.json(notFound, 404);
-      const { content, model } = c.req.valid("json");
+      const { content, model, thinking, strong } = c.req.valid("json");
       if (!providers.get(model.providerId)) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
       try {
-        return c.json(work.chat(id, content, model), 200);
+        return c.json(work.chat(id, content, model, { thinking, strong }), 200);
       } catch (err) {
         return c.json(refused(err), 409);
       }

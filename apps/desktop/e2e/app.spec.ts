@@ -44,7 +44,19 @@ test("opens with a working core and remembers theme and language", async () => {
   await expect(steps).toContainText("По подписке.");
   await expect(steps.getByRole("button", { name: "Подключить нейросеть" })).toBeVisible();
   // The guide goes from what Drimvox is to the questions people ask, with contents that lead to each part.
-  const parts = ["Сначала главное: пять слов", "Что умеет Drimvox", "Шаг 1. Подключите нейросеть", "Шаг 2. Первый разговор", "Чат с папкой: нейросеть работает с вашими файлами", "Проект: агент делает работу сам", "Бесплатные модели и цепочки", "Деньги и безопасность", "Дополнительно", "Словарик", "Частые вопросы"];
+  const parts = [
+    "Сначала главное: пять слов",
+    "Что умеет Drimvox",
+    "Шаг 1. Подключите нейросеть",
+    "Шаг 2. Первый разговор",
+    "Чат с папкой: нейросеть работает с вашими файлами",
+    "Проект: агент делает работу сам",
+    "Бесплатные модели и цепочки",
+    "Деньги и безопасность",
+    "Дополнительно",
+    "Словарик",
+    "Частые вопросы",
+  ];
   for (const part of parts) await expect(page.getByRole("region", { name: part })).toHaveCount(1);
   const contents = page.getByRole("navigation", { name: "Содержание" });
   await contents.getByRole("button", { name: "Частые вопросы" }).click();
@@ -99,7 +111,31 @@ test("the page has no access to Node", async () => {
     process: typeof (window as unknown as { process?: unknown }).process,
     bridge: Object.keys((window as unknown as { drimvox?: object }).drimvox ?? {}).sort(),
   }));
-  expect(exposed).toEqual({ require: "undefined", process: "undefined", bridge: ["checkUpdates", "focusPage", "getToken", "installUpdate", "noticeLook", "notify", "onOpenChat", "onOpenProject", "onOpenTask", "onUpdate", "openSkillsFolder", "pickFolder", "pickKey", "placeBrowser", "savePdf", "setLanguage", "setTitleBar", "testNotify", "updateState"] });
+  expect(exposed).toEqual({
+    require: "undefined",
+    process: "undefined",
+    bridge: [
+      "checkUpdates",
+      "focusPage",
+      "getToken",
+      "installUpdate",
+      "noticeLook",
+      "notify",
+      "onOpenChat",
+      "onOpenProject",
+      "onOpenTask",
+      "onUpdate",
+      "openSkillsFolder",
+      "pickFolder",
+      "pickKey",
+      "placeBrowser",
+      "savePdf",
+      "setLanguage",
+      "setTitleBar",
+      "testNotify",
+      "updateState",
+    ],
+  });
 });
 
 test("the catalog switches a ready skill on and off, and shows a server's details with the token it needs", async () => {
@@ -111,7 +147,8 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await page.getByRole("tab", { name: "Скиллы" }).click();
   const cards = page.locator(".catalog-card");
   await expect(cards).toHaveCount(28);
-  for (const name of ["Дизайн интерфейсов", "Сначала тест", "Документы Word", "Проверка безопасности", "SEO и скорость", "Docker", "HTML-письма"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  for (const name of ["Дизайн интерфейсов", "Сначала тест", "Документы Word", "Проверка безопасности", "SEO и скорость", "Docker", "HTML-письма"])
+    await expect(page.locator(".catalog-grid")).toContainText(name);
   // A filter by what the card is about.
   await page.getByRole("button", { name: "Документы", exact: true }).click();
   await expect(cards).toHaveCount(6);
@@ -134,7 +171,8 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await page.getByRole("tab", { name: "Серверы MCP" }).click();
   // Playwright and Chrome DevTools are built into the agent's browser now, not offered as servers (asked for).
   await expect(cards).toHaveCount(15);
-  for (const name of ["Exa", "Context7", "GitHub", "Figma", "PostgreSQL", "SQLite", "Sentry", "Stripe"]) await expect(page.locator(".catalog-grid")).toContainText(name);
+  for (const name of ["Exa", "Context7", "GitHub", "Figma", "PostgreSQL", "SQLite", "Sentry", "Stripe"])
+    await expect(page.locator(".catalog-grid")).toContainText(name);
   // The cards say what a server is for in a few sentences (asked for: the lines said too little).
   expect(((await cards.filter({ hasText: "Context7" }).locator("p.muted").first().textContent()) ?? "").length).toBeGreaterThan(120);
   for (const name of ["Playwright", "Chrome DevTools"]) await expect(page.locator(".catalog-grid")).not.toContainText(name);
@@ -145,7 +183,10 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await page.keyboard.press("Escape");
 
   // GitHub needs a token: switching it on asks for one in its window; Escape closes the window, nothing is added.
-  await cards.filter({ has: page.locator("strong", { hasText: /^GitHub$/ }) }).locator("label.toggle").click();
+  await cards
+    .filter({ has: page.locator("strong", { hasText: /^GitHub$/ }) })
+    .locator("label.toggle")
+    .click();
   const dialog = page.getByRole("dialog", { name: "GitHub" });
   await expect(dialog).toContainText("api.githubcopilot.com/mcp");
   await expect(dialog.getByLabel("Ключ GitHub")).toBeVisible();
@@ -161,16 +202,40 @@ test("closing the window keeps Drimvox working in the tray, and it shows the win
   app = await launch();
   const page = await app.firstWindow();
   await expect(paramsButton(page)).toBeVisible();
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().endsWith("#notice"))!.close());
-  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().endsWith("#notice"))!.isVisible())).toBe(false);
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => !w.webContents.getURL().endsWith("#notice"))!
+      .close(),
+  );
+  await expect
+    .poll(() =>
+      app!.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => !w.webContents.getURL().endsWith("#notice"))!
+          .isVisible(),
+      ),
+    )
+    .toBe(false);
   // Said with Drimvox's own card, not one of Windows' plain notifications (asked for).
   await expect.poll(() => app!.windows().some((w) => w.url().endsWith("#notice"))).toBe(true);
   const notice = app.windows().find((w) => w.url().endsWith("#notice"))!;
   await expect(notice.getByText("Drimvox работает в фоне")).toBeVisible();
   // The core still answers: the app did not quit.
   expect(await page.evaluate(async () => (await fetch("/api/health")).ok)).toBe(true);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().endsWith("#notice"))!.show());
-  await expect.poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => !w.webContents.getURL().endsWith("#notice"))!.isVisible())).toBe(true);
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => !w.webContents.getURL().endsWith("#notice"))!
+      .show(),
+  );
+  await expect
+    .poll(() =>
+      app!.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => !w.webContents.getURL().endsWith("#notice"))!
+          .isVisible(),
+      ),
+    )
+    .toBe(true);
 });
 
 // Asked for: one "Parameters" button; the parameters a page of their own, sections on the right, a way back, the mode kept.
@@ -181,7 +246,8 @@ test("opens the parameters as a page of their own and goes back, keeping the mod
   await expect(page.getByRole("heading", { name: "Над чем поработаем?" })).toBeVisible();
   await paramsButton(page).click();
   const nav = page.getByRole("navigation", { name: "Разделы параметров" });
-  for (const name of ["Настройки", "Ключи и модели", "Локальные модели", "Галерея", "Инструкция"]) await expect(nav.getByRole("button", { name })).toBeVisible();
+  for (const name of ["Настройки", "Ключи и модели", "Локальные модели", "Галерея", "Инструкция"])
+    await expect(nav.getByRole("button", { name })).toBeVisible();
   // The page covers the window: no sidebar; the mode stays the one it was opened from.
   await expect(page.locator(".side")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Проекты", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -218,7 +284,13 @@ test("shows its own notification window with the chosen sound, and it goes away 
   await notice.getByRole("button", { name: "Закрыть уведомление" }).click();
   await expect(card).toHaveCount(0);
   await expect
-    .poll(() => app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().endsWith("#notice"))!.isVisible()))
+    .poll(() =>
+      app!.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((x) => x.webContents.getURL().endsWith("#notice"))!
+          .isVisible(),
+      ),
+    )
     .toBe(false);
   // The setting stays.
   await page.reload();
@@ -233,14 +305,19 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
   const site = createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     if (req.url === "/b") return res.end("<title>Вторая</title><h1>Вторая</h1>");
-    res.end(`<title>Проверка</title><body style="margin:0"><button style="width:400px;height:250px" onclick="document.title='Нажато'">Я не робот</button><input oninput="document.title='Введено: '+this.value"></body>`);
+    res.end(
+      `<title>Проверка</title><body style="margin:0"><button style="width:400px;height:250px" onclick="document.title='Нажато'">Я не робот</button><input oninput="document.title='Введено: '+this.value"></body>`,
+    );
   });
   await new Promise<void>((r) => site.listen(0, "127.0.0.1", r));
   const port = (site.address() as AddressInfo).port;
   /** Where the window holds the agent's tab, by its address. */
   const tabBounds = () =>
     app!.evaluate(({ BrowserWindow }, port) => {
-      const views = BrowserWindow.getAllWindows()[0]!.contentView.children as unknown as { webContents?: { getURL(): string }; getBounds(): Electron.Rectangle }[];
+      const views = BrowserWindow.getAllWindows()[0]!.contentView.children as unknown as {
+        webContents?: { getURL(): string };
+        getBounds(): Electron.Rectangle;
+      }[];
       return views.find((v) => v.webContents?.getURL().includes(`:${port}/`))?.getBounds() ?? null;
     }, port);
   try {
@@ -262,7 +339,9 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
     expect(await pane.locator(".browser-view").evaluate((el) => getComputedStyle(el).getPropertyValue("-webkit-app-region"))).toBe("no-drag");
     // The tab lies exactly over the panel's page box: the page fills the panel, nothing squeezed or empty.
     const box = (await pane.locator(".browser-view").boundingBox())!;
-    await expect.poll(async () => JSON.stringify(await tabBounds())).toBe(JSON.stringify({ x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) }));
+    await expect
+      .poll(async () => JSON.stringify(await tabBounds()))
+      .toBe(JSON.stringify({ x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) }));
 
     // The panel's edge stays free of the tab: dragged, it widens the panel, and the tab follows.
     const edge = (await pane.locator(".browser-edge").boundingBox())!;
@@ -277,8 +356,8 @@ test("opens the agent's browser as a real tab in the panel, where a page is clic
     await expect.poll(async () => (await pane.locator(".browser-view").boundingBox())!.width).toBeGreaterThan(box.width + 100);
     const wider = (await pane.locator(".browser-view").boundingBox())!;
     await expect.poll(async () => (await tabBounds())?.width).toBe(Math.round(wider.width));
-    // Its grip is a slider for the keyboard too.
-    const grip = pane.getByRole("button", { name: /Ширина браузера/ });
+    // Its edge is a slider for the keyboard too (no grip on it any more: asked for).
+    const grip = pane.getByRole("separator", { name: /Ширина браузера/ });
     await expect(grip).toBeVisible();
     await grip.press("ArrowLeft");
     await expect.poll(async () => (await pane.locator(".browser-view").boundingBox())!.width).toBeGreaterThan(wider.width + 30);
@@ -349,7 +428,10 @@ test("the agent's browser opens listed sites through the proxy and learns a site
     await expect(paramsButton(page)).toBeVisible();
     const port = (proxy.address() as AddressInfo).port;
     await page.evaluate(async (port) => {
-      const headers = { authorization: `Bearer ${await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken()}`, "content-type": "application/json" };
+      const headers = {
+        authorization: `Bearer ${await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken()}`,
+        "content-type": "application/json",
+      };
       await fetch("/api/proxy", { method: "PUT", headers, body: JSON.stringify({ url: `http://127.0.0.1:${port}` }) });
       await fetch("/api/proxy/sites", { method: "PUT", headers, body: JSON.stringify({ hosts: ["listed-blocked.test"] }) });
     }, port);
@@ -366,7 +448,20 @@ test("the agent's browser opens listed sites through the proxy and learns a site
     await pane.getByLabel("Адрес").press("Enter");
     await expect.poll(() => proxied.some((u) => u.includes("other-blocked.test")), { timeout: 20_000 }).toBe(true);
     await expect
-      .poll(() => page.evaluate(async () => (await (await fetch("/api/proxy/sites", { headers: { authorization: `Bearer ${await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken()}` } })).json()).hosts), { timeout: 20_000 })
+      .poll(
+        () =>
+          page.evaluate(
+            async () =>
+              (
+                await (
+                  await fetch("/api/proxy/sites", {
+                    headers: { authorization: `Bearer ${await (window as unknown as { drimvox: { getToken(): Promise<string> } }).drimvox.getToken()}` },
+                  })
+                ).json()
+              ).hosts,
+          ),
+        { timeout: 20_000 },
+      )
       .toContain("other-blocked.test");
   } finally {
     proxy.closeAllConnections();
@@ -394,7 +489,10 @@ test("opens the window about 80% of the screen wide", async () => {
   app = await launch();
   // The app is up before it is closed again.
   await expect(paramsButton(await app.firstWindow())).toBeVisible();
-  const { win, area } = await app.evaluate(({ BrowserWindow, screen }) => ({ win: BrowserWindow.getAllWindows()[0]!.getBounds(), area: screen.getPrimaryDisplay().workAreaSize }));
+  const { win, area } = await app.evaluate(({ BrowserWindow, screen }) => ({
+    win: BrowserWindow.getAllWindows()[0]!.getBounds(),
+    area: screen.getPrimaryDisplay().workAreaSize,
+  }));
   expect(Math.abs(win.width - Math.max(960, Math.round(area.width * 0.8)))).toBeLessThanOrEqual(2);
   // A few pixels either way: the display scale rounds the window frame.
   expect(Math.abs(win.height - Math.min(860, area.height))).toBeLessThanOrEqual(6);
@@ -420,7 +518,9 @@ test("groups the providers by what is free, and says on each card what is", asyn
   await expect(group("Только платные").getByRole("radio", { name: /^Groq/ })).toHaveCount(0);
   await expect(group("Свой сервер").getByRole("radio", { name: /OpenAI-совместимый/ })).toBeVisible();
   // Cloudflare needs the account's id in the address, and says where to find it.
-  await group("Бесплатно с лимитами").getByRole("radio", { name: /Cloudflare/ }).click();
+  await group("Бесплатно с лимитами")
+    .getByRole("radio", { name: /Cloudflare/ })
+    .click();
   await expect(page.getByText("Замени ACCOUNT_ID в адресе")).toBeVisible();
 });
 
@@ -434,9 +534,14 @@ test("offers Piper's voices on the audio tab and in the settings", async () => {
   await expect(page.locator(".local-card", { hasText: "Ирина" })).toContainText("русский, женский");
   await openSection(page, "Настройки");
   await page.getByRole("tab", { name: "Модели и деньги" }).click();
-  await expect(page.getByRole("region", { name: "Голос для чтения ответов" })).toContainText("Скачать голоса Piper");
-  // Voices from the cloud (asked for): those of every connected provider that has them; with none connected, said so.
-  await expect(page.getByRole("region", { name: "Облачный голос" })).toContainText("У подключённых провайдеров нет моделей речи");
+  // One list of voices, as the dictation's models (asked for): this computer's first, then every provider's that has them.
+  const voices = page.getByRole("region", { name: "Голос для чтения ответов" });
+  await voices.getByRole("button", { name: "Голос для чтения ответов" }).click();
+  await expect(voices.getByRole("navigation", { name: "Откуда голоса" }).getByRole("button", { name: "На этом компьютере" })).toBeVisible();
+  await expect(voices.getByRole("option", { name: "Голос Windows" })).toBeVisible();
+  await expect(voices).toContainText("Скачать голоса Piper");
+  // With no provider that speaks connected, said so.
+  await expect(voices).toContainText("У подключённых провайдеров нет моделей речи");
 });
 
 // Seen again and again: a model list fixed to open downwards ran off the window near the bottom of a page.

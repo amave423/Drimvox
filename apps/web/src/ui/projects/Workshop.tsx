@@ -1,60 +1,44 @@
 import { MissingFolder } from "./MissingFolder";
-import { CHAIN_PROVIDER_ID } from "@drimvox/shared";
 import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
-import { readLastModel, rememberLastModel, type ModelChoice } from "../../lib/lastModel";
-import { Composer } from "../chat/Composer";
-import { ModelPicker } from "../chat/ModelPicker";
 import { ChatSheet } from "../chat/ChatSheet";
-import { Tabs } from "../Tabs";
 import { TaskSheet } from "../tasks/TaskSheet";
 import { useAddProject } from "./AddProject";
 import { PlanCard } from "./PlanCard";
-import { ProjectStart } from "./ProjectStart";
 import { PaneSplit, usePaneWidth } from "../PaneSplit";
 import { useProjectWork } from "./useProjectWork";
-import { PlanTab } from "./Workspace";
 import { WorkshopResult } from "./WorkshopResult";
+import { ProjectComposer } from "./ProjectComposer";
 
 export const LAST_PROJECT_KEY = "drimvox.lastProject";
 
-export type Stage = "folder" | "git" | "loading" | "start" | "interview" | "plan" | "work" | "talk";
+export type Stage = "folder" | "git" | "loading" | "interview" | "plan" | "work" | "talk";
 
 /**
- * Where a project's work is: git first, the start, the interview, the plan, then the work itself. A ready project is a
- * conversation from the first message (asked for: like the chat with a folder).
+ * Where a project is (asked for: one conversation per project, as a ready project had): git first, then its
+ * conversation; the interview and the plan to approve only when the box asked for them, while they go on.
  */
-export function stageOf(project: ProjectView, work: ProjectWorkView | null, fresh = false): Stage {
+export function stageOf(project: ProjectView, work: ProjectWorkView | null): Stage {
   if (project.gitState === "missing") return "folder";
   if (project.gitState === "not_repo") return "git";
   if (!work) return "loading";
-  if (project.kind === "existing") return work.chatId && work.startedAt ? "work" : "talk";
-  if (fresh || work.status === "idle") return "start";
   if (work.status === "planning" && !work.plan) return "interview";
   if (work.status === "ready" || work.status === "planning") return "plan";
-  return work.startedAt && work.chatId ? "work" : "start";
+  return work.chatId && work.startedAt ? "work" : "talk";
 }
 
-type Part = "work" | "plan" | "questions";
-
 /**
- * A project's workshop (asked for: variant A with variant C's timeline): the work in the middle as it goes (the start,
- * the interview, the plan, then the agent's timeline with its plan and questions beside it in tabs), the result on the
- * right, its width dragged by the handle between them, folded away at the edge. The state and the controls are in the
- * top bar (WorkshopBar), the projects and the checklist in the sidebar.
+ * A project's workshop: its one conversation in the middle (asked for: as a ready project had; the interview and the
+ * plan to approve come first only when the box asks for them), the project on the right, its width dragged at the
+ * edge between them. The state and the controls are in the top bar (WorkshopBar), the projects and the checklist in
+ * the sidebar.
  */
 export function Workshop({ projectId }: { projectId: string }) {
-  const { t, projects, providers, reloadTasks, reloadWorks, reloadProjects } = useApp();
+  const { t, projects, reloadWorks, reloadProjects } = useApp();
   const project = projects.find((p) => p.id === projectId);
   const { work, reload } = useProjectWork(projectId);
-  const [fresh, setFresh] = useState(false);
-  const [part, setPart] = useState<Part>("work");
   const split = usePaneWidth();
-  const [choice] = useState<ModelChoice | null>(() => {
-    const last = readLastModel();
-    return last && (last.providerId === CHAIN_PROVIDER_ID || providers.some((p) => p.id === last.providerId)) ? last : null;
-  });
   // The top bar and the sidebar show this work's state and checklist: kept in step with what the workshop sees.
   const doneItems = work?.checklist.filter((i) => i.done).length;
   useEffect(reloadWorks, [work?.status, work?.checklist.length, doneItems, work?.spentUsd, work?.questions.length]);
@@ -70,137 +54,49 @@ export function Workshop({ projectId }: { projectId: string }) {
   }, [projectId]);
   if (!project) return null;
 
-  const stage = stageOf(project, work, fresh);
-  const questions = work?.questions.length ?? 0;
+  const stage = stageOf(project, work);
 
   return (
     <div className="workshop">
-      <div className={`workshop-body${split.dragging ? " is-dragging" : ""}`} ref={split.body} style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${split.width}px` }}>
+      <div
+        className={`workshop-body${split.dragging ? " is-dragging" : ""}`}
+        ref={split.body}
+        style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${split.width}px` }}
+      >
         <section className="workshop-main" aria-label={t("workshop.work")}>
           {stage === "folder" && <MissingFolder project={project} />}
           {stage === "git" && <GitNotice project={project} />}
           {stage === "loading" && <p className="muted workshop-pad">{t("model.loading")}</p>}
-          {stage === "start" && (
-            <div className="workshop-pad workshop-scroll">
-              <ProjectStart
-                projectId={project.id}
-                initial={choice}
-                onStarted={() => {
-                  setFresh(false);
-                  void reload();
-                  void reloadTasks();
-                }}
-              />
-            </div>
-          )}
-          {stage === "talk" && (
-            <ReadyStart
-              projectId={project.id}
-              initial={choice}
-              onStarted={() => void reload()}
-            />
-          )}
+          {stage === "talk" && <ReadyStart projectId={project.id} work={work} onStarted={() => void reload()} />}
           {stage === "interview" && work?.planTaskId && <TaskSheet key={work.planTaskId} taskId={work.planTaskId} embedded />}
           {stage === "plan" && work && (
             <div className="workshop-pad workshop-scroll">
               <PlanCard key={work.plan?.context} work={work} onChanged={() => void reload()} />
             </div>
           )}
-          {stage === "work" && work?.chatId && project.kind === "existing" && (
+          {stage === "work" && work?.chatId && (
             <div className="workshop-feed">
               <ChatSheet key={work.chatId} chatId={work.chatId} viewKey={work.chatId} workshop />
             </div>
           )}
-          {stage === "work" && work?.chatId && project.kind !== "existing" && (
-            <>
-              <div className="workshop-tabs">
-                <Tabs<Part>
-                  value={part}
-                  label={t("workshop.work")}
-                  options={[
-                    { value: "work", label: t("workshop.part.work") },
-                    { value: "plan", label: t("workshop.part.plan") },
-                    { value: "questions", label: questions ? t("workshop.part.questionsN", { n: questions }) : t("workshop.part.questions") },
-                  ]}
-                  onChange={setPart}
-                />
-              </div>
-              {/* The timeline stays put while another tab is open: what is typed in its box is kept. */}
-              <div className="workshop-feed" hidden={part !== "work"}>
-                <ChatSheet key={work.chatId} chatId={work.chatId} viewKey={work.chatId} workshop />
-              </div>
-              {part === "plan" && (
-                <div className="workshop-pad workshop-scroll">
-                  <PlanTab work={work} />
-                </div>
-              )}
-              {part === "questions" && <Questions work={work} />}
-            </>
-          )}
         </section>
         <PaneSplit split={split} controls="workshop-result" label={{ open: "workshop.hideResult", closed: "workshop.showResult" }} />
-        <WorkshopResult
-          project={project}
-          work={work}
-          open={split.width > 0}
-          onChanged={() => void reload()}
-          onNew={work && work.status !== "idle" && work.status !== "running" ? () => setFresh(true) : undefined}
-        />
+        <WorkshopResult project={project} work={work} open={split.width > 0} onChanged={() => void reload()} />
       </div>
     </div>
   );
 }
 
-/** A ready project before its first message: what it is for, and the box with the model to write to. */
-function ReadyStart({ projectId, initial, onStarted }: { projectId: string; initial: ModelChoice | null; onStarted(): void }) {
-  const { api, t } = useApp();
-  const [choice, setChoice] = useState<ModelChoice | null>(initial);
-  const [failed, setFailed] = useState(false);
-  async function send(content: string) {
-    if (!choice) return;
-    setFailed(false);
-    const res = await api.projects[":id"].work.chat
-      .$post({ param: { id: projectId }, json: { content, model: { providerId: choice.providerId, model: choice.model } } })
-      .catch(() => null);
-    if (!res?.ok) return setFailed(true);
-    rememberLastModel(choice);
-    onStarted();
-  }
+/** A project before its first message: what it is for, and the box with the model, the interview and the plan. */
+function ReadyStart({ projectId, work, onStarted }: { projectId: string; work: ProjectWorkView | null; onStarted(): void }) {
+  const { t } = useApp();
   return (
     <div className="workshop-ready">
       <div className="workshop-ready-intro">
         <h2 className="sheet-h">{t("workshop.readyTitle")}</h2>
         <p className="muted">{t("workshop.readyLede")}</p>
       </div>
-      {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
-      <Composer
-        disabled={!choice}
-        streaming={false}
-        onSend={(text) => void send(text)}
-        onStop={() => {}}
-        picker={<ModelPicker value={choice} onChange={setChoice} placement="above" />}
-        options={{ changed: [], rows: [] }}
-        placeholder={t("chat.readyPlaceholder")}
-      />
-    </div>
-  );
-}
-
-/** What the agent asked without waiting, with what it assumes meanwhile; answered by a message in the timeline. */
-function Questions({ work }: { work: ProjectWorkView }) {
-  const { t } = useApp();
-  if (work.questions.length === 0) return <p className="muted workshop-pad">{t("workshop.noQuestions")}</p>;
-  return (
-    <div className="workshop-pad workshop-scroll">
-      <ul className="work-questions">
-        {[...work.questions].reverse().map((q, n) => (
-          <li key={n} className="work-question">
-            <p>{q.question}</p>
-            <p className="muted">{t("projectWork.assumes", { assumption: q.assumption })}</p>
-          </li>
-        ))}
-      </ul>
-      <p className="muted">{t("projectWork.answerHint")}</p>
+      <ProjectComposer projectId={projectId} work={work} onSent={onStarted} />
     </div>
   );
 }
@@ -260,7 +156,6 @@ export function ProjectsStart() {
           </button>
         </div>
         {add.failed && <p className="error-note">{t("project.addFailed")}</p>}
-        {add.dialog}
         {projects.length > 0 && (
           <ul className="workshop-recent">
             {projects.map((p) => (

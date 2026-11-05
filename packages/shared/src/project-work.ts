@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ProjectPlan } from "./backlog";
 import { modelRefSchema } from "./tasks";
+import { thinkingLevels } from "./chats";
 
 /**
  * Work on a project (docs/specs/project-work.md): an interview, a plan, then one long run of the agent in the project's
@@ -100,7 +101,12 @@ export const projectPlanStartSchema = z.object({ task: z.string().trim().min(1).
 export const projectPlanReviseSchema = z.object({ note: z.string().trim().min(1).max(20_000) }).strict();
 export const projectWorkStartSchema = z.object(limits).strict();
 export const projectWorkUpdateSchema = z.object({ budgetUsd: limits.budgetUsd.optional(), hours: limits.hours.optional(), strong: modelRefSchema.nullable().optional() }).strict();
-export const projectWorkMessageSchema = z.object({ content: z.string().trim().min(1).max(200_000) }).strict();
-/** A message in a ready project's conversation, with the model that answers it (as in a chat). */
-export const projectWorkChatSchema = z.object({ content: z.string().trim().min(1).max(200_000), model: modelRefSchema }).strict();
+/** How much the model thinks, picked under the box (asked for: it always thought at its fullest). */
+const thinking = z.enum(thinkingLevels).optional();
+export const projectWorkMessageSchema = z.object({ content: z.string().trim().min(1).max(200_000), thinking }).strict();
+/**
+ * A message in a project's conversation, with the model that answers it (as in a chat), how much it thinks, and the strong
+ * model that steps in when it is stuck (picked in the box's menu, asked for).
+ */
+export const projectWorkChatSchema = z.object({ content: z.string().trim().min(1).max(200_000), model: modelRefSchema, thinking, strong: modelRefSchema.nullable().optional() }).strict();
 

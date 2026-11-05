@@ -6,9 +6,10 @@ import { playSound } from "../lib/sounds";
 import { Segmented } from "./Segmented";
 import { Setting } from "./Setting";
 
-/** The look and sound of a notification the settings send: as the real ones will be. */
+/** The look and sound of a notification sent now: the window's theme and the colours of the mode the user is in. */
 export function noticeLookNow(settings: { locale: "ru" | "en"; notifySound: NoticeRequest["sound"]; notifyVolume: number }): Omit<NoticeRequest, "title" | "body"> {
-  return { dark: document.documentElement.dataset.theme === "dark", mode: "projects", locale: settings.locale, sound: settings.notifySound, volume: settings.notifyVolume };
+  const mode = document.documentElement.dataset.mode === "chat" ? "chat" : "projects";
+  return { dark: document.documentElement.dataset.theme === "dark", mode, locale: settings.locale, sound: settings.notifySound, volume: settings.notifyVolume };
 }
 
 /** The notifications' sound (asked for: Drimvox's own), heard when chosen, and its loudness. */

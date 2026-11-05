@@ -1,25 +1,21 @@
-import type { ProjectKind, ProjectView } from "@drimvox/shared";
-import { useEffect, useState } from "react";
+import type { ProjectView } from "@drimvox/shared";
+import { useState } from "react";
 import { ok } from "../../api";
 import { useApp } from "../../context";
 
 /**
- * Adding a project folder: the native picker on the desktop, a path field in a plain browser; then whether the project
- * is ready or made from scratch (asked for: the work fits itself to that).
+ * Adding a project folder: the native picker on the desktop, a path field in a plain browser. Opened at once: every
+ * project is one conversation now, the interview and the plan picked in its box (asked for: no kind to choose).
  */
 export function useAddProject() {
   const { api, reloadProjects, navigate } = useApp();
   const [typing, setTyping] = useState(false);
   const [path, setPath] = useState("");
   const [failed, setFailed] = useState(false);
-  /** The folder picked, waiting for its kind. */
-  const [asking, setAsking] = useState<string | null>(null);
-
-  async function add(folder: string, kind: ProjectKind) {
+  async function add(folder: string) {
     setFailed(false);
-    setAsking(null);
     const project = await api.projects
-      .$post({ json: { path: folder, kind } })
+      .$post({ json: { path: folder, kind: "existing" } })
       .then((r) => ok<ProjectView>(r))
       .catch(() => null);
     if (!project) {
@@ -38,71 +34,16 @@ export function useAddProject() {
       return;
     }
     const folder = await window.drimvox.pickFolder();
-    if (folder) setAsking(folder);
+    if (folder) await add(folder);
   }
 
-  const dialog = asking ? <KindDialog folder={asking} onPick={(kind) => void add(asking, kind)} onCancel={() => setAsking(null)} /> : null;
-  return { pick, ask: setAsking, typing, path, setPath, failed, dialog };
-}
-
-/** Ready or from scratch, with Drimvox's guess from what is in the folder already chosen. */
-function KindDialog({ folder, onPick, onCancel }: { folder: string; onPick(kind: ProjectKind): void; onCancel(): void }) {
-  const { api, t } = useApp();
-  const [kind, setKind] = useState<ProjectKind | null>(null);
-  const [guess, setGuess] = useState<ProjectKind | null>(null);
-  useEffect(() => {
-    let live = true;
-    void api.projects.peek
-      .$post({ json: { path: folder } })
-      .then((r) => ok<{ guess: ProjectKind }>(r))
-      .then((r) => {
-        if (!live) return;
-        setGuess(r.guess);
-        setKind((k) => k ?? r.guess);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [folder]);
-  useEffect(() => {
-    const close = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [onCancel]);
-  return (
-    <div className="kind-backdrop" onClick={onCancel}>
-      <div className="kind-dialog" role="dialog" aria-modal="true" aria-labelledby="kind-title" onClick={(e) => e.stopPropagation()}>
-        <h2 id="kind-title" className="sheet-h">
-          {t("project.kindTitle")}
-        </h2>
-        <p className="mono muted kind-path">{folder}</p>
-        <div className="kind-options" role="radiogroup" aria-label={t("project.kindTitle")}>
-          {(["new", "existing"] as const).map((k) => (
-            <button key={k} type="button" role="radio" aria-checked={kind === k} className={`kind-option${kind === k ? " is-on" : ""}`} onClick={() => setKind(k)}>
-              <strong>{t(`project.kind.${k}`)}</strong>
-              <span className="muted">{t(`project.kind.${k}Text`)}</span>
-            </button>
-          ))}
-        </div>
-        {guess && <p className="kind-guess">{t(guess === "existing" ? "project.kindGuessExisting" : "project.kindGuessNew")}</p>}
-        <div className="actions">
-          <button type="button" className="btn" onClick={onCancel}>
-            {t("providers.cancel")}
-          </button>
-          <button type="button" className="btn is-primary" disabled={!kind} onClick={() => kind && onPick(kind)}>
-            {t("project.kindContinue")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return { pick, ask: (folder: string) => void add(folder), typing, path, setPath, failed };
 }
 
 /** The sidebar's "+ Project". */
 export function AddProject() {
   const { t } = useApp();
-  const { pick, ask, typing, path, setPath, failed, dialog } = useAddProject();
+  const { pick, ask, typing, path, setPath, failed } = useAddProject();
   return (
     <>
       <button className="side-new" onClick={() => void pick()}>
@@ -128,7 +69,6 @@ export function AddProject() {
         </form>
       )}
       {failed && <p className="error-note">{t("project.addFailed")}</p>}
-      {dialog}
     </>
   );
 }

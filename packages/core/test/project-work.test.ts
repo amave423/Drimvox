@@ -748,6 +748,40 @@ describe("a ready project", () => {
     expect(work.report).toContain("ok: 3 tests");
   });
 
+  // Asked for: changed files shown in the conversation where the agent changed them, with the lines added and removed.
+  it("keeps with each write and edit the lines it added and removed", async () => {
+    const s = await setup({
+      coder: [
+        call("write_file", { path: "index.html", content: "<h1>Клиника</h1>\n<p>Запись</p>\n<p>Цены</p>\n" }),
+        call("edit_file", { edits: [{ path: "index.html", old: "<p>Цены</p>", new: "<p>Прайс</p>\n<p>Врачи</p>" }] }),
+        { text: "Готово." },
+      ],
+    });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Поправь страницу", model: s.ref("coder") });
+    const work = await until(s.project.id, (w) => w.status === "done");
+    const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
+    const acts = chat.messages.at(-1).activity.map(({ at: _at, ...a }: any) => a);
+    // The folder had "<h1>Клиника</h1>": the write kept it and added two lines; the edit changed one and added one.
+    expect(acts).toEqual([
+      { name: "write_file", input: "index.html", added: 2, removed: 0 },
+      { name: "edit_file", input: "index.html", added: 2, removed: 1 },
+    ]);
+  });
+
+  // Asked for: the thinking level in the projects' mode (the model always thought at its fullest), and the strong model
+  // picked under the box, as the interview's and the plan's.
+  it("takes the thinking level and the strong model with the message, and keeps them for the run's next answers", async () => {
+    const s = await setup({ coder: [{ text: "Готово." }, { text: "И это готово." }] });
+    const res = await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай", model: s.ref("coder"), thinking: "low", strong: s.ref("coder") });
+    expect(res.status).toBe(200);
+    const work = await until(s.project.id, (w) => w.status === "done");
+    expect(work.models.strong).toEqual(s.ref("coder"));
+    expect(JSON.stringify(requestsOf("coder")[0]!.body)).toContain('"effort":"low"');
+    await env.call("POST", `/api/projects/${s.project.id}/work/message`, { content: "Ещё", thinking: "high" });
+    await until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length >= 2);
+    expect(JSON.stringify(requestsOf("coder")[1]!.body)).toContain('"effort":"high"');
+  });
+
   // Asked for: what runs in the background is shown and can be stopped. Seen live: two servers on one port, as the agent
   // started its server again not knowing it still ran.
   it("lists the processes running in the background, stops one, and does not start the same command twice", async () => {
@@ -889,10 +923,13 @@ describe("a project's git rules", () => {
 
   it("makes pointer files for the agents chosen in the settings", async () => {
     const s = await ready([{ text: "Готово." }]);
-    await env.call("PATCH", "/api/settings", { agentFiles: ["gemini", "qwen"] });
+    await env.call("PATCH", "/api/settings", { agentFiles: ["gemini", "qwen", "copilot", "windsurf"] });
     await ask(s, "Сделай что-нибудь", 1);
     expect(readFileSync(join(folder, "GEMINI.md"), "utf8")).toBe("@AGENTS.md\n");
     expect(readFileSync(join(folder, "QWEN.md"), "utf8")).toBe("@AGENTS.md\n");
+    // Agents without "@file" get the pointer in words, in their own folders (asked for: more agents than three).
+    expect(readFileSync(join(folder, ".github", "copilot-instructions.md"), "utf8")).toMatch(/^Read AGENTS\.md/);
+    expect(readFileSync(join(folder, ".windsurf", "rules", "drimvox.md"), "utf8")).toMatch(/^Read AGENTS\.md/);
     expect(existsSync(join(folder, "CLAUDE.md"))).toBe(false);
   });
 

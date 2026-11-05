@@ -119,12 +119,13 @@ export function App({ api, token, initialSettings, status }: Props) {
     setTasks(next);
   }, [api]);
 
-  // How Drimvox's own notifications look and sound now: the window's theme, the projects' colours (they are all about
-  // projects), the settings' sound. Kept in a ref: the effects that notify read the latest.
+  // How Drimvox's own notifications look and sound now: the window's theme, the colours of the mode the user is in
+  // (asked for: they were always the projects' green, in a chat too), the settings' sound. Kept in a ref: the effects
+  // that notify read the latest.
   const noticeLook = useRef<Omit<NoticeRequest, "title" | "body">>(null!);
   noticeLook.current = {
     dark: resolveTheme(settings.theme, systemDark) === "dark",
-    mode: "projects",
+    mode: mode === "chat" ? "chat" : "projects",
     locale: settings.locale,
     sound: settings.notifySound,
     volume: settings.notifyVolume,

@@ -74,7 +74,6 @@ export function FirstSteps() {
               </button>
             )}
             {project.failed && <p className="error-note">{t("project.addFailed")}</p>}
-            {project.dialog}
           </div>
         </li>
       </ol>

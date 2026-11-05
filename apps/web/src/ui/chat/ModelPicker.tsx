@@ -1,4 +1,13 @@
-import { CHAIN_PROVIDER_ID, estimateCost, type ChainView, type ChatKind, type MediaModel, type ModelInfo, type PhotoInput, type ProviderView } from "@drimvox/shared";
+import {
+  CHAIN_PROVIDER_ID,
+  estimateCost,
+  type ChainView,
+  type ChatKind,
+  type MediaModel,
+  type ModelInfo,
+  type PhotoInput,
+  type ProviderView,
+} from "@drimvox/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../context";
 import { fixedBy, useFlip, useOnWindow } from "../../lib/flip";
@@ -69,7 +78,10 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const [open, setOpen] = useState(false);
   const [chosenProvider, setProviderId] = useState(value?.providerId ?? providers[0]?.id);
   // A provider that is not offered (no model that hears) gives way to the first that is.
-  const providerId = providers.some((p) => p.id === chosenProvider) || chosenProvider === FAVORITES || (chainsTab && chosenProvider === CHAIN_PROVIDER_ID) ? chosenProvider : providers[0]?.id;
+  const providerId =
+    providers.some((p) => p.id === chosenProvider) || chosenProvider === FAVORITES || (chainsTab && chosenProvider === CHAIN_PROVIDER_ID)
+      ? chosenProvider
+      : providers[0]?.id;
   // Local models and programs on a subscription only talk: no tabs for pictures and video there (seen: empty tabs).
   const preset = providers.find((p) => p.id === providerId)?.preset;
   const talkOnly = preset === "ollama" || preset === "lmstudio" || providers.find((p) => p.id === providerId)?.billing === "subscription";
@@ -146,10 +158,12 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
     };
     const mine = favorites.filter((f) => providers.some((p) => p.id === f.providerId));
     setFavoriteList(mine.map((f) => known(storedModels(f.providerId), f)));
-    void Promise.all(mine.map(async (f) => {
-      const r = await loadModels(api, f.providerId);
-      return known("models" in r ? r.models : storedModels(f.providerId), f);
-    })).then((list) => live && setFavoriteList(list));
+    void Promise.all(
+      mine.map(async (f) => {
+        const r = await loadModels(api, f.providerId);
+        return known("models" in r ? r.models : storedModels(f.providerId), f);
+      }),
+    ).then((list) => live && setFavoriteList(list));
     return () => {
       live = false;
     };
@@ -158,7 +172,9 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const isFavorite = (pid: string | undefined, model: string) => favorites.some((f) => f.providerId === pid && f.model === model);
   const toggleFavorite = (pid: string, model: string) =>
     void updateSettings({
-      favoriteModels: isFavorite(pid, model) ? favorites.filter((f) => !(f.providerId === pid && f.model === model)) : [...favorites, { providerId: pid, model }],
+      favoriteModels: isFavorite(pid, model)
+        ? favorites.filter((f) => !(f.providerId === pid && f.model === model))
+        : [...favorites, { providerId: pid, model }],
     });
 
   useEffect(() => {
@@ -204,61 +220,70 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
 
   const providerName = value?.providerId === CHAIN_PROVIDER_ID ? t("chains.provider") : providers.find((p) => p.id === value?.providerId)?.name;
   // A CLI's "default" is whatever the program itself is set to.
-  const isCliDefault = (pid: string | undefined, model: string) =>
-    model === "default" && providers.find((p) => p.id === pid)?.billing === "subscription";
+  const isCliDefault = (pid: string | undefined, model: string) => model === "default" && providers.find((p) => p.id === pid)?.billing === "subscription";
   const modelName = useModelName(value);
   const cliDefault = !!value && isCliDefault(value.providerId, value.model);
-  const chosen = value && providerName ? { name: cliDefault ? t("model.cliDefault") : (modelName ?? value.model), id: cliDefault ? t("model.cliDefault") : value.model } : null;
+  const chosen =
+    value && providerName
+      ? { name: cliDefault ? t("model.cliDefault") : (modelName ?? value.model), id: cliDefault ? t("model.cliDefault") : value.model }
+      : null;
 
   // A model that takes no photo cannot be chosen while one waits: it would be refused anyway.
   const refused = (m: Listed) => photos && kind !== "text" && !m.photoInput;
-  const item = (m: Listed) => {
+  // Under the free heading a model is not marked free again (asked for: it said the obvious and crowded the list).
+  const item = (m: Listed, inFree = false) => {
     const pid = m.providerId ?? providerId;
     return (
-    <li key={`${pid}/${m.id}`} role="option" className="picker-item" aria-selected={value?.providerId === pid && value?.model === m.id} aria-disabled={refused(m) || undefined}>
-      <button
-        type="button"
-        disabled={refused(m)}
-        className={refused(m) ? "is-unsupported" : undefined}
-        onClick={() => {
-          if (!pid) return;
-          onChange({ providerId: pid, model: m.id, kind });
-          setOpen(false);
-        }}
+      <li
+        key={`${pid}/${m.id}`}
+        role="option"
+        className="picker-item"
+        aria-selected={value?.providerId === pid && value?.model === m.id}
+        aria-disabled={refused(m) || undefined}
       >
-        {isCliDefault(providerId, m.id) ? (
-          <span className="picker-name">
-            {t("model.cliDefault")}
-            <small>{m.info?.resolved ? t("model.cliDefaultNow", { model: m.info.resolved }) : t("model.cliDefaultHint")}</small>
-          </span>
-        ) : (
-          <span className="picker-name">
-            {/* What it does with a photo, before its name (asked for). */}
-            <span className="picker-title">
-              {kind !== "text" && m.photoInput && <PhotoMark photos={m.photoInput} />}
-              {m.name}
-            </span>
-            {onFavorites && <small>{providers.find((p) => p.id === pid)?.name}</small>}
-            {m.name !== m.id && <small className="mono">{m.id}</small>}
-            {refused(m) && <small className="picker-why">{t("photos.cannot")}</small>}
-          </span>
-        )}
-        {m.info && <ModelFacts model={m.info} billing={providers.find((p) => p.id === pid)?.billing} />}
-        {!m.info && kind !== "text" && pid && <MediaPrice providerId={pid} kind={kind} model={m.id} />}
-      </button>
-      {kind === "text" && pid && (
         <button
           type="button"
-          className={`picker-star${isFavorite(pid, m.id) ? " is-on" : ""}`}
-          aria-pressed={isFavorite(pid, m.id)}
-          aria-label={t(isFavorite(pid, m.id) ? "model.unfavorite" : "model.favorite", { model: m.name })}
-          title={t(isFavorite(pid, m.id) ? "model.unfavorite" : "model.favorite", { model: m.name })}
-          onClick={() => toggleFavorite(pid, m.id)}
+          disabled={refused(m)}
+          className={refused(m) ? "is-unsupported" : undefined}
+          onClick={() => {
+            if (!pid) return;
+            onChange({ providerId: pid, model: m.id, kind });
+            setOpen(false);
+          }}
         >
-          {isFavorite(pid, m.id) ? "★" : "☆"}
+          {isCliDefault(providerId, m.id) ? (
+            <span className="picker-name">
+              {t("model.cliDefault")}
+              <small>{m.info?.resolved ? t("model.cliDefaultNow", { model: m.info.resolved }) : t("model.cliDefaultHint")}</small>
+            </span>
+          ) : (
+            <span className="picker-name">
+              {/* What it does with a photo, before its name (asked for). */}
+              <span className="picker-title">
+                {kind !== "text" && m.photoInput && <PhotoMark photos={m.photoInput} />}
+                {m.name}
+              </span>
+              {onFavorites && <small>{providers.find((p) => p.id === pid)?.name}</small>}
+              {m.name !== m.id && <small className="mono">{m.id}</small>}
+              {refused(m) && <small className="picker-why">{t("photos.cannot")}</small>}
+            </span>
+          )}
+          {m.info && <ModelFacts model={m.info} billing={providers.find((p) => p.id === pid)?.billing} inFree={inFree} />}
+          {!m.info && kind !== "text" && pid && <MediaPrice providerId={pid} kind={kind} model={m.id} />}
         </button>
-      )}
-    </li>
+        {kind === "text" && pid && (
+          <button
+            type="button"
+            className={`picker-star${isFavorite(pid, m.id) ? " is-on" : ""}`}
+            aria-pressed={isFavorite(pid, m.id)}
+            aria-label={t(isFavorite(pid, m.id) ? "model.unfavorite" : "model.favorite", { model: m.name })}
+            title={t(isFavorite(pid, m.id) ? "model.unfavorite" : "model.favorite", { model: m.name })}
+            onClick={() => toggleFavorite(pid, m.id)}
+          >
+            {isFavorite(pid, m.id) ? "★" : "☆"}
+          </button>
+        )}
+      </li>
     );
   };
 
@@ -289,7 +314,15 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
         <div
           className={`picker-panel model-panel${(nested ? true : flip.above) ? " is-above" : ""}${sidebar ? " has-providers" : ""}`}
           ref={panel}
-          style={nested ? undefined : { ...onWindow, height: sidebar ? Math.min(PANEL_H, flip.maxHeight ?? PANEL_H) : undefined, maxHeight: flip.maxHeight ? Math.min(560, flip.maxHeight) : undefined }}
+          style={
+            nested
+              ? undefined
+              : {
+                  ...onWindow,
+                  height: sidebar ? Math.min(PANEL_H, flip.maxHeight ?? PANEL_H) : undefined,
+                  maxHeight: flip.maxHeight ? Math.min(560, flip.maxHeight) : undefined,
+                }
+          }
         >
           {audio && hearing !== null && providers.length === 0 && <p className="muted">{t("voice.noModels")}</p>}
           {/* Every provider stays in the row whichever is chosen (seen: choosing the picture engine hid the others). */}
@@ -367,48 +400,51 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
               </a>
             </div>
           ) : (
-          <div className="picker-main">
-          {kinds.length > 1 && !onFavorites && (
-            <div className="picker-kinds" role="tablist">
-              {kinds.map((k) => (
-                <button type="button" key={k} role="tab" aria-selected={k === kind} className={k === kind ? "is-on" : undefined} onClick={() => setKind(k)}>
-                  {t(`model.kind.${k}`)}
-                </button>
-              ))}
+            <div className="picker-main">
+              {kinds.length > 1 && !onFavorites && (
+                <div className="picker-kinds" role="tablist">
+                  {kinds.map((k) => (
+                    <button type="button" key={k} role="tab" aria-selected={k === kind} className={k === kind ? "is-on" : undefined} onClick={() => setKind(k)}>
+                      {t(`model.kind.${k}`)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <input
+                className="field-input"
+                placeholder={t("model.search")}
+                aria-label={t("model.search")}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+              />
+              {loading && <p className="muted">{t("model.loading")}</p>}
+              {checking && <p className="muted">{t("model.checking")}</p>}
+              {hidden > 0 && <p className="muted">{t("model.hidden", { count: hidden })}</p>}
+              {kind === "text" && !onFavorites && result && "error" in result && <ErrorNote error={result.error} />}
+              {!loading && shown.length === 0 && !(kind === "text" && !onFavorites && result && "error" in result) && (
+                <p className="muted">
+                  {onFavorites && !query.trim() ? t("model.noFavorites") : kind !== "text" && media?.length === 0 ? t("model.noMedia") : t("model.nothing")}
+                </p>
+              )}
+              <ul className="picker-list" role="listbox">
+                {groups ? (
+                  <>
+                    <li role="presentation" className="picker-group">
+                      {t(preset === "google" ? "model.groupFreeTier" : "model.groupFree", { count: groups.free.length })}
+                    </li>
+                    {groups.free.map((m) => item(m, true))}
+                    <li role="presentation" className="picker-group">
+                      {t("model.groupPaid")}
+                    </li>
+                    {groups.paid.map((m) => item(m))}
+                  </>
+                ) : (
+                  // A provider whose every model is free: none is marked so either (asked for: it only crowded the list).
+              shown.map((m) => item(m, shown.length > 1 && shown.every((x) => !!x.info && x.info.priceIn === 0 && x.info.priceOut === 0)))
+                )}
+              </ul>
             </div>
-          )}
-          <input
-            className="field-input"
-            placeholder={t("model.search")}
-            aria-label={t("model.search")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
-          {loading && <p className="muted">{t("model.loading")}</p>}
-          {checking && <p className="muted">{t("model.checking")}</p>}
-          {hidden > 0 && <p className="muted">{t("model.hidden", { count: hidden })}</p>}
-          {kind === "text" && !onFavorites && result && "error" in result && <ErrorNote error={result.error} />}
-          {!loading && shown.length === 0 && !(kind === "text" && !onFavorites && result && "error" in result) && (
-            <p className="muted">{onFavorites && !query.trim() ? t("model.noFavorites") : kind !== "text" && media?.length === 0 ? t("model.noMedia") : t("model.nothing")}</p>
-          )}
-          <ul className="picker-list" role="listbox">
-            {groups ? (
-              <>
-                <li role="presentation" className="picker-group">
-                  {t(preset === "google" ? "model.groupFreeTier" : "model.groupFree", { count: groups.free.length })}
-                </li>
-                {groups.free.map(item)}
-                <li role="presentation" className="picker-group">
-                  {t("model.groupPaid")}
-                </li>
-                {groups.paid.map(item)}
-              </>
-            ) : (
-              shown.map(item)
-            )}
-          </ul>
-          </div>
           )}
         </div>
       )}
@@ -440,19 +476,22 @@ function useModelName(value: ModelChoice | null): string | null {
   return name;
 }
 
-function ModelFacts({ model, billing }: { model: ModelInfo; billing: ProviderView["billing"] | undefined }) {
+function ModelFacts({ model, billing, inFree }: { model: ModelInfo; billing: ProviderView["billing"] | undefined; inFree: boolean }) {
   const { t, settings } = useApp();
+  const free = model.priceIn === 0 && model.priceOut === 0;
   const price =
-    model.priceIn === null || model.priceOut === null
-      ? t("model.priceNone")
-      : model.priceIn === 0 && model.priceOut === 0
-        ? t(billing === "subscription" ? "model.subscription" : billing === "credits" ? "model.freeCredits" : "model.free")
-        : `${model.priceEstimated ? "≈" : ""}${formatPrice(model.priceIn)} / ${formatPrice(model.priceOut)}`;
+    inFree && (free || model.freeTier) && billing !== "subscription" && billing !== "credits"
+      ? null
+      : model.priceIn === null || model.priceOut === null
+        ? t("model.priceNone")
+        : model.priceIn === 0 && model.priceOut === 0
+          ? t(billing === "subscription" ? "model.subscription" : billing === "credits" ? "model.freeCredits" : "model.free")
+          : `${model.priceEstimated ? "≈" : ""}${formatPrice(model.priceIn)} / ${formatPrice(model.priceOut)}`;
   return (
     <span className="picker-facts mono">
       {model.available === "busy" && <span className="picker-busy">{t("model.busy")}</span>}
-      {model.freeTier && <span className="is-ok-text">{t("model.freeTier")}</span>}
-      <span>{price}</span>
+      {model.freeTier && !inFree && <span className="is-ok-text">{t("model.freeTier")}</span>}
+      {price && <span>{price}</span>}
       {model.contextLength && <span>{formatTokens(model.contextLength, settings.locale)}</span>}
     </span>
   );
@@ -470,7 +509,11 @@ function MediaPrice({ providerId, kind, model }: { providerId: string; kind: Exc
     };
   }, [api, providerId, kind, model]);
   if (cost === undefined) return <span className="picker-facts mono muted">…</span>;
-  return <span className="picker-facts mono">{cost === null ? t("model.priceNone") : t(kind === "image" ? "model.perImage" : "model.perClip", { cost: formatUsd(cost) })}</span>;
+  return (
+    <span className="picker-facts mono">
+      {cost === null ? t("model.priceNone") : t(kind === "image" ? "model.perImage" : "model.perClip", { cost: formatUsd(cost) })}
+    </span>
+  );
 }
 
 /** What a model does with a photo, on its line in the list: a reference, a first frame; "needs a photo" where it must. */
@@ -481,7 +524,17 @@ function PhotoMark({ photos }: { photos: PhotoInput }) {
   const hint = t(photos.use === "reference" ? "photos.referenceHint" : "photos.firstFrameHint");
   return (
     <span className={`picker-photo${photos.min > 0 ? " is-required" : ""}`} title={`${name}: ${hint}`} role="img" aria-label={name}>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
         <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
         <circle cx="12" cy="13" r="3.2" />
       </svg>

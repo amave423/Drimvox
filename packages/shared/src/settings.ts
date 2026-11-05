@@ -8,10 +8,27 @@ export const currencies = ["RUB", "USD"] as const;
 /** What the browser's address field searches with; "auto": Yandex in Russian, Bing in English (as it was). */
 export const searchEngines = ["auto", "google", "yandex", "duckduckgo", "bing"] as const;
 export type SearchEngine = (typeof searchEngines)[number];
-/** Agents that do not read AGENTS.md by default, each with the file it reads: a one-line pointer there (asked for). */
-export const agentFiles = ["claude", "gemini", "qwen"] as const;
+/**
+ * Agents that do not read AGENTS.md by default, each with the file it reads: a short pointer there (asked for; Codex,
+ * Cursor, Kimi Code, Z Code, opencode and Amp read AGENTS.md themselves).
+ */
+export const agentFiles = ["claude", "gemini", "qwen", "copilot", "windsurf", "cline", "roo", "kilo", "trae", "kiro", "junie", "crush", "iflow"] as const;
 export type AgentFile = (typeof agentFiles)[number];
-export const agentFileNames: Record<AgentFile, string> = { claude: "CLAUDE.md", gemini: "GEMINI.md", qwen: "QWEN.md" };
+export const agentFileNames: Record<AgentFile, string> = {
+  claude: "CLAUDE.md",
+  gemini: "GEMINI.md",
+  qwen: "QWEN.md",
+  copilot: ".github/copilot-instructions.md",
+  windsurf: ".windsurf/rules/drimvox.md",
+  cline: ".clinerules/drimvox.md",
+  roo: ".roo/rules/drimvox.md",
+  kilo: ".kilocode/rules/drimvox.md",
+  trae: ".trae/rules/project_rules.md",
+  kiro: ".kiro/steering/drimvox.md",
+  junie: ".junie/guidelines.md",
+  crush: "CRUSH.md",
+  iflow: "IFLOW.md",
+};
 export const noticeSounds = ["drop", "chime", "soft", "pop", "off"] as const;
 
 export const settingsSchema = z.object({
@@ -56,7 +73,7 @@ export const settingsSchema = z.object({
   /** The browser's address field searches with it (asked for: a choice instead of Yandex alone). */
   searchEngine: z.enum(searchEngines),
   /** Pointer files to AGENTS.md for agents that read their own file (Claude Code, Gemini CLI, Qwen Code); none by default. */
-  agentFiles: z.array(z.enum(agentFiles)).max(3),
+  agentFiles: z.array(z.enum(agentFiles)).max(agentFiles.length),
   favoriteModels: z.array(z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) })).max(100),
 });
 
@@ -68,7 +85,29 @@ export type Theme = Settings["theme"];
 export type Locale = Settings["locale"];
 export type Currency = Settings["currency"];
 
-export const defaultSettings: Settings = { theme: "system", locale: "ru", currency: "RUB", agentBudgetUsd: 0.5, strongModel: null, imageModel: null, visionModel: null, acceptanceModel: null, notifications: true, notifySound: "drop", notifyVolume: 0.6, developer: false, folderAutoApprove: false, favoriteModels: [], searchEngine: "auto", agentFiles: [], monthlyBudgetUsd: null, voiceModel: null, dictationLanguage: "interface", speechVoice: null, cloudVoice: null };
+export const defaultSettings: Settings = {
+  theme: "system",
+  locale: "ru",
+  currency: "RUB",
+  agentBudgetUsd: 0.5,
+  strongModel: null,
+  imageModel: null,
+  visionModel: null,
+  acceptanceModel: null,
+  notifications: true,
+  notifySound: "drop",
+  notifyVolume: 0.6,
+  developer: false,
+  folderAutoApprove: false,
+  favoriteModels: [],
+  searchEngine: "auto",
+  agentFiles: [],
+  monthlyBudgetUsd: null,
+  voiceModel: null,
+  dictationLanguage: "interface",
+  speechVoice: null,
+  cloudVoice: null,
+};
 
 /** A speech model of a connected provider, with its voices (docs/specs/local-speech.md). */
 export interface CloudSpeechModel {

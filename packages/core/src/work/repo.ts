@@ -1,4 +1,4 @@
-import type { AgentQuestion, ChecklistItem, ProjectModels, ProjectWorkReason, ProjectWorkStatus, WorkShot } from "@drimvox/shared";
+import type { AgentQuestion, ChecklistItem, ProjectModels, ProjectWorkReason, ProjectWorkStatus, ThinkingLevel, WorkShot } from "@drimvox/shared";
 import type { Database } from "../db";
 
 interface Row {
@@ -21,6 +21,8 @@ interface Row {
   site_command: string | null;
   site_url: string | null;
   context_tokens: number | null;
+  thinking: string | null;
+  planned: number;
 }
 
 export interface WorkRow {
@@ -45,6 +47,10 @@ export interface WorkRow {
   site: { command: string; url: string } | null;
   /** What the latest step sent the model: how full its context is now. */
   contextTokens: number | null;
+  /** How much the model thinks, as picked under the box; null: as the provider decides. */
+  thinking: ThinkingLevel | null;
+  /** The run goes by an approved plan, to the end of its checklist; otherwise it answers as a chat. */
+  planned: boolean;
 }
 
 const toWork = (r: Row): WorkRow => ({
@@ -66,6 +72,8 @@ const toWork = (r: Row): WorkRow => ({
   report: r.report ?? null,
   site: r.site_command && r.site_url ? { command: r.site_command, url: r.site_url } : null,
   contextTokens: r.context_tokens ?? null,
+  thinking: (r.thinking as ThinkingLevel | null) ?? null,
+  planned: r.planned === 1,
 });
 
 /** Screenshots kept per project: the newest; older ones stay on disk with the task screenshots. */
@@ -115,6 +123,8 @@ export class ProjectWorkRepo {
     if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
     if (patch.report !== undefined) columns.report = patch.report;
     if (patch.contextTokens !== undefined) columns.context_tokens = patch.contextTokens;
+    if (patch.thinking !== undefined) columns.thinking = patch.thinking;
+    if (patch.planned !== undefined) columns.planned = patch.planned ? 1 : 0;
     if (patch.site !== undefined) {
       columns.site_command = patch.site?.command ?? null;
       columns.site_url = patch.site?.url ?? null;
@@ -131,7 +141,13 @@ export class ProjectWorkRepo {
   answers(chatId: string, since: number): { model: string | null; costUsd: number; inputTokens: number; outputTokens: number; actions: string[] }[] {
     const rows = this.db.sql
       .prepare("select model, cost_usd, input_tokens, output_tokens, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?")
-      .all(chatId, since) as { model: string | null; cost_usd: number | null; input_tokens: number | null; output_tokens: number | null; activity: string | null }[];
+      .all(chatId, since) as {
+      model: string | null;
+      cost_usd: number | null;
+      input_tokens: number | null;
+      output_tokens: number | null;
+      activity: string | null;
+    }[];
     return rows.map((r) => ({
       model: r.model,
       costUsd: r.cost_usd ?? 0,
@@ -143,8 +159,16 @@ export class ProjectWorkRepo {
 
   spending(chatId: string, since: number): { spentUsd: number; actions: number; inputTokens: number; outputTokens: number; cachedTokens: number } {
     const rows = this.db.sql
-      .prepare("select cost_usd, input_tokens, output_tokens, cached_tokens, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?")
-      .all(chatId, since) as { cost_usd: number | null; input_tokens: number | null; output_tokens: number | null; cached_tokens: number | null; activity: string | null }[];
+      .prepare(
+        "select cost_usd, input_tokens, output_tokens, cached_tokens, activity from messages where chat_id = ? and role = 'assistant' and created_at >= ?",
+      )
+      .all(chatId, since) as {
+      cost_usd: number | null;
+      input_tokens: number | null;
+      output_tokens: number | null;
+      cached_tokens: number | null;
+      activity: string | null;
+    }[];
     return {
       spentUsd: rows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0),
       inputTokens: rows.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0),

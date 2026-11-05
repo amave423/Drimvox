@@ -36,7 +36,6 @@ export function LinkedText({ text }: { text: string }) {
           <Fragment key={n}>{part}</Fragment>
         ),
       )}
-      {project.dialog}
     </>
   );
 }

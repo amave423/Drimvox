@@ -57,7 +57,8 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 
 .side {
   background: var(--paper);
-  border-right: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 6px 0 6px 6px;
   padding: 18px 14px;
   display: flex;
   flex-direction: column;

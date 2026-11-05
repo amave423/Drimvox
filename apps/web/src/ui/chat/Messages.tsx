@@ -1,6 +1,6 @@
 import type { MessageKey } from "../../i18n";
 import type { ChatKind, MessageView } from "@drimvox/shared";
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, createContext, useContext } from "react";
 import { PencilIcon } from "../SideChats";
 import { MessageText } from "./LinkedText";
 import { SpeakButton } from "./Voice";
@@ -100,13 +100,25 @@ export function UserMessage({
           )}
           {versions && onVersion && (
             <span className="msg-versions">
-              <button type="button" className="msg-tool" aria-label={t("msg.versionPrev")} disabled={versions.index === 0} onClick={() => onVersion(versions.ids[versions.index - 1]!)}>
+              <button
+                type="button"
+                className="msg-tool"
+                aria-label={t("msg.versionPrev")}
+                disabled={versions.index === 0}
+                onClick={() => onVersion(versions.ids[versions.index - 1]!)}
+              >
                 <Chevron left />
               </button>
               <span className="msg-versions-count">
                 {versions.index + 1} / {versions.count}
               </span>
-              <button type="button" className="msg-tool" aria-label={t("msg.versionNext")} disabled={versions.index === versions.count - 1} onClick={() => onVersion(versions.ids[versions.index + 1]!)}>
+              <button
+                type="button"
+                className="msg-tool"
+                aria-label={t("msg.versionNext")}
+                disabled={versions.index === versions.count - 1}
+                onClick={() => onVersion(versions.ids[versions.index + 1]!)}
+              >
                 <Chevron />
               </button>
             </span>
@@ -154,7 +166,12 @@ export interface AnswerAction {
   at?: number;
   /** A screenshot of a page: its address to show it. */
   shot?: string;
+  /** A file written or changed: shown where it happened, with the lines that went in and out (asked for). */
+  file?: { paths: string[]; touch: "written" | "changed"; added?: number; removed?: number };
 }
+
+/** Opens a file of a project conversation's folder to look at; absent in a chat, which lists its files at the answer's end. */
+export const OpenFileContext = createContext<((path: string) => void) | null>(null);
 
 export interface ChatApproval {
   id: string;
@@ -169,7 +186,13 @@ export interface ChatApproval {
 }
 
 /** One permission request of a chat answer: open, with its buttons, or answered. */
-export function ChatApprovalCard({ approval: a, onApprove }: { approval: ChatApproval; onApprove?(id: string, allow: boolean, always: boolean, server?: boolean): void }) {
+export function ChatApprovalCard({
+  approval: a,
+  onApprove,
+}: {
+  approval: ChatApproval;
+  onApprove?(id: string, allow: boolean, always: boolean, server?: boolean): void;
+}) {
   const { t } = useApp();
   return (
     <div className={`approval${a.state === "open" && onApprove ? " is-asking" : ""}`} role={a.state === "open" ? "alert" : undefined}>
@@ -249,7 +272,9 @@ export function AssistantMessage({
         ))}
       {reasoning && <Reasoning text={reasoning} thinking={!!streaming && !content} />}
       <AnswerFlow text={shown} actions={actions} streaming={!!streaming} live={!!streaming || rendering} />
-      {message?.media.map((item) => <MediaView key={item.id} item={item} />)}
+      {message?.media.map((item) => (
+        <MediaView key={item.id} item={item} />
+      ))}
       {files}
       {/* An answer followed live shows its own caret and words; "answering" is for one only known to be under way. */}
       {(making || (rendering && !streaming)) && (
@@ -313,27 +338,32 @@ function AnswerFlow({ text, actions, streaming, live }: { text: string; actions:
   );
 }
 
-/** Actions done in a row: one line saying how many and the latest, opened while it is the newest of an answer. */
+/**
+ * Actions done in a row: one line saying how many and the latest, opened while it is the newest of an answer; a single
+ * action is just its line, with nothing to open (asked for: the arrow there opened nothing). The files written or changed
+ * here stand under it, with their lines added and removed.
+ */
 function ActionGroup({ actions, open }: { actions: AnswerAction[]; open: boolean }) {
   const { t } = useApp();
   const lines = actions.filter((a) => !a.shot);
   const shots = actions.filter((a) => a.shot);
+  // Where they happened in a project's conversation; a chat lists them at the answer's end instead.
+  const inProject = useContext(OpenFileContext) !== null;
+  const files = inProject ? filesHere(actions) : [];
   return (
     <>
-      {lines.length > 0 && (
+      {lines.length === 1 && <p className="msg-done msg-one muted">{lines[0]!.line}</p>}
+      {lines.length > 1 && (
         <details className="msg-done muted" open={open || undefined}>
-          <summary>
-            {lines.length === 1 ? lines[0]!.line : t("msg.actionsLatest", { n: lines.length, latest: lines.at(-1)!.line })}
-          </summary>
-          {lines.length > 1 && (
-            <ul className="msg-activity">
-              {lines.map((a, i) => (
-                <li key={i}>{a.line}</li>
-              ))}
-            </ul>
-          )}
+          <summary>{t("msg.actionsLatest", { n: lines.length, latest: lines.at(-1)!.line })}</summary>
+          <ul className="msg-activity">
+            {lines.map((a, i) => (
+              <li key={i}>{a.line}</li>
+            ))}
+          </ul>
         </details>
       )}
+      {files.length > 0 && <InlineFiles files={files} />}
       {shots.length > 0 && (
         <div className="msg-shots">
           {shots.map((a, i) => (
@@ -345,6 +375,56 @@ function ActionGroup({ actions, open }: { actions: AnswerAction[]; open: boolean
   );
 }
 
+/** The files of a run of actions, each once: written beats changed, and their lines summed. */
+function filesHere(actions: AnswerAction[]): { path: string; touch: "written" | "changed"; added: number; removed: number; counted: boolean }[] {
+  const found = new Map<string, { path: string; touch: "written" | "changed"; added: number; removed: number; counted: boolean }>();
+  for (const a of actions) {
+    if (!a.file) continue;
+    const one = a.file.paths.length === 1;
+    for (const path of a.file.paths) {
+      const had = found.get(path);
+      const counted = one && a.file.added !== undefined;
+      found.set(path, {
+        path,
+        touch: had?.touch === "written" ? "written" : a.file.touch,
+        added: (had?.added ?? 0) + (counted ? a.file.added! : 0),
+        removed: (had?.removed ?? 0) + (counted ? (a.file.removed ?? 0) : 0),
+        counted: (had?.counted ?? false) || counted,
+      });
+    }
+  }
+  return [...found.values()];
+}
+
+/** Files written or changed, where it happened: each opens to look at. */
+function InlineFiles({ files }: { files: ReturnType<typeof filesHere> }) {
+  const { t } = useApp();
+  const openFile = useContext(OpenFileContext);
+  return (
+    <div className="file-chips is-inline">
+      {files.map((f) => (
+        <button
+          key={f.path}
+          type="button"
+          className={`file-chip is-${f.touch}`}
+          title={t("files.open", { path: f.path })}
+          disabled={!openFile}
+          onClick={() => openFile?.(f.path)}
+        >
+          <span className="mono">{f.path.split("/").pop()}</span>
+          {f.counted ? (
+            <span className="file-chip-lines mono">
+              <span className="is-added">+{f.added}</span> <span className="is-removed">−{f.removed}</span>
+            </span>
+          ) : (
+            <span className="file-chip-touch">{t(`files.touch.${f.touch}`)}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** A screenshot; a click opens it among all of the conversation's, to go through them with the arrows. */
 function ShotImage({ url }: { url: string }) {
   const { t } = useApp();
@@ -353,7 +433,12 @@ function ShotImage({ url }: { url: string }) {
   const shots = all.some((s) => s.url === url) ? all : [{ url }];
   return (
     <>
-      <button type="button" className="zoomable" aria-label={t("viewer.open", { name: t("msg.screenshot") })} onClick={() => setOpen(shots.findIndex((s) => s.url === url))}>
+      <button
+        type="button"
+        className="zoomable"
+        aria-label={t("viewer.open", { name: t("msg.screenshot") })}
+        onClick={() => setOpen(shots.findIndex((s) => s.url === url))}
+      >
         <AuthImage className="msg-shot" url={url} alt={t("msg.screenshot")} />
       </button>
       {open !== null && <ShotGallery shots={shots} start={open} onClose={() => setOpen(null)} />}

@@ -12,10 +12,10 @@
 
 /* The sidebar's width set by the handle beside it, sliding when it opens or folds (asked for). */
 .shell { transition: grid-template-columns 0.3s ease; }
-.shell.is-dragging { transition: none; user-select: none; cursor: col-resize; }
+.shell.is-dragging { transition: none; user-select: none; cursor: w-resize; }
 @media (prefers-reduced-motion: reduce) { .shell { transition: none; } }
 .side { min-width: 0; }
-.side.is-closed { padding-inline: 0; border-right: 0; }
+.side.is-closed { padding-inline: 0; margin-left: 0; }
 .shell > .workshop-split { border-left: 0; }
 
 /* The mark drawn along its outline, then filled: at the start and on a change of mode. */
@@ -84,11 +84,12 @@
 
 /* The workshop fills the desk edge to edge: the work, the handle, the result. */
 .desk.is-workshop { padding: 0; overflow: hidden; display: block; }
-.workshop { height: 100%; display: flex; flex-direction: column; min-width: 0; background: var(--sheet); }
-.workshop-body { flex: 1; min-height: 0; display: grid; transition: grid-template-columns 0.3s ease; }
-.workshop-body.is-dragging { transition: none; user-select: none; cursor: col-resize; }
+.workshop { height: 100%; display: flex; flex-direction: column; min-width: 0; }
+.workshop-body { flex: 1; min-height: 0; display: grid; padding: 6px 6px 6px 0; transition: grid-template-columns 0.3s ease; }
+.workshop-body.is-dragging { transition: none; user-select: none; cursor: w-resize; }
 @media (prefers-reduced-motion: reduce) { .workshop-body { transition: none; } }
-.workshop-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: auto; }
+/* Each section a sheet rounded at the bottom, the window's ground between them (asked for). */
+.workshop-main { min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden auto; background: var(--sheet); border-radius: 12px; }
 /* Each stage keeps its full height and the column scrolls (seen: a long interview could not be scrolled to its end). */
 .workshop-main > :not(.workshop-feed) { flex-shrink: 0; }
 .workshop-tabs { flex: none; padding: 0 18px; }
@@ -96,7 +97,11 @@
 .workshop-tabs .tab { padding: 10px 12px; font-size: 13.5px; }
 .workshop-pad { padding: 20px 24px; }
 .workshop-scroll { max-width: 900px; width: 100%; }
-.workshop-feed { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+/* Never sideways (seen: a long line or a wide block pushed the conversation into a horizontal scroll). */
+.workshop-feed { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden auto; }
+.workshop-chat-body, .workshop-chat .messages, .workshop-chat .msg { min-width: 0; }
+.workshop-chat .messages { overflow-wrap: anywhere; }
+.workshop-chat pre { max-width: 100%; overflow-x: auto; }
 .workshop-feed[hidden] { display: none; }
 /* A ready project before its first message: a few words on top, the box at the bottom, as in a new chat. */
 .workshop-main > .workshop-ready { flex: 1; flex-shrink: 1; }
@@ -107,15 +112,15 @@
 .workshop-main > .sheet.is-embedded { border: 0; box-shadow: none; border-radius: 0; max-width: none; grid-template-columns: minmax(0, 1fr); }
 
 /* The handle: a slim strip with a small grip; drag it to set the width, to the edge to fold the panel away. */
-.workshop-split { width: 12px; position: relative; cursor: col-resize; touch-action: none; border-left: 1px solid var(--line); background: var(--paper); }
-.workshop-split.is-closed { border-left-color: var(--line); }
-.workshop-grip { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 10px; height: 44px; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: var(--sheet); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: col-resize; touch-action: none; }
-.workshop-grip span { width: 4px; height: 1.5px; border-radius: 1px; background: var(--muted); }
-.workshop-grip:hover, .workshop-grip:focus-visible { border-color: var(--ink); }
-.workshop-grip:hover span, .workshop-grip:focus-visible span { background: var(--ink); }
-.workshop-split::before { content: ""; position: absolute; inset: 0 -4px; cursor: col-resize; }
+/* The edge between sections (asked for: no grip, just a resize cursor; the sections rounded at the bottom): a narrow gap
+   of the window's ground, a line in it while taken or focused. */
+.workshop-split { width: 6px; position: relative; cursor: w-resize; touch-action: none; user-select: none; background: transparent; outline: none; }
+.workshop-split::before { content: ""; position: absolute; inset: 0 -4px; cursor: w-resize; }
+.workshop-split::after { content: ""; position: absolute; top: 12px; bottom: 12px; left: 2px; width: 2px; border-radius: 1px; background: transparent; transition: background 0.12s; }
+.workshop-split:hover::after, .workshop-split:focus-visible::after, .is-dragging > .workshop-split::after { background: var(--line); }
+.workshop-split:focus-visible::after { background: var(--ink); }
 
-.workshop-result { min-height: 0; min-width: 0; overflow: hidden auto; background: var(--sheet); font-size: 13.5px; }
+.workshop-result { min-height: 0; min-width: 0; overflow: hidden auto; background: var(--sheet); border-radius: 12px; font-size: 13.5px; }
 .workshop-result .workshop-tabs { position: sticky; top: 0; background: var(--sheet); z-index: 1; }
 .workshop-result-body { display: grid; gap: 14px; padding: 14px 18px 22px; align-content: start; min-width: 280px; }
 .workshop-project { display: grid; gap: 12px; align-content: start; }
@@ -179,7 +184,7 @@
 /* The left edge: taken and dragged, it widens or narrows the panel. */
 /* The slider along the panel's left side, as the side panels have; the panel's content starts after it. */
 .browser-pane { padding-left: 12px; }
-.browser-edge.workshop-split { position: absolute; left: 0; top: 0; bottom: 0; z-index: 1; border-left: 0; border-right: 1px solid var(--line); }
+.browser-edge.workshop-split { position: absolute; left: 0; top: 0; bottom: 0; width: 12px; z-index: 1; border-left: 0; border-right: 1px solid var(--line); }
 .browser-pane.is-wide { padding-left: 0; }
 .browser-pane.is-wide .browser-edge { display: none; }
 /* The page fills the box one to one: the agent's browser takes the box's size. */

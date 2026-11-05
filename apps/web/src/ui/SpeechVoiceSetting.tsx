@@ -2,71 +2,85 @@ import type { CloudSpeechModel, LocalSpeechStatus, LocalVoiceId } from "@drimvox
 import { useEffect, useRef, useState } from "react";
 import { authHeaders, ok } from "../api";
 import { useApp } from "../context";
-import { Segmented } from "./Segmented";
 import { Setting } from "./Setting";
-import { Dropdown } from "./Dropdown";
 
-const SYSTEM = "system";
+/** Where the voices come from: this computer (the system's and Piper's), or a provider's speech models. */
+const HERE = "here";
 
-/** Which voice reads answers aloud: the system's, or one of the Piper voices downloaded (docs/specs/local-speech.md). */
+interface Voice {
+  key: string;
+  label: string;
+  /** The model's name, as a heading over its voices; absent on this computer. */
+  group?: string;
+  pick: { speechVoice: LocalVoiceId | null; cloudVoice: { providerId: string; model: string; voice: string } | null };
+}
+
+/**
+ * Which voice reads answers aloud, all in one list as the dictation's models are (asked for: the computer's voices and
+ * the providers' were two settings): the sources on the left, this computer first, their voices on the right, a sample
+ * to hear the chosen one (docs/specs/local-speech.md).
+ */
 export function SpeechVoiceSetting() {
-  const { api, t, settings, updateSettings, navigate } = useApp();
+  const { api, t, settings, updateSettings, navigate, token } = useApp();
   const [status, setStatus] = useState<LocalSpeechStatus | null>(null);
+  const [models, setModels] = useState<CloudSpeechModel[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [source, setSource] = useState<string>(settings.cloudVoice?.providerId ?? HERE);
+  const [query, setQuery] = useState("");
+  const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
+  const [problem, setProblem] = useState<string | null>(null);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => () => audio.current?.pause(), []);
   useEffect(() => {
     void api.local.speech
       .$get()
       .then((r) => ok<LocalSpeechStatus>(r))
       .then(setStatus)
       .catch(() => setStatus(null));
-  }, [api]);
-  const installed = status?.voices.filter((v) => v.installed) ?? [];
-  return (
-    <Setting id="speech-voice-label" title={t("settings.speechVoice")} about={t("settings.speechVoiceHint")}>
-      {/* The voices here are chosen in place; more are downloaded on the audio tab (seen: a lone link under the setting
-          looked out of place). */}
-      {installed.length > 0 ? (
-        <div className="speech-voice">
-          <Segmented<string>
-            labelledBy="speech-voice-label"
-            value={settings.speechVoice ?? SYSTEM}
-            options={[{ value: SYSTEM, label: t("settings.speechVoiceSystem") }, ...installed.map((v) => ({ value: v.id, label: v.name }))]}
-            onChange={(value) => void updateSettings({ speechVoice: value === SYSTEM ? null : (value as LocalVoiceId) })}
-          />
-          <button type="button" className="link" onClick={() => navigate({ kind: "local", part: "audio" })}>
-            {t("settings.speechVoiceMore")}
-          </button>
-        </div>
-      ) : (
-        <button type="button" className="btn" onClick={() => navigate({ kind: "local", part: "audio" })}>
-          {t("settings.speechVoiceGet")}
-        </button>
-      )}
-    </Setting>
-  );
-}
-
-const NONE = "none";
-
-/**
- * A provider's voice that reads answers instead of the Piper or system one (asked for: voices from every provider that
- * has them): the speech models of the connected providers, then a voice of the chosen one, and a sample to hear it.
- */
-export function CloudVoiceSetting() {
-  const { t, settings, updateSettings, token } = useApp();
-  const [models, setModels] = useState<CloudSpeechModel[] | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "playing">("idle");
-  const [problem, setProblem] = useState<string | null>(null);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => () => audio.current?.pause(), []);
-  useEffect(() => {
     void fetch("/api/voice/cloud", { headers: authHeaders(token) })
       .then((r) => (r.ok ? (r.json() as Promise<CloudSpeechModel[]>) : []))
       .then(setModels)
       .catch(() => setModels([]));
-  }, [token]);
-  const chosen = settings.cloudVoice;
-  const key = (m: { providerId: string; model: string }) => `${m.providerId}|${m.model}`;
-  const model = chosen ? models?.find((m) => key(m) === key(chosen)) : undefined;
+  }, [api, token]);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const here: Voice[] = [
+    { key: "system", label: t("settings.speechVoiceSystem"), pick: { speechVoice: null, cloudVoice: null } },
+    ...(status?.voices.filter((v) => v.installed) ?? []).map((v) => ({ key: `piper|${v.id}`, label: v.name, pick: { speechVoice: v.id, cloudVoice: null } })),
+  ];
+  const providers = [...new Map((models ?? []).map((m) => [m.providerId, m.provider])).entries()];
+  const voicesOf = (providerId: string): Voice[] =>
+    (models ?? [])
+      .filter((m) => m.providerId === providerId)
+      .flatMap((m) =>
+        m.voices.map((voice) => ({
+          key: `${m.providerId}|${m.model}|${voice}`,
+          label: voice,
+          group: m.free ? `${m.name} · ${t("settings.cloudVoiceFree")}` : m.name,
+          pick: { speechVoice: settings.speechVoice, cloudVoice: { providerId: m.providerId, model: m.model, voice } },
+        })),
+      );
+  const chosenKey = settings.cloudVoice
+    ? `${settings.cloudVoice.providerId}|${settings.cloudVoice.model}|${settings.cloudVoice.voice}`
+    : settings.speechVoice
+      ? `piper|${settings.speechVoice}`
+      : "system";
+  const all = [...here, ...providers.flatMap(([id]) => voicesOf(id))];
+  const chosen = all.find((v) => v.key === chosenKey);
+  const chosenSource = settings.cloudVoice ? providers.find(([id]) => id === settings.cloudVoice!.providerId)?.[1] : t("settings.voiceHere");
+  const q = query.trim().toLowerCase();
+  const list = (source === HERE ? here : voicesOf(source)).filter((v) => !q || v.label.toLowerCase().includes(q) || v.group?.toLowerCase().includes(q));
 
   async function sample() {
     if (state === "playing") {
@@ -77,7 +91,11 @@ export function CloudVoiceSetting() {
     setProblem(null);
     setState("loading");
     try {
-      const res = await fetch("/api/voice/speak", { method: "POST", headers: { ...authHeaders(token), "content-type": "application/json" }, body: JSON.stringify({ text: t("settings.cloudVoiceSample") }) });
+      const res = await fetch("/api/voice/speak", {
+        method: "POST",
+        headers: { ...authHeaders(token), "content-type": "application/json" },
+        body: JSON.stringify({ text: t("settings.cloudVoiceSample") }),
+      });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: { detail?: string } } | null;
         throw new Error(body?.error?.detail ?? String(res.status));
@@ -98,52 +116,92 @@ export function CloudVoiceSetting() {
   }
 
   return (
-    <Setting id="cloud-voice-label" title={t("settings.cloudVoice")} about={t("settings.cloudVoiceHint")}>
-      {models === null ? (
-        <p className="muted">{t("settings.cloudVoiceLooking")}</p>
-      ) : models.length === 0 ? (
-        <p className="muted">{t("settings.cloudVoiceNone")}</p>
-      ) : (
-        <div className="cloud-voice">
-          <Dropdown<string>
-            label={t("settings.cloudVoiceModel")}
-            search={t("settings.cloudVoiceSearch")}
-            value={chosen ? key(chosen) : NONE}
-            options={[
-              { value: NONE, label: t("settings.cloudVoiceOff") },
-              ...models.map((m) => ({ value: key(m), label: m.name, hint: `${m.provider}${m.free ? ` · ${t("settings.cloudVoiceFree")}` : ""} · ${t("settings.cloudVoiceCount", { n: m.voices.length })}` })),
-            ]}
-            onChange={(value) => {
-              setProblem(null);
-              const next = models.find((m) => key(m) === value);
-              // A new model starts on its first voice; the same voice is kept when the new model has it.
-              void updateSettings({ cloudVoice: next ? { providerId: next.providerId, model: next.model, voice: next.voices.includes(chosen?.voice ?? "") ? chosen!.voice : next.voices[0]! } : null });
-            }}
-          />
-          {chosen && model && (
-            <Dropdown<string>
-              label={t("settings.cloudVoiceVoice")}
-              search={model.voices.length > 12 ? t("settings.cloudVoiceSearch") : undefined}
-              value={chosen.voice}
-              options={model.voices.map((v) => ({ value: v, label: v }))}
-              onChange={(voice) => {
-                setProblem(null);
-                void updateSettings({ cloudVoice: { ...chosen, voice } });
-              }}
-            />
-          )}
-          {chosen && (
-            <button type="button" className="btn" disabled={state === "loading"} onClick={() => void sample()}>
-              {t(state === "loading" ? "voice.preparing" : state === "playing" ? "voice.silence" : "settings.cloudVoiceListen")}
-            </button>
+    <Setting id="speech-voice-label" title={t("settings.speechVoice")} about={t("settings.speechVoiceHint")}>
+      <div className="speech-voice">
+        <div className="picker" ref={root}>
+          <button type="button" className="picker-button" aria-expanded={open} aria-labelledby="speech-voice-label" onClick={() => setOpen(!open)}>
+            <span className="picker-label">
+              {chosen?.label ?? settings.cloudVoice?.voice ?? t("settings.speechVoiceSystem")}
+              {chosenSource && <span className="picker-label-provider">{chosenSource}</span>}
+            </span>
+            <span aria-hidden>▾</span>
+          </button>
+          {open && (
+            <div className="picker-panel model-panel has-providers voice-panel">
+              <nav className="picker-providers" aria-label={t("settings.voiceSources")}>
+                <button type="button" className={source === HERE ? "is-on" : undefined} onClick={() => setSource(HERE)}>
+                  {t("settings.voiceHere")}
+                </button>
+                {providers.length > 0 && <span className="picker-providers-h">{t("settings.voiceCloud")}</span>}
+                {providers.map(([id, name]) => (
+                  <button type="button" key={id} className={source === id ? "is-on" : undefined} onClick={() => setSource(id)}>
+                    {name}
+                  </button>
+                ))}
+                {models === null && <span className="picker-providers-h">{t("settings.cloudVoiceLooking")}</span>}
+              </nav>
+              <div className="picker-main">
+                <input
+                  className="field-input"
+                  placeholder={t("settings.cloudVoiceSearch")}
+                  aria-label={t("settings.cloudVoiceSearch")}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  autoFocus
+                />
+                <ul className="picker-list" role="listbox" aria-label={t("settings.speechVoice")}>
+                  {list.map((v, i) => (
+                    <VoiceItem
+                      key={v.key}
+                      voice={v}
+                      heading={v.group && v.group !== list[i - 1]?.group ? v.group : undefined}
+                      chosen={v.key === chosenKey}
+                      onPick={() => {
+                        setProblem(null);
+                        setOpen(false);
+                        void updateSettings(v.pick);
+                      }}
+                    />
+                  ))}
+                </ul>
+                {source === HERE && (
+                  <button type="button" className="link voice-more" onClick={() => navigate({ kind: "local", part: "audio" })}>
+                    {t(here.length > 1 ? "settings.speechVoiceMore" : "settings.speechVoiceGet")}
+                  </button>
+                )}
+                {source === HERE && models?.length === 0 && <p className="muted">{t("settings.cloudVoiceNone")}</p>}
+              </div>
+            </div>
           )}
         </div>
-      )}
+        {(settings.speechVoice || settings.cloudVoice) && (
+          <button type="button" className="btn" disabled={state === "loading"} onClick={() => void sample()}>
+            {t(state === "loading" ? "voice.preparing" : state === "playing" ? "voice.silence" : "settings.cloudVoiceListen")}
+          </button>
+        )}
+      </div>
       {problem && (
         <p className="muted" role="status">
           {problem}
         </p>
       )}
     </Setting>
+  );
+}
+
+function VoiceItem({ voice, heading, chosen, onPick }: { voice: Voice; heading?: string; chosen: boolean; onPick(): void }) {
+  return (
+    <>
+      {heading && (
+        <li role="presentation" className="picker-group">
+          {heading}
+        </li>
+      )}
+      <li role="option" className="picker-item" aria-selected={chosen}>
+        <button type="button" onClick={onPick}>
+          <span className="picker-name">{voice.label}</span>
+        </button>
+      </li>
+    </>
   );
 }

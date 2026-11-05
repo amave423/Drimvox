@@ -283,6 +283,10 @@ const migrations: string[] = [
   `alter table project_work add column context_tokens integer;`,
   // Of an answer's input, what came from the provider's cache (asked for: whether the cache works, and how much).
   `alter table messages add column cached_tokens integer;`,
+  // One conversation per project (asked for): how much its model thinks, and whether the run goes by an approved plan
+  // (to the end of the checklist) or answers as a chat.
+  `alter table project_work add column thinking text;
+   alter table project_work add column planned integer not null default 0;`,
 ];
 
 export interface Database {

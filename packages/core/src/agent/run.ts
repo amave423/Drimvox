@@ -1,4 +1,4 @@
-import type { ModelInfo, ProviderError } from "@drimvox/shared";
+import type { ModelInfo, ProviderError, ThinkingLevel } from "@drimvox/shared";
 import { hasToolCall, isStepCount, streamText, type ModelMessage, type StopCondition, type ToolSet } from "ai";
 import { describeError } from "../providers/errors";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";
@@ -67,6 +67,8 @@ export interface RunInput {
   system?: string;
   /** false: the model answers without thinking where the provider lets us turn it off (DeepSeek). */
   thinking?: boolean;
+  /** How much the model thinks, as the user picked it (a project's box); unset or "auto": as the provider decides. */
+  thinkingLevel?: ThinkingLevel | null;
   /** Money already spent on the task and the limit for it. */
   spentUsd: number;
   budgetUsd: number;
@@ -171,7 +173,13 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         // DeepSeek thinks by default, bills it as output and, with tools, gets it back as input on every later step.
         // After a cut the model thinks less: its thinking takes the same output limit (seen in a manual test).
         providerOptions:
-          i.thinking === false && i.conn.preset === "deepseek" ? { deepseek: { thinking: { type: "disabled" } } } : round > 0 ? thinkingOptions(i.conn.preset, "low") : undefined,
+          i.thinking === false && i.conn.preset === "deepseek"
+            ? { deepseek: { thinking: { type: "disabled" } } }
+            : round > 0
+              ? thinkingOptions(i.conn.preset, "low")
+              : i.thinkingLevel
+                ? thinkingOptions(i.conn.preset, i.thinkingLevel)
+                : undefined,
         // Near the model's context, the older work becomes one summary; see memory.ts.
         prepareStep: async ({ messages }) => {
           // A summary written in the background meanwhile takes over the older work now.

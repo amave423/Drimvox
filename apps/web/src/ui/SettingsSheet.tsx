@@ -13,7 +13,7 @@ import { UpdatesSection } from "./UpdatesSection";
 import { Catalog } from "./Catalog";
 import { Setting } from "./Setting";
 import { NoticeSoundSetting, noticeLookNow } from "./NoticeSoundSetting";
-import { CloudVoiceSetting, SpeechVoiceSetting } from "./SpeechVoiceSetting";
+import { SpeechVoiceSetting } from "./SpeechVoiceSetting";
 import { SearchSection } from "./SearchSection";
 import { ChainsSection } from "./ChainsSection";
 import { SshSection } from "./SshSection";
@@ -192,7 +192,6 @@ export function SettingsSheet() {
         </Setting>
 
         <SpeechVoiceSetting />
-        <CloudVoiceSetting />
 
         <SpendingSection />
 

@@ -29,6 +29,7 @@ import { workTools } from "./tools";
 import { projectMap } from "../agent/repo-map";
 import { proxyHint } from "../internet/blocked";
 import { checksFailedMessage, checksReport, projectChecks, runChecks } from "./checks";
+import { lineStat } from "./line-stat";
 
 /** Steps one answer of the run takes before the next answer goes on with the same context. */
 export const SEGMENT_STEPS = 60;
@@ -175,8 +176,17 @@ export class WorkRun {
     await this.d.git?.prepare(this.projectId, this.folder).catch(() => {});
 
     // How the run ended, written after git's last steps: until then it still counts as running (a new message waits).
-    let final: { status: "paused" | "stopped" | "done"; reason: "budget" | "time" | "stuck" | "error" | "user" | "month_budget" | null; detail: string | null; workedMs: number } | null = null;
-    const stopWith = (status: "paused" | "stopped" | "done", reason: "budget" | "time" | "stuck" | "error" | "user" | "month_budget" | null, detail?: string) => {
+    let final: {
+      status: "paused" | "stopped" | "done";
+      reason: "budget" | "time" | "stuck" | "error" | "user" | "month_budget" | null;
+      detail: string | null;
+      workedMs: number;
+    } | null = null;
+    const stopWith = (
+      status: "paused" | "stopped" | "done",
+      reason: "budget" | "time" | "stuck" | "error" | "user" | "month_budget" | null,
+      detail?: string,
+    ) => {
       final = { status, reason, detail: detail ?? null, workedMs: worked() };
     };
 
@@ -254,15 +264,22 @@ export class WorkRun {
       try {
         const row = this.row();
         const goal = this.d.plan(this.projectId)?.context ?? this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? "";
-        const branch = this.d.git ? (await this.d.git.state(this.projectId, this.folder).catch(() => null))?.branch ?? null : null;
+        const branch = this.d.git ? ((await this.d.git.state(this.projectId, this.folder).catch(() => null))?.branch ?? null) : null;
         writeState(this.folder, { goal, checklist: row.checklist, start: row.site, branch, report: row.report, at: Date.now() }, this.d.agentFiles?.() ?? []);
       } catch {
         // A folder that cannot be written: the state is only in Drimvox.
       }
       // What the agent left uncommitted goes in one commit; then its branch to GitHub, as the rules say.
       if (this.d.git) {
-        const done = this.row().checklist.filter((i) => i.done).at(-1)?.text;
-        const asked = this.d.chats.history(this.chatId).filter((m) => m.role === "user").at(-1)?.content.split("\n")[0] ?? "";
+        const done = this.row()
+          .checklist.filter((i) => i.done)
+          .at(-1)?.text;
+        const asked =
+          this.d.chats
+            .history(this.chatId)
+            .filter((m) => m.role === "user")
+            .at(-1)
+            ?.content.split("\n")[0] ?? "";
         await this.d.git.commit(this.projectId, this.folder, done ?? asked).catch(() => false);
         await this.d.git.finish(this.projectId, this.folder, asked || done || "").catch(() => {});
       }
@@ -291,10 +308,10 @@ export class WorkRun {
     let cost = 0;
     let priced = true;
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
-    const onCall = (name: string, what: string) => {
+    const onCall = (name: string, what: string, stat?: { added: number; removed: number } | null) => {
       if (name === "use_skill") this.skillsOpened.add(what);
       this.sinceChecklist = name === "update_checklist" ? 0 : this.sinceChecklist + 1;
-      activity.push({ name, input: what, at: content.length });
+      activity.push({ name, input: what, at: content.length, ...(stat ?? {}) });
       save();
     };
     // The activity line of a call, and the approvals of risky commands, as in a chat with a folder.
@@ -303,7 +320,12 @@ export class WorkRun {
     };
     const askApproval: ToolHooks["askApproval"] = (command, reason, sig, purpose) =>
       this.d.approvals.ask(this.chatId, emit, { server: "", tool: command, input: null, reason, purpose, signal: sig });
-    const hooks = { onCall: (call: { name: string; input: unknown }) => onCall(call.name, describeCall(call.input)), onResult: () => {}, askApproval };
+    // A write or an edit carries the lines it adds and removes, counted before it runs.
+    const hooks = {
+      onCall: (call: { name: string; input: unknown }) => onCall(call.name, describeCall(call.input), lineStat(this.folder, call.name, call.input)),
+      onResult: () => {},
+      askApproval,
+    };
 
     const price = await findModel(conn, model);
     const plan = this.d.plan(this.projectId);
@@ -320,7 +342,13 @@ export class WorkRun {
     const spentNow = this.spent();
     const gitLine = this.d.git ? await this.d.git.instructions(this.projectId, this.folder) : undefined;
     const imageTools = this.d.imageTools
-      ? await this.d.imageTools(this.folder, this.chatId, hooks, (usd) => (cost += usd), () => (this.chatMode ? Number.POSITIVE_INFINITY : this.row().budgetUsd - spentNow - cost))
+      ? await this.d.imageTools(
+          this.folder,
+          this.chatId,
+          hooks,
+          (usd) => (cost += usd),
+          () => (this.chatMode ? Number.POSITIVE_INFINITY : this.row().budgetUsd - spentNow - cost),
+        )
       : {};
     const own: ToolSet = {
       ...mcpTools,
@@ -330,12 +358,18 @@ export class WorkRun {
             vision,
             hooks,
             owner: this.chatId,
-            see: vision ? async (png, question, signal) => (await askAboutPictures(vision, [{ data: png, mediaType: "image/png" }], question, signal)).text : undefined,
+            see: vision
+              ? async (png, question, signal) => (await askAboutPictures(vision, [{ data: png, mediaType: "image/png" }], question, signal)).text
+              : undefined,
           })
         : {}),
       ...imageTools,
       ...pick(folderTools(this.folder, emit, askApproval, files, vision), ["save_attachment", "look_at_image"]),
-      ...webTools(this.d.web, { onCall: (call) => onCall(call.name, describeCall(call.input)) }, { local: true, vision, onSpend: (usd) => (cost += usd), folder: this.folder, owner: this.chatId }),
+      ...webTools(
+        this.d.web,
+        { onCall: (call) => onCall(call.name, describeCall(call.input)) },
+        { local: true, vision, onSpend: (usd) => (cost += usd), folder: this.folder, owner: this.chatId },
+      ),
       ...skillTools(skills, this.folder, hooks),
       ...visualTools(
         {
@@ -372,7 +406,13 @@ export class WorkRun {
             this.sentBack = true;
             return { fix: checksFailedMessage(results) };
           }
-          const asked = this.d.chats.history(this.chatId).filter((m) => m.role === "user").at(-1)?.content ?? plan?.context ?? "";
+          const asked =
+            this.d.chats
+              .history(this.chatId)
+              .filter((m) => m.role === "user")
+              .at(-1)?.content ??
+            plan?.context ??
+            "";
           return { report: checksReport(results, /[а-яё]/i.test(asked)) };
         },
         codeReview: async () => {
@@ -433,7 +473,9 @@ export class WorkRun {
           return issues ? polishWorkMessage(issues) : null;
         },
         onCall,
-        ...(this.d.git && this.d.git.rules(this.projectId).commit !== "never" ? { commit: (message: string) => this.d.git!.commit(this.projectId, this.folder, message) } : {}),
+        ...(this.d.git && this.d.git.rules(this.projectId).commit !== "never"
+          ? { commit: (message: string) => this.d.git!.commit(this.projectId, this.folder, message) }
+          : {}),
       }),
     };
     const spentBefore = this.spent();
@@ -447,6 +489,7 @@ export class WorkRun {
       messages,
       mode: "write",
       noFinish: true,
+      thinkingLevel: this.row().thinking,
       ownTools: own,
       stopTools: ["finish_work"],
       maxSteps: SEGMENT_STEPS,
@@ -464,7 +507,9 @@ export class WorkRun {
         folderHint(this.folder),
         // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
         proxyHint(this.d.web),
-        this.chatMode ? existingRules(!!vision && !!this.d.visualKit.screenshot, gitLine) : projectRules(plan, !!vision && !!this.d.visualKit.screenshot, gitLine),
+        this.chatMode
+          ? existingRules(!!vision && !!this.d.visualKit.screenshot, gitLine)
+          : projectRules(plan, !!vision && !!this.d.visualKit.screenshot, gitLine),
         VISUAL_HINT,
         WEB_HINT,
         skillsInstructions(skills),

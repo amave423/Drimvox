@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 /**
  * The project's notes for agents: AGENTS.md (or CLAUDE.md), sent whole at the start of every request and never
@@ -53,8 +53,8 @@ export interface ProjectState {
 /**
  * The project's state, written by Drimvox itself after each turn of its agent, whatever the model remembered to note
  * (asked for: any agent, in Drimvox or another program, picks the work up without explanations). AGENTS.md is the open
- * format most agents read; for those that read a file of their own, a one-line pointer is made when the settings ask
- * for it (CLAUDE.md, GEMINI.md, QWEN.md) and the project has none.
+ * format most agents read; for those that read a file of their own, a short pointer is made when the settings ask for
+ * it (CLAUDE.md, GEMINI.md, Copilot's, Windsurf's rules…) and the project has none.
  */
 export function writeState(root: string, s: ProjectState, pointers: string[] = []): void {
   const lines = [
@@ -72,9 +72,15 @@ export function writeState(root: string, s: ProjectState, pointers: string[] = [
   writeSection(root, STATE_START, STATE_END, lines.join("\n"));
   for (const name of pointers) {
     const file = join(root, name);
-    if (!existsSync(file)) writeFileSync(file, "@AGENTS.md\n");
+    if (existsSync(file)) continue;
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, IMPORTS.has(name) ? "@AGENTS.md\n" : POINTER);
   }
 }
+
+/** Files whose agent includes another file by "@name"; the rest get the pointer in words. */
+const IMPORTS = new Set(["CLAUDE.md", "GEMINI.md", "QWEN.md"]);
+const POINTER = "Read AGENTS.md in the project root first: the project's rules, state, plan and notes, kept current by Drimvox.\n";
 
 /** Replaces one marked section of AGENTS.md, creating the file or the section when missing. */
 function writeSection(root: string, open: string, close: string, body: string): void {

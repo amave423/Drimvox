@@ -5,6 +5,7 @@ import type { Database } from "../db";
 import { isCli } from "../cli/kinds";
 import type { FreeModel, FreeWatch } from "./free-watch";
 import { languageModel } from "./model";
+import { smartness } from "./smart";
 import type { Connection, ProviderRepo } from "./repo";
 
 const KEY = "chains";
@@ -59,7 +60,9 @@ export class Chains {
   }
 
   save(chains: ModelChain[]): void {
-    this.db.sql.prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value").run(KEY, JSON.stringify(chains));
+    this.db.sql
+      .prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value")
+      .run(KEY, JSON.stringify(chains));
   }
 
   /** The free models a chain can be made of, for the settings' "Add a model", with what the background check found. */
@@ -87,8 +90,15 @@ export class Chains {
     const local = (f: FreeModel) => (this.providers.connection(f.providerId)?.preset === "ollama" ? 1 : 0);
     const answers = (f: FreeModel) => (this.watch.check(f).state === "ok" ? 0 : 1);
     const speed = (f: FreeModel) => this.watch.check(f).ms ?? 60_000;
-    picked.sort((a, b) => local(a) - local(b) || answers(a) - answers(b) || Number(b.tools === true) - Number(a.tools === true) || speed(a) - speed(b));
-    return { id, name: auto.name, models: picked.slice(0, 20).map((f) => ({ providerId: f.providerId, model: f.model })), order: "best", onLimit: true, onError: true, timeoutS: 30, toolsOnly: auto.toolsOnly };
+    // For code the smartest go first (asked for: the fastest came first, and they are the weakest), kept in that order
+    // when asked; for a chat the fastest that answered, best by how they answered here.
+    const smart = (f: FreeModel) => (auto.toolsOnly ? smartness(f.model, f.name) : 0);
+    picked.sort(
+      (a, b) =>
+        local(a) - local(b) || answers(a) - answers(b) || smart(b) - smart(a) || Number(b.tools === true) - Number(a.tools === true) || speed(a) - speed(b),
+    );
+    const models = picked.slice(0, 20).map((f) => ({ providerId: f.providerId, model: f.model }));
+    return { id, name: auto.name, models, order: auto.toolsOnly ? "list" : "best", onLimit: true, onError: true, timeoutS: 30, toolsOnly: auto.toolsOnly };
   }
 
   /** Every chain with its models' names and state, for the settings and the model picker. */
@@ -117,7 +127,16 @@ export class Chains {
 
   /** The chains as models of the "chain" provider: free, and calling tools when the chain is made of such models. */
   async models(): Promise<ModelInfo[]> {
-    return (await this.views()).map((c) => ({ id: c.id, name: c.name, contextLength: null, priceIn: 0, priceOut: 0, priceEstimated: false, tools: c.toolsOnly ? true : null, vision: null }));
+    return (await this.views()).map((c) => ({
+      id: c.id,
+      name: c.name,
+      contextLength: null,
+      priceIn: 0,
+      priceOut: 0,
+      priceEstimated: false,
+      tools: c.toolsOnly ? true : null,
+      vision: null,
+    }));
   }
 
   /** The order to try a chain's models in now: resting ones out (unless all rest), the best first when asked. */
@@ -155,7 +174,8 @@ export class Chains {
       const chain = await self.chain(chainId);
       if (!chain) throw new APICallError({ message: "The chain is gone", url: "drimvox://chain", requestBodyValues: {}, statusCode: 404 });
       const order = await self.order(chain);
-      if (!order.length) throw new APICallError({ message: "The chain has no models that can answer", url: "drimvox://chain", requestBodyValues: {}, statusCode: 404 });
+      if (!order.length)
+        throw new APICallError({ message: "The chain has no models that can answer", url: "drimvox://chain", requestBodyValues: {}, statusCode: 404 });
       let last: unknown = null;
       for (const { ref, conn } of order) {
         if (options.abortSignal?.aborted) break;

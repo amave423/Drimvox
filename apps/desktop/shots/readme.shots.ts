@@ -268,11 +268,16 @@ test("README screenshots", async () => {
   );
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await addProject(page);
-  await page.getByLabel("Что сделать?").fill("Сайт стоматологической клиники «Улыбка» с онлайн-записью к врачу");
-  // The last model of the chat is picked already; the project gets a stronger one.
-  await page.getByRole("group", { name: "Модели" }).getByRole("button", { name: /DeepSeek V4 Flash/ }).first().click();
+  // The last model of the chat is picked already; the project gets a stronger one, and asks for the interview and the plan.
+  await page.locator(".composer").getByRole("button", { name: /DeepSeek V4 Flash/ }).click();
   await page.getByRole("option", { name: /Claude Sonnet 5.5/ }).click();
-  await page.getByRole("button", { name: "Начать опрос" }).click();
+  await page.locator(".composer").getByRole("button", { name: /^Параметры/ }).click();
+  const options = page.getByRole("dialog", { name: "Параметры" });
+  await options.getByText(/^Сначала пара вопросов/).click();
+  await options.getByText(/^План на утверждение/).click();
+  await page.keyboard.press("Escape");
+  await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт стоматологической клиники «Улыбка» с онлайн-записью к врачу");
+  await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
   await expect(page.getByText("Как пациент записывается?")).toBeVisible({ timeout: 30_000 });
   await shot(page, "project-interview");
   for (const option of ["Выбор врача и времени", "Светлый и спокойный"]) await page.getByText(option, { exact: true }).click();

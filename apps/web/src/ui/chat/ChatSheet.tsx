@@ -27,7 +27,7 @@ import { Hint } from "../Hint";
 import { MessageRail } from "./MessageRail";
 import { MediaPrice, useMediaOptionRows } from "./MediaOptions";
 import { directorRows, useDirector } from "./DirectorControl";
-import { AssistantMessage, ChatApprovalCard, UserMessage, type AnswerAction, type ChatApproval } from "./Messages";
+import { AssistantMessage, ChatApprovalCard, OpenFileContext, UserMessage, type AnswerAction, type ChatApproval } from "./Messages";
 import { ModelPicker } from "./ModelPicker";
 import { isPhoto, photoProblem } from "./photos";
 import { loadModels } from "../../lib/models";
@@ -35,7 +35,8 @@ import { readWebMode, WebSwitch } from "./WebSwitch";
 import { FolderSwitch } from "./FolderSwitch";
 import { readThinking, ThinkingSwitch } from "./ThinkingSwitch";
 import { ChatMargin } from "./ChatMargin";
-import { FileChips } from "./FileChips";
+import { FileChips, FileViewer } from "./FileChips";
+import { ProjectComposer } from "../projects/ProjectComposer";
 import { WorkReview } from "../projects/WorkReview";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 import { activityLine } from "./activityLine";
@@ -68,7 +69,7 @@ const PENDING_POLL_MS = 3000;
  * user's messages in time, with the box to write to the run under them.
  */
 export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: string | null; viewKey: string; autoSend?: string; workshop?: boolean }) {
-  const { api, token, t, settings, updateSettings, providers, projects, navigate, reloadChats, reloadToday } = useApp();
+  const { api, token, t, settings, updateSettings, providers, navigate, reloadChats, reloadToday } = useApp();
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -81,6 +82,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   const [options, setOptions] = useState<Options>({});
   const [web, setWeb] = useState(readWebMode);
   const [thinking, setThinking] = useState(readThinking);
+  /** A file of the folder opened from a chip in the answers. */
+  const [viewing, setViewing] = useState<string | null>(null);
   // Small local models cannot call tools: they chat without Drimvox's search.
   const [noTools, setNoTools] = useState(false);
   // The folder the model works in; kept locally until the chat exists.
@@ -113,7 +116,10 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   }, [api, choice?.providerId, choice?.model, kind]);
 
   async function load(id: string) {
-    const loaded = await api.chats[":id"].$get({ param: { id } }).then((r) => ok<ChatWithMessages>(r)).catch(() => null);
+    const loaded = await api.chats[":id"]
+      .$get({ param: { id } })
+      .then((r) => ok<ChatWithMessages>(r))
+      .catch(() => null);
     if (!loaded) return;
     setChat(loaded);
     setFolder(loaded.folder);
@@ -136,7 +142,12 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   // the chat checks on them until they are done.
   const pending = !draft && !!chat?.messages.some((m) => m.status === "streaming");
   // A text answer is followed live, letter by letter (useLiveAnswer); the rest (clips, a project's run) by looking again.
-  const live = useLiveAnswer(chat?.id ?? null, pending && chat?.kind === "text" && !chat.projectId, token, () => chat && void load(chat.id).then(() => void reloadToday()));
+  const live = useLiveAnswer(
+    chat?.id ?? null,
+    pending && chat?.kind === "text" && !chat.projectId,
+    token,
+    () => chat && void load(chat.id).then(() => void reloadToday()),
+  );
   useEffect(() => {
     if (!pending || !chat || live) return;
     // A text answer is followed closely; a clip renders for minutes.
@@ -186,16 +197,30 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   }, [projectId, workshop]);
   /** What the model did, as the answer shows it in order; a project's screenshots by their address. */
   const toActions = (entries: ActivityEntry[]): AnswerAction[] =>
-    entries.flatMap((a) =>
+    entries.flatMap((a): AnswerAction[] =>
       a.name === "screenshot"
         ? projectId
           ? [{ line: "", at: a.at, shot: `/api/projects/${projectId}/work/shots/${a.input}` }]
           : []
-        : [{ line: activityLine(t, a.name, a.input), at: a.at }],
+        : [
+            {
+              line: activityLine(t, a.name, a.input),
+              at: a.at,
+              // Files written or changed show where it happened, with their lines (asked for).
+              ...(a.name === "write_file" || a.name === "edit_file"
+                ? {
+                    file: {
+                      paths: a.input.split("\n").filter(Boolean),
+                      touch: a.name === "write_file" ? ("written" as const) : ("changed" as const),
+                      added: a.added,
+                      removed: a.removed,
+                    },
+                  }
+                : {}),
+            },
+          ],
     );
   const { work, reload: reloadWork } = useProjectWork(projectId);
-  // A ready project is talked to as in a chat (asked for): each message goes to the model picked under the box.
-  const ready = !!projectId && projects.find((p) => p.id === projectId)?.kind === "existing";
   // Every screenshot of the run in order, so one opened goes on to the others; captioned with its page.
   const shots: Shot[] = projectId
     ? (chat?.messages ?? []).flatMap((m) =>
@@ -290,20 +315,6 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
     return sent;
   }
 
-  /** In a project's conversation a message goes to the run: taken on the way, or starting it again. */
-  async function sendToWork(id: string, content: string) {
-    setFailed(false);
-    setSentAt(Date.now());
-    const res = await (ready && choice
-      ? api.projects[":id"].work.chat.$post({ param: { id }, json: { content, model: { providerId: choice.providerId, model: choice.model } } })
-      : api.projects[":id"].work.message.$post({ param: { id }, json: { content } })
-    ).catch(() => null);
-    if (ready && choice) rememberLastModel(choice);
-    if (!res?.ok) setFailed(true);
-    await reloadWork();
-    if (chat) await load(chat.id);
-  }
-
   /** Shows another version of an edited message, and the branch that goes on from it. */
   async function showVersion(messageId: string) {
     if (!chat) return;
@@ -313,7 +324,6 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
 
   async function send(content: string, editOf?: string) {
     setMonthRefusal(null);
-    if (projectId) return sendToWork(projectId, content);
     if (!choice) return;
     setFailed(false);
     setAttachError(null);
@@ -364,7 +374,9 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
               options,
               confirm,
               attachments: attached.map((a) => a.id),
-              ...(directing ? { director: { providerId: director.providerId!, model: director.model!, attempts: director.attempts, sketches: director.sketches } } : {}),
+              ...(directing
+                ? { director: { providerId: director.providerId!, model: director.model!, attempts: director.attempts, sketches: director.sketches } }
+                : {}),
             },
         (e) => {
           // The core named the chat after the question: the list shows the name before the answer is done.
@@ -379,7 +391,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
             setDraft((d) => d && { ...d, approvals: [...d.approvals, card] });
             // The answer waits on the user: said by a notification when the window is elsewhere (seen: a chat stood still
             // for minutes on a request nobody saw).
-            if (settings.notifications) window.drimvox?.notify({ ...noticeLookNow(settings), mode: "chat", title: t("notice.chatApproval"), body: content.slice(0, 120), chatId: id });
+            if (settings.notifications)
+              window.drimvox?.notify({ ...noticeLookNow(settings), mode: "chat", title: t("notice.chatApproval"), body: content.slice(0, 120), chatId: id });
           }
           if (e.type === "approved") {
             const state = e.allowed ? "allowed" : "denied";
@@ -389,7 +402,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
         controller.signal,
       );
     } catch (err) {
-      if (err instanceof CoreRefusal && err.error?.code === "month_budget") setMonthRefusal({ spent: Number(err.error.spentUsd ?? 0), budget: Number(err.error.budgetUsd ?? 0) });
+      if (err instanceof CoreRefusal && err.error?.code === "month_budget")
+        setMonthRefusal({ spent: Number(err.error.spentUsd ?? 0), budget: Number(err.error.budgetUsd ?? 0) });
       else if (!controller.signal.aborted) setFailed(true);
     }
     abort.current = null;
@@ -432,7 +446,10 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   const messages = chat?.messages ?? [];
   const answers = messages.filter((m) => m.role === "assistant");
   // A reply to the agent's question closes its note at once, before the core saves the message.
-  const ownTexts = messages.filter((m) => m.role === "user").map((m) => m.content).concat(draft ? [draft.user] : []);
+  const ownTexts = messages
+    .filter((m) => m.role === "user")
+    .map((m) => m.content)
+    .concat(draft ? [draft.user] : []);
   const lastUserAt = Math.max(sentAt, ...messages.filter((m) => m.role === "user").map((m) => m.createdAt));
   const empty = messages.length === 0 && !draft;
   // One's own message is edited in a text chat; a project's run and a program on a subscription keep their own course.
@@ -450,167 +467,193 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
     );
 
   return (
-    <article className={workshop ? "workshop-chat" : "sheet chat"}>
-      <div className={workshop ? "workshop-chat-body" : "sheet-body chat-body"}>
-        {!workshop && (
-          <header className="chat-head">
-            <h1>{chat?.title ?? t("chat.emptyTitle")}</h1>
-          </header>
-        )}
-
-        {empty && !workshop && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
-
-        <ShotsContext.Provider value={shots}>
-        {/* The user's own questions as marks to jump between (asked for: like DeepSeek and Codex). */}
-        {workshop && <MessageRail texts={ownTexts} list={list} />}
-        <div className={`messages${workshop ? " timeline" : ""}`} ref={list}>
-          {(cutAt !== null ? messages.slice(0, cutAt) : messages).map((m) => at(m.id, m.createdAt,
-            m.role === "user" ? (
-              <UserMessage
-                key={m.id}
-                content={m.content}
-                files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null}
-                versions={m.versions}
-                onVersion={draft ? undefined : (id) => void showVersion(id)}
-                onEdit={editable && !draft ? (text) => void send(text, m.id) : undefined}
-              />
-            ) : (
-              <AssistantMessage
-                key={m.id}
-                // Still being written and followed live: the text, the thinking and the actions as they come.
-                content={live?.messageId === m.id ? live.text : m.content}
-                reasoning={live?.messageId === m.id ? live.reasoning || null : m.reasoning}
-                streaming={live?.messageId === m.id}
-                model={m.model}
-                message={m}
-                kind={chat?.kind}
-                // Still being written: its actions so far, as they come; once done, folded.
-                actions={toActions(live?.messageId === m.id ? live.activity : m.activity)}
-                onUndo={draft || chat?.itemId || running ? undefined : () => void undo(m.id)}
-                files={chat?.folder && live?.messageId !== m.id ? <FileChips chatId={chat.id} files={filesOf(m.activity)} /> : null}
-                // Seen after coming back to the chat: the requests this answer waits on, to answer here.
-                approvals={m.status === "streaming" && !draft ? chat?.approvals.map((a) => ({ ...a, state: "open" as const })) : undefined}
-                onApprove={approve}
-              />
-            ),
-            // On the timeline a finished answer is a filled point; one still being written, an open one.
-            m.role === "assistant" && m.status !== "streaming",
-          ))}
-          {draft && (
-            <>
-              <UserMessage content={draft.user} files={chat ? <SentFiles chatId={chat.id} files={draft.attachments} /> : null} />
-              <AssistantMessage
-                content={draft.text}
-                reasoning={draft.reasoning || null}
-                model={draft.model}
-                streaming
-                making={draft.media ? kind : undefined}
-                actions={toActions(draft.activity)}
-                approvals={draft.approvals}
-                onApprove={approve}
-              />
-            </>
+    // A file chip in the answers opens the file of the folder over the window.
+    <OpenFileContext.Provider value={workshop && chat?.folder ? setViewing : null}>
+      <article className={workshop ? "workshop-chat" : "sheet chat"}>
+        <div className={workshop ? "workshop-chat-body" : "sheet-body chat-body"}>
+          {!workshop && (
+            <header className="chat-head">
+              <h1>{chat?.title ?? t("chat.emptyTitle")}</h1>
+            </header>
           )}
-          <div ref={end} />
+
+          {empty && !workshop && <p className="lede">{t(kind === "text" ? "chat.emptyLede" : "media.emptyLede", { limit: formatUsd(CONFIRM_ABOVE_USD) })}</p>}
+
+          <ShotsContext.Provider value={shots}>
+            {/* The user's own questions as marks to jump between (asked for: like DeepSeek and Codex). */}
+            {workshop && <MessageRail texts={ownTexts} list={list} />}
+            <div className={`messages${workshop ? " timeline" : ""}`} ref={list}>
+              {(cutAt !== null ? messages.slice(0, cutAt) : messages).map((m) =>
+                at(
+                  m.id,
+                  m.createdAt,
+                  m.role === "user" ? (
+                    <UserMessage
+                      key={m.id}
+                      content={m.content}
+                      files={chat ? <SentFiles chatId={chat.id} files={m.attachments} /> : null}
+                      versions={m.versions}
+                      onVersion={draft ? undefined : (id) => void showVersion(id)}
+                      onEdit={editable && !draft ? (text) => void send(text, m.id) : undefined}
+                    />
+                  ) : (
+                    <AssistantMessage
+                      key={m.id}
+                      // Still being written and followed live: the text, the thinking and the actions as they come.
+                      content={live?.messageId === m.id ? live.text : m.content}
+                      reasoning={live?.messageId === m.id ? live.reasoning || null : m.reasoning}
+                      streaming={live?.messageId === m.id}
+                      model={m.model}
+                      message={m}
+                      kind={chat?.kind}
+                      // Still being written: its actions so far, as they come; once done, folded.
+                      actions={toActions(live?.messageId === m.id ? live.activity : m.activity)}
+                      onUndo={draft || chat?.itemId || running ? undefined : () => void undo(m.id)}
+                      // In a project the files stand where they were changed, not at the answer's end (asked for).
+                      files={chat?.folder && !workshop && live?.messageId !== m.id ? <FileChips chatId={chat.id} files={filesOf(m.activity)} /> : null}
+                      // Seen after coming back to the chat: the requests this answer waits on, to answer here.
+                      approvals={m.status === "streaming" && !draft ? chat?.approvals.map((a) => ({ ...a, state: "open" as const })) : undefined}
+                      onApprove={approve}
+                    />
+                  ),
+                  // On the timeline a finished answer is a filled point; one still being written, an open one.
+                  m.role === "assistant" && m.status !== "streaming",
+                ),
+              )}
+              {draft && (
+                <>
+                  <UserMessage content={draft.user} files={chat ? <SentFiles chatId={chat.id} files={draft.attachments} /> : null} />
+                  <AssistantMessage
+                    content={draft.text}
+                    reasoning={draft.reasoning || null}
+                    model={draft.model}
+                    streaming
+                    making={draft.media ? kind : undefined}
+                    actions={toActions(draft.activity)}
+                    approvals={draft.approvals}
+                    onApprove={approve}
+                  />
+                </>
+              )}
+              <div ref={end} />
+            </div>
+          </ShotsContext.Provider>
+
+          {openApprovals.length > 0 && (
+            <section className="approval-dock" ref={dock} aria-label={t("approval.waiting")}>
+              {openApprovals.map((a) => (
+                <ChatApprovalCard key={a.id} approval={a} onApprove={approve} />
+              ))}
+            </section>
+          )}
+          {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
+          {monthRefusal && (
+            <p className="error-note">{t("chat.monthBudget", { spent: formatUsd(monthRefusal.spent), budget: formatUsd(monthRefusal.budget) })}</p>
+          )}
+          {attachError && <p className="error-note">{t(`attach.${attachError}` as MessageKey, { max: MAX_FILES })}</p>}
+          {folderError && (
+            <p className="error-note">{t(folderError === "no_tools" ? "folder.noTools" : folderError === "not_found" ? "folder.notFound" : "folder.failed")}</p>
+          )}
+          {chat?.projectId && chat.itemId && <WorkReview projectId={chat.projectId} itemId={chat.itemId} busy={!!draft} answers={answers.length} />}
+          {/* The agent's newest question over the box until the user writes after it; the user answers in the conversation. */}
+          {workshop && work && work.questions.length > 0 && work.questions.at(-1)!.at > lastUserAt && (
+            <section className="work-questions-note">
+              <strong>{t("workshop.asks")}</strong>
+              <p>{work.questions.at(-1)!.question}</p>
+              <p className="muted">{t("projectWork.assumes", { assumption: work.questions.at(-1)!.assumption })}</p>
+            </section>
+          )}
+          {projectId ? (
+            // A project's conversation: the run goes on while the user writes; Stop is in the workshop's header. Its box
+            // picks the model, the interview and the plan, the strong model and the thinking (ProjectComposer).
+            <ProjectComposer
+              projectId={projectId}
+              work={work}
+              onSent={() => {
+                setSentAt(Date.now());
+                void reloadWork().then(() => chat && load(chat.id));
+              }}
+            />
+          ) : (
+            <Composer
+              disabled={!choice || (kind !== "text" && !mediaModel)}
+              streaming={!!draft || pending}
+              onSend={(text) => void send(text)}
+              // An answer from this window stops with its request; one seen after coming back, through the core.
+              onStop={() => (draft ? abort.current?.abort() : chat && void api.chats[":id"].stop.$post({ param: { id: chat.id } }).then(() => load(chat.id)))}
+              attach={{
+                files,
+                onAdd: (added) => void addFiles(added),
+                onRemove: (key) => setFiles(files.filter((f) => f.key !== key)),
+                photos: kind !== "text",
+                blocked: kind !== "text" && mediaModel && !mediaModel.photos ? t("photos.cannot") : undefined,
+              }}
+              picker={
+                <ModelPicker
+                  value={choice}
+                  onChange={setChoice}
+                  placement="above"
+                  kinds={["text", "image", "video"]}
+                  photos={kind !== "text" && files.some(isPhoto)}
+                />
+              }
+              options={
+                mediaModel
+                  ? mediaRows
+                  : kind === "text" && choice
+                    ? {
+                        changed: changedOptions,
+                        rows: [
+                          { label: t("web.label"), control: <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} /> },
+                          ...(thinks ? [{ label: t("thinking.label"), control: <ThinkingSwitch value={thinking} onChange={setThinking} /> }] : []),
+                          { label: t("folder.label"), control: <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} /> },
+                          // Asked for: commands in the folder can run without a card to click each time.
+                          ...(folder
+                            ? [
+                                {
+                                  label: t("approval.modeLabel"),
+                                  control: (
+                                    <span className="director-row">
+                                      <Toggle checked={settings.folderAutoApprove} onChange={(on) => void updateSettings({ folderAutoApprove: on })}>
+                                        <span className="visually-hidden">{t("approval.modeLabel")}</span>
+                                      </Toggle>
+                                      <Hint text={t("approval.autoHint")} />
+                                    </span>
+                                  ),
+                                },
+                              ]
+                            : []),
+                        ],
+                      }
+                    : { changed: [], rows: [] }
+              }
+              beforeSend={mediaModel && !confirm && <MediaPrice model={mediaModel} estimateUsd={estimateUsd} />}
+              placeholder={kind === "text" ? undefined : t(kind === "image" ? "media.placeholderImage" : "media.placeholderVideo")}
+              sendLabel={
+                kind === "text"
+                  ? undefined
+                  : confirm
+                    ? estimateUsd === null
+                      ? t("media.startUnknown")
+                      : t("media.startFor", { cost: formatUsd(estimateUsd) })
+                    : t("media.make")
+              }
+            />
+          )}
         </div>
-        </ShotsContext.Provider>
 
-        {openApprovals.length > 0 && (
-          <section className="approval-dock" ref={dock} aria-label={t("approval.waiting")}>
-            {openApprovals.map((a) => (
-              <ChatApprovalCard key={a.id} approval={a} onApprove={approve} />
-            ))}
-          </section>
-        )}
-        {failed && <p className="error-note">{t("chat.sendFailed")}</p>}
-        {monthRefusal && <p className="error-note">{t("chat.monthBudget", { spent: formatUsd(monthRefusal.spent), budget: formatUsd(monthRefusal.budget) })}</p>}
-        {attachError && <p className="error-note">{t(`attach.${attachError}` as MessageKey, { max: MAX_FILES })}</p>}
-        {folderError && <p className="error-note">{t(folderError === "no_tools" ? "folder.noTools" : folderError === "not_found" ? "folder.notFound" : "folder.failed")}</p>}
-        {chat?.projectId && chat.itemId && (
-          <WorkReview projectId={chat.projectId} itemId={chat.itemId} busy={!!draft} answers={answers.length} />
-        )}
-        {/* The agent's newest question over the box until the user writes after it; all of them are in the workshop's "Questions". */}
-        {workshop && work && work.questions.length > 0 && work.questions.at(-1)!.at > lastUserAt && (
-          <section className="work-questions-note">
-            <strong>{t("workshop.asks")}</strong>
-            <p>{work.questions.at(-1)!.question}</p>
-            <p className="muted">{t("projectWork.assumes", { assumption: work.questions.at(-1)!.assumption })}</p>
-          </section>
-        )}
-        {projectId ? (
-          // A project's conversation: the run goes on while the user writes; Stop is in the workshop's header.
-          <Composer
-            disabled={!work?.startedAt || (ready && !choice)}
-            streaming={false}
-            onSend={(text) => void send(text)}
-            onStop={() => {}}
-            picker={ready ? <ModelPicker value={choice} onChange={setChoice} placement="above" /> : null}
-            options={{ changed: [], rows: [] }}
-            placeholder={t(ready ? "chat.readyPlaceholder" : "chat.workPlaceholder")}
-          />
-        ) : (
-          <Composer
-            disabled={!choice || (kind !== "text" && !mediaModel)}
-            streaming={!!draft || pending}
-            onSend={(text) => void send(text)}
-            // An answer from this window stops with its request; one seen after coming back, through the core.
-            onStop={() => (draft ? abort.current?.abort() : chat && void api.chats[":id"].stop.$post({ param: { id: chat.id } }).then(() => load(chat.id)))}
-            attach={{
-              files,
-              onAdd: (added) => void addFiles(added),
-              onRemove: (key) => setFiles(files.filter((f) => f.key !== key)),
-              photos: kind !== "text",
-              blocked: kind !== "text" && mediaModel && !mediaModel.photos ? t("photos.cannot") : undefined,
-            }}
-            picker={<ModelPicker value={choice} onChange={setChoice} placement="above" kinds={["text", "image", "video"]} photos={kind !== "text" && files.some(isPhoto)} />}
-            options={
-              mediaModel
-                ? mediaRows
-                : kind === "text" && choice
-                  ? {
-                      changed: changedOptions,
-                      rows: [
-                        { label: t("web.label"), control: <WebSwitch value={web} onChange={setWeb} providerName={searchProvider} noTools={noTools} /> },
-                        ...(thinks ? [{ label: t("thinking.label"), control: <ThinkingSwitch value={thinking} onChange={setThinking} /> }] : []),
-                        { label: t("folder.label"), control: <FolderSwitch value={folder} onChange={(next) => void changeFolder(next)} noTools={noTools} /> },
-                        // Asked for: commands in the folder can run without a card to click each time.
-                        ...(folder
-                          ? [
-                              {
-                                label: t("approval.modeLabel"),
-                                control: (
-                                  <span className="director-row">
-                                    <Toggle checked={settings.folderAutoApprove} onChange={(on) => void updateSettings({ folderAutoApprove: on })}>
-                                      <span className="visually-hidden">{t("approval.modeLabel")}</span>
-                                    </Toggle>
-                                    <Hint text={t("approval.autoHint")} />
-                                  </span>
-                                ),
-                              },
-                            ]
-                          : []),
-                      ],
-                    }
-                  : { changed: [], rows: [] }
-            }
-            beforeSend={mediaModel && !confirm && <MediaPrice model={mediaModel} estimateUsd={estimateUsd} />}
-            placeholder={kind === "text" ? undefined : t(kind === "image" ? "media.placeholderImage" : "media.placeholderVideo")}
-            sendLabel={
-              kind === "text"
-                ? undefined
-                : confirm
-                  ? estimateUsd === null
-                    ? t("media.startUnknown")
-                    : t("media.startFor", { cost: formatUsd(estimateUsd) })
-                  : t("media.make")
-            }
+        {!workshop && (
+          <ChatMargin
+            choice={choice}
+            answers={answers}
+            chat={chat && chat.messages.length ? { id: chat.id, title: chat.title, folder: chat.folder } : null}
+            onDelete={chat ? () => void remove() : null}
+            own={ownTexts}
+            list={list}
           />
         )}
-      </div>
-
-      {!workshop && (
-        <ChatMargin choice={choice} answers={answers} chat={chat && chat.messages.length ? { id: chat.id, title: chat.title, folder: chat.folder } : null} onDelete={chat ? () => void remove() : null} own={ownTexts} list={list} />
-      )}
-    </article>
+      </article>
+      {viewing && chat && <FileViewer chatId={chat.id} path={viewing} onClose={() => setViewing(null)} />}
+    </OpenFileContext.Provider>
   );
 }

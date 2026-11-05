@@ -58,81 +58,73 @@ export function usePaneWidth(shape: PaneShape = RESULT_PANE) {
     if (!box) return state.width;
     return shape.side === "right" ? box.right - x - 6 : x - box.left - 6;
   };
-  return { shape, width: state.width, last: state.last, set, fit, widthAt, dragging, setDragging, body, toggle: () => set(state.width > 0 ? 0 : fit(state.last)) };
+  return {
+    shape,
+    width: state.width,
+    last: state.last,
+    set,
+    fit,
+    widthAt,
+    dragging,
+    setDragging,
+    body,
+    toggle: () => set(state.width > 0 ? 0 : fit(state.last)),
+  };
 }
 
 export type Pane = ReturnType<typeof usePaneWidth>;
 
 /**
- * The handle beside a pane (asked for: a slider, not a button): dragged, it sets the pane's width and folds it away at
- * the edge; clicked, it opens or folds the pane, which slides; the arrow keys move it too.
+ * The edge beside a pane (asked for: no grip on it, just the edge with a resize cursor, the sections around it rounded
+ * at the bottom): dragged, it sets the pane's width and folds it away at the edge; double-clicked, it opens or folds the
+ * pane, which slides; focused, the arrow keys move it and Enter folds or opens.
  */
 export function PaneSplit({ split, label, controls }: { split: Pane; label: { open: MessageKey; closed: MessageKey }; controls: string }) {
   const { t } = useApp();
-  const start = useRef<{ x: number; moved: boolean; grip: boolean } | null>(null);
-  // Where the grip stands along the strip: where it was last taken (asked for: anywhere, not only in the middle).
-  const [gripY, setGripY] = useState<number | null>(null);
+  const start = useRef<{ x: number; moved: boolean } | null>(null);
   const open = split.width > 0;
   // The arrow towards the pane widens it.
   const wider = split.shape.side === "right" ? "ArrowLeft" : "ArrowRight";
   const narrower = split.shape.side === "right" ? "ArrowRight" : "ArrowLeft";
-  const follow = (strip: HTMLElement, y: number) => {
-    const box = strip.getBoundingClientRect();
-    setGripY(Math.min(Math.max(y - box.top, 28), box.height - 28));
-  };
   return (
-    // The whole strip takes the pointer: taken anywhere, it drags, and the grip comes to where it was taken; a click on
-    // the grip itself, without dragging, opens or folds the pane.
     <div
       className={`workshop-split${open ? "" : " is-closed"}`}
+      role="separator"
+      aria-orientation="vertical"
+      tabIndex={0}
+      aria-label={t(open ? label.open : label.closed)}
+      aria-expanded={open}
+      aria-controls={controls}
+      title={t("workshop.gripHint")}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
-        const grip = (e.target as HTMLElement).closest(".workshop-grip") !== null;
-        start.current = { x: e.clientX, moved: false, grip };
-        follow(e.currentTarget, e.clientY);
+        start.current = { x: e.clientX, moved: false };
       }}
       onPointerMove={(e) => {
         if (!start.current) return;
-        follow(e.currentTarget, e.clientY);
         if (!start.current.moved && Math.abs(e.clientX - start.current.x) < 4) return;
         if (!start.current.moved) split.setDragging(true);
         start.current.moved = true;
         split.set(split.fit(split.widthAt(e.clientX)));
       }}
       onPointerUp={() => {
-        const taken = start.current;
         start.current = null;
         split.setDragging(false);
-        if (taken?.grip && !taken.moved) split.toggle();
       }}
       onPointerCancel={() => {
         start.current = null;
         split.setDragging(false);
       }}
-    >
-      <button
-        type="button"
-        className="workshop-grip"
-        style={gripY === null ? undefined : { top: gripY }}
-        aria-label={t(open ? label.open : label.closed)}
-        aria-expanded={open}
-        aria-controls={controls}
-        title={t("workshop.gripHint")}
-        onClick={(e) => {
-          // A keyboard's Enter or Space: pointer clicks are handled on the way up.
-          if (e.detail === 0) split.toggle();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === wider) split.set(split.fit((open ? split.width : split.shape.closeBelow) + STEP));
-          else if (e.key === narrower) split.set(split.fit(split.width - STEP));
-          else return;
-          e.preventDefault();
-        }}
-      >
-        <span aria-hidden />
-        <span aria-hidden />
-        <span aria-hidden />
-      </button>
-    </div>
+      // A double click would select the words beside the edge (seen): the edge takes no text selection.
+      onMouseDown={(e) => e.preventDefault()}
+      onDoubleClick={() => split.toggle()}
+      onKeyDown={(e) => {
+        if (e.key === wider) split.set(split.fit((open ? split.width : split.shape.closeBelow) + STEP));
+        else if (e.key === narrower) split.set(split.fit(split.width - STEP));
+        else if (e.key === "Enter" || e.key === " ") split.toggle();
+        else return;
+        e.preventDefault();
+      }}
+    />
   );
 }

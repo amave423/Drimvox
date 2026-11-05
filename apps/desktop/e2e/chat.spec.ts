@@ -417,7 +417,8 @@ test("works in a connected folder and undoes an answer", async () => {
   await say(page, "Создай hello.txt");
   await expect(page.getByText("Создал hello.txt.")).toBeVisible();
   // What it did stays in the answer, in order before the text it led to (seen: it vanished once the chat reloaded).
-  await expect(page.locator(".msg-assistant summary", { hasText: "Пишет hello.txt" })).toBeVisible();
+  // One action alone is its line, with nothing to open (asked for: the arrow there opened nothing).
+  await expect(page.locator(".msg-assistant .msg-done", { hasText: "Пишет hello.txt" })).toBeVisible();
   expect(readFileSync(join(folder, "hello.txt"), "utf8")).toBe("привет\n");
   // The file it made is attached to the answer and opens to look at; the margin lists it too, under the context and the model.
   await page.locator(".file-chip", { hasText: "hello.txt" }).click();

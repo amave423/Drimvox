@@ -32,8 +32,9 @@ function goTo(list: RefObject<HTMLDivElement | null>, i: number) {
 const line = (text: string) => text.replace(/\s+/g, " ").slice(0, 90);
 
 /**
- * The user's own messages as marks along the workshop's timeline (asked for: like in DeepSeek and Codex): each mark is
- * one message; hovered it shows the message's start, clicked it brings the message into view.
+ * The user's own messages along the workshop's conversation, as in DeepSeek (asked for: the marks that each grew a label
+ * were awkward). Folded, a short dash per message at the right edge, the one in view longer; hovered or focused, one
+ * card with all of them listed, the one in view marked, a click bringing it into view.
  */
 export function MessageRail({ texts, list }: { texts: string[]; list: RefObject<HTMLDivElement | null> }) {
   const { t } = useApp();
@@ -41,12 +42,26 @@ export function MessageRail({ texts, list }: { texts: string[]; list: RefObject<
   if (texts.length < 2) return null;
   return (
     <nav className="msg-rail" aria-label={t("chat.yourMessages")}>
-      {texts.map((text, i) => (
-        <button key={i} type="button" className={`msg-rail-mark${i === current ? " is-on" : ""}`} onClick={() => goTo(list, i)} aria-label={text.slice(0, 80)} aria-current={i === current || undefined}>
-          <span className="msg-rail-line" aria-hidden />
-          <span className="msg-rail-text">{line(text)}</span>
-        </button>
-      ))}
+      <div className="msg-rail-marks" aria-hidden>
+        {texts.map((_, i) => (
+          <span key={i} className={i === current ? "is-on" : undefined} />
+        ))}
+      </div>
+      <ol className="msg-rail-panel">
+        {texts.map((text, i) => (
+          <li key={i}>
+            <button
+              type="button"
+              className={i === current ? "is-on" : undefined}
+              onClick={() => goTo(list, i)}
+              aria-current={i === current || undefined}
+              title={text.slice(0, 300)}
+            >
+              {line(text)}
+            </button>
+          </li>
+        ))}
+      </ol>
     </nav>
   );
 }
@@ -65,7 +80,13 @@ export function MessageJump({ texts, list }: { texts: string[]; list: RefObject<
       <ol>
         {texts.map((text, i) => (
           <li key={i}>
-            <button type="button" className={i === current ? "is-on" : undefined} onClick={() => goTo(list, i)} aria-current={i === current || undefined} title={text.slice(0, 300)}>
+            <button
+              type="button"
+              className={i === current ? "is-on" : undefined}
+              onClick={() => goTo(list, i)}
+              aria-current={i === current || undefined}
+              title={text.slice(0, 300)}
+            >
               {line(text)}
             </button>
           </li>

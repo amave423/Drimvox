@@ -134,6 +134,20 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
           takes the arrow keys too. */}
       <div
         className="workshop-split browser-edge"
+        role="separator"
+        aria-orientation="vertical"
+        tabIndex={0}
+        aria-label={t("browser.width")}
+        title={t("browser.width")}
+        onKeyDown={(e) => {
+          const step = e.key === "ArrowLeft" ? 40 : e.key === "ArrowRight" ? -40 : 0;
+          if (!step) return;
+          e.preventDefault();
+          setWide(false);
+          const next = fitWidth((width || (e.currentTarget.closest(".browser-pane") as HTMLElement).offsetWidth) + step);
+          setWidth(next);
+          keepWidth(next);
+        }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           dragging.current = true;
@@ -149,32 +163,24 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
           setResizing(false);
           keepWidth(width);
         }}
-      >
+      />
+      <header className="browser-bar">
         <button
           type="button"
-          className="workshop-grip"
-          aria-label={t("browser.width")}
-          title={t("browser.width")}
-          onKeyDown={(e) => {
-            const step = e.key === "ArrowLeft" ? 40 : e.key === "ArrowRight" ? -40 : 0;
-            if (!step) return;
-            e.preventDefault();
-            setWide(false);
-            const next = fitWidth((width || (e.currentTarget.closest(".browser-pane") as HTMLElement).offsetWidth) + step);
-            setWidth(next);
-            keepWidth(next);
-          }}
+          className="icon-button"
+          aria-label={t("browser.back")}
+          title={t("browser.back")}
+          onClick={() => void api.browser.back.$post().catch(() => null)}
         >
-          <span aria-hidden />
-          <span aria-hidden />
-          <span aria-hidden />
-        </button>
-      </div>
-      <header className="browser-bar">
-        <button type="button" className="icon-button" aria-label={t("browser.back")} title={t("browser.back")} onClick={() => void api.browser.back.$post().catch(() => null)}>
           ‹
         </button>
-        <button type="button" className="icon-button" aria-label={t("browser.reload")} title={t("browser.reload")} onClick={() => void api.browser.reload.$post().catch(() => null)}>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={t("browser.reload")}
+          title={t("browser.reload")}
+          onClick={() => void api.browser.reload.$post().catch(() => null)}
+        >
           ↻
         </button>
         <form
@@ -196,7 +202,14 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
             onChange={(e) => setAddress(e.target.value)}
           />
         </form>
-        <button type="button" className="icon-button" aria-pressed={wide} aria-label={t(wide ? "browser.narrow" : "browser.wide")} title={t(wide ? "browser.narrow" : "browser.wide")} onClick={() => setWide(!wide)}>
+        <button
+          type="button"
+          className="icon-button"
+          aria-pressed={wide}
+          aria-label={t(wide ? "browser.narrow" : "browser.wide")}
+          title={t(wide ? "browser.narrow" : "browser.wide")}
+          onClick={() => setWide(!wide)}
+        >
           {wide ? "⤡" : "⤢"}
         </button>
         <button type="button" className="icon-button" aria-label={t("viewer.close")} title={t("viewer.close")} onClick={onClose}>
@@ -208,15 +221,32 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
         <div className="browser-tabs" role="tablist" aria-label={t("browser.tabs")}>
           {state.tabs.map((tab) => (
             <div key={tab.id} className={`browser-tab${tab.id === state.active ? " is-on" : ""}`}>
-              <button type="button" role="tab" aria-selected={tab.id === state.active} title={tab.url} onClick={() => void api.browser.tab.$post({ json: { id: tab.id } }).catch(() => null)}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab.id === state.active}
+                title={tab.url}
+                onClick={() => void api.browser.tab.$post({ json: { id: tab.id } }).catch(() => null)}
+              >
                 {tabName(tab, t("browser.blank"))}
               </button>
-              <button type="button" className="browser-tab-close" aria-label={t("browser.closeTab", { name: tabName(tab, t("browser.blank")) })} onClick={() => void api.browser.tab.close.$post({ json: { id: tab.id } }).catch(() => null)}>
+              <button
+                type="button"
+                className="browser-tab-close"
+                aria-label={t("browser.closeTab", { name: tabName(tab, t("browser.blank")) })}
+                onClick={() => void api.browser.tab.close.$post({ json: { id: tab.id } }).catch(() => null)}
+              >
                 ×
               </button>
             </div>
           ))}
-          <button type="button" className="browser-tab-new" aria-label={t("browser.newTab")} title={t("browser.newTab")} onClick={() => void api.browser.tab.new.$post({ json: {} }).catch(() => null)}>
+          <button
+            type="button"
+            className="browser-tab-new"
+            aria-label={t("browser.newTab")}
+            title={t("browser.newTab")}
+            onClick={() => void api.browser.tab.new.$post({ json: {} }).catch(() => null)}
+          >
             +
           </button>
         </div>

@@ -307,4 +307,4 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 @media (prefers-reduced-motion: reduce) { .radio-row input, .option input, .stage-switch input { transition: none; } }
 
 /* Pointer files for other agents: one switch per agent. */
-.agent-files { display: grid; gap: 8px; }
+.agent-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px 16px; }

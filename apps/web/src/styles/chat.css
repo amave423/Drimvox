@@ -141,9 +141,12 @@
 .picker-why { display: block; color: var(--muted); }
 .picker-list button.is-unsupported { opacity: 0.55; cursor: default; }
 .picker-list button:hover, .picker-list [aria-selected="true"] button { background: var(--paper); }
-.picker-name { display: grid; font-size: 14px; min-width: 0; }
-.picker-name small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
-.picker-facts { display: flex; gap: 12px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+/* The name keeps its room; the facts go under it when the list is narrow (seen: the name squeezed to a few letters a
+   line, "busy" written over it). */
+.picker-list .picker-item > button:first-child { flex-wrap: wrap; align-items: baseline; row-gap: 2px; }
+.picker-name { display: grid; font-size: 14px; min-width: 0; flex: 1 1 200px; }
+.picker-name small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-facts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 12px; margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .picker-busy { color: var(--pencil); }
 .picker-panel.is-above { top: auto; bottom: calc(100% + 6px); }
 
@@ -220,6 +223,13 @@
 .options-panel { width: max-content; min-width: 260px; max-width: min(380px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }
 .options-row { display: grid; grid-template-columns: 136px 1fr; align-items: center; gap: 10px; font-size: 13px; min-height: 32px; }
 .options-row .picker { justify-self: start; }
+/* A project's box: its rows explain themselves and pick models, so the panel is wider (asked for). */
+.options-panel.is-wide { width: min(560px, calc(100vw - 32px)); max-width: min(560px, calc(100vw - 32px)); }
+.options-panel.is-wide .options-row { grid-template-columns: 160px minmax(0, 1fr); }
+.options-panel.is-wide .options-row .picker-button { max-width: 100%; }
+/* A project's box (ProjectComposer.tsx): a switch with what it does, a model with a way back. */
+.options-about { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.options-model { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 /* An option's own list opens over the panel, from its bottom right corner up and to the left (seen: to the right it ran
    off the window; above the panel, a tall panel pushed it past the top of the window). */
 .options-panel .picker { position: static; }
@@ -238,6 +248,8 @@
 .work-diff { margin-top: 8px; max-height: min(55vh, 520px); overflow: auto; border-radius: 10px; }
 .msg-done { font-size: 13px; margin: 2px 0 6px; }
 .msg-done summary { cursor: pointer; }
+/* One action alone: its line, with nothing to open (asked for: the arrow opened nothing). */
+.msg-done.msg-one { margin: 2px 0 6px; }
 .msg-done .msg-activity { margin-top: 4px; }
 /* Narrow: the model's list and the other menus open above the panel at full width instead of beside it. */
 .options-panel.is-narrow { width: max-content; max-width: min(380px, calc(100vw - 32px)); }
@@ -346,17 +358,19 @@
 
 /* The user's questions as marks at the right edge, staying in view (asked for: like DeepSeek and Codex). A mark is a
    short line; hovered, the rail shows the questions' starts; the one in view is longer and darker. */
-.msg-rail { position: sticky; top: 30vh; align-self: flex-end; height: 0; margin-right: -22px; z-index: 3; }
-.msg-rail::before { content: ""; position: absolute; right: 0; top: -8px; width: 28px; height: 8px; }
-.msg-rail { display: flex; flex-direction: column; align-items: flex-end; gap: 0; }
-.msg-rail-mark { display: flex; align-items: center; justify-content: flex-end; gap: 8px; height: 14px; padding: 0 2px; border: 0; background: none; cursor: pointer; color: var(--muted); }
-.msg-rail-line { display: block; width: 10px; height: 2px; border-radius: 1px; background: var(--line); transition: width 0.15s, background 0.15s; }
-.msg-rail-mark.is-on .msg-rail-line { width: 16px; background: var(--ink); }
-.msg-rail-mark:hover .msg-rail-line, .msg-rail-mark:focus-visible .msg-rail-line { background: var(--ink); }
-.msg-rail-text { display: none; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; padding: 2px 8px; border-radius: 6px; background: var(--sheet); box-shadow: var(--sheet-shadow); color: var(--fg); }
-.msg-rail:hover .msg-rail-text, .msg-rail:focus-within .msg-rail-text { display: block; }
-.msg-rail:hover .msg-rail-mark, .msg-rail:focus-within .msg-rail-mark { height: 26px; }
-@media (prefers-reduced-motion: reduce) { .msg-rail-line { transition: none; } }
+.msg-rail { position: sticky; top: 28vh; align-self: flex-end; width: 0; height: 0; margin-right: -12px; z-index: 3; }
+/* Folded: a dash per message, drawn leftwards from the edge so nothing pokes out sideways. */
+.msg-rail-marks { position: absolute; top: 0; right: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding: 6px 2px; max-height: 50vh; overflow: hidden; cursor: pointer; }
+.msg-rail-marks > span { display: block; width: 10px; height: 2px; border-radius: 1px; background: var(--line); flex-shrink: 0; }
+.msg-rail-marks > .is-on { width: 16px; background: var(--ink); }
+/* Unfolded: one card with every message. */
+.msg-rail-panel { position: absolute; top: -8px; right: -4px; width: min(300px, 70vw); max-height: 60vh; overflow-y: auto; margin: 0; padding: 6px; list-style: none; border-radius: 10px; background: var(--sheet); box-shadow: var(--sheet-shadow); visibility: hidden; opacity: 0; transition: opacity 0.12s, visibility 0.12s; }
+.msg-rail:hover .msg-rail-panel, .msg-rail:focus-within .msg-rail-panel { visibility: visible; opacity: 1; }
+.msg-rail:hover .msg-rail-marks, .msg-rail:focus-within .msg-rail-marks { visibility: hidden; }
+.msg-rail-panel button { display: block; width: 100%; padding: 6px 10px; border: 0; border-radius: 6px; background: none; text-align: left; font: inherit; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.msg-rail-panel button:hover, .msg-rail-panel button:focus-visible { background: var(--paper); color: var(--fg); }
+.msg-rail-panel button.is-on { color: var(--fg); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .msg-rail-panel { transition: none; } }
 /* The chat's own messages in its margin, always open, one line each. */
 .msg-jump { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; min-width: 0; margin-top: 14px; font-size: 13px; }
 .msg-jump ol { list-style: none; margin: 0; padding: 0 0 0 8px; border-left: 2px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr); max-height: 40vh; overflow-y: auto; overflow-x: hidden; }
@@ -397,6 +411,12 @@
 .file-chip .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-chip-touch { font-size: 12px; opacity: 0.8; }
 .file-chip.is-read { background: var(--paper); color: var(--fg); }
+/* Files written or changed, where it happened in the answer (asked for): the lines that went in and out. */
+.file-chips.is-inline { margin: 2px 0 8px; }
+.file-chip-lines { font-size: 12px; }
+.file-chip-lines .is-added { color: var(--ok); }
+.file-chip-lines .is-removed { color: var(--pencil); }
+.file-chip:disabled { cursor: default; }
 .file-chip:hover, .file-chip:focus-visible { outline: 1px solid var(--ink); }
 .file-view { position: relative; display: flex; flex-direction: column; width: min(1000px, calc(100vw - 48px)); max-height: calc(100vh - var(--topbar-h) - 48px); margin-top: var(--topbar-h); border-radius: 12px; background: var(--sheet); box-shadow: var(--sheet-shadow); cursor: default; overflow: hidden; }
 .file-view-head { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 18px; border-bottom: 1px solid var(--line); font-size: 13px; }
@@ -408,4 +428,6 @@
 .file-view-body img { display: block; max-width: 100%; margin: 0 auto; }
 .file-view-body pre { margin: 0; }
 .margin-sec.is-pencil { color: var(--pencil); }
-.cloud-voice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* One list of voices, as the models: the sources on the left, this computer first (SpeechVoiceSetting.tsx). */
+.voice-panel { height: min(420px, 60vh); }
+.voice-panel .voice-more { align-self: flex-start; margin: 2px 8px; }

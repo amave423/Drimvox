@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { downloadInPieces, hasPieces, SEGMENT_MIN, SEGMENTS } from "./segments";
 
 /** Where GGUF files come from. Hugging Face redirects to its CDN, which some networks cannot reach (seen from Russia). */
@@ -50,9 +53,11 @@ let preferred: string | null = null;
 
 /** The file of hf.co/<repo>:<quant>: its path, size and sha256, as Hugging Face lists it. */
 async function findFile(apiUrl: string, repo: string, quant: string, signal: AbortSignal): Promise<{ path: string; size: number; sha256: string }> {
-  const res = await fetch(`${apiUrl}/api/models/${repo}/tree/main`, { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) }).catch((err: unknown) => {
-    throw new HfDownloadError(`Hugging Face did not answer: ${err instanceof Error ? err.message : String(err)}`);
-  });
+  const res = await fetch(`${apiUrl}/api/models/${repo}/tree/main`, { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) }).catch(
+    (err: unknown) => {
+      throw new HfDownloadError(`Hugging Face did not answer: ${err instanceof Error ? err.message : String(err)}`);
+    },
+  );
   if (!res.ok) throw new HfDownloadError(`Hugging Face answered ${res.status}`);
   const files = (await res.json()) as { type: string; path: string; size: number; lfs?: { oid?: string; size?: number } }[];
   const tail = QUANT_TAIL(quant);
@@ -101,9 +106,11 @@ async function sha256Of(file: string): Promise<string> {
 /** A file of a repository by its exact path, as Hugging Face lists it; folders are listed one at a time. */
 export async function fileByPath(apiUrl: string, repo: string, path: string, signal: AbortSignal): Promise<{ path: string; size: number; sha256: string }> {
   const folder = path.includes("/") ? `/${path.slice(0, path.lastIndexOf("/"))}` : "";
-  const res = await fetch(`${apiUrl}/api/models/${repo}/tree/main${folder}`, { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) }).catch((err: unknown) => {
-    throw new HfDownloadError(`Hugging Face did not answer: ${err instanceof Error ? err.message : String(err)}`);
-  });
+  const res = await fetch(`${apiUrl}/api/models/${repo}/tree/main${folder}`, { signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) }).catch(
+    (err: unknown) => {
+      throw new HfDownloadError(`Hugging Face did not answer: ${err instanceof Error ? err.message : String(err)}`);
+    },
+  );
   if (!res.ok) throw new HfDownloadError(`Hugging Face answered ${res.status}`);
   const files = (await res.json()) as { type: string; path: string; size: number; lfs?: { oid?: string; size?: number } }[];
   const file = files.find((f) => f.type === "file" && f.path === path);
@@ -194,6 +201,25 @@ export async function downloadFile(d: FileDownload, repo: string, file: { path: 
 }
 
 /**
+ * Sends a file as a request's body as fast as the other side takes it. Seen live: fetch with the file as a stream read it
+ * all into memory first (16.5 GB of the core's memory for a 16.5 GB model), and a 29 GB model brought the core down;
+ * a pipe waits for the socket instead.
+ */
+export async function uploadFile(url: string, file: string, signal: AbortSignal): Promise<number> {
+  const u = new URL(url);
+  const send = u.protocol === "https:" ? httpsRequest : httpRequest;
+  return new Promise<number>((resolve, reject) => {
+    const req = send(u, { method: "POST", headers: { "content-length": statSync(file).size, "content-type": "application/octet-stream" }, signal }, (res) => {
+      res.resume();
+      res.on("end", () => resolve(res.statusCode ?? 0));
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    pipeline(createReadStream(file), req).catch(reject);
+  });
+}
+
+/**
  * Downloads hf.co/<repo>:<quant> by Drimvox itself and makes an Ollama model of it (seen: Ollama's own pull could not
  * reach Hugging Face's CDN).
  */
@@ -211,8 +237,8 @@ export async function downloadHf(d: HfDownload): Promise<void> {
   const digest = `sha256:${file.sha256}`;
   const known = await fetch(`${d.ollamaUrl}/api/blobs/${digest}`, { method: "HEAD", signal: d.signal });
   if (!known.ok) {
-    const up = await fetch(`${d.ollamaUrl}/api/blobs/${digest}`, { method: "POST", body: Readable.toWeb(createReadStream(part)) as never, duplex: "half", signal: d.signal } as RequestInit);
-    if (!up.ok) throw new HfDownloadError(`Ollama did not take the file: ${up.status}`);
+    const status = await uploadFile(`${d.ollamaUrl}/api/blobs/${digest}`, part, d.signal);
+    if (status < 200 || status >= 300) throw new HfDownloadError(`Ollama did not take the file: ${status}`);
   }
   const res = await fetch(`${d.ollamaUrl}/api/create`, {
     method: "POST",
@@ -222,7 +248,10 @@ export async function downloadHf(d: HfDownload): Promise<void> {
   });
   if (!res.ok || !res.body) throw new HfDownloadError(`Ollama answered ${res.status}`);
   const text = await res.text();
-  const lines = text.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l) as { status?: string; error?: string });
+  const lines = text
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((l) => JSON.parse(l) as { status?: string; error?: string });
   const failed = lines.find((l) => l.error);
   if (failed) throw new HfDownloadError(failed.error!);
   if (!lines.some((l) => l.status === "success")) throw new HfDownloadError("Ollama did not finish making the model");

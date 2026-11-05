@@ -1,4 +1,4 @@
-import type { ProjectKind, ProjectView, ProjectWorkView } from "@drimvox/shared";
+import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import { formatUsd } from "../../lib/format";
@@ -7,18 +7,19 @@ import { Tabs } from "../Tabs";
 import { StatusChip } from "../tasks/StatusDot";
 import { GithubPublish } from "./GithubPublish";
 import { ProjectGitCard } from "./ProjectGitCard";
-import { ChangesTab, RunTab } from "./Workspace";
+import { RunTab } from "./Workspace";
 import { WorkTokens } from "./WorkTokens";
 
-type Part = "result" | "changes" | "project";
-// The project first (asked for), then what changed, then what came of it.
-const PARTS: Part[] = ["project", "changes", "result"];
+type Part = "result" | "project";
+// The project first (asked for), then what came of it. The changed files are in the conversation, where the agent
+// changed them (asked for: the "Changes" tab went).
+const PARTS: Part[] = ["project", "result"];
 
 /**
- * The workshop's right side, its width set by the handle beside it: what came of the work (the agent's last look at
- * the page, large, the started result and the report), the folder's changes, and the project itself.
+ * The workshop's right side, its width set by its edge: the project itself, and what came of the work (the started
+ * result and the report).
  */
-export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView | null; open: boolean; onChanged(): void; onNew?: () => void }) {
+export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView | null; open: boolean; onChanged(): void }) {
   const { api, t, reloadWorks } = useApp();
   // A ready project's next task in a new conversation; the old one is kept.
   async function fresh() {
@@ -35,11 +36,10 @@ export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView 
       </div>
       <div className="workshop-result-body">
         {part === "result" && (work?.startedAt ? <ResultPart work={work} onChanged={p.onChanged} /> : <p className="muted">{t("workshop.noResult")}</p>)}
-        {part === "changes" && (work ? <ChangesTab work={work} /> : null)}
         {part === "project" && (
           <>
-            {work && <WorkTokens work={work} onFresh={p.project.kind === "existing" ? () => void fresh() : undefined} />}
-            <ProjectPart project={p.project} onNew={p.onNew} busy={work?.status === "running"} locked={!!work?.startedAt} />
+            {work && <WorkTokens work={work} onFresh={() => void fresh()} />}
+            <ProjectPart project={p.project} busy={work?.status === "running"} />
           </>
         )}
       </div>
@@ -59,37 +59,16 @@ function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): v
   );
 }
 
-/** The project itself: its folder and kind, its tasks, skills, GitHub, a new task, and leaving Drimvox. */
-function ProjectPart({ project, onNew, busy, locked }: { project: ProjectView; onNew?: () => void; busy: boolean; locked: boolean }) {
-  const { api, t, tasks, navigate, reloadProjects } = useApp();
+/**
+ * The project itself: its folder, tasks, skills, GitHub, and leaving Drimvox. No kind any more (asked for: one
+ * conversation for every project, the interview and the plan picked in the box).
+ */
+function ProjectPart({ project, busy }: { project: ProjectView; busy: boolean }) {
+  const { t, tasks, navigate } = useApp();
   const own = tasks.filter((task) => task.projectId === project.id);
-  async function setKind(kind: ProjectKind) {
-    await api.projects[":id"].$patch({ param: { id: project.id }, json: { kind } }).catch(() => null);
-    await reloadProjects();
-  }
   return (
     <div className="workshop-project">
       <p className="mono muted">{project.path}</p>
-      <div className="project-kind-switch" role="group" aria-label={t("project.kindLabel")}>
-        <span className="muted">{t("project.kindLabel")}</span>
-        {/* Once the agent has been written to, the kind is said, not switched (asked for). */}
-        {locked ? (
-          <strong className="project-kind-fixed">{t(`project.kind.${project.kind}`)}</strong>
-        ) : (
-          <span className="segmented">
-            {(["existing", "new"] as const).map((k) => (
-              <button key={k} type="button" className={project.kind === k ? "is-on" : undefined} aria-pressed={project.kind === k} onClick={() => project.kind !== k && void setKind(k)}>
-                {t(`project.kind.${k}`)}
-              </button>
-            ))}
-          </span>
-        )}
-      </div>
-      {onNew && project.kind !== "existing" && (
-        <button className="btn" onClick={onNew}>
-          {t("projectWork.newTask")}
-        </button>
-      )}
       <h3 className="margin-h">{t("project.tasks")}</h3>
       {own.length === 0 ? (
         <p className="muted">{t("project.noTasks")}</p>

@@ -18,7 +18,7 @@ export function SideProjects() {
   // A project is called by its folder until the user names it (asked for: renaming like chats).
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
-  // The "⋯" of a project: renaming, its kind, leaving Drimvox (asked for: removing a project was hard to find).
+  // The "⋯" of a project: renaming, leaving Drimvox (asked for: removing a project was hard to find).
   const [menu, setMenu] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   useEffect(() => {
@@ -34,11 +34,6 @@ export function SideProjects() {
       window.removeEventListener("keydown", escape);
     };
   }, [menu]);
-  async function setKind(id: string, kind: "new" | "existing") {
-    setMenu(null);
-    await api.projects[":id"].$patch({ param: { id }, json: { kind } }).catch(() => null);
-    await reloadProjects();
-  }
   async function rename(id: string) {
     const next = name.trim();
     setRenaming(null);
@@ -51,8 +46,8 @@ export function SideProjects() {
   const currentTask = view.kind === "task" ? view.taskId : undefined;
 
   const current = works.find((w) => w.projectId === currentProject);
-  // A ready project's checklist is the agent's plan for what it was asked last.
-  const plainTalk = projects.find((p) => p.id === currentProject)?.kind === "existing";
+  // Without an approved plan the checklist is the agent's own plan for what it was asked last.
+  const plainTalk = !current?.plan;
   // The item being worked on: the first one not done yet.
   const now = current?.status === "running" ? current.checklist.findIndex((i) => !i.done) : -1;
 
@@ -95,7 +90,11 @@ export function SideProjects() {
                   </form>
                 ) : (
                   <div className="side-project-row">
-                    <button className={`side-item side-project${here ? " is-on" : ""}`} onClick={() => navigate({ kind: "project", projectId: project.id })} aria-current={here ? "page" : undefined}>
+                    <button
+                      className={`side-item side-project${here ? " is-on" : ""}`}
+                      onClick={() => navigate({ kind: "project", projectId: project.id })}
+                      aria-current={here ? "page" : undefined}
+                    >
                       <span className="side-item-title">{project.name}</span>
                       <WorkLine work={work} />
                     </button>
@@ -122,11 +121,6 @@ export function SideProjects() {
                         >
                           {t("side.renameProjectLabel")}
                         </button>
-                        {!works.find((w) => w.projectId === project.id)?.startedAt && (
-                          <button role="menuitem" onClick={() => void setKind(project.id, project.kind === "existing" ? "new" : "existing")}>
-                          {t(project.kind === "existing" ? "side.makeNew" : "side.makeExisting")}
-                        </button>
-                        )}
                         <button
                           role="menuitem"
                           className="is-pencil"
@@ -199,7 +193,14 @@ function WorkLine({ work }: { work: ProjectWorkView | null }) {
   const { t } = useApp();
   if (!work || work.status === "idle") return null;
   // A plan that stopped on an error waits for the user, it does not run.
-  const tone = work.status === "running" || (work.status === "planning" && !work.planStalled) ? (work.waitingApproval ? "wait" : "run") : work.status === "done" ? "ok" : "wait";
+  const tone =
+    work.status === "running" || (work.status === "planning" && !work.planStalled)
+      ? work.waitingApproval
+        ? "wait"
+        : "run"
+      : work.status === "done"
+        ? "ok"
+        : "wait";
   const done = work.checklist.filter((i) => i.done).length;
   const total = work.checklist.length;
   return (

@@ -104,6 +104,9 @@ export interface ActivityEntry {
   input: string;
   /** How long the answer's text was when the tool was called; absent in answers saved before it was kept. */
   at?: number;
+  /** A write or an edit: the lines it added and removed (asked for: shown where the agent changed the file). */
+  added?: number;
+  removed?: number;
 }
 
 /** What an answer did to a file: wrote it (new or rewritten), changed part of it, or only read it. */
