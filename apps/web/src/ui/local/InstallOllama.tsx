@@ -6,8 +6,8 @@ import { useSize } from "./size";
 const OLLAMA_DOWNLOAD = "https://ollama.com/download";
 
 /**
- * Ollama is not on this computer: on Windows Drimvox downloads the official setup and runs it, showing the size first and
- * then the progress; elsewhere it shows the command to run, with the site as the other way.
+ * Ollama is not on this computer: on Windows and macOS Drimvox downloads its plain build into its own folder, showing the
+ * size first and then the progress; on Linux it shows the command to run, with the site as the other way.
  */
 export function InstallOllama({ status, onChange }: { status: LocalStatus; onChange(): void }) {
   const { api, t } = useApp();

@@ -35,6 +35,8 @@ export interface OllamaOptions {
   command: string[] | null;
   /** Extra environment for it; tests pass their fake's settings. */
   commandEnv?: Record<string, string>;
+  /** Its blobs folder on this computer, where a downloaded file is moved instead of sent; null when not known. */
+  blobs?: () => string | null;
   /** Without requests, downloads or loaded models for this long, the Ollama Drimvox started goes away. */
   idleMs: number;
   hardware: () => Promise<LocalHardware>;
@@ -271,6 +273,7 @@ export class OllamaManager {
         dir: hf.dir,
         signal: a.abort.signal,
         partial: (path) => (a.partial = path),
+        blobs: this.o.blobs?.() ?? null,
         progress: (s) => {
           this.touch();
           Object.assign(p, { status: s.status, completed: s.completed, total: s.total || p.total });

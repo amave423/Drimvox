@@ -1,9 +1,10 @@
 import { LocalAudio, type LocalAudioOptions } from "./audio/service";
 import { LocalSpeech, type LocalSpeechOptions } from "./speech/service";
 import { HF_FILE_BASES } from "./hf-download";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { OLLAMA_LINUX_COMMAND, OLLAMA_SETUP_URL, OllamaInstaller, runSetup } from "./install";
+import { OLLAMA_LINUX_COMMAND, OLLAMA_RELEASES, ollamaArchive, OllamaInstaller, ownOllama, unpackWithTar } from "./install";
 import { presets, type HfRepo, type HfVariant, type LocalHardware, type LocalPick, type LocalPull, type LocalStatus } from "@drimvox/shared";
 import type { ProviderRepo } from "../providers/repo";
 import { LocalCatalog } from "./catalog";
@@ -27,8 +28,12 @@ export interface LocalOptions {
   downloadsDir?: string;
   /** The proxy from the settings: Hugging Face files go through it when the direct way fails. */
   proxy?: () => string | null;
-  /** Tests: where the setup comes from, what runs it, and whether Ollama is there afterwards. */
+  /** Tests: where the archive comes from, whether to unpack it, and what is found afterwards. */
   install?: { url?: string; skipRun?: boolean; command?: string[]; can?: boolean };
+  /** Where Drimvox unpacks its own Ollama; the data folder's "engines/ollama" by default. */
+  ollamaDir?: string;
+  /** Ollama's blobs folder; by default its own (OLLAMA_MODELS or ~/.ollama/models) for an Ollama on this computer. */
+  ollamaBlobs?: string | null;
   /** Where the picture engine and its models live; the data folder's "images" by default. */
   imagesDir?: string;
   /** The picture engine (docs/specs/local-images.md); tests give a fake one. */
@@ -41,6 +46,15 @@ export interface LocalOptions {
   speechDir?: string;
   /** Reading aloud (docs/specs/local-speech.md); tests give a fake engine. */
   speech?: LocalSpeechOptions;
+}
+
+/** An address on this computer. */
+const local = (url: string) => /\/\/(127\.0\.0\.1|localhost|\[::1\])[:/]/.test(url);
+
+/** Where an Ollama on this computer keeps its files, as it does by default: OLLAMA_MODELS, or ~/.ollama/models. */
+function ollamaBlobs(): string | null {
+  const blobs = join(process.env.OLLAMA_MODELS ?? join(homedir(), ".ollama", "models"), "blobs");
+  return existsSync(blobs) ? blobs : null;
 }
 
 /** Local models: Ollama on this computer, the catalog sized for it, and the chat provider that uses it. */
@@ -61,9 +75,14 @@ export class LocalModels {
     o: LocalOptions = {},
   ) {
     this.hardware = o.hardware ? async () => o.hardware! : detectHardware;
+    const ollamaDir = o.ollamaDir ?? join(tmpdir(), "drimvox-ollama");
+    // The user's own Ollama first (installed, on PATH); else the one Drimvox unpacked.
+    const findAny = () => findOllama() ?? ownOllama(ollamaDir);
     this.ollama = new OllamaManager({
       apiUrl: baseUrl.replace(/\/v1\/?$/, "").replace(/\/+$/, ""),
-      command: o.command === undefined ? findOllama() : o.command,
+      command: o.command === undefined ? findAny() : o.command,
+      // Tests that give their own Ollama never reach into the computer's real one.
+      blobs: () => (o.ollamaBlobs !== undefined ? o.ollamaBlobs : o.command === undefined && local(baseUrl) ? ollamaBlobs() : null),
       commandEnv: o.commandEnv,
       idleMs: o.idleMs ?? 10 * 60_000,
       hardware: this.hardware,
@@ -71,13 +90,14 @@ export class LocalModels {
       hf: { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "drimvox-downloads"), proxy: o.proxy ?? (() => null) },
     });
     const test = o.install;
-    this.canInstall = test?.can ?? process.platform === "win32";
+    const archive = ollamaArchive();
+    this.canInstall = test?.can ?? !!archive;
     this.installer = new OllamaInstaller({
-      url: test?.url ?? OLLAMA_SETUP_URL,
-      dir: join(tmpdir(), "drimvox-ollama-setup"),
-      run: test?.skipRun ? async () => {} : runSetup,
+      url: test?.url ?? `${OLLAMA_RELEASES}/${archive ?? "ollama-windows-amd64.zip"}`,
+      dir: ollamaDir,
+      unpack: test?.skipRun ? async (_, into) => void mkdirSync(into, { recursive: true }) : unpackWithTar,
       found: () => {
-        const command = test?.command ?? findOllama();
+        const command = test?.command ?? findAny();
         if (command) this.ollama.setCommand(command);
         return !!command;
       },

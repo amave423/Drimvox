@@ -149,7 +149,7 @@ export function createCore(o: AppOptions) {
   const searchStore = new SearchStore(o.db, cipher);
   const searchUrls = o.searchUrls ?? SEARCH_URLS;
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
-  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), ...o.local });
+  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), ollamaDir: join(o.dataDir, "engines", "ollama"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), ...o.local });
   providers.setWaker(local.ollama);
   // Chains of free models answer as models of their own provider (docs/specs/model-chains.md).
   // Free models kept between starts and asked a word in the background (docs/specs/model-chains.md).

@@ -2,7 +2,9 @@
 // FAKE_OLLAMA_MODELS: JSON list of installed names. FAKE_OLLAMA_PULL_MS: delay between progress lines.
 // FAKE_OLLAMA_KEEP_MS: how long a model stays loaded after a chat (what /api/ps shows).
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
+import { join } from "node:path";
 
 const [host, port] = (process.env.OLLAMA_HOST ?? "127.0.0.1:11434").replace(/^https?:\/\//, "").split(":");
 const pullMs = Number(process.env.FAKE_OLLAMA_PULL_MS ?? 20);
@@ -10,6 +12,8 @@ const keepMs = Number(process.env.FAKE_OLLAMA_KEEP_MS ?? 100);
 const models = new Map((JSON.parse(process.env.FAKE_OLLAMA_MODELS ?? "[]")).map((name) => [name, 1000]));
 const chats = [];
 const blobs = new Set();
+// FAKE_OLLAMA_BLOBS: a folder whose sha256-<hex> files count as blobs, as Ollama's own blobs folder does.
+const has = (digest) => blobs.has(digest) || (!!process.env.FAKE_OLLAMA_BLOBS && existsSync(join(process.env.FAKE_OLLAMA_BLOBS, digest.replace(":", "-"))));
 let loadedUntil = 0;
 let loadedModel = "";
 
@@ -39,7 +43,7 @@ createServer(async (req, res) => {
   if (url.pathname.startsWith("/api/blobs/")) {
     const digest = decodeURIComponent(url.pathname.slice("/api/blobs/".length));
     if (req.method === "HEAD") {
-      res.writeHead(blobs.has(digest) ? 200 : 404);
+      res.writeHead(has(digest) ? 200 : 404);
       return res.end();
     }
     const hash = createHash("sha256");
@@ -53,7 +57,7 @@ createServer(async (req, res) => {
   if (url.pathname === "/fake/blobs") return json(res, 200, [...blobs]);
   if (url.pathname === "/api/create" && req.method === "POST") {
     const { model, files } = await read(req);
-    const missing = Object.values(files ?? {}).find((d) => !blobs.has(d));
+    const missing = Object.values(files ?? {}).find((d) => !has(d));
     res.writeHead(200, { "content-type": "application/x-ndjson" });
     if (missing) {
       res.write(`${JSON.stringify({ error: `blob ${missing} not found` })}\n`);

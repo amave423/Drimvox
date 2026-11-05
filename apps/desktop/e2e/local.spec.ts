@@ -137,17 +137,17 @@ test("installs Ollama from the sheet: the size first, then Drimvox finds it", as
     registryUrl: "http://127.0.0.1:9",
     hfUrl: "http://127.0.0.1:9",
     // After the setup, the fake Ollama is the one found.
-    install: { url: `http://127.0.0.1:${(registry.address() as { port: number }).port}/OllamaSetup.exe`, skipRun: true, command: [process.execPath, FAKE_OLLAMA], can: true },
+    install: { url: `http://127.0.0.1:${(registry.address() as { port: number }).port}/ollama-windows-amd64.zip`, skipRun: true, command: [process.execPath, FAKE_OLLAMA], can: true },
   };
   app = await electron.launch({ args: [mainJs], env: { ...process.env, DRIMVOX_USER_DATA: userData, DRIMVOX_TEST_OLLAMA_URL: `http://127.0.0.1:${port}/v1`, DRIMVOX_TEST_LOCAL: JSON.stringify(local) } });
   const page: Page = await app.firstWindow();
   await expect(paramsButton(page)).toBeVisible();
 
   await openSection(page, "Локальные модели");
-  await expect(page.getByText(/Ollama не установлена/)).toBeVisible();
-  await page.getByRole("button", { name: "Установить Ollama · 3 МБ" }).click();
+  await expect(page.getByText(/нужен движок Ollama/)).toBeVisible();
+  await page.getByRole("button", { name: "Скачать движок · 3 МБ" }).click();
   await expect(page.getByText(/Ollama 0\.31\.1-fake запущена Drimvox/)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/Ollama не установлена/)).toHaveCount(0);
+  await expect(page.getByText(/нужен движок Ollama/)).toHaveCount(0);
 });
 
 // The installer's "Install Ollama" box: it leaves a note beside the program, and the first start opens the local
@@ -165,7 +165,7 @@ test("installs Ollama on the first start when the installer was asked to", async
     hardware: { ramBytes: 16 * GB, gpu: null, unified: false },
     registryUrl: "http://127.0.0.1:9",
     hfUrl: "http://127.0.0.1:9",
-    install: { url: `http://127.0.0.1:${(registry.address() as { port: number }).port}/OllamaSetup.exe`, skipRun: true, command: [process.execPath, FAKE_OLLAMA], can: true },
+    install: { url: `http://127.0.0.1:${(registry.address() as { port: number }).port}/ollama-windows-amd64.zip`, skipRun: true, command: [process.execPath, FAKE_OLLAMA], can: true },
   };
   const program = mkdtempSync(join(tmpdir(), "drimvox-e2e-program-"));
   writeFileSync(join(program, "install-ollama"), "");

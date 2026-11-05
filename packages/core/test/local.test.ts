@@ -2,6 +2,9 @@ import type { LocalHardware } from "@drimvox/shared";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createServer as netServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -57,7 +60,9 @@ async function serve(handler: (path: string, url: URL) => unknown): Promise<stri
   return `http://127.0.0.1:${(s.address() as { port: number }).port}`;
 }
 
-function setup(o: { installed?: boolean; idleMs?: number; hardware?: LocalHardware; models?: string[]; pullMs?: number; keepMs?: number; registry?: string; hf?: string; hfFiles?: string[] } = {}) {
+function setup(
+  o: { installed?: boolean; idleMs?: number; hardware?: LocalHardware; models?: string[]; pullMs?: number; keepMs?: number; registry?: string; hf?: string; hfFiles?: string[]; blobs?: string } = {},
+) {
   env.setPresetUrl("ollama", `${base()}/v1`);
   env.setLocal({
     command: o.installed === false ? null : [process.execPath, FAKE],
@@ -65,7 +70,9 @@ function setup(o: { installed?: boolean; idleMs?: number; hardware?: LocalHardwa
       FAKE_OLLAMA_MODELS: JSON.stringify(o.models ?? []),
       FAKE_OLLAMA_PULL_MS: String(o.pullMs ?? 10),
       FAKE_OLLAMA_KEEP_MS: String(o.keepMs ?? 50),
+      ...(o.blobs ? { FAKE_OLLAMA_BLOBS: o.blobs } : {}),
     },
+    ollamaBlobs: o.blobs ?? null,
     idleMs: o.idleMs ?? 60_000,
     hardware: o.hardware ?? desktop,
     ...(o.registry ? { registryUrl: o.registry } : {}),
@@ -286,6 +293,24 @@ describe("Hugging Face downloads", () => {
     // The proxy tunnels to the file server (a CONNECT names only its host and port).
     expect(proxy.hits.some((h) => h.target.includes(new URL(m.url).port))).toBe(true);
     await proxy.close();
+  });
+
+  // Seen live: two models took 45 GB twice, the download and Ollama's copy. Ollama on this computer gets the file moved.
+  it("moves the file into the blobs of an Ollama on this computer instead of sending a copy", async () => {
+    const m = await mirror(FILE);
+    const blobs = mkdtempSync(join(tmpdir(), "drimvox-blobs-"));
+    try {
+      setup({ hf: await api(), hfFiles: [m.url], blobs });
+      await env.call("POST", "/api/local/pulls", { model: MODEL });
+      const done = await until(status, (v) => v.pulls[0]?.done, 20_000);
+      expect(done.pulls[0]).toMatchObject({ done: true, error: null });
+      expect(done.models.map((x: any) => x.name)).toContain(MODEL);
+      expect(readFileSync(join(blobs, `sha256-${SHA}`)).equals(FILE)).toBe(true);
+      // Nothing was sent: the fake's own store stays empty.
+      expect(await (await fetch(`${base()}/fake/blobs`)).json()).toEqual([]);
+    } finally {
+      rmSync(blobs, { recursive: true, force: true });
+    }
   });
 
   it("says to set a proxy when the file server cannot be reached and none is set", async () => {

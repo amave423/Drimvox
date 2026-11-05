@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createReadStream, createWriteStream, existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
+import { createReadStream, createWriteStream, existsSync, mkdirSync, renameSync, statSync, unlinkSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { join } from "node:path";
@@ -37,6 +37,8 @@ export interface HfDownload {
   progress(p: { status: string; completed: number; total: number }): void;
   /** The partial file this download writes, so a cancel can delete it. */
   partial(path: string): void;
+  /** Ollama's blobs folder when it runs on this computer and its folder is known: the file is moved there, not copied. */
+  blobs?: string | null;
 }
 
 /** A failure the page shows: a network that does not reach any address, a file that is not what Hugging Face says. */
@@ -236,8 +238,12 @@ export async function downloadHf(d: HfDownload): Promise<void> {
   // Into Ollama: the file as a blob, then a model made from it (it reads the chat template from the GGUF).
   d.progress({ status: "copying the model to Ollama", completed: file.size, total: file.size });
   const digest = `sha256:${file.sha256}`;
+  // Ollama on this computer: the file is moved into its blobs, at once and without a second copy on the disk (seen: two
+  // models took 45 GB twice). Moved back and sent the usual way when that Ollama does not see it there.
+  const moved = d.blobs ? moveInto(part, join(d.blobs, `sha256-${file.sha256}`)) : null;
   const known = await fetch(`${d.ollamaUrl}/api/blobs/${digest}`, { method: "HEAD", signal: d.signal });
   if (!known.ok) {
+    if (moved) renameSync(moved, part);
     const status = await uploadFile(`${d.ollamaUrl}/api/blobs/${digest}`, part, d.signal);
     if (status < 200 || status >= 300) throw new HfDownloadError(`Ollama did not take the file: ${status}`);
   }
@@ -256,5 +262,16 @@ export async function downloadHf(d: HfDownload): Promise<void> {
   const failed = lines.find((l) => l.error);
   if (failed) throw new HfDownloadError(failed.error!);
   if (!lines.some((l) => l.status === "success")) throw new HfDownloadError("Ollama did not finish making the model");
-  unlinkSync(part);
+  if (existsSync(part)) unlinkSync(part);
+}
+
+/** Moves a file to `target` when nothing is there yet; the target on success, null when it could not (another disk). */
+function moveInto(file: string, target: string): string | null {
+  if (existsSync(target)) return null;
+  try {
+    renameSync(file, target);
+    return target;
+  } catch {
+    return null;
+  }
 }
