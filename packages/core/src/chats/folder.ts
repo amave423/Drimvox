@@ -2,7 +2,7 @@ import type { AttachmentView, StreamEvent } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { BATCH_HINT, STUCK_HINT } from "../agent/prompt";
-import { ASSETS_HINT } from "../agent/design";
+import { ASSETS_HINT, DESIGN_HINT } from "../agent/design";
 import { buildTools, type ToolHooks } from "../agent/tools";
 import { Workspace } from "../agent/workspace";
 import { askAboutPictures, type Vision } from "../visual/look";
@@ -113,6 +113,7 @@ export function folderHint(folder: string, platform = process.platform): string 
     BATCH_HINT,
     STUCK_HINT,
     ASSETS_HINT,
+    DESIGN_HINT,
     // Seen live: a model drove a hidden Word through COM; it waited for an answer nobody could give, for two hours.
     "Office files (.docx, .xlsx, .pptx) are made with libraries: python-docx, openpyxl, python-pptx (or docx, exceljs,",
     "pptxgenjs in Node). Never drive Word, Excel, PowerPoint or Outlook through COM automation or New-Object -ComObject:",

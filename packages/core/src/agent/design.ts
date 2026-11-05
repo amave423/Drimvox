@@ -29,6 +29,17 @@ export const ASSETS_HINT =
   "free photos (Unsplash, Pexels) and save them in the project's assets folder, the source named in README. No grey " +
   "placeholders, and no images linked from other sites at random.";
 
+/**
+ * Ambition for whatever the agent builds, with no design brief too (asked for: designs rich and not like every AI-made
+ * page; seen: of five weather sites four were plain and alike, and the one he liked had a chart, scenes and gauges).
+ */
+export const DESIGN_HINT =
+  "When you build an interface, do not stop at a plain, safe page unless the user asks for one: make it rich and " +
+  "distinctive, as a good product of its kind would be. Give it what such products have beyond the bare request (for a " +
+  "weather site, a temperature chart, wind and sun, quick cities; for a shop, filters and a cart that feels alive), data " +
+  "shown as charts and gauges where it fits, purposeful motion and micro-interactions, and a palette, fonts with Cyrillic " +
+  `and one signature detail that come from the subject, not from habit. Avoid what makes AI-made pages look alike: ${CLICHES.join("; ")}.`;
+
 const CRAFT = [
   "one scale for text sizes and one for spacing (steps of 4 px), used everywhere",
   "text contrast of at least WCAG AA",

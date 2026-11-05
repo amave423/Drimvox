@@ -77,6 +77,9 @@ function question(d: ReviewDeps, pages: number): string {
     reviewQuestion(brief, pages),
     notes ? `\nThe project's own design notes (DESIGN.md):\n${notes}` : "",
     "\nEmoji standing in for icons, default browser controls left unstyled and cramped phone layouts count as issues.",
+    // Asked for: designs rich and not like every AI-made page.
+    "A result that is bare or looks like any AI-made page (a generic layout, nothing beyond the bare request, no signature " +
+      "detail) is an issue too: say what would make it richer and its own.",
   ].join("\n");
 }
 

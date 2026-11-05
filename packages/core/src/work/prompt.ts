@@ -1,5 +1,5 @@
 import type { ProjectPlan } from "@drimvox/shared";
-import { ASSETS_HINT, designInstructions } from "../agent/design";
+import { ASSETS_HINT, DESIGN_HINT, designInstructions } from "../agent/design";
 import { BATCH_HINT, STUCK_HINT } from "../agent/prompt";
 
 /** Steps one answer on a task may take: enough for a task of the list; past it, "go on" continues. */
@@ -18,6 +18,7 @@ export function workRules(plan: ProjectPlan | null): string {
     BATCH_HINT,
     STUCK_HINT,
     ASSETS_HINT,
+    DESIGN_HINT,
     // Seen live: a file written, then patched sixteen times in a row before it was run once.
     "Write a new file whole and right in one write_file, then run or check it before changing it; do not build a file",
     "out of many small edits. Batch related changes to one file into one edit where you can.",
@@ -52,6 +53,7 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "
     BATCH_HINT,
     STUCK_HINT,
     ASSETS_HINT,
+    DESIGN_HINT,
     "Your checklist: keep it current with update_checklist (short items, done marked) whenever an item is done or you find",
     "new work; the user sees it. If you cannot decide something well yourself, ask_user with your assumption and go on: never",
     "wait for an answer. A message from the user while you work comes as a user message: follow it, then go on.",
@@ -102,6 +104,7 @@ export function existingRules(canLook: boolean, git = "- Never commit or push: g
     BATCH_HINT,
     STUCK_HINT,
     ASSETS_HINT,
+    DESIGN_HINT,
     "For a question, look at the code and answer it; change nothing unless asked.",
     "For a task: first write a short checklist of the steps with update_checklist (3-8 items, in the user's language); the",
     "user sees it as your plan beside the conversation. Keep it current: mark items done as you go, add found work. Then do",
