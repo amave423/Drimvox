@@ -250,6 +250,8 @@
 .msg-done summary { cursor: pointer; }
 /* One action alone: its line, with nothing to open (asked for: the arrow opened nothing). */
 .msg-done.msg-one { margin: 2px 0 6px; }
+/* Drimvox sent the work back: in plain sight, as the note over the box is (Messages.tsx). */
+.msg-review-note { margin: 4px 0 10px; padding: 8px 12px; border-left: 3px solid var(--wait); background: var(--wait-soft); border-radius: 0 10px 10px 0; font-size: 13.5px; }
 .msg-done .msg-activity { margin-top: 4px; }
 /* Narrow: the model's list and the other menus open above the panel at full width instead of beside it. */
 .options-panel.is-narrow { width: max-content; max-width: min(380px, calc(100vw - 32px)); }

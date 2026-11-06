@@ -206,11 +206,13 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
             {
               line: activityLine(t, a.name, a.input),
               at: a.at,
+              ...(a.name === "sent_back" ? { note: true as const } : {}),
               // Files written or changed show where it happened, with their lines (asked for).
               ...(a.name === "write_file" || a.name === "edit_file"
                 ? {
                     file: {
-                      paths: a.input.split("\n").filter(Boolean),
+                      // Only what reads as a path (seen live: a cut-off call's raw JSON shown as a file's name).
+                      paths: a.input.split("\n").filter((p) => !!p && p.length <= 200 && !/[{}"]/.test(p)),
                       touch: a.name === "write_file" ? ("written" as const) : ("changed" as const),
                       added: a.added,
                       removed: a.removed,

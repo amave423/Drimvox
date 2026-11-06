@@ -168,6 +168,8 @@ export interface AnswerAction {
   shot?: string;
   /** A file written or changed: shown where it happened, with the lines that went in and out (asked for). */
   file?: { paths: string[]; touch: "written" | "changed"; added?: number; removed?: number };
+  /** Drimvox sent the work back (its checks, the code or design review): said in plain sight, not folded away. */
+  note?: true;
 }
 
 /** Opens a file of a project conversation's folder to look at; absent in a chat, which lists its files at the answer's end. */
@@ -345,13 +347,20 @@ function AnswerFlow({ text, actions, streaming, live }: { text: string; actions:
  */
 function ActionGroup({ actions, open }: { actions: AnswerAction[]; open: boolean }) {
   const { t } = useApp();
-  const lines = actions.filter((a) => !a.shot);
+  const lines = actions.filter((a) => !a.shot && !a.note);
   const shots = actions.filter((a) => a.shot);
+  // Seen live: the agent wrote "the review asks for…" and the user had asked for nothing; the review's word was folded.
+  const notes = actions.filter((a) => a.note);
   // Where they happened in a project's conversation; a chat lists them at the answer's end instead.
   const inProject = useContext(OpenFileContext) !== null;
   const files = inProject ? filesHere(actions) : [];
   return (
     <>
+      {notes.map((a, i) => (
+        <p key={`note-${i}`} className="msg-review-note">
+          {a.line}
+        </p>
+      ))}
       {lines.length === 1 && <p className="msg-done msg-one muted">{lines[0]!.line}</p>}
       {lines.length > 1 && (
         <details className="msg-done muted" open={open || undefined}>

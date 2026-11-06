@@ -90,7 +90,16 @@ function lookAtImage(ws: Workspace, vision: Vision, emit: (event: StreamEvent) =
 
 /** What the activity line shows of a call: the file, the command or the search. */
 export function describeCall(input: unknown): string {
-  if (typeof input === "string") return input.length > 200 ? `${input.slice(0, 200)}…` : input;
+  // Arguments the model sent as unreadable JSON (cut off, broken): what they name, never the JSON itself (seen live: a
+  // file's whole content shown as its name in the feed).
+  if (typeof input === "string") {
+    if (!input.trimStart().startsWith("{")) return input.length > 200 ? `${input.slice(0, 200)}…` : input;
+    try {
+      return describeCall(JSON.parse(input));
+    } catch {
+      return /"(?:path|command|url|query|pattern|name)"\s*:\s*"((?:[^"\\]|\\.){1,200})"/.exec(input)?.[1] ?? "";
+    }
+  }
   const i = (input ?? {}) as Record<string, unknown>;
   // Several edits at once (edit_file's edits): every file they change, one per line, so the chat's list of files has them all.
   if (Array.isArray(i.edits)) {

@@ -616,6 +616,12 @@ describe("work on a project", () => {
     expect(sent).toContain("Anyone can subscribe to any board");
     // Low ones are not worth a round of fixes.
     expect(sent).not.toContain("Naming");
+    // The sending back is in the conversation for the user to see (seen live: "the review asks for…" out of nowhere).
+    const work = await (await env.call("GET", `/api/projects/${s.project.id}/work`)).json();
+    const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
+    const activity = chat.messages.flatMap((m: any) => m.activity);
+    expect(activity).toContainEqual(expect.objectContaining({ name: "sent_back", input: "code:1" }));
+    expect(activity).toContainEqual(expect.objectContaining({ name: "sent_back", input: "skills:1" }));
   });
 
   // Asked for: a plain HTML page was reviewed for security; it has no server, no accounts and no one's data.

@@ -331,6 +331,9 @@ export class WorkRun {
     const plan = this.d.plan(this.projectId);
     const vision = await this.d.vision(conn, model);
     const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]);
+    // The plan's skills are given whole in the instructions: no reminder to open them before the end (seen live: a round
+    // spent opening two skills the agent already had).
+    if (!this.chatMode) for (const name of plan?.skills ?? []) this.skillsOpened.add(name);
     const files = { list: () => this.d.chats.attachments.ofChat(this.chatId), file: (id: string) => this.d.chats.attachments.file(id) };
     // The user's MCP servers work in the run too (seen: four were switched on and the run had none of them).
     const mcpTools = this.d.mcp
@@ -404,6 +407,7 @@ export class WorkRun {
           // Twice back to the agent at most; then the report says honestly what still fails.
           if (results.some((r) => !r.ok) && this.checkRounds <= MAX_CHECK_ROUNDS) {
             this.sentBack = true;
+            onCall("sent_back", `checks:${results.filter((r) => !r.ok).length}`);
             return { fix: checksFailedMessage(results) };
           }
           const asked =
@@ -439,13 +443,17 @@ export class WorkRun {
             hooks,
             onSpend: (usd) => (cost += usd),
           }).catch(() => null);
-          return issues ? reviewWorkMessage(issues) : null;
+          if (!issues) return null;
+          const message = reviewWorkMessage(issues);
+          if (message) onCall("sent_back", `code:${issues.filter((i) => i.severity !== "low").length}`);
+          return message;
         },
         skillsLeft: () => {
           if (this.skillsNudged || this.chatMode) return null;
           this.skillsNudged = true;
           const left = skills.filter((s) => !this.skillsOpened.has(s.name));
           if (!left.length) return null;
+          onCall("sent_back", `skills:${left.length}`);
           return [
             "Before you finish: these skills are ready and you have not opened them.",
             ...left.map((s) => `- ${s.name}: ${s.description}`),
@@ -458,7 +466,10 @@ export class WorkRun {
           // Motion asked for is checked in the code: screenshots cannot see it (seen live: "animated" came out still).
           const asked = [plan?.context ?? "", this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? ""].join("\n");
           const motion = missingMotion(this.folder, asked);
-          if (!vision || !this.d.visualKit.screenshot) return motion ? polishWorkMessage([motion]) : null;
+          if (!vision || !this.d.visualKit.screenshot) {
+            if (motion) onCall("sent_back", "design:1");
+            return motion ? polishWorkMessage([motion]) : null;
+          }
           onCall("design_review", "");
           const issues = await reviewProjectDesign(
             {
@@ -477,6 +488,7 @@ export class WorkRun {
             start,
           );
           const all = [...(issues ?? []), ...(motion ? [motion] : [])];
+          if (all.length) onCall("sent_back", `design:${all.length}`);
           return all.length ? polishWorkMessage(all) : null;
         },
         onCall,

@@ -11,7 +11,7 @@ import { parseSkill, type Skill } from "../skills/skills";
 /** Files a static page is made of: nothing in them runs on a server or holds anyone's data. */
 const STATIC = new Set([".html", ".htm", ".css", ".js", ".mjs", ".json", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".ico", ".woff", ".woff2", ".ttf", ".md", ".txt"]);
 /** Script that reaches past the browser: a server, files, the environment, other programs. */
-const SERVER_CODE = /\brequire\(|from\s+["'](?:node:|express|fastify|koa|fs|http|child_process)|process\.env|child_process/;
+const SERVER_CODE = /(?:require\(\s*|from\s+)["'](?:node:)?(?:fs|fs\/promises|http|https|http2|net|child_process|express|fastify|koa|hono|ws)["']|process\.env|child_process/;
 
 /**
  * Whether the project is a static page only: HTML, styles, browser scripts, pictures, no package.json and no server
@@ -30,7 +30,8 @@ export function isStaticSite(root: string): boolean {
       if (++seen > 500 || name === "package.json") return false;
       const ext = extname(name).toLowerCase();
       if (!STATIC.has(ext)) return false;
-      if ((ext === ".js" || ext === ".mjs") && SERVER_CODE.test(readFileSync(path, "utf8"))) return false;
+      // A page's own tests run in Node and require its scripts (seen live: tests.js made a weather page "a server").
+      if ((ext === ".js" || ext === ".mjs") && !/test|spec/i.test(name) && SERVER_CODE.test(readFileSync(path, "utf8"))) return false;
     }
     return true;
   };

@@ -44,6 +44,11 @@ const OWN_LINES = [
 export function activityLine(t: (key: MessageKey, vars?: Record<string, string | number>) => string, name: string, input: string): string {
   if (name === "web_search") return t("web.searching", { query: input });
   if (name === "open_page") return t("web.reading", { url: input });
+  // Drimvox sent the work back: "design:8", "code:2", "checks:1", "skills:2".
+  if (name === "sent_back") {
+    const [kind, n] = input.split(":");
+    return t(`sentBack.${kind === "design" || kind === "code" || kind === "checks" ? kind : "skills"}` as MessageKey, { n: Number(n) || 0 });
+  }
   // The folder itself is "." to the model; to the reader it is just "the folder" (seen: "Looks at the folder .").
   if (OWN_LINES.includes(name)) return t(`folder.tool.${name}` as MessageKey, { input: input === "." || input === "./" ? "" : input }).trim();
   return t("chat.mcpCall", { name });
