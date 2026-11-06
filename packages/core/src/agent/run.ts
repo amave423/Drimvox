@@ -187,16 +187,20 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
             if (writing.done) adopt(writing.done);
             writing = null;
           }
-          let sent = withMemory(messages, memory);
+          // A step gets the messages the last one sent: once the summary is in them, they are not cut again by the old
+          // count (seen in chats: the summary and the newest messages fell off at the next step).
+          const view: Memory | null =
+            memory && messages[1]?.role === "user" && messages[1].content === memory.summary ? { upTo: 2, summary: memory.summary } : memory;
+          let sent = withMemory(messages, view);
           const limit = memoryLimit(i.price);
           const size = sizeOf(sent);
           // Before the limit the summary starts in the background and the agent goes on (as OpenCode does); only at the
           // limit does it wait for it.
           if (i.onMemory && !writing && size > limit * EARLY_SUMMARY) {
-            const upTo = cutPoint(messages, memory, limit);
+            const upTo = cutPoint(messages, view, limit);
             if (upTo !== null) {
               const job: Summary = { result: Promise.resolve(null), done: undefined };
-              job.result = remember(i.conn, i.model, i.worktree, messages, memory, upTo, i.signal).then(
+              job.result = remember(i.conn, i.model, i.worktree, messages, view, upTo, i.signal).then(
                 (r) => (job.done = r),
                 // Without a summary the whole conversation goes; a later step tries again.
                 () => (job.done = null),

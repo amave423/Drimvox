@@ -36,24 +36,37 @@ export function memoryLimit(price: ModelInfo | undefined): number {
  */
 const MAX_SENT = 400_000;
 
-/** The conversation as the model gets it: the task, the summary, then the newer messages. */
-export function withMemory(messages: ModelMessage[], memory: Memory | null): ModelMessage[] {
+/**
+ * The conversation as the model gets it: the task, the summary, then the newer messages. A chat has no task at its start
+ * (`keepFirst` false): its first message is an old question like any other, and goes into the summary.
+ */
+export function withMemory(messages: ModelMessage[], memory: Memory | null, keepFirst = true): ModelMessage[] {
   if (!memory || memory.upTo <= 1 || memory.upTo > messages.length) return messages;
-  return [messages[0]!, { role: "user", content: memory.summary }, ...messages.slice(memory.upTo)];
+  return [...(keepFirst ? [messages[0]!] : []), { role: "user", content: memory.summary }, ...messages.slice(memory.upTo)];
 }
 
-export const sizeOf = (messages: ModelMessage[]) => JSON.stringify(messages).length;
+/** What a picture or a file of bytes counts for in the size: about what a model reads of it, not its bytes as text. */
+const BINARY_SIZE = 2_000;
+
+/**
+ * The conversation's size in characters. Pictures count as a picture, not as their bytes written out (seen live: five
+ * screenshots of 3 MB counted as millions of characters, and a chat was summarized at its first step).
+ */
+export const sizeOf = (messages: ModelMessage[]) =>
+  JSON.stringify(messages, (_, v: unknown) => (v instanceof Uint8Array || v instanceof ArrayBuffer ? "x".repeat(BINARY_SIZE) : v)).length;
 
 /**
  * Where a new summary may end: before an assistant message, so that the newest messages after it take no more than
  * their share of the limit (at least the last exchange stays). Null when there is nothing older to summarize.
  */
-export function cutPoint(messages: ModelMessage[], memory: Memory | null, limit: number): number | null {
+export function cutPoint(messages: ModelMessage[], memory: Memory | null, limit: number, keepFrom?: number): number | null {
   const floor = Math.max(1, memory?.upTo ?? 1);
   let kept = 0;
   let cut: number | null = null;
   for (let i = messages.length - 1; i > floor; i--) {
-    kept += JSON.stringify(messages[i]).length;
+    kept += sizeOf([messages[i]!]);
+    // The user's newest question is never summarized away (seen live: a chat answered an old question instead).
+    if (keepFrom !== undefined && i > keepFrom) continue;
     if (messages[i]!.role !== "assistant") continue;
     if (cut !== null && kept > limit * KEEP_SHARE) break;
     cut = i;
@@ -76,8 +89,10 @@ export async function remember(
   memory: Memory | null,
   upTo: number,
   signal?: AbortSignal,
+  /** A chat's: the user's newest question, which is the task; its first message is not. */
+  chat?: { task: string },
 ): Promise<Remembered> {
-  const older = withMemory(messages.slice(0, upTo), memory).slice(1);
+  const older = chat ? withMemory(messages.slice(0, upTo), memory, false) : withMemory(messages.slice(0, upTo), memory).slice(1);
   const log = transcript(older);
   const result = await generateText({
     model: languageModel(conn, model),
@@ -86,7 +101,14 @@ export async function remember(
       "the goal and what the user asked for; what is done, file by file, and why; decisions made; commands that build, " +
       "test and run the project; what failed and how it was fixed; what is left to do. Plain text, at most 600 words, " +
       "in the language of the task. Facts only.",
-    messages: [{ role: "user", content: `The task:\n${text(messages[0]!)}\n\nThe log:\n${log.slice(-SUMMARIZER_INPUT)}` }],
+    messages: [
+      {
+        role: "user",
+        content: chat
+          ? `The user's newest question (it stays in the conversation as it is; the log is what came before it):\n${chat.task}\n\nThe log:\n${log.slice(-SUMMARIZER_INPUT)}`
+          : `The task:\n${text(messages[0]!)}\n\nThe log:\n${log.slice(-SUMMARIZER_INPUT)}`,
+      },
+    ],
     abortSignal: signal,
     maxRetries: 2,
   });

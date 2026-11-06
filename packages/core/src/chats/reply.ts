@@ -322,14 +322,22 @@ const addUsage = (a: { inputTokens: number; outputTokens: number }, b: { inputTo
 function memoryStep(i: ReplyInput, limit: number, spent: (u: { inputTokens: number; outputTokens: number }) => void) {
   let memory: Memory | null = null;
   return async ({ messages }: { messages: ModelMessage[] }) => {
-    let sent = withMemory(messages, memory);
-    const upTo = sizeOf(sent) > limit ? cutPoint(messages, memory, limit) : null;
+    // A chat's task is the user's newest question, not its first message (seen live: a long chat kept its first question
+    // as "the task", summarized the newest one away, and answered an old request instead).
+    const asked = messages.findLastIndex((m) => m.role === "user");
+    const question = messages[asked];
+    const task = typeof question?.content === "string" ? question.content : (question?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("\n");
+    // The next step gets the messages this one sent, the summary first: they are not cut again by the old count (seen:
+    // the summary and the newest question both fell off at the step after a tool).
+    const view: Memory | null = memory && messages[0]?.role === "user" && messages[0].content === memory.summary ? { upTo: 1, summary: memory.summary } : memory;
+    let sent = withMemory(messages, view, false);
+    const upTo = sizeOf(sent) > limit ? cutPoint(messages, view, limit, asked) : null;
     if (upTo !== null && i.folder) {
       try {
-        const r = await remember(i.conn, i.model, i.folder, messages, memory, upTo, i.signal);
+        const r = await remember(i.conn, i.model, i.folder, messages, view, upTo, i.signal, { task });
         memory = r.memory;
         spent({ inputTokens: r.inputTokens, outputTokens: r.outputTokens });
-        sent = withMemory(messages, memory);
+        sent = withMemory(messages, memory, false);
       } catch {
         // Without a summary the step goes as it is; the next one tries again.
       }

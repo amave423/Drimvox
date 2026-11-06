@@ -177,3 +177,37 @@ describe("a chat with a folder", () => {
     expect(events.at(-1).message).toMatchObject({ content: "На референсе оранжевый круг." });
   });
 });
+
+// Seen live: a long chat with a folder kept its first question as "the task", summarized the newest one away, and
+// answered an old request ("the graphics settings") instead of what the user had just asked.
+describe("memory of a long chat with a folder", () => {
+  it("keeps the newest question as it is and does not hold the first one up as the task", async () => {
+    const turns: FakeTurn[] = [
+      { text: `Про игру: ${"длинный ответ ".repeat(500)}` },
+      { text: `Про графику: ${"ещё ответ ".repeat(500)}` },
+      { toolCalls: [{ name: "list_files", args: { path: "." } }] },
+      { text: "В папке запрета всё на месте." },
+    ];
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [{ id: "coder", context_length: 4000 }],
+      respond: (body) => (JSON.stringify(body.messages?.[0] ?? "").includes("working memory") ? { text: "SUMMARY: спрашивал про игру и графику." } : (turns.shift() ?? { text: "Готово." })),
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const chat = (await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "coder" })).json()) as { id: string };
+    await connect(chat.id, folder);
+    for (const content of ["Варзон закрывается после обновления", "Посоветуй настройки графики", "Посмотри папку запрета"]) {
+      await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content }));
+    }
+    const asks = fake.requests.filter((r) => r.path === "/v1/chat/completions" && !JSON.stringify(r.body.messages?.[0] ?? "").includes("working memory"));
+    const summarizer = fake.requests.find((r) => r.path === "/v1/chat/completions" && JSON.stringify(r.body.messages?.[0] ?? "").includes("working memory"));
+    expect(summarizer).toBeDefined();
+    expect(JSON.stringify(summarizer!.body.messages)).toContain("newest question");
+    const last = asks.at(-1)!.body.messages.filter((m: any) => m.role === "user");
+    // The summary first, the newest question whole; the first question is not held up as the task.
+    expect(JSON.stringify(last)).toContain("Посмотри папку запрета");
+    expect(JSON.stringify(last)).not.toContain("Варзон закрывается после обновления");
+    const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
+    expect(saved.messages.at(-1).content).toContain("В папке запрета всё на месте.");
+  });
+});
