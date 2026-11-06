@@ -2,6 +2,7 @@ import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
 import { formatTokens } from "../../lib/format";
+import { useModelInfo } from "../chat/ModelNote";
 import { ProjectParams } from "./ProjectParams";
 import { WorkTokens } from "./WorkTokens";
 
@@ -30,6 +31,9 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
   const [height, setHeight] = useState<number | null>(keptHeight);
   const drag = useRef<{ y: number; from: number } | null>(null);
   const { work } = p;
+  const model = useModelInfo(work ? (work.escalated && work.models?.strong ? work.models.strong : (work.models?.work ?? null)) : null);
+  // How full the context is, for the folded icon: a pie of that share, ink while it is short, pencil once it is long.
+  const share = work?.tokens.context && model?.contextLength ? Math.min(1, work.tokens.context / model.contextLength) : 0;
 
   // How tall the context's own content is: the most it may take.
   useLayoutEffect(() => {
@@ -63,6 +67,7 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
   return (
     <aside id="workshop-result" className="project-panel" aria-label={t("projectParams.panel")} aria-hidden={!p.open} inert={!p.open}>
       {!folded && (
+        // Made smaller, the context is cut, not scrolled (asked for).
         <section className="panel-context" aria-label={t("projectParams.context")} style={{ height: shown || undefined }}>
           <div ref={content} className="panel-context-body">
             {context ?? <p className="muted">{t("workshop.noResult")}</p>}
@@ -97,10 +102,25 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
           <h2 className="sheet-h">{t("projectParams.title")}</h2>
           {/* The folded context as a small button: how full it is, a click brings it back. */}
           {folded && (
-            <button type="button" className="panel-context-chip" title={t("projectParams.showContext")} onClick={() => setHeight(null)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 3a9 9 0 0 1 9 9h-9z" fill="currentColor" stroke="none" />
+            <button
+              type="button"
+              className={`panel-context-chip${share >= 0.4 ? " is-long" : ""}`}
+              title={t("projectParams.showContext")}
+              aria-label={t("projectParams.showContext")}
+              onClick={() => setHeight(null)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.35" />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  strokeDasharray={`${(share * 56.55).toFixed(2)} 56.55`}
+                  transform="rotate(-90 12 12)"
+                />
               </svg>
               {work?.tokens.context ? formatTokens(work.tokens.context, settings.locale) : t("projectParams.context")}
             </button>

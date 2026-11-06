@@ -27,7 +27,7 @@ export const projectGitRulesSchema = z
   .strict();
 export type ProjectGitRules = z.infer<typeof projectGitRulesSchema>;
 
-export const defaultGitRules: ProjectGitRules = { target: "project-branch", commit: "per-item", messages: "history", push: true, pullRequest: true, allowMain: false };
+export const defaultGitRules: ProjectGitRules = { target: "current", commit: "per-item", messages: "history", push: true, pullRequest: true, allowMain: false };
 
 /** Where the project's git is now: the agent's branch and the one it came from, its commits, the pull request. */
 export interface ProjectGitState {

@@ -7,7 +7,6 @@ import { TrashIcon } from "./SideChats";
 import { CatalogDetails, useEntryText } from "./catalog/CatalogDetails";
 import { CatalogLogo } from "./catalog/CatalogLogo";
 import { Hint } from "./Hint";
-import { Toggle } from "./Toggle";
 
 const CATEGORIES: ("all" | CatalogCategory)[] = ["all", "web", "code", "design", "docs"];
 
@@ -27,16 +26,29 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
 
   async function load() {
     const [s, k] = await Promise.all([
-      api.mcp.$get().then((r) => ok<McpServerView[]>(r)).catch(() => []),
-      api.skills.$get().then((r) => ok<SkillView[]>(r)).catch(() => []),
+      api.mcp
+        .$get()
+        .then((r) => ok<McpServerView[]>(r))
+        .catch(() => []),
+      api.skills
+        .$get()
+        .then((r) => ok<SkillView[]>(r))
+        .catch(() => []),
     ]);
     setServers(s);
     setSkills(k);
   }
   useEffect(() => void load(), []);
 
-  /** On: installs the skill or creates the server (or switches it back on); off: removes the skill, switches the server off. */
+  /**
+   * Installs the skill or creates the server (or switches an old switched-off one back on); "off" deletes it: a project
+   * switches on its own ones of those installed here (asked for: install and remove, no switch).
+   */
   async function turn(entry: CatalogEntry, on: boolean, secret?: string, trust?: McpTrust): Promise<boolean> {
+    if (!on) {
+      await remove(entry);
+      return true;
+    }
     setBusy(entry.id);
     setFailed(null);
     const have = installed(entry, servers, skills);
@@ -52,7 +64,9 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
       const env = s?.env && secret ? { [s.env]: secret } : {};
       const headers = s?.header && secret ? { [s.header.name]: `${s.header.prefix}${secret}` } : {};
       const how = entry.server.command ? { command: entry.server.command, args: entry.server.args ?? [] } : { url: entry.server.url! };
-      res = (await api.mcp.$post({ json: { name: text(entry, "name"), ...how, env, headers, trust: trust ?? entry.trust ?? "changes" } }).catch(() => null)) as Response | null;
+      res = (await api.mcp
+        .$post({ json: { name: text(entry, "name"), ...how, env, headers, trust: trust ?? entry.trust ?? "changes" } })
+        .catch(() => null)) as Response | null;
     }
     setBusy(null);
     const done = !!res?.ok;
@@ -114,37 +128,37 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
             </div>
             <p className="muted">{text(entry, "about")}</p>
             <div className="catalog-card-foot">
-              <Toggle
-                checked={isOn(entry)}
-                disabled={busy === entry.id}
-                onChange={(on) => {
-                  // A server that needs a key asks for it in its window first.
-                  if (on && needsSetup(entry)) return setOpen(entry);
-                  void turn(entry, on);
-                }}
-              >
-                <span className="visually-hidden">{text(entry, "name")}</span>
-                {busy === entry.id && <span className="muted">{t("catalog.installing")}</span>}
-              </Toggle>
+              {isOn(entry) ? (
+                <button
+                  type="button"
+                  className="btn"
+                  aria-label={t("catalog.remove", { name: text(entry, "name") })}
+                  disabled={busy === entry.id}
+                  onClick={() => void remove(entry)}
+                >
+                  <TrashIcon /> {t("catalog.turnOff")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn is-primary"
+                  aria-label={t("catalog.install", { name: text(entry, "name") })}
+                  disabled={busy === entry.id}
+                  // A server that needs a key or a choice asks in its window first.
+                  onClick={() => (needsSetup(entry) ? setOpen(entry) : void turn(entry, true))}
+                >
+                  {busy === entry.id ? t("catalog.installing") : t("catalog.turnOn")}
+                </button>
+              )}
               <span className="catalog-card-actions">
-                {installed(entry, servers, skills) && (
-                  <button
-                    type="button"
-                    className="icon-button is-pencil"
-                    aria-label={t("catalog.remove", { name: text(entry, "name") })}
-                    title={t("catalog.remove", { name: text(entry, "name") })}
-                    disabled={busy === entry.id}
-                    onClick={() => void remove(entry)}
-                  >
-                    <TrashIcon />
-                  </button>
-                )}
                 <button type="button" className="link" onClick={() => setOpen(entry)}>
                   {t("catalog.more")}
                 </button>
               </span>
             </div>
-            {failed?.id === entry.id && !open && <p className="is-pencil-text">{t(failed.code === "download" ? "catalog.failedDownload" : "catalog.failed")}</p>}
+            {failed?.id === entry.id && !open && (
+              <p className="is-pencil-text">{t(failed.code === "download" ? "catalog.failedDownload" : "catalog.failed")}</p>
+            )}
           </li>
         ))}
       </ul>

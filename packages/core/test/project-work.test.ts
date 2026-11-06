@@ -282,10 +282,9 @@ describe("work on a project", () => {
     expect(chat.messages[0]).toMatchObject({ role: "user" });
     expect(chat.messages[0].content).toContain("Каталог");
     expect(chat.messages.at(-1)).toMatchObject({ role: "assistant", status: "done" });
-    // By the default git rules the work is committed in the project's own branch, named after it; main stays as it was.
-    const project = await (await env.call("GET", "/api/projects")).json();
-    expect(git(folder, "branch", "--show-current")).toBe(`drimvox/${slug(project[0].name)}`);
-    expect(git(folder, "log", "--oneline", "main").split("\n")).toHaveLength(1);
+    // The work is committed in the branch the project is on, no branch of the agent's own (asked for).
+    expect(git(folder, "branch", "--show-current")).toBe("main");
+    expect(git(folder, "log", "--oneline", "main").split("\n").length).toBeGreaterThan(1);
     expect(git(folder, "status", "--porcelain")).toBe("");
     // The plan's task is over once the work started.
     expect((await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json()).statusReason).toBe("started");
@@ -977,7 +976,7 @@ describe("a project's git rules", () => {
     return until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length >= turns);
   };
 
-  it("commits in a branch of its own when the agent says, leaves secrets out, and tells the agent how to write", async () => {
+  it("commits in the project's branch when the agent says, leaves secrets out, and tells the agent how to write", async () => {
     const s = await ready([
       call("write_file", { path: "cart.js", content: "total()\n" }),
       call("write_file", { path: ".env", content: "KEY=secret\n" }),
@@ -985,26 +984,23 @@ describe("a project's git rules", () => {
       { text: "Готово." },
     ]);
     await ask(s, "Почини корзину", 4);
-    expect(git(folder, "branch", "--show-current")).toMatch(/^drimvox\/task-/);
+    expect(git(folder, "branch", "--show-current")).toBe("main");
     // The agent's own commit, then Drimvox's with the project's state for whoever picks it up next.
-    expect(git(folder, "log", "--format=%s", "main..HEAD").split("\n")).toEqual(["Почини корзину", "Fix cart total"]);
+    expect(git(folder, "log", "--format=%s", "-2").split("\n")).toEqual(["Почини корзину", "Fix cart total"]);
     expect(git(folder, "show", "--name-only", "--format=", "HEAD~1").split("\n")).toEqual(["cart.js"]);
     // AGENTS.md only: pointer files for other agents only when the settings ask (asked for: not every agent is Claude).
     expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n")).toEqual(["AGENTS.md"]);
     const agents = readFileSync(join(folder, "AGENTS.md"), "utf8");
     expect(agents).toContain("## Project state (kept by Drimvox)");
     expect(agents).toContain("Goal: Почини корзину");
-    expect(agents).toMatch(/Git branch: drimvox\/task-/);
+    expect(agents).toContain("Git branch: main");
     expect(existsSync(join(folder, "CLAUDE.md"))).toBe(false);
     expect(git(folder, "status", "--porcelain")).toBe("?? .env");
     const system = JSON.stringify(requestsOf("coder")[0]!.body.messages[0]);
     expect(system).toContain("commit_changes");
     expect(system).toContain("in English");
     const view = await (await env.call("GET", `/api/projects/${s.project.id}/git`)).json();
-    expect(view.state).toMatchObject({ base: "main", ahead: 2, github: false, pullRequest: null });
-    // The changes are counted from main, committed ones too.
-    const changes = await (await env.call("GET", `/api/projects/${s.project.id}/work/changes`)).json();
-    expect(changes.map((f: any) => f.path)).toContain("cart.js");
+    expect(view.state).toMatchObject({ branch: "main", base: null, github: false, pullRequest: null });
   });
 
   it("makes pointer files for the agents chosen in the settings", async () => {
@@ -1019,19 +1015,20 @@ describe("a project's git rules", () => {
     expect(existsSync(join(folder, "CLAUDE.md"))).toBe(false);
   });
 
-  it("accepts the branch into main, or rejects it and goes back to main", async () => {
-    const s = await ready([call("write_file", { path: "a.txt", content: "a\n" }), { text: "Готово." }, call("write_file", { path: "b.txt", content: "b\n" }), { text: "Готово." }]);
-    await ask(s, "Сделай a", 2);
-    expect((await env.call("POST", `/api/projects/${s.project.id}/git/accept`)).status).toBe(200);
+  // Seen live: a project left on "drimvox/task-1106-2048 → master" from before, which said nothing to its user.
+  it("brings an agent's branch left from before back into the branch it came from, and works there", async () => {
+    const s = await ready([call("write_file", { path: "b.txt", content: "b\n" }), { text: "Готово." }]);
+    git(folder, "switch", "-q", "-c", "drimvox/task-1106-2048");
+    writeFileSync(join(folder, "a.txt"), "a\n");
+    git(folder, "add", "a.txt");
+    git(folder, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "a");
+    env.db.sql
+      .prepare("insert into settings (key, value) values (?, ?)")
+      .run(`git.branch:${s.project.id}`, JSON.stringify({ branch: "drimvox/task-1106-2048", base: "main", pullRequest: null }));
+    await ask(s, "Сделай b", 2);
     expect(git(folder, "branch", "--show-current")).toBe("main");
-    expect(readFileSync(join(folder, "a.txt"), "utf8")).toBe("a\n");
-    await ask(s, "Сделай b", 4);
-    const branch = git(folder, "branch", "--show-current");
-    expect(branch).toMatch(/^drimvox\//);
-    expect((await env.call("POST", `/api/projects/${s.project.id}/git/reject`)).status).toBe(200);
-    expect(git(folder, "branch", "--show-current")).toBe("main");
-    expect(git(folder, "ls-files")).not.toContain("b.txt");
-    expect(git(folder, "branch", "--list", branch)).toContain(branch);
+    expect(git(folder, "ls-files")).toContain("a.txt");
+    expect(git(folder, "ls-files")).toContain("b.txt");
   });
 
   // Asked for: a project's answer is undone like a chat's — the folder back as it was before it.

@@ -36,11 +36,13 @@ interface PickerProps {
   audio?: boolean;
   /** A photo waits to be sent: picture and video models that take one come first, the others cannot be chosen. */
   photos?: boolean;
+  /** What the button says while nothing is chosen, instead of "Choose a model". */
+  empty?: string;
 }
 
 type Listed = { id: string; name: string; info: ModelInfo | null; photoInput?: PhotoInput | null; providerId?: string };
 
-export function ModelPicker({ value, onChange, placement = "below", kinds: wanted = ["text"], vision = false, photos = false, audio = false }: PickerProps) {
+export function ModelPicker({ value, onChange, placement = "below", kinds: wanted = ["text"], vision = false, photos = false, audio = false, empty }: PickerProps) {
   const { api, t, providers: all, settings, updateSettings, navigate } = useApp();
   const openChains = () => {
     try {
@@ -309,7 +311,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
             <span className="picker-label-provider">{providerName}</span>
           </span>
         ) : (
-          <span className="picker-label">{t("model.pick")}</span>
+          <span className="picker-label">{empty ?? t("model.pick")}</span>
         )}
         <span aria-hidden>▾</span>
       </button>

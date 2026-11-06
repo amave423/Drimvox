@@ -329,6 +329,10 @@ const addUsage = (a: { inputTokens: number; outputTokens: number }, b: { inputTo
   outputTokens: a.outputTokens + b.outputTokens,
 });
 
+/** The last summary of each chat's history, with a mark of the message it ends on (lost with a restart, then made again). */
+const chatMemories = new Map<string, { memory: Memory; mark: string }>();
+const markOf = (m: ModelMessage | undefined) => (m ? `${m.role}:${JSON.stringify(m.content).slice(0, 2_000)}` : "");
+
 /**
  * The agent's memory inside one long answer (agent/memory.ts): past the limit, the older steps are told by a summary the
  * model writes, with the current text of the files it changed. Without this a task's answer of 200 steps outgrew the
@@ -336,7 +340,14 @@ const addUsage = (a: { inputTokens: number; outputTokens: number }, b: { inputTo
  */
 function memoryStep(i: ReplyInput, limit: number, spent: (u: { inputTokens: number; outputTokens: number }) => void) {
   let memory: Memory | null = null;
+  let first = true;
   return async ({ messages }: { messages: ModelMessage[] }) => {
+    // The summary of a chat's history from its last answer, when that history is still the same: the next message does
+    // not wait for the whole history to be told again (seen: a long chat thought for minutes before anything showed).
+    const kept = first ? chatMemories.get(i.chatId) : undefined;
+    if (kept && messages.length > kept.memory.upTo && markOf(messages[kept.memory.upTo - 1]) === kept.mark) memory = kept.memory;
+    const atStart = first;
+    first = false;
     // A chat's task is the user's newest question, not its first message (seen live: a long chat kept its first question
     // as "the task", summarized the newest one away, and answered an old request instead).
     const asked = messages.findLastIndex((m) => m.role === "user");
@@ -351,6 +362,8 @@ function memoryStep(i: ReplyInput, limit: number, spent: (u: { inputTokens: numb
       try {
         const r = await remember(i.conn, i.model, i.folder, messages, view, upTo, i.signal, { task });
         memory = r.memory;
+        // Kept for the next message: only a summary counted on the chat's own history, as the next answer gets it.
+        if (atStart) chatMemories.set(i.chatId, { memory, mark: markOf(messages[memory.upTo - 1]) });
         spent({ inputTokens: r.inputTokens, outputTokens: r.outputTokens });
         sent = withMemory(messages, memory, false);
       } catch {

@@ -236,3 +236,9 @@ button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; borde
 .home-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .home-chips .chip { padding: 6px 14px; font-size: 13.5px; color: var(--muted); background: var(--sheet); }
 .home-chips .chip:hover { color: var(--fg); border-color: var(--muted); }
+
+/* A heading that folds its part of the page away (the providers' page). */
+.folding-head { display: inline-flex; align-items: center; gap: 8px; font: inherit; color: inherit; }
+.folding-head svg { transition: transform 0.15s ease; color: var(--muted); }
+.folding-head[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.folding-head:hover svg { color: var(--fg); }

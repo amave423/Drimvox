@@ -30,8 +30,8 @@ export const catalogEn: Record<keyof typeof catalogRu, string> = {
   "catalog.secretLabel": "{name} key",
   "catalog.secretHelp": "The key is kept encrypted and given to this server only.",
   "catalog.getToken": "Get a key",
-  "catalog.turnOn": "Switch on",
-  "catalog.turnOff": "Switch off",
+  "catalog.turnOn": "Install",
+  "catalog.turnOff": "Remove",
   "catalog.installing": "Installing…",
 
 

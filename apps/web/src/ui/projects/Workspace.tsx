@@ -1,31 +1,22 @@
-import type { ProjectWorkView, WorkReport } from "@drimvox/shared";
-import { useEffect, useState } from "react";
-import { ok } from "../../api";
+import type { ProjectWorkView } from "@drimvox/shared";
+import { useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
-import { formatUsd } from "../../lib/format";
-import { activityLine } from "../chat/activityLine";
 import { Markdown } from "../chat/Markdown";
-import { hoursAndMinutes } from "./useProjectWork";
 
-/** The agent's report and the result Drimvox started: where to open it, stop and start it again. */
 /**
- * What came of the work, as a card at the end of the project's conversation (asked for: the result panel went): the
- * started result to open, stop and start again, the report, and what the run did.
+ * What came of the work, as a card at the end of the project's conversation: the agent's own report. Without the started
+ * result's card and the run's figures (asked for: not needed there).
  */
-export function WorkResultCard({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
+export function WorkResultCard({ work }: { work: ProjectWorkView }) {
   const { t } = useApp();
   return (
     <section className="work-result-card" aria-label={t("workshop.result")}>
       {work.escalated && <p className="muted">{t("projectWork.escalated")}</p>}
-      <SiteCard work={work} onChanged={onChanged} />
-      {work.report && (
-        <div className="note work-report">
-          <h3 className="margin-h">{t("projectWork.report")}</h3>
-          <Markdown text={work.report} />
-        </div>
-      )}
-      <ReportCard work={work} />
+      <div className="note work-report">
+        <h3 className="margin-h">{t("projectWork.report")}</h3>
+        <Markdown text={work.report ?? ""} />
+      </div>
     </section>
   );
 }
@@ -68,104 +59,6 @@ export function PublishSiteCard({ projectId }: { projectId: string }) {
       <div className="actions">
         <button className="btn is-primary" disabled={state.kind === "busy"} onClick={() => void publish()}>
           {state.kind === "busy" ? t("publish.busy") : state.kind === "done" ? t("publish.again") : t("publish.go")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** What the run did (asked for: a report after the project): time, money by model, actions by kind, files, checklist. */
-function ReportCard({ work }: { work: ProjectWorkView }) {
-  const { api, t } = useApp();
-  const [report, setReport] = useState<WorkReport | null>(null);
-  useEffect(() => {
-    void api.projects[":id"].work.report
-      .$get({ param: { id: work.projectId } })
-      .then((r) => ok<WorkReport>(r))
-      .then(setReport)
-      .catch(() => setReport(null));
-  }, [api, work.projectId, work.status]);
-  if (!report) return null;
-  const top = report.actions.slice(0, 6);
-  return (
-    <div className="note work-stats">
-      <h3 className="margin-h">{t("projectWork.stats")}</h3>
-      <dl className="work-stats-grid">
-        <dt>{t("projectWork.time")}</dt>
-        <dd className="mono">{hoursAndMinutes(report.workedMs, t)}</dd>
-        <dt>{t("projectWork.spent")}</dt>
-        <dd className="mono">{formatUsd(report.costUsd)}</dd>
-        <dt>{t("projectWork.statsTokens")}</dt>
-        <dd className="mono">
-          {report.inputTokens.toLocaleString()} → {report.outputTokens.toLocaleString()}
-        </dd>
-        <dt>{t("projectWork.checklist")}</dt>
-        <dd className="mono">{t("projectWork.progress", { done: report.checklist.done, total: report.checklist.total })}</dd>
-        <dt>{t("projectWork.statsFiles")}</dt>
-        <dd className="mono">
-          {report.files.changed} · <span className="is-ok-text">+{report.files.added}</span> <span className="is-pencil-text">−{report.files.removed}</span>
-        </dd>
-      </dl>
-      {report.byModel.length > 0 && (
-        <>
-          <h4>{t("projectWork.statsModels")}</h4>
-          <ul className="work-stats-list">
-            {report.byModel.map((m) => (
-              <li key={m.model}>
-                <span className="mono">{m.model}</span>
-                <span className="muted">{t("spending.answers", { n: m.answers })}</span>
-                <span className="mono">{formatUsd(m.costUsd)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {top.length > 0 && (
-        <>
-          <h4>{t("projectWork.statsActions")}</h4>
-          <ul className="work-stats-list">
-            {top.map((a) => (
-              <li key={a.name}>
-                <span>{activityLine(t, a.name, "").replace(/[:\s]+$/, "")}</span>
-                <span className="mono">{a.count}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
-
-/** The finished project, running while Drimvox runs (in the tray too): open it, stop it, start it again. */
-export function SiteCard({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
-  const { api, t } = useApp();
-  const [busy, setBusy] = useState(false);
-  if (!work.site) return null;
-  async function act(kind: "start" | "stop") {
-    setBusy(true);
-    const site = api.projects[":id"].work.site;
-    await (kind === "start" ? site.start.$post({ param: { id: work.projectId } }) : site.stop.$post({ param: { id: work.projectId } })).catch(() => null);
-    setBusy(false);
-    onChanged();
-  }
-  const running = work.site.running;
-  return (
-    <div className="note work-site">
-      <p className={running ? "work-state is-ok" : "work-state"}>{t(running ? "projectWork.siteRunning" : "projectWork.siteStopped")}</p>
-      <p className="mono work-site-url">{work.site.url}</p>
-      <div className="actions">
-        {running && (
-          <a className="btn is-primary" href={work.site.url} target="_blank" rel="noreferrer">
-            {t("projectWork.siteOpen")}
-          </a>
-        )}
-        <button
-          className={running ? "btn" : "btn is-primary"}
-          disabled={busy || work.status === "running"}
-          onClick={() => void act(running ? "stop" : "start")}
-        >
-          {t(running ? "projectWork.siteStop" : "projectWork.siteStart")}
         </button>
       </div>
     </div>

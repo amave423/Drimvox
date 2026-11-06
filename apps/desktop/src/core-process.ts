@@ -92,6 +92,7 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
     dataDir: data.dataDir,
     version: data.version,
     port: data.port,
+    portFallback: true,
     webDir: data.webDir,
     screenshot,
     readPage,

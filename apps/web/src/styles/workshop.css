@@ -280,18 +280,24 @@
 
 /* The right side (ProjectPanel.tsx, asked for: no tabs): the context on top, the parameters below, the edge between them
    dragged; the context never taller than what it holds, folded away to a chip. */
-.project-panel { min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--sheet); border-radius: 12px; overflow: hidden; font-size: 13.5px; }
-.panel-context { flex: none; overflow: hidden auto; }
+/* Two windows, the context above the parameters, with the window gap between them (asked for: one panel with a line did
+   not say its height could change); the gap is the edge that is dragged. */
+.project-panel { min-height: 0; min-width: 0; display: flex; flex-direction: column; font-size: 13.5px; }
+.project-panel > section { background: var(--sheet); border-radius: 12px; }
+.panel-context { flex: none; overflow: hidden; }
 .panel-context-body { padding: 14px 18px 10px; display: grid; gap: 10px; min-width: 260px; }
 .panel-path { margin: 0; overflow-wrap: anywhere; font-size: 12px; }
-.panel-split { flex: none; height: 7px; cursor: row-resize; touch-action: none; position: relative; outline: none; }
-.panel-split::after { content: ""; position: absolute; left: 18px; right: 18px; top: 3px; height: 1px; background: var(--line); }
-.panel-split:hover::after, .panel-split:focus-visible::after { height: 2px; top: 2px; background: var(--ink); }
+.panel-split { flex: none; height: 6px; cursor: row-resize; touch-action: none; position: relative; outline: none; }
+.panel-split::before { content: ""; position: absolute; inset: -4px 0; cursor: row-resize; }
+.panel-split::after { content: ""; position: absolute; left: 40%; right: 40%; top: 2px; height: 2px; border-radius: 1px; background: transparent; transition: background 0.12s; }
+.panel-split:hover::after { background: var(--line); }
+.panel-split:focus-visible::after { background: var(--ink); }
 .panel-params { flex: 1; min-height: 0; overflow: hidden auto; padding: 12px 18px 22px; display: grid; gap: 14px; align-content: start; min-width: 260px; }
 .panel-params-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .panel-params-head .sheet-h { margin: 0; font-size: 17px; }
-.panel-context-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
-.panel-context-chip:hover { color: var(--fg); border-color: var(--muted); }
+.panel-context-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--ink); background: var(--ink-soft); color: var(--ink); font-size: 12.5px; }
+.panel-context-chip.is-long { border-color: var(--pencil); color: var(--pencil); background: transparent; }
+.panel-context-chip:hover { filter: brightness(1.12); }
 .project-params { display: grid; gap: 18px; }
 .params-block { display: grid; gap: 8px; }
 .params-block .margin-h { margin: 0 0 2px; }

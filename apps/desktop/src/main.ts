@@ -15,6 +15,11 @@ import { AgentView } from "./agent-view";
 
 /** Must match DEV_CORE_PORT in apps/web/vite.config.ts (Vite proxies /api there). */
 const DEV_CORE_PORT = 47800;
+/**
+ * The window's own port, the same at every start (seen: a level of thinking set in a chat was gone after a restart).
+ * The page keeps its choices in localStorage, which belongs to the address with its port; a random port lost them all.
+ */
+const CORE_PORT = 47810;
 /** Injected by build.mjs; app.getVersion() reports Electron's version when running unpackaged. */
 declare const __DRIMVOX_VERSION__: string;
 const devServerUrl = process.env.DRIMVOX_DEV_SERVER_URL;
@@ -140,7 +145,7 @@ function startCore(): Promise<number> {
     secretKey: loadSecretKey(dataDir).toString("base64"),
     dataDir,
     version: __DRIMVOX_VERSION__,
-    port: devServerUrl ? DEV_CORE_PORT : 0,
+    port: devServerUrl ? DEV_CORE_PORT : Number(process.env.DRIMVOX_TEST_PORT ?? CORE_PORT),
     webDir: devServerUrl ? undefined : webDir(),
   };
 

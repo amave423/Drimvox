@@ -1,5 +1,5 @@
 import { presets, type PresetId } from "@drimvox/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../../context";
 import { ConnectForm } from "./ConnectForm";
 import { Tabs } from "../Tabs";
@@ -42,22 +42,67 @@ export function ProvidersSheet() {
           onChange={(v) => setTab(v as "key" | "subscription")}
         />
         <p className="muted providers-lede">{t(tab === "key" ? "providers.lede" : "providers.subscriptionsLede")}</p>
-        <h2 className="sheet-h">{t(tab === "key" ? "providers.add" : "providers.addSubscription")}</h2>
-        <ConnectForm key={tab} kind={tab} />
-        <h2 className="sheet-h">{t(tab === "key" ? "providers.connected" : "providers.connectedSubscriptions")}</h2>
-        {list.length === 0 ? (
-          <p className="muted">{t(tab === "key" ? "providers.empty" : "providers.emptySubscriptions")}</p>
-        ) : (
-          <ul className="provider-list">
-            {list.map((p) => (
-              <ProviderRow key={p.id} provider={p} proxySet={proxySet} />
-            ))}
-          </ul>
-        )}
+        <Folding id="add" title={t(tab === "key" ? "providers.add" : "providers.addSubscription")}>
+          <ConnectForm key={tab} kind={tab} />
+        </Folding>
+        <Folding id="connected" title={t(tab === "key" ? "providers.connected" : "providers.connectedSubscriptions")}>
+          {list.length === 0 ? (
+            <p className="muted">{t(tab === "key" ? "providers.empty" : "providers.emptySubscriptions")}</p>
+          ) : (
+            <ul className="provider-list">
+              {list.map((p) => (
+                <ProviderRow key={p.id} provider={p} proxySet={proxySet} />
+              ))}
+            </ul>
+          )}
+        </Folding>
       </div>
       <aside className="margin">
         <p className="note">{t("providers.marginTip")}</p>
       </aside>
     </article>
+  );
+}
+
+/** A part of the page folded away with a click on its heading, remembered on this device (asked for: the providers took the page). */
+function Folding({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  const key = `drimvox.providers.folded.${id}`;
+  const [folded, setFolded] = useState(() => {
+    try {
+      return localStorage.getItem(key) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () => {
+    setFolded(!folded);
+    try {
+      localStorage.setItem(key, folded ? "0" : "1");
+    } catch {
+      // Folded for this visit only.
+    }
+  };
+  return (
+    <section className="folding">
+      <h2 className="sheet-h">
+        <button type="button" className="folding-head" aria-expanded={!folded} onClick={toggle}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+          {title}
+        </button>
+      </h2>
+      {!folded && children}
+    </section>
   );
 }

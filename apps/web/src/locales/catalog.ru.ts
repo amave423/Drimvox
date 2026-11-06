@@ -28,8 +28,8 @@ export const catalogRu = {
   "catalog.secretLabel": "Ключ {name}",
   "catalog.secretHelp": "Ключ хранится зашифрованным и передаётся только этому серверу.",
   "catalog.getToken": "Получить ключ",
-  "catalog.turnOn": "Включить",
-  "catalog.turnOff": "Выключить",
+  "catalog.turnOn": "Установить",
+  "catalog.turnOff": "Удалить",
   "catalog.installing": "Ставлю…",
 
 

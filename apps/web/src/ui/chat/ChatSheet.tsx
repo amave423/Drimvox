@@ -543,8 +543,8 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
               {workshop &&
                 work?.startedAt &&
                 work.status !== "running" &&
-                (work.site || work.report) &&
-                at("result", Date.now(), <WorkResultCard work={work} onChanged={() => void reloadWork()} />, true)}
+                work.report &&
+                at("result", Date.now(), <WorkResultCard work={work} />, true)}
               <div ref={end} />
             </div>
           </ShotsContext.Provider>

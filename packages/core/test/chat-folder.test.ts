@@ -212,6 +212,34 @@ describe("memory of a long chat with a folder", () => {
   });
 });
 
+// Seen live: in a long chat every new message waited while the whole history was told again before the model answered.
+describe("summary of a long chat between messages", () => {
+  it("is made once and used again by the next message while the history stays the same", async () => {
+    let summaries = 0;
+    let answers = 0;
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [{ id: "coder", context_length: 4000 }],
+      respond: (body) => {
+        if (JSON.stringify(body.messages?.[0] ?? "").includes("working memory")) {
+          summaries++;
+          return { text: "SUMMARY: говорили про игру." };
+        }
+        return answers++ < 2 ? { text: `Ответ: ${"слово ".repeat(900)}` } : { text: "Коротко." };
+      },
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const chat = (await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "coder" })).json()) as { id: string };
+    await connect(chat.id, folder);
+    for (const content of ["Первый вопрос", "Второй вопрос", "Третий вопрос"]) await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content }));
+    const made = summaries;
+    expect(made).toBeGreaterThan(0);
+    await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Короткий вопрос" }));
+    // The fourth message goes on from the kept summary.
+    expect(summaries).toBe(made);
+  });
+});
+
 // Asked for: sub-agents as in Claude Code. The research goes to an agent with a fresh context; only its report comes back.
 describe("sub-agents", () => {
   it("reads in a context of its own and gives the main agent only its report", async () => {

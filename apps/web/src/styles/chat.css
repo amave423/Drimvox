@@ -146,7 +146,10 @@
 .picker-list .picker-item > button:first-child { flex-wrap: wrap; align-items: baseline; row-gap: 2px; }
 .picker-name { display: grid; font-size: 14px; min-width: 0; flex: 1 1 200px; }
 .picker-name small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker-facts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 12px; margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+/* The facts go under the name, from its left edge, in every row (seen: wrapped to the right, each row ended in another
+   place and the list looked crooked). */
+.picker-facts { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 4px 12px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.picker-list .picker-item > button:first-child > .picker-facts { flex-basis: 100%; }
 .picker-busy { color: var(--pencil); }
 .picker-panel.is-above { top: auto; bottom: calc(100% + 6px); }
 
@@ -216,7 +219,9 @@
 .code-block pre { margin: 0 !important; border: 0 !important; border-radius: 0 !important; }
 /* The chat's options: one button, a panel with a row per option; each option's own list opens to its right. */
 .composer-tools .chat-options { min-width: 0; }
-.chat-options .picker-button { gap: 8px; max-width: clamp(110px, 26cqw, 260px); }
+/* One width whatever is chosen (asked for: the button grew and shrank with its words); the words are cut to fit. */
+.chat-options .picker-button { gap: 8px; width: clamp(110px, 26cqw, 220px); justify-content: space-between; }
+.chat-options .options-text { flex: 1; min-width: 0; text-align: left; }
 .chat-options .picker-button.is-on { border-color: var(--ink); color: var(--ink); background: var(--ink-soft); }
 .chat-options .options-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* As wide as its rows, no wider (seen: a strip of empty panel to the right of the buttons). */

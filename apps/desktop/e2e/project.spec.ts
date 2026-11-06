@@ -148,10 +148,19 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   // The interview and the plan each have a model of their own (asked for), the working one until picked.
   await expect(options).toContainText("Модель опроса");
   await expect(options).toContainText("Модель плана");
-  await options.getByRole("button", { name: "Выбери модель" }).first().click();
+  // An unchosen model says it is the working one; beside a chosen one, "As the working one" puts it back (asked for).
+  await expect(options.getByRole("button", { name: "Выбери модель" })).toHaveCount(0);
+  await options.locator(".picker-button", { hasText: "Как рабочая" }).first().click();
   await pickCoderIn(page, /Planner/);
   await expect(options.getByRole("button", { name: /Planner/ })).toHaveCount(1);
-  await expect(options.getByRole("button", { name: "Как рабочая" })).toBeVisible();
+  await expect(options.locator("button.link", { hasText: "Как рабочая" })).toBeVisible();
+  // The strong model is a switch with its hint, its model chosen once it is on.
+  await expect(options.getByRole("switch", { name: /Если рабочая модель застрянет/ })).not.toBeChecked();
+  await options.getByText(/^Если рабочая модель застрянет/).click();
+  await expect(options.getByRole("switch", { name: /Если рабочая модель застрянет/ })).toBeChecked();
+  await expect(options.getByRole("button", { name: "Выбери модель" })).toHaveCount(1);
+  // The model for screenshots is the project's too (asked for: not in the settings).
+  await expect(options).toContainText("Модель для зрения");
   await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт клиники");
   await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
 
@@ -232,9 +241,9 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await page.getByRole("separator", { name: "Показать боковую панель" }).dblclick();
   await expect(page.locator("#sidebar")).toBeVisible();
   expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Запись");
-  // By the default git rules the work is in the project's own branch, named after it; main stays as it was.
-  expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toMatch(/^drimvox\/drimvox-repo-/);
-  expect(execFileSync("git", ["log", "--oneline", "main"], { cwd: repo, encoding: "utf8" }).trim().split("\n")).toHaveLength(1);
+  // The work is committed in the branch the project is on, in the user's name: no branch of the agent's own (asked for).
+  expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toBe("main");
+  expect(execFileSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" }).trim()).toBe("");
   expect(fake!.requests.some((r) => JSON.stringify(r.body?.messages ?? []).includes("Сделай заголовок крупнее"))).toBe(true);
   // An answer closes the question's note over the box (seen: it stayed after the reply).
   await page.locator(".side-project").first().click();
@@ -314,21 +323,11 @@ test("a project without the interview: talked to as in a chat, its plan on the l
   await expect(result.locator(".project-kind-switch, .project-kind-fixed")).toHaveCount(0);
   // Removing is in the sidebar's "⋯" only (asked for: the frame in the project tab went).
   await expect(result.getByRole("button", { name: "Убрать из Drimvox…" })).toHaveCount(0);
-  // Git in the parameters: one line for the project's branch, the rules folded under it; no "Accept" (asked for).
-  const git = result.getByRole("region", { name: "Git и GitHub" });
-  await expect(git.getByLabel("Ветка агента")).toContainText(/drimvox\/drimvox-repo-.* → main/);
-  await expect(git.getByRole("button", { name: "Принять" })).toHaveCount(0);
-  await git.getByText("Git: как работает агент").click();
-  await expect(git.getByRole("button", { name: "Куда пишет" })).toHaveText(/Одна ветка на проект/);
-  await expect(git.getByRole("button", { name: "Когда коммитит" })).toHaveText(/После каждого пункта плана/);
-  // The lists are Drimvox's own, not the browser's square ones (asked for).
-  await git.getByRole("button", { name: "Сообщения" }).click();
-  await expect(git.getByRole("listbox", { name: "Сообщения" }).getByRole("option")).toHaveCount(4);
-  await git.getByRole("option", { name: "Коротко, по-русски" }).click();
-  await expect(git.getByRole("button", { name: "Сообщения" })).toHaveText(/Коротко, по-русски/);
-  // Without GitHub the branch goes into main here.
-  await git.getByRole("button", { name: "Влить в main" }).click();
-  await expect.poll(() => execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toBe("main");
+  // No branches nor commits by hand (asked for): the agent commits in the project's own branch; only publishing stays.
+  await expect(result.getByLabel("Ветка агента")).toHaveCount(0);
+  await expect(result.getByText("Git: как работает агент")).toHaveCount(0);
+  await expect(result.getByRole("region", { name: "Публикация" })).toBeVisible();
+  expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toBe("main");
   // The next message goes on in the same conversation, still with a model to pick under the box.
   await expect(page.locator(".workshop-feed .composer-bar").getByRole("button", { name: /coder/i })).toBeVisible();
 

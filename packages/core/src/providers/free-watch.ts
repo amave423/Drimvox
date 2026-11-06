@@ -10,7 +10,10 @@ const KEY = "free.models";
 const LIST_MS = 8_000;
 /** How often the free models are asked a word in the background. */
 const EVERY_MS = 30 * 60_000;
-const AT_ONCE = 4;
+/** Models of one provider asked at once; every provider goes at the same time (one slow provider held the rest). */
+const AT_ONCE = 3;
+/** The first check after the start: soon, so the free models are known when a chat is opened (asked for). */
+const FIRST_MS = 5_000;
 
 export interface FreeModel {
   providerId: string;
@@ -107,8 +110,10 @@ export class FreeWatch {
         return conn && (conn.flat || canCheck(conn));
       });
       for (const m of queue) this.checks.set(keyOf(m), { ...this.check(m), state: "checking" });
-      const worker = async () => {
-        for (let m = queue.shift(); m; m = queue.shift()) {
+      const byProvider = new Map<string, FreeModel[]>();
+      for (const m of queue) byProvider.set(m.providerId, [...(byProvider.get(m.providerId) ?? []), m]);
+      const worker = async (mine: FreeModel[]) => {
+        for (let m = mine.shift(); m; m = mine.shift()) {
           const conn = this.providers.connection(m.providerId);
           if (!conn) continue;
           const started = Date.now();
@@ -118,7 +123,7 @@ export class FreeWatch {
           this.checks.set(keyOf(m), { state: state ?? "unknown", ms: state === "ok" ? ms : null, at: Date.now() });
         }
       };
-      await Promise.all(Array.from({ length: AT_ONCE }, worker));
+      await Promise.all([...byProvider.values()].flatMap((mine) => Array.from({ length: AT_ONCE }, () => worker(mine))));
     })().finally(() => (this.checking = null));
     return this.checking;
   }
@@ -132,10 +137,10 @@ export class FreeWatch {
   }
   private kicked = 0;
 
-  /** Every half hour in the background, the first a minute after the start. */
+  /** Every half hour in the background, the first a few seconds after the start. */
   start(): void {
     if (this.timer) return;
-    const first = setTimeout(() => void this.checkAll().catch(() => {}), 60_000);
+    const first = setTimeout(() => void this.checkAll().catch(() => {}), FIRST_MS);
     first.unref();
     this.timer = setInterval(() => void this.checkAll().catch(() => {}), EVERY_MS);
     this.timer.unref();

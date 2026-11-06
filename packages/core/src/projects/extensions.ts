@@ -4,6 +4,8 @@ import type { Database } from "../db";
 export interface ProjectExtensionsChoice {
   skills: string[] | null;
   mcp: string[] | null;
+  /** The model that looks at the screenshots for this project (asked for: in the project, not the settings); null: as before. */
+  vision: { providerId: string; model: string } | null;
 }
 
 const key = (projectId: string) => `project.extensions:${projectId}`;
@@ -17,9 +19,9 @@ export class ProjectExtensions {
 
   get(projectId: string): ProjectExtensionsChoice {
     const row = this.db.sql.prepare("select value from settings where key = ?").get(key(projectId)) as { value: string } | undefined;
-    if (!row) return { skills: null, mcp: null };
+    if (!row) return { skills: null, mcp: null, vision: null };
     const kept = JSON.parse(row.value) as Partial<ProjectExtensionsChoice>;
-    return { skills: kept.skills ?? null, mcp: kept.mcp ?? null };
+    return { skills: kept.skills ?? null, mcp: kept.mcp ?? null, vision: kept.vision ?? null };
   }
 
   set(projectId: string, patch: Partial<ProjectExtensionsChoice>): ProjectExtensionsChoice {

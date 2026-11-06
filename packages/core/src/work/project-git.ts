@@ -39,11 +39,16 @@ export class ProjectGit {
     return (await runGit(folder, ["var", "GIT_AUTHOR_IDENT"], true)).code === 0 ? [] : ["-c", "user.name=Drimvox user", "-c", "user.email=user@localhost"];
   }
 
+  /**
+   * The agent commits into the branch the project is on, in the user's name, and it goes to GitHub when the project is
+   * there (asked for: no drimvox/… branches nor pull requests, no commits by hand; only publishing stays). Saved rules
+   * keep how often and how the messages are written.
+   */
   rules(projectId: string): ProjectGitRules {
     const row = this.db.sql.prepare("select value from settings where key = ?").get(rulesKey(projectId)) as { value: string } | undefined;
-    if (!row) return defaultGitRules;
-    const parsed = projectGitRulesSchema.safeParse({ ...defaultGitRules, ...(JSON.parse(row.value) as object) });
-    return parsed.success ? parsed.data : defaultGitRules;
+    const parsed = row ? projectGitRulesSchema.safeParse({ ...defaultGitRules, ...(JSON.parse(row.value) as object) }) : null;
+    const saved = parsed?.success ? parsed.data : defaultGitRules;
+    return { ...saved, target: "current", pullRequest: false, push: true, allowMain: false };
   }
 
   setRules(projectId: string, rules: ProjectGitRules): ProjectGitRules {
@@ -70,6 +75,11 @@ export class ProjectGit {
    * next message goes on in it); otherwise a new one starts from where the folder is.
    */
   async prepare(projectId: string, folder: string): Promise<void> {
+    // A branch of the agent's own from before is brought back into the one it came from, once (seen: a project left on
+    // "drimvox/task-1106-2048 → master", which said nothing to its user).
+    const left = this.kept(projectId);
+    if (left && (await currentBranch(folder)) === left.branch) await this.accept(projectId, folder).catch(() => false);
+    else if (left) this.keep(projectId, null);
     const rules = this.rules(projectId);
     if (rules.commit === "never" || rules.target === "current") return;
     const here = await currentBranch(folder);
@@ -103,6 +113,11 @@ export class ProjectGit {
   /** After the agent's work: its branch to GitHub, and the pull request, as the rules say. */
   async finish(projectId: string, folder: string, title: string): Promise<void> {
     const rules = this.rules(projectId);
+    // The project's own branch goes to GitHub as it is, when the project is there.
+    if (rules.target === "current") {
+      if (rules.push && (await this.github.ready(folder).catch(() => false))) await this.github.push(folder).catch(() => {});
+      return;
+    }
     const kept = this.kept(projectId);
     if (!kept || !rules.push || (await currentBranch(folder)) !== kept.branch || !(await this.github.ready(folder))) return;
     try {
@@ -182,8 +197,8 @@ export class ProjectGit {
       style = log ? `Commit messages: write them like this project's recent ones:\n${log}` : "Commit messages: one short line in English, imperative.";
     }
     return [
-      `- Git: ${when}. Drimvox makes the commit (secrets and dependency folders are left out), pushes and opens the pull`,
-      "  request itself. Never run git commit, push, checkout, switch or reset yourself.",
+      `- Git: ${when}. Drimvox makes the commit in the user's name (secrets and dependency folders are left out) and sends`,
+      "  it to GitHub itself. Never run git commit, push, checkout, switch or reset yourself.",
       `- ${style}`,
     ].join("\n");
   }

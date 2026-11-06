@@ -66,12 +66,13 @@ export interface RunDeps {
   /** Tools of the user's MCP servers; their questions come into the project's conversation. */
   mcp?: { toolsFor(ask: McpAsk, hooks: McpHooks, only?: (serverId: string) => boolean): Promise<ToolSet> };
   /** The downloaded skills and the MCP servers this project switched on; null in either: all of them. */
-  extensions?(projectId: string): { skills: string[] | null; mcp: string[] | null };
+  extensions?(projectId: string): { skills: string[] | null; mcp: string[] | null; vision: { providerId: string; model: string } | null };
   idleTimeoutMs: number;
   plan(projectId: string): ProjectPlan | null;
   /** This month's spending against the app's budget. */
   month(): MonthUsage;
-  vision(conn: Connection, model: string): Promise<Vision | null>;
+  /** The model that sees pictures for this one: the project's own choice, else the settings', else the model itself. */
+  vision(conn: Connection, model: string, chosen?: { providerId: string; model: string } | null): Promise<Vision | null>;
   /** Downloads, mail, SSH, dependency audits, before and after of a page (tools/index.ts). */
   toolbox?: ToolboxDeps;
   /** Pointer files to AGENTS.md the settings ask for (CLAUDE.md, GEMINI.md, QWEN.md). */
@@ -358,9 +359,9 @@ export class WorkRun {
 
     const price = await findModel(conn, model);
     const plan = this.d.plan(this.projectId);
-    const vision = await this.d.vision(conn, model);
-    // The project's own skills, and the downloaded ones it switched on (asked for: chosen per project).
-    const chosen = this.d.extensions?.(this.projectId) ?? { skills: null, mcp: null };
+    // The project's own skills, the downloaded ones it switched on, its model for screenshots (asked for: per project).
+    const chosen = this.d.extensions?.(this.projectId) ?? { skills: null, mcp: null, vision: null };
+    const vision = await this.d.vision(conn, model, chosen.vision);
     const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]).filter(
       (s) => s.scope === "project" || chosen.skills === null || chosen.skills.includes(s.name),
     );

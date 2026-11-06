@@ -12,6 +12,7 @@ const choiceSchema = z
   .object({
     skills: z.array(z.string().min(1).max(200)).max(500).nullable().optional(),
     mcp: z.array(z.string().min(1).max(200)).max(200).nullable().optional(),
+    vision: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable().optional(),
   })
   .strict();
 
@@ -30,7 +31,7 @@ export function projectExtensionRoutes(projects: ProjectRepo, extensions: Projec
       on: choice.skills === null || choice.skills.includes(s.name),
     }));
     const servers = mcp.list().map((s) => ({ id: s.id, name: s.name, on: s.enabled && (choice.mcp === null || choice.mcp.includes(s.id)), installed: s.enabled }));
-    return { skills: [...own, ...shared], mcp: servers };
+    return { skills: [...own, ...shared], mcp: servers, vision: choice.vision };
   };
   return new Hono()
     .get("/:id/extensions", (c) => {
@@ -41,8 +42,12 @@ export function projectExtensionRoutes(projects: ProjectRepo, extensions: Projec
     .put("/:id/extensions", zValidator("json", choiceSchema), (c) => {
       const project = projects.get(c.req.param("id"));
       if (!project) return c.json(notFound, 404);
-      const { skills, mcp: servers } = c.req.valid("json");
-      extensions.set(project.id, { ...(skills !== undefined ? { skills } : {}), ...(servers !== undefined ? { mcp: servers } : {}) });
+      const { skills, mcp: servers, vision } = c.req.valid("json");
+      extensions.set(project.id, {
+        ...(skills !== undefined ? { skills } : {}),
+        ...(servers !== undefined ? { mcp: servers } : {}),
+        ...(vision !== undefined ? { vision } : {}),
+      });
       return c.json(view(project.id, project.path), 200);
     });
 }

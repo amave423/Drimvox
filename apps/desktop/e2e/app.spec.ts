@@ -153,18 +153,15 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await page.getByRole("button", { name: "Документы", exact: true }).click();
   await expect(cards).toHaveCount(6);
 
+  // Installed and removed with buttons, no switch (asked for): each project switches on its own ones.
   const word = cards.filter({ hasText: "Документы Word" });
-  await word.getByRole("switch").click({ force: true });
-  await expect(word.getByRole("switch")).toBeChecked();
-  // A ready skill lives on its card, not in the list of skills added by hand; the card can delete it at once.
+  await expect(word.getByRole("switch")).toHaveCount(0);
+  await word.getByRole("button", { name: "Установить «Документы Word»" }).click();
+  await expect(word.getByRole("button", { name: "Удалить «Документы Word»" })).toBeVisible();
+  // A ready skill lives on its card, not in the list of skills added by hand.
   await expect(page.locator(".skill-list li", { hasText: "docx" })).toHaveCount(0);
-  await word.getByRole("switch").click({ force: true });
-  await expect(word.getByRole("switch")).not.toBeChecked();
-  await expect(page.getByText("Общих скиллов пока нет.")).toBeVisible();
-  await word.getByRole("switch").click({ force: true });
-  await expect(word.getByRole("switch")).toBeChecked();
   await word.getByRole("button", { name: "Удалить «Документы Word»" }).click();
-  await expect(word.getByRole("switch")).not.toBeChecked();
+  await expect(word.getByRole("button", { name: "Установить «Документы Word»" })).toBeVisible();
   await expect(word.getByRole("button", { name: /^Удалить/ })).toHaveCount(0);
 
   // The details show what using it looks like.
@@ -185,7 +182,7 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   // GitHub needs a token: switching it on asks for one in its window; Escape closes the window, nothing is added.
   await cards
     .filter({ has: page.locator("strong", { hasText: /^GitHub$/ }) })
-    .locator("label.toggle")
+    .getByRole("button", { name: "Установить «GitHub»" })
     .click();
   const dialog = page.getByRole("dialog", { name: "GitHub" });
   await expect(dialog).toContainText("api.githubcopilot.com/mcp");
@@ -194,7 +191,7 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await expect(dialog.getByRole("radio", { name: "Только об изменениях" })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(cards.filter({ has: page.locator("strong", { hasText: /^GitHub$/ }) }).getByRole("switch")).not.toBeChecked();
+  await expect(cards.filter({ has: page.locator("strong", { hasText: /^GitHub$/ }) }).getByRole("button", { name: "Установить «GitHub»" })).toBeVisible();
 });
 
 // Seen: closing the window stopped the agents and the started site; Drimvox now stays in the tray until "Quit".
@@ -551,7 +548,7 @@ test("a model list near the bottom of the window opens upwards and stays inside 
   await expect(paramsButton(page)).toBeVisible();
   await openSection(page, "Настройки");
   await page.getByRole("tab", { name: "Модели и деньги" }).click();
-  const setting = page.getByRole("region", { name: "Проверка по скриншотам" });
+  const setting = page.getByRole("region", { name: "Служебная модель" });
   const button = setting.getByRole("button", { name: "Выбери модель" });
   await button.scrollIntoViewIfNeeded();
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
