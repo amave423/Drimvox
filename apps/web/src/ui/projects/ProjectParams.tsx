@@ -11,6 +11,7 @@ import { ThinkingSwitch } from "../chat/ThinkingSwitch";
 import { Hint } from "../Hint";
 import { Toggle } from "../Toggle";
 import { GithubPublish } from "./GithubPublish";
+import { LimitsForm } from "./LimitsForm";
 import { PublishSiteCard } from "./Workspace";
 
 interface Extensions {
@@ -26,7 +27,7 @@ type ExtensionsPatch = { skills?: string[]; mcp?: string[]; vision?: ModelChoice
  * and where it is published.
  */
 export function ProjectParams({ project, work }: { project: ProjectView; work: ProjectWorkView | null }) {
-  const { api, t } = useApp();
+  const { api, t, reloadWorks } = useApp();
   const [ext, setExt] = useState<Extensions | null>(null);
   useEffect(() => {
     void api.projects[":id"].extensions
@@ -49,12 +50,18 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
         vision={ext?.vision ?? null}
         onVision={(m) => void save({ vision: m ? { providerId: m.providerId, model: m.model } : null })}
       />
+      {work && (
+        <section className="params-block" aria-labelledby="params-limits-h">
+          <h3 className="margin-h" id="params-limits-h">
+            {t("projectParams.limits")}
+          </h3>
+          <LimitsForm key={`${work.projectId}-${work.budgetUsd}-${work.hours}`} work={work} onSaved={reloadWorks} />
+        </section>
+      )}
       {ext && <ProjectExtensions ext={ext} save={save} />}
       {project.gitState === "ready" && (
-        <section className="params-block" aria-labelledby="params-git-h">
-          <h3 className="margin-h" id="params-git-h">
-            {t("projectParams.publish")}
-          </h3>
+        // GitHub and the site, each under its own heading; one name for both for those who read the page by regions.
+        <section className="params-block params-publish" aria-label={t("projectParams.publish")}>
           <GithubPublish project={project} />
           {work?.startedAt && work.status !== "running" && <PublishSiteCard projectId={project.id} />}
         </section>

@@ -327,6 +327,9 @@ test("a project without the interview: talked to as in a chat, its plan on the l
   await expect(result.getByLabel("Ветка агента")).toHaveCount(0);
   await expect(result.getByText("Git: как работает агент")).toHaveCount(0);
   await expect(result.getByRole("region", { name: "Публикация" })).toBeVisible();
+  // The time and the budget are set in the parameters too (asked for: not a pop-up from the header's numbers).
+  await expect(result.getByRole("region", { name: "Время и бюджет" }).getByLabel("Время, часов")).toBeVisible();
+  await expect(page.locator(".workshop-bar-top").getByRole("button", { name: /из/ })).toHaveCount(0);
   expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toBe("main");
   // The next message goes on in the same conversation, still with a model to pick under the box.
   await expect(page.locator(".workshop-feed .composer-bar").getByRole("button", { name: /coder/i })).toBeVisible();

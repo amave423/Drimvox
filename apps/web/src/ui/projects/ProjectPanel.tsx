@@ -83,6 +83,8 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
           aria-label={t("projectParams.resize")}
           tabIndex={0}
           onPointerDown={(e) => {
+            // No text is selected on the way (seen: dragging the edge selected the whole window).
+            e.preventDefault();
             e.currentTarget.setPointerCapture(e.pointerId);
             drag.current = { y: e.clientY, from: shown };
           }}
@@ -99,7 +101,7 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
       )}
       <section className="panel-params" aria-label={t("projectParams.title")}>
         <header className="panel-params-head">
-          <h2 className="sheet-h">{t("projectParams.title")}</h2>
+          <h2 className="panel-title">{t("projectParams.title")}</h2>
           {/* The folded context as a small button: how full it is, a click brings it back. */}
           {folded && (
             <button

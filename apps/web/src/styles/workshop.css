@@ -294,14 +294,30 @@
 .panel-split:focus-visible::after { background: var(--ink); }
 .panel-params { flex: 1; min-height: 0; overflow: hidden auto; padding: 12px 18px 22px; display: grid; gap: 14px; align-content: start; min-width: 260px; }
 .panel-params-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.panel-params-head .sheet-h { margin: 0; font-size: 17px; }
-.panel-context-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--ink); background: var(--ink-soft); color: var(--ink); font-size: 12.5px; }
-.panel-context-chip.is-long { border-color: var(--pencil); color: var(--pencil); background: transparent; }
-.panel-context-chip:hover { filter: brightness(1.12); }
+.panel-params-head { min-height: 26px; }
+/* Only the ring is coloured (asked for): ink while the context is short, pencil once it is long. */
+.panel-context-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+.panel-context-chip svg { color: var(--ink); flex: none; }
+.panel-context-chip.is-long svg { color: var(--pencil); }
+.panel-context-chip:hover { color: var(--fg); border-color: var(--muted); }
 .project-params { display: grid; gap: 18px; }
 .params-block { display: grid; gap: 8px; }
 .params-block .margin-h { margin: 0 0 2px; }
-.params-row { display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 8px; }
+.params-block p { margin: 0; }
+.params-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 10px; }
+.params-row > .muted { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+/* A switch's hint goes under its name, not on after it (seen: the lines ran on and wrapped under the switch). */
+.params-block .toggle .options-about { display: block; margin-top: 1px; }
+/* The time and the budget in one row, the button beside them. */
+.params-block .workshop-limits { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 8px 10px; }
+.params-block .workshop-limits .field-input { padding-block: 6px; }
+.params-block .workshop-limits p { grid-column: 1 / -1; }
+/* GitHub and the site as blocks alike: no margin line before the site's. */
+.params-publish { gap: 18px; }
+.params-publish .note { border-left: 0; padding: 0; }
+.params-publish .note .margin-h, .params-publish .github .margin-h { font-size: 13px; }
+/* The two windows' titles alike. */
+.panel-title, .panel-context .work-tokens > .margin-h { margin: 0; font-size: 15px; font-weight: 600; }
 .params-row .picker-button { max-width: 100%; }
 .params-block .link { justify-self: start; font-size: 13px; }
 .git-block { display: grid; gap: 8px; }

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useApp } from "../../context";
 import { fromShown, shownSign, toShown } from "../../lib/format";
 
-/** The run's budget and time, changed on the way; opens from the numbers in the workshop's header. */
+/** The run's budget and time, changed on the way, in the project's parameters (asked for: not a pop-up in the header). */
 export function LimitsForm({ work, onSaved }: { work: ProjectWorkView; onSaved(): void }) {
   const { api, t } = useApp();
   const [budget, setBudget] = useState(() => String(toShown(work.budgetUsd)));
@@ -28,7 +28,7 @@ export function LimitsForm({ work, onSaved }: { work: ProjectWorkView; onSaved()
     >
       <label className="field">
         <span className="field-label">{t("projectWork.budget", { currency: shownSign() })}</span>
-        <input className="field-input" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} autoFocus />
+        <input className="field-input" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} />
       </label>
       <label className="field">
         <span className="field-label">{t("projectWork.hours")}</span>

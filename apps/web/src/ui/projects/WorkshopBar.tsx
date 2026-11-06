@@ -1,27 +1,16 @@
 import type { ProjectWorkView } from "@drimvox/shared";
-import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
 import { formatUsd } from "../../lib/format";
-import { LimitsForm } from "./LimitsForm";
 import { hoursAndMinutes } from "./useProjectWork";
 import { stageOf, type Stage } from "./Workshop";
 
 /**
  * The open project's run in the top bar (variant A): its state with the checklist's progress, the time and the money
- * (a click opens the limits, changed without stopping), and Stop or Continue.
+ * (the limits are in the project's parameters), and Stop or Continue.
  */
 export function WorkshopBar({ projectId }: { projectId: string }) {
   const { api, t, projects, works, reloadWorks } = useApp();
-  const [limits, setLimits] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  // The limits close on a click elsewhere, like a menu.
-  useEffect(() => {
-    if (!limits) return;
-    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setLimits(false);
-    document.addEventListener("pointerdown", away);
-    return () => document.removeEventListener("pointerdown", away);
-  }, [limits]);
   const project = projects.find((p) => p.id === projectId);
   const w = works.find((x) => x.projectId === projectId) ?? null;
   if (!project) return null;
@@ -46,28 +35,16 @@ export function WorkshopBar({ projectId }: { projectId: string }) {
         {text}
         {total > 0 && ` · ${t("projectWork.progress", { done, total })}`}
       </span>
+      {/* What the run took; the limits are set in the project's parameters (asked for: moved there). */}
       {w?.startedAt && (
-        <div className="workshop-limits-box" ref={box}>
-          <button type="button" className="link workshop-numbers" aria-expanded={limits} onClick={() => setLimits(!limits)} title={t("workshop.limits")}>
-            {t("workshop.numbers", {
-              time: hoursAndMinutes(w.workedMs, t),
-              hours: t("projectWork.hoursShort", { h: w.hours }),
-              spent: formatUsd(w.spentUsd),
-              budget: formatUsd(w.budgetUsd),
-            })}
-          </button>
-          {limits && (
-            <div className="workshop-limits-pop">
-              <LimitsForm
-                work={w}
-                onSaved={() => {
-                  setLimits(false);
-                  reloadWorks();
-                }}
-              />
-            </div>
-          )}
-        </div>
+        <span className="workshop-numbers mono">
+          {t("workshop.numbers", {
+            time: hoursAndMinutes(w.workedMs, t),
+            hours: t("projectWork.hoursShort", { h: w.hours }),
+            spent: formatUsd(w.spentUsd),
+            budget: formatUsd(w.budgetUsd),
+          })}
+        </span>
       )}
       {w?.status === "running" && (
         <button className="btn is-pencil is-small" onClick={() => void act("stop")}>

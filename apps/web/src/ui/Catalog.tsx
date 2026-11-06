@@ -131,7 +131,7 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
               {isOn(entry) ? (
                 <button
                   type="button"
-                  className="btn"
+                  className="btn is-small"
                   aria-label={t("catalog.remove", { name: text(entry, "name") })}
                   disabled={busy === entry.id}
                   onClick={() => void remove(entry)}
@@ -141,7 +141,7 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
               ) : (
                 <button
                   type="button"
-                  className="btn is-primary"
+                  className="btn is-primary is-small"
                   aria-label={t("catalog.install", { name: text(entry, "name") })}
                   disabled={busy === entry.id}
                   // A server that needs a key or a choice asks in its window first.
