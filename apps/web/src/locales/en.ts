@@ -1719,6 +1719,7 @@ export const en: Record<keyof typeof ru, string> = {
   "folder.tool.design_review": "Drimvox reviews the design on a desktop and a phone",
   "folder.tool.look_at_image": "Looks at the picture {input}",
   "folder.tool.use_skill": "Opens the skill {input}",
+  "folder.tool.delegate": "Sub-agent: {input}",
   "folder.tool.browser_look": "Looks at the page in the browser",
   "folder.tool.browser_pdf": "Saves the page as a PDF",
   "folder.tool.browser_upload": "Uploads a file to the page",

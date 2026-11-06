@@ -675,6 +675,17 @@ describe("a ready project", () => {
     rmSync(other, { recursive: true, force: true });
   });
 
+  // Seen live: "the site looked fine at 20 rubles", and the agent polished on, answer after answer. Asked for: no pause,
+  // as Claude Code; at each 60 steps the agent is asked whether what was asked is done.
+  it("goes on past 60 steps without a pause, asking the agent to stop if the task is done", async () => {
+    const s = await setup({ coder: [...Array.from({ length: 62 }, () => call("list_files", { path: "." })), { text: "Готово: сайт сделан." }] });
+    const res = await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай сайт", model: s.ref("coder") });
+    expect(res.status).toBe(200);
+    const work = await until(s.project.id, (w) => w.status === "done");
+    expect(work.reason).toBeNull();
+    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("60 steps on this message");
+  });
+
   it("answers the first message at once, keeps its plan, ends without finish_work and goes on with the next message", async () => {
     const s = await setup({
       coder: [

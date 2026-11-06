@@ -1,6 +1,7 @@
 import { isLocal, NO_LIMIT_MS } from "../budget";
 import { mergeOptions, thinkingOptions } from "./thinking";
 import { toModelMessages } from "./history";
+import { subagentTools } from "../agent/subagent";
 import { notesBlock } from "../agent/notes";
 import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
 import { FOLDER_STEPS, folderHint } from "./folder";
@@ -152,6 +153,20 @@ export async function reply(i: ReplyInput): Promise<void> {
   const tools: ToolSet = {
     ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }, { owner: i.chatId }) : {}),
     ...i.extraTools,
+    // Research in a fresh context, only its report coming back (asked for: sub-agents as in Claude Code).
+    ...(i.folder
+      ? subagentTools({
+          conn: i.conn,
+          model: i.model,
+          price: await findModel(i.conn, i.model),
+          folder: i.folder,
+          signal: i.signal,
+          idleTimeoutMs: i.idleTimeoutMs,
+          tools: i.web === "free" ? () => webTools(i.webAccess, { onCall: () => {} }, { owner: i.chatId }) : undefined,
+          onSpend: (_, tokens) => (extraUsage = addUsage(extraUsage, tokens)),
+          onCall: (name, what) => void i.emit({ type: "tool", name, input: what }),
+        })
+      : {}),
   };
   const deferral = deferTools(tools);
   // Research takes room: the internet, or tools of the user's servers (seen: a browser server stopped at 8 steps).

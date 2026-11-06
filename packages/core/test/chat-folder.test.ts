@@ -211,3 +211,31 @@ describe("memory of a long chat with a folder", () => {
     expect(saved.messages.at(-1).content).toContain("В папке запрета всё на месте.");
   });
 });
+
+// Asked for: sub-agents as in Claude Code. The research goes to an agent with a fresh context; only its report comes back.
+describe("sub-agents", () => {
+  it("reads in a context of its own and gives the main agent only its report", async () => {
+    const isSub = (body: any) => JSON.stringify(body.messages?.[0] ?? "").includes("You are a sub-agent");
+    const main: FakeTurn[] = [
+      { toolCalls: [{ name: "delegate", args: { description: "Найти константу a", prompt: "Где задана константа a и чему она равна?" } }] },
+      { text: "Константа a = 1, в app.js." },
+    ];
+    const sub: FakeTurn[] = [{ toolCalls: [{ name: "read_file", args: { path: "app.js" } }] }, { toolCalls: [{ name: "report", args: { report: "a = 1, задана в app.js:1" } }] }];
+    fake = await startFakeProvider({ key: KEY, models: [{ id: "coder" }], respond: (body) => (isSub(body) ? (sub.shift() ?? { text: "—" }) : (main.shift() ?? { text: "Готово." })) });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const chat = (await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "coder" })).json()) as { id: string };
+    await connect(chat.id, folder);
+    await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Чему равна константа a?" }));
+    const asks = fake.requests.filter((r) => r.path === "/v1/chat/completions");
+    const subAsks = asks.filter((r) => isSub(r.body));
+    const mainAsks = asks.filter((r) => !isSub(r.body));
+    // The sub-agent read the file; the main agent got the report, never the file itself.
+    expect(JSON.stringify(subAsks.at(-1)!.body.messages)).toContain("export const a = 1");
+    const after = JSON.stringify(mainAsks.at(-1)!.body.messages);
+    expect(after).toContain("a = 1, задана в app.js:1");
+    expect(after).not.toContain("export const a = 1");
+    const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
+    expect(saved.messages.at(-1).activity).toContainEqual(expect.objectContaining({ name: "delegate", input: "Найти константу a" }));
+    expect(saved.messages.at(-1).content).toContain("Константа a = 1");
+  });
+});

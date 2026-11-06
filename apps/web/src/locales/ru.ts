@@ -1719,6 +1719,7 @@ export const ru = {
   "folder.tool.design_review": "Drimvox проверяет дизайн на компьютере и телефоне",
   "folder.tool.look_at_image": "Смотрит картинку {input}",
   "folder.tool.use_skill": "Открывает навык {input}",
+  "folder.tool.delegate": "Подагент: {input}",
   "folder.tool.browser_look": "Смотрит на страницу в браузере",
   "folder.tool.browser_pdf": "Сохраняет страницу в PDF",
   "folder.tool.browser_upload": "Загружает файл на страницу",

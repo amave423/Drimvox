@@ -37,6 +37,7 @@ const OWN_LINES = [
   "code_review",
   ...["look", "pdf", "upload", "audit", "console", "emulate", "eval", "hover", "network", "performance", "wait"].map((b) => `browser_${b}`),
   "report_review",
+  "delegate",
   "report_acceptance",
 ];
 

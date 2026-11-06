@@ -12,7 +12,22 @@ export class RelayBrowser implements BrowserDriver {
   private readonly listeners = new Set<(s: BrowserState) => void>();
   private readonly blockedListeners = new Set<(host: string) => void>();
 
-  constructor(private readonly call: BrowserCall) {}
+  private readonly call: BrowserCall;
+
+  /**
+   * Every request answers within `timeoutMs` or fails (seen live: a tab out of sight never answered a device emulation,
+   * and a project's agent waited on it for twenty minutes while the run said "working").
+   */
+  constructor(call: BrowserCall, timeoutMs = 30_000) {
+    this.call = (op, args) =>
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`The browser did not answer "${op}" within ${Math.round(timeoutMs / 1000)} s`)), timeoutMs);
+        call(op, args).then(
+          (v) => (clearTimeout(timer), resolve(v)),
+          (e: unknown) => (clearTimeout(timer), reject(e)),
+        );
+      });
+  }
 
   /** The main process tells what its tabs are now. */
   update(state: BrowserState): void {

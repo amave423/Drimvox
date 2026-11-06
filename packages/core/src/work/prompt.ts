@@ -82,6 +82,7 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "
     git,
     "- Keep the project's notes current with update_notes: commands, decisions, what is done.",
     "- Do the work, then stop: no endless polishing. Look at each page once on each width, again only after a real fix.",
+    "  Never grade your own result (\"8/10\") and polish toward a higher mark: the design review after you does that once.",
     "When every checklist item is done and checked, call finish_work with a short report in the user's language: what is done,",
     "how to start it; give start (the command and the address) when the result is something to open, a site or a server:",
     "Drimvox starts it for the user. Stop your own background processes first. The report is the end: nothing after it.",
@@ -121,7 +122,9 @@ export function existingRules(canLook: boolean, git = "- Never commit or push: g
     "- Keep the project's notes current with update_notes when you learn how the project works.",
     // Seen live: a currency converter was ready in 12 minutes, then polished for 15 more (78 edits, 15 looks).
     "- Do the task, then stop: no endless polishing. Look at each changed page once on each width, again only after a real",
-    "  fix; a look that finds only matters of taste is not a reason for another round. Do not read a file again that you",
+    "  fix; a look that finds only matters of taste is not a reason for another round. Never grade your own result (\"8/10\")",
+    "  and polish toward a higher mark, even where a skill says to critique your work: once it does what was asked and nothing",
+    "  is broken, stop and say what you made; the user asks for more if they want it. Do not read a file again that you",
     "  just read or wrote. A server you started stays running between the user's messages: open its address again first.",
     "End your turn with a short reply: what you changed and how to check it, or the answer. finish_work is not needed;",
     "call it only when the user asked to make something to open (a site or a server) and it is ready, with start.",

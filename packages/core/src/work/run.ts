@@ -30,9 +30,13 @@ import { projectMap } from "../agent/repo-map";
 import { proxyHint } from "../internet/blocked";
 import { checksFailedMessage, checksReport, projectChecks, runChecks } from "./checks";
 import { lineStat } from "./line-stat";
+import { subagentTools } from "../agent/subagent";
 
 /** Steps one answer of the run takes before the next answer goes on with the same context. */
 export const SEGMENT_STEPS = 60;
+/** Drimvox's word to a project worked as a chat, at every 60 steps of one answer. */
+export const DONE_YET =
+  "[Drimvox: 60 steps on this message.] If what the user asked is done and nothing is broken, stop now and reply what you made. Otherwise go on with what is left, without polishing what already works.";
 /** Times in a row the model may stop without finish_work, and without ticking anything off, before it counts as stuck. */
 export const MAX_NUDGES = 3;
 /** Actions without touching the checklist before the agent is reminded of it (seen live: unticked for an hour and a half). */
@@ -229,6 +233,9 @@ export class WorkRun {
           continue;
         }
         if (outcome.kind === "budget") return stopWith("paused", "budget");
+        // A long answer goes on without a pause (asked for: as Claude Code, give the task and get it done), with one word
+        // at each 60 steps: if what was asked is done, stop now (seen live: a site fine at 20 rubles, polished on and on).
+        if (this.chatMode && outcome.kind === "steps") messages.push({ role: "user", content: DONE_YET });
         if (outcome.kind === "limit" || outcome.kind === "steps") continue;
         // As in a chat: the answer is the end of the turn; the next message goes on. Unless the project's own tests sent
         // the agent back from finish_work: it fixes them first.
@@ -374,6 +381,18 @@ export class WorkRun {
         { local: true, vision, onSpend: (usd) => (cost += usd), folder: this.folder, owner: this.chatId },
       ),
       ...skillTools(skills, this.folder, hooks),
+      // Research in a fresh context, only its report coming back (asked for: sub-agents as in Claude Code).
+      ...subagentTools({
+        conn,
+        model,
+        price,
+        folder: this.folder,
+        signal,
+        idleTimeoutMs: this.d.idleTimeoutMs,
+        tools: () => webTools(this.d.web, { onCall: () => {} }, { local: true, folder: this.folder, owner: this.chatId, onSpend: (usd) => (cost += usd) }),
+        onSpend: (usd) => (cost += usd),
+        onCall,
+      }),
       ...visualTools(
         {
           kit: this.d.visualKit,
