@@ -41,6 +41,7 @@ export function smartness(id: string, name = ""): number {
   if (CODE.test(text)) score += 4;
   if (/thinking|reason|\br1\b/.test(text)) score += 2;
   if (SMALL.test(text)) score -= 25;
-  else if (FAST.test(text)) score -= 8;
+  // DeepSeek's flagship is called Flash (V4.1 Flash, 2026-11): the word says nothing about its size there.
+  else if (FAST.test(text) && !/deepseek/.test(text)) score -= 8;
   return score;
 }

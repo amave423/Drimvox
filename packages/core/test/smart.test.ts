@@ -20,4 +20,10 @@ describe("smartness", () => {
     expect(smartness("gemini-3-pro")).toBeGreaterThan(smartness("gemini-3-flash"));
     expect(smartness("deepseek-v4-pro")).toBeGreaterThan(smartness("mistral-small-3.2-24b"));
   });
+
+  // DeepSeek's flagship is V4.1 Flash: its name is not a smaller model's.
+  it("does not count DeepSeek's Flash as a fast small variant", () => {
+    expect(smartness("deepseek-v4.1-flash")).toBe(smartness("deepseek-v4.1"));
+    expect(smartness("free/deepseek-v4.1-flash")).toBeGreaterThan(smartness("free/glm-5.3-flash"));
+  });
 });
