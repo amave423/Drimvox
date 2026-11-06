@@ -2,7 +2,9 @@ import type { ModelInfo } from "@drimvox/shared";
 import { tool, type ModelMessage, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Connection } from "../providers/repo";
+import { findModel } from "../providers/catalog";
 import { runAgent } from "./run";
+import { serviceModel } from "./service-model";
 
 /** Steps a sub-agent may take: enough to find and read what it was sent for, not to wander. */
 const SUBAGENT_STEPS = 30;
@@ -58,10 +60,13 @@ export function subagentTools(d: SubagentDeps): ToolSet {
         let said = "";
         const messages: ModelMessage[] = [{ role: "user", content: prompt }];
         const quiet = { onCall: () => {}, onResult: () => {}, askApproval: async () => false as const };
+        // Research needs reading, not the strongest model: the cheaper service one when it is set.
+        const service = serviceModel(d.conn, d.model);
+        const same = service.conn.id === d.conn.id && service.model === d.model;
         const outcome = await runAgent({
-          conn: d.conn,
-          model: d.model,
-          price: d.price,
+          conn: service.conn,
+          model: service.model,
+          price: same ? d.price : await findModel(service.conn, service.model).catch(() => undefined),
           worktree: d.folder,
           messages,
           mode: "read",

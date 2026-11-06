@@ -3,14 +3,24 @@ import { todayLine } from "../now";
 import { ASSETS_HINT, DESIGN_HINT } from "./design";
 
 /**
+ * Every line read stays in the conversation and is sent again at every step (asked for: fewer tokens, the same quality):
+ * a long file is found into, not read through.
+ */
+export const READ_RANGES_HINT =
+  "A file of up to about 300 lines: read it whole, once. A longer one: search for what you need first, then read_file " +
+  "with offset and limit around the lines found, not the whole file.";
+
+/**
  * Independent calls in one step (as Codex's and Claude Code's prompts ask): every step sends the whole conversation to the
  * model again (seen live: 247 actions, one a step, for a currency converter).
  */
 export const BATCH_HINT =
   "Work in few steps: every step costs a full round to the model. Make the calls that do not depend on each other in the same " +
   "step: read the files you need together, run independent searches together, and make all the edits you already know in " +
-  "one edit_file call with edits. Big new files are the exception: one per step, at most about 200 lines in one write_file, " +
-  "the rest added with edit_file (the output limit cuts a longer answer, and nothing in it is done).";
+  "one edit_file call with edits; hand several independent pieces of research to sub-agents (delegate) in one step. Big new " +
+  "files are the exception: one per step, at most about 200 lines in one write_file, the rest added with edit_file (the " +
+  "output limit cuts a longer answer, and nothing in it is done). " +
+  READ_RANGES_HINT;
 
 /**
  * After two failed fixes of the same error a third one sinks deeper into the agent's own guesses (said in a video on agent
@@ -38,7 +48,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
     `- ${ASSETS_HINT}`,
     `- ${DESIGN_HINT}`,
     "- Explore first: list_files, read_file and search before editing. Read a file before you change it.",
-    "- Read a file whole, once, and keep it in mind; read code with read_file and search, never with run_command (no Get-Content, Select-String, cat or node -e to look at files).",
+    "- Keep what you read in mind instead of reading it again; read code with read_file and search, never with run_command (no Get-Content, Select-String, cat or node -e to look at files).",
     "- Make focused changes that do exactly what was asked. Prefer edit_file for existing files; use write_file for new files.",
     "- Keep files small: when a file grows past about 400 lines, split it by responsibility.",
     "- If the project has tests, a linter or a build, run them with run_command and fix what you broke.",

@@ -40,9 +40,9 @@
 .params { width: 100%; max-width: 1400px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 0 28px; align-items: start; }
 .params-main { min-width: 0; display: grid; gap: 12px; }
 .params-main > .sheet { max-width: none; }
-.params-back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 999px; color: var(--muted); font-size: 14px; }
+.params-back { justify-self: start; margin-top: 14px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 999px; color: var(--muted); font-size: 14px; }
 .params-back:hover { color: var(--fg); background: var(--sheet); }
-.params-nav { position: sticky; top: 0; display: grid; gap: 2px; padding: 46px 14px 0 0; border-right: 1px solid var(--line); }
+.params-nav { position: sticky; top: 0; display: grid; gap: 2px; padding: 4px 14px 0 0; border-right: 1px solid var(--line); }
 .params-nav .side-link { margin: 0; }
 .params-nav .side-link.is-on { background: var(--sheet); box-shadow: 0 1px 0 var(--line); }
 @container (max-width: 880px) {
@@ -120,9 +120,6 @@
 .workshop-split:hover::after, .workshop-split:focus-visible::after, .is-dragging > .workshop-split::after { background: var(--line); }
 .workshop-split:focus-visible::after { background: var(--ink); }
 
-.workshop-result { min-height: 0; min-width: 0; overflow: hidden auto; background: var(--sheet); border-radius: 12px; font-size: 13.5px; }
-.workshop-result .workshop-tabs { position: sticky; top: 0; background: var(--sheet); z-index: 1; }
-.workshop-result-body { display: grid; gap: 14px; padding: 14px 18px 22px; align-content: start; min-width: 280px; }
 .workshop-project { display: grid; gap: 12px; align-content: start; }
 .workshop-project > .mono { margin: 0; overflow-wrap: anywhere; }
 .workshop-project > .btn { justify-self: start; }
@@ -280,3 +277,29 @@
   .planning-card:not(.is-past) { animation: planning-in 0.24s ease; }
 }
 @keyframes planning-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* The right side (ProjectPanel.tsx, asked for: no tabs): the context on top, the parameters below, the edge between them
+   dragged; the context never taller than what it holds, folded away to a chip. */
+.project-panel { min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--sheet); border-radius: 12px; overflow: hidden; font-size: 13.5px; }
+.panel-context { flex: none; overflow: hidden auto; }
+.panel-context-body { padding: 14px 18px 10px; display: grid; gap: 10px; min-width: 260px; }
+.panel-path { margin: 0; overflow-wrap: anywhere; font-size: 12px; }
+.panel-split { flex: none; height: 7px; cursor: row-resize; touch-action: none; position: relative; outline: none; }
+.panel-split::after { content: ""; position: absolute; left: 18px; right: 18px; top: 3px; height: 1px; background: var(--line); }
+.panel-split:hover::after, .panel-split:focus-visible::after { height: 2px; top: 2px; background: var(--ink); }
+.panel-params { flex: 1; min-height: 0; overflow: hidden auto; padding: 12px 18px 22px; display: grid; gap: 14px; align-content: start; min-width: 260px; }
+.panel-params-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.panel-params-head .sheet-h { margin: 0; font-size: 17px; }
+.panel-context-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+.panel-context-chip:hover { color: var(--fg); border-color: var(--muted); }
+.project-params { display: grid; gap: 18px; }
+.params-block { display: grid; gap: 8px; }
+.params-block .margin-h { margin: 0 0 2px; }
+.params-row { display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 8px; }
+.params-row .picker-button { max-width: 100%; }
+.params-block .link { justify-self: start; font-size: 13px; }
+.git-block { display: grid; gap: 8px; }
+.git-state p { margin: 0 0 4px; }
+.git-rules summary { cursor: pointer; color: var(--muted); }
+.git-rules[open] { display: grid; gap: 8px; }
+.work-result-card { display: grid; gap: 10px; }

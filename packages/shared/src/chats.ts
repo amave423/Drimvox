@@ -107,6 +107,8 @@ export interface ActivityEntry {
   /** A write or an edit: the lines it added and removed (asked for: shown where the agent changed the file). */
   added?: number;
   removed?: number;
+  /** One call that changed several files: each file's lines. */
+  perFile?: Record<string, { added: number; removed: number }>;
 }
 
 /** What an answer did to a file: wrote it (new or rewritten), changed part of it, or only read it. */

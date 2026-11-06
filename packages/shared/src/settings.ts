@@ -42,6 +42,11 @@ export const settingsSchema = z.object({
   strongModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
   /** The model that looks at screenshots; null means the task's own model, when it sees pictures. */
   visionModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable(),
+  /**
+   * A cheaper model for the work around the work: sub-agents' research, summaries of long histories, the code review.
+   * Null: the working model does it (asked for: fewer tokens, the same quality of what is built).
+   */
+  serviceModel: z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) }).nullable().default(null),
   /** Windows notifications when a task needs the user and the window is not in front. */
   notifications: z.boolean(),
   /** The sound of Drimvox's own notifications; "off": silent. */
@@ -93,6 +98,7 @@ export const defaultSettings: Settings = {
   strongModel: null,
   imageModel: null,
   visionModel: null,
+  serviceModel: null,
   acceptanceModel: null,
   notifications: true,
   notifySound: "drop",

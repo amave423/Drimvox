@@ -73,9 +73,10 @@ export class McpHub {
    * The tools of every enabled server for a model. The first call of each tool asks the user unless they
    * allowed it for good; a server that cannot be reached simply adds nothing.
    */
-  async toolsFor(ask: McpAsk, hooks: McpHooks): Promise<ToolSet> {
+  /** `only`: the servers a project switched on (docs/specs/project-work.md); all of them without it. */
+  async toolsFor(ask: McpAsk, hooks: McpHooks, only?: (serverId: string) => boolean): Promise<ToolSet> {
     const tools: ToolSet = {};
-    for (const server of this.repo.enabled()) {
+    for (const server of this.repo.enabled().filter((s) => !only || only(s.id))) {
       let list: McpTool[];
       try {
         list = await this.connect(server).tools;

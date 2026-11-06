@@ -61,7 +61,7 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
     ),
     read_file: wrap(
       "read_file",
-      "Read a text file. Lines are prefixed with their numbers. Use offset/limit for long files.",
+      "Read a text file. Lines are prefixed with their numbers. A long file: search it first, then read the lines around what you found with offset/limit.",
       z.object({ path: z.string(), offset: z.number().int().min(1).optional(), limit: z.number().int().min(1).max(2000).optional() }),
       async ({ path, offset, limit }) => ok(ws.readFile(path, offset, limit)),
     ),

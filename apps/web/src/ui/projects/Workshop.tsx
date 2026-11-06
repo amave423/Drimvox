@@ -8,7 +8,7 @@ import { useAddProject } from "./AddProject";
 import { PlanCard } from "./PlanCard";
 import { PaneSplit, usePaneWidth } from "../PaneSplit";
 import { useProjectWork } from "./useProjectWork";
-import { WorkshopResult } from "./WorkshopResult";
+import { ProjectPanel } from "./ProjectPanel";
 import { ProjectComposer } from "./ProjectComposer";
 import { PlanningFeed } from "./PlanningFeed";
 
@@ -84,7 +84,7 @@ export function Workshop({ projectId }: { projectId: string }) {
           )}
         </section>
         <PaneSplit split={split} controls="workshop-result" label={{ open: "workshop.hideResult", closed: "workshop.showResult" }} />
-        <WorkshopResult project={project} work={work} open={split.width > 0} onChanged={() => void reload()} />
+        <ProjectPanel project={project} work={work} open={split.width > 0} onChanged={() => void reload()} />
       </div>
     </div>
   );

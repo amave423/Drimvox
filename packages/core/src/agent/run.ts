@@ -80,6 +80,9 @@ export interface RunInput {
   onStep(step: { messages: ModelMessage[]; inputTokens: number; outputTokens: number; cachedTokens: number; costUsd: number; priced: boolean }): void;
 }
 
+/** On "auto" thinking, every this many steps the model thinks fully again, to look at the plan anew. */
+const THINK_AGAIN_EVERY = 10;
+
 export type RunOutcome =
   | { kind: "finished"; summary: string; commitMessage: string | null }
   | { kind: "budget" }
@@ -162,6 +165,9 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
     const overBudget: StopCondition<ToolSet> = ({ steps: done }) => spentBefore + done.reduce((sum, s) => sum + stepCost(s), 0) >= i.budgetUsd;
     cut = false;
     resetClock();
+    // On "auto" the routine steps think little (see prepareStep); a step after a failed tool thinks fully.
+    const autoThinking = i.thinking !== false && (!i.thinkingLevel || i.thinkingLevel === "auto");
+    let lastFailed = false;
     try {
       const result = streamText({
         model: languageModel(i.conn, i.model),
@@ -181,7 +187,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
                 ? thinkingOptions(i.conn.preset, i.thinkingLevel)
                 : undefined,
         // Near the model's context, the older work becomes one summary; see memory.ts.
-        prepareStep: async ({ messages }) => {
+        prepareStep: async ({ messages, stepNumber }) => {
           // A summary written in the background meanwhile takes over the older work now.
           if (writing?.done !== undefined) {
             if (writing.done) adopt(writing.done);
@@ -231,7 +237,16 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           if (note) sent = [...sent, { role: "user", content: note }];
           // The same text as long as the notes stay the same: the provider's cache holds.
           const active = deferral?.active();
-          return { system: system(), ...(active ? { activeTools: active } : {}), ...(sent === messages ? {} : { messages: sent }) };
+          // Thinking on "auto" (asked for: fewer tokens, the same quality): the first step, a step after a failed tool and
+          // every tenth (to look at the plan again) think as the provider decides; the routine steps between think little.
+          const routine = autoThinking && round === 0 && stepNumber > 0 && !lastFailed && (stepsBefore + stepNumber) % THINK_AGAIN_EVERY !== 0;
+          const lean = routine ? thinkingOptions(i.conn.preset, "low") : undefined;
+          return {
+            system: system(),
+            ...(active ? { activeTools: active } : {}),
+            ...(sent === messages ? {} : { messages: sent }),
+            ...(lean ? { providerOptions: lean } : {}),
+          };
         },
         stopWhen: [
           hasToolCall("finish"),
@@ -247,6 +262,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         onError: () => {},
         onStepEnd: (step) => {
           steps++;
+          lastFailed = step.content.some((part) => part.type === "tool-error");
           cut = step.finishReason === "length";
           said.push(...(step.response.messages as ModelMessage[]));
           const input = step.usage.inputTokens ?? 0;

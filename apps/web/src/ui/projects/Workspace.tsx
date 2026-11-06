@@ -9,21 +9,23 @@ import { Markdown } from "../chat/Markdown";
 import { hoursAndMinutes } from "./useProjectWork";
 
 /** The agent's report and the result Drimvox started: where to open it, stop and start it again. */
-export function RunTab({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
+/**
+ * What came of the work, as a card at the end of the project's conversation (asked for: the result panel went): the
+ * started result to open, stop and start again, the report, and what the run did.
+ */
+export function WorkResultCard({ work, onChanged }: { work: ProjectWorkView; onChanged(): void }) {
   const { t } = useApp();
   return (
-    <section className="work-tab-body">
+    <section className="work-result-card" aria-label={t("workshop.result")}>
+      {work.escalated && <p className="muted">{t("projectWork.escalated")}</p>}
       <SiteCard work={work} onChanged={onChanged} />
-      {work.report ? (
+      {work.report && (
         <div className="note work-report">
           <h3 className="margin-h">{t("projectWork.report")}</h3>
           <Markdown text={work.report} />
         </div>
-      ) : (
-        !work.site && <p className="muted">{t(work.status === "running" ? "projectWork.runLater" : "projectWork.runNone")}</p>
       )}
-      {work.startedAt && work.status !== "running" && <PublishSiteCard projectId={work.projectId} />}
-      {work.startedAt && work.status !== "running" && <ReportCard work={work} />}
+      <ReportCard work={work} />
     </section>
   );
 }
@@ -32,7 +34,7 @@ export function RunTab({ work, onChanged }: { work: ProjectWorkView; onChanged()
  * The finished site on the internet in one click (asked for): built if it has a build, put on GitHub Pages from a branch
  * of its own, with the link. The project must be on GitHub first.
  */
-function PublishSiteCard({ projectId }: { projectId: string }) {
+export function PublishSiteCard({ projectId }: { projectId: string }) {
   const { api, t } = useApp();
   const [state, setState] = useState<{ kind: "idle" | "busy" } | { kind: "done"; url: string } | { kind: "failed"; code: string; detail?: string }>({
     kind: "idle",

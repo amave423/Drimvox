@@ -1,3 +1,4 @@
+import { slug } from "../src/work/project-git";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -281,8 +282,9 @@ describe("work on a project", () => {
     expect(chat.messages[0]).toMatchObject({ role: "user" });
     expect(chat.messages[0].content).toContain("Каталог");
     expect(chat.messages.at(-1)).toMatchObject({ role: "assistant", status: "done" });
-    // By the default git rules the work is committed in a branch of the agent's own; main stays as it was.
-    expect(git(folder, "branch", "--show-current")).toMatch(/^drimvox\/task-/);
+    // By the default git rules the work is committed in the project's own branch, named after it; main stays as it was.
+    const project = await (await env.call("GET", "/api/projects")).json();
+    expect(git(folder, "branch", "--show-current")).toBe(`drimvox/${slug(project[0].name)}`);
     expect(git(folder, "log", "--oneline", "main").split("\n")).toHaveLength(1);
     expect(git(folder, "status", "--porcelain")).toBe("");
     // The plan's task is over once the work started.
@@ -673,6 +675,20 @@ describe("a ready project", () => {
     const fresh = await (await env.call("POST", "/api/projects", { path: other })).json();
     expect(fresh.kind).toBe("new");
     rmSync(other, { recursive: true, force: true });
+  });
+
+  // Asked for: fewer tokens at the same quality. On "auto", the first step thinks as the provider decides, the routine
+  // ones after it think little, and a step after a failed tool thinks fully again.
+  it("thinks fully on the first step and after a failure, little on the routine steps between", async () => {
+    const s = await setup({
+      coder: [call("list_files", { path: "." }), call("read_file", { path: "no-such-file.txt" }), call("list_files", { path: "." }), { text: "Готово." }],
+    });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Посмотри проект", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done");
+    const efforts = requestsOf("coder").map((r) => r.body.reasoning?.effort ?? null);
+    expect(efforts[0]).toBeNull();
+    expect(efforts[1]).toBe("low");
+    expect(efforts.length).toBeGreaterThanOrEqual(4);
   });
 
   // Seen live: "the site looked fine at 20 rubles", and the agent polished on, answer after answer. Asked for: no pause,
@@ -1067,5 +1083,15 @@ describe("a project whose folder was renamed or moved", () => {
     const res = await env.call("POST", `/api/projects/${s.project.id}/move`, { path: other });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ path: other, gitState: "ready" });
+  });
+});
+
+// Asked for: one branch per project with a readable name, not drimvox/task-1106-2010.
+describe("the project's branch name", () => {
+  it("is the project's name in any script, words joined by dashes", () => {
+    expect(slug("Сайт погоды")).toBe("сайт-погоды");
+    expect(slug("тест 2")).toBe("тест-2");
+    expect(slug("My CRM: v2!")).toBe("my-crm-v2");
+    expect(slug("***")).toBe("");
   });
 });

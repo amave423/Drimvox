@@ -38,6 +38,7 @@ import { ChatMargin } from "./ChatMargin";
 import { FileChips, FileViewer } from "./FileChips";
 import { ProjectComposer } from "../projects/ProjectComposer";
 import { WorkReview } from "../projects/WorkReview";
+import { WorkResultCard } from "../projects/Workspace";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
@@ -216,6 +217,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                       touch: a.name === "write_file" ? ("written" as const) : ("changed" as const),
                       added: a.added,
                       removed: a.removed,
+                      perFile: a.perFile,
                     },
                   }
                 : {}),
@@ -537,6 +539,12 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                   />
                 </>
               )}
+              {/* What came of the work, at the end of the conversation (asked for: the result panel on the right went). */}
+              {workshop &&
+                work?.startedAt &&
+                work.status !== "running" &&
+                (work.site || work.report) &&
+                at("result", Date.now(), <WorkResultCard work={work} onChanged={() => void reloadWork()} />, true)}
               <div ref={end} />
             </div>
           </ShotsContext.Provider>

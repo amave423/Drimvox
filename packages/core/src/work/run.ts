@@ -14,6 +14,8 @@ import { WEB_HINT, webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { nowLine } from "../now";
 import { findModel } from "../providers/catalog";
+import { serviceModel } from "../agent/service-model";
+import { lastWords, newStage, stageMessages } from "./stage";
 import type { Connection, ProviderRepo } from "../providers/repo";
 import { findSkills, projectSkillRoots, skillsGiven, skillsInstructions, skillTools } from "../skills/skills";
 import { askAboutPictures, type Vision } from "../visual/look";
@@ -62,7 +64,9 @@ export interface RunDeps {
   web: WebAccess;
   skillsDir: string;
   /** Tools of the user's MCP servers; their questions come into the project's conversation. */
-  mcp?: { toolsFor(ask: McpAsk, hooks: McpHooks): Promise<ToolSet> };
+  mcp?: { toolsFor(ask: McpAsk, hooks: McpHooks, only?: (serverId: string) => boolean): Promise<ToolSet> };
+  /** The downloaded skills and the MCP servers this project switched on; null in either: all of them. */
+  extensions?(projectId: string): { skills: string[] | null; mcp: string[] | null };
   idleTimeoutMs: number;
   plan(projectId: string): ProjectPlan | null;
   /** This month's spending against the app's budget. */
@@ -109,6 +113,12 @@ export class WorkRun {
   private sentBack = false;
   /** Actions since the checklist was last updated. */
   private sinceChecklist = 0;
+  /**
+   * The start of the system prompt, the same for every answer of this run (asked for: a stable prefix the provider's cache
+   * keeps): the time it started and a ready project's map, not computed again for every answer.
+   */
+  private readonly startedAt = nowLine();
+  private map: Promise<string> | null = null;
 
   constructor(
     private readonly d: RunDeps,
@@ -175,6 +185,7 @@ export class WorkRun {
     let nudges = 0;
     let errors = 0;
     let doneBefore = this.row().checklist.filter((i) => i.done).length;
+    let doneAtStage = doneBefore;
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
     // The branch the project's git rules ask for, before anything changes.
     await this.d.git?.prepare(this.projectId, this.folder).catch(() => {});
@@ -208,6 +219,17 @@ export class WorkRun {
         // The app's budget for the month is used up: the run waits until it is raised.
         if (this.d.month().over && !isFreeToRun(conn)) return stopWith("paused", "month_budget");
 
+        // A big task goes in stages: after a checklist step, a grown context starts again from a brief (asked for: fewer
+        // tokens; every step sends the whole conversation again).
+        if (!this.chatMode) {
+          const now = row.checklist.filter((i) => i.done).length;
+          const left = row.checklist.length - now;
+          const contextLength = (await findModel(conn, ref.model).catch(() => undefined))?.contextLength ?? null;
+          if (newStage({ contextTokens: row.contextTokens ?? 0, contextLength, doneNow: now, doneAtStage, left })) {
+            messages.splice(0, messages.length, ...stageMessages(messages, row.checklist, lastWords(messages)));
+            doneAtStage = now;
+          }
+        }
         // The older part of a long run is shortened between answers: old outputs and written files, not the words.
         compactHistory(messages);
         const outcome = await this.answer(messages, conn, ref.model, () => {
@@ -315,7 +337,7 @@ export class WorkRun {
     let cost = 0;
     let priced = true;
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
-    const onCall = (name: string, what: string, stat?: { added: number; removed: number } | null) => {
+    const onCall = (name: string, what: string, stat?: Pick<ActivityEntry, "added" | "removed" | "perFile"> | null) => {
       if (name === "use_skill") this.skillsOpened.add(what);
       this.sinceChecklist = name === "update_checklist" ? 0 : this.sinceChecklist + 1;
       activity.push({ name, input: what, at: content.length, ...(stat ?? {}) });
@@ -337,17 +359,25 @@ export class WorkRun {
     const price = await findModel(conn, model);
     const plan = this.d.plan(this.projectId);
     const vision = await this.d.vision(conn, model);
-    const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]);
+    // The project's own skills, and the downloaded ones it switched on (asked for: chosen per project).
+    const chosen = this.d.extensions?.(this.projectId) ?? { skills: null, mcp: null };
+    const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]).filter(
+      (s) => s.scope === "project" || chosen.skills === null || chosen.skills.includes(s.name),
+    );
     // The plan's skills are given whole in the instructions: no reminder to open them before the end (seen live: a round
     // spent opening two skills the agent already had).
     if (!this.chatMode) for (const name of plan?.skills ?? []) this.skillsOpened.add(name);
     const files = { list: () => this.d.chats.attachments.ofChat(this.chatId), file: (id: string) => this.d.chats.attachments.file(id) };
     // The user's MCP servers work in the run too (seen: four were switched on and the run had none of them).
     const mcpTools = this.d.mcp
-      ? await this.d.mcp.toolsFor((call) => this.d.approvals.ask(this.chatId, emit, call), {
-          onCall: (call) => onCall(call.name, describeCall(call.input)),
-          onResult: () => {},
-        })
+      ? await this.d.mcp.toolsFor(
+          (call) => this.d.approvals.ask(this.chatId, emit, call),
+          {
+            onCall: (call) => onCall(call.name, describeCall(call.input)),
+            onResult: () => {},
+          },
+          (id) => chosen.mcp === null || chosen.mcp.includes(id),
+        )
       : {};
     const spentNow = this.spent();
     const gitLine = this.d.git ? await this.d.git.instructions(this.projectId, this.folder) : undefined;
@@ -443,16 +473,18 @@ export class WorkRun {
           this.codeReviewed = true;
           // A static page has nothing to attack: no server, no accounts, no one's data.
           if (isStaticSite(this.folder)) return null;
-          // The working model reviews, in a fresh conversation with only this to do (asked for: no expensive model for it).
+          // The service model reviews, else the working one, in a fresh conversation with only this to do (asked for: no
+          // expensive model for it).
           const row = this.row();
           const ref = row.models?.work ?? null;
-          const reviewer = ref ? this.d.providers.connection(ref.providerId) : null;
-          if (!ref || !reviewer) return null;
-          onCall("code_review", ref.model);
+          const working = ref ? this.d.providers.connection(ref.providerId) : null;
+          if (!ref || !working) return null;
+          const reviewer = serviceModel(working, ref.model);
+          onCall("code_review", reviewer.model);
           const issues = await reviewProjectCode({
-            conn: reviewer,
-            model: ref.model,
-            price: await findModel(reviewer, ref.model),
+            conn: reviewer.conn,
+            model: reviewer.model,
+            price: await findModel(reviewer.conn, reviewer.model),
             folder: this.folder,
             plan,
             skills,
@@ -541,7 +573,7 @@ export class WorkRun {
         return this.inbox.length > 0 || limited || overBudget();
       },
       system: [
-        nowLine(),
+        this.startedAt,
         folderHint(this.folder),
         // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
         proxyHint(this.d.web),
@@ -554,7 +586,7 @@ export class WorkRun {
         // The skills the plan was made with, whole: the working model follows them without having to open them.
         this.chatMode ? "" : skillsGiven(skills, plan?.skills ?? []),
         // A ready project's files and what each defines (as Aider's repo map): fewer steps spent finding the right file.
-        this.chatMode ? await projectMap(this.folder).catch(() => "") : "",
+        this.chatMode ? await (this.map ??= projectMap(this.folder).catch(() => "")) : "",
       ]
         .filter(Boolean)
         .join("\n\n"),

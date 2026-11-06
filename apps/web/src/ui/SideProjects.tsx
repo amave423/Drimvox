@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "../context";
 import type { MessageKey } from "../i18n";
 import { showStart } from "./SideChats";
-import { RemoveProject } from "./projects/WorkshopResult";
+import { RemoveProject } from "./projects/RemoveProject";
 import { AddProject } from "./projects/AddProject";
 import { StatusDot } from "./tasks/StatusDot";
 

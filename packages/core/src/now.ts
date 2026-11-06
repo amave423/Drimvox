@@ -19,3 +19,16 @@ export function todayLine(at = new Date()): string {
   const day = new Intl.DateTimeFormat("en-GB", { dateStyle: "full" }).format(at);
   return `Today is ${day} (${zone}).`;
 }
+
+/**
+ * The date and the hour, the same for a whole hour: a chat's system prompt starts every request, and to the minute it
+ * changed with every message, so nothing of the chat's history was cached (asked for: fewer tokens).
+ */
+export function hourLine(at = new Date()): string {
+  const from = new Date(at);
+  from.setMinutes(0, 0, 0);
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const day = new Intl.DateTimeFormat("en-GB", { dateStyle: "full" }).format(from);
+  const hour = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:00`;
+  return `Current date and hour: ${day}, between ${hour(from)} and ${hour(new Date(from.getTime() + 3_600_000))} (${zone}).`;
+}

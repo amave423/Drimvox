@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
+import { serviceModel } from "./service-model";
 
 /**
  * What the agent remembers of its older work. Seen live: cutting old file reads and command outputs piece by piece
@@ -94,8 +95,9 @@ export async function remember(
 ): Promise<Remembered> {
   const older = chat ? withMemory(messages.slice(0, upTo), memory, false) : withMemory(messages.slice(0, upTo), memory).slice(1);
   const log = transcript(older);
+  const service = serviceModel(conn, model);
   const result = await generateText({
-    model: languageModel(conn, model),
+    model: languageModel(service.conn, service.model),
     system:
       "You keep the working memory of a coding agent. From its log, write what it must remember to go on without the log: " +
       "the goal and what the user asked for; what is done, file by file, and why; decisions made; commands that build, " +

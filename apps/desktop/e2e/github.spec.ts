@@ -53,8 +53,8 @@ test("publishes a project on GitHub: the code to enter, the name, private by def
   await expect(paramsButton(page)).toBeVisible();
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await addProject(page);
-  // The project's GitHub is in the workshop's result panel, under "Проект".
-  await page.getByRole("tab", { name: "Проект" }).click();
+  // The project's GitHub is in its parameters on the right, no tabs.
+  await expect(page.getByRole("region", { name: "Параметры" })).toBeVisible();
 
   const github = page.getByRole("region", { name: "GitHub" });
   await github.getByRole("button", { name: "Подключить GitHub" }).click();
@@ -75,5 +75,6 @@ test("publishes a project on GitHub: the code to enter, the name, private by def
   expect(made.private).toBe(true);
   const head = (cwd: string, ref: string) => execFileSync("git", ["rev-parse", ref], { cwd, encoding: "utf8" }).trim();
   expect(head(made.bare, "main")).toBe(head(repo, "HEAD"));
-  await expect(github.getByRole("button", { name: "Отправить изменения на GitHub" })).toBeVisible();
+  // Sending goes in the project's git block, once: not a second button here.
+  await expect(github.getByRole("button", { name: "Отправить изменения на GitHub" })).toHaveCount(0);
 });

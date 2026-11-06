@@ -40,6 +40,7 @@ export function ProjectModels({ save }: { save(patch: SettingsPatch): void }) {
       </h2>
       {/* Only models that see pictures: a model without eyes cannot judge a screenshot. */}
       <ModelSetting title="settings.visionModel" vision hint={t("settings.visionModelHint")} value={settings.visionModel} onChange={(visionModel) => save({ visionModel })} />
+      <ModelSetting title="settings.serviceModel" hint={t("settings.serviceModelHint")} value={settings.serviceModel} onChange={(serviceModel) => save({ serviceModel })} />
     </section>
   );
 }

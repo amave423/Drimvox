@@ -7,8 +7,9 @@ import { Dropdown } from "../Dropdown";
 import { Toggle } from "../Toggle";
 
 /**
- * How the agent works with git in this project (docs/specs/project-git.md, asked for: the variant "rules for the agent"
- * without manual commits): where it writes, when it commits, how its messages read; and its branch to accept or reject.
+ * How the agent works with git in this project (docs/specs/project-git.md): where its branch is, how far GitHub has it,
+ * its pull request; folded below, the rules — where it writes, when it commits, how its messages read. Commits and
+ * pushes go by themselves (asked for: no accepting or sending by hand, no duplicates).
  */
 export function ProjectGitCard({ project, busy }: { project: ProjectView; busy: boolean }) {
   const { api, t } = useApp();
@@ -42,6 +43,16 @@ export function ProjectGitCard({ project, busy }: { project: ProjectView; busy: 
     await api.projects[":id"].git.rules.$put({ param: { id: project.id }, json: next }).catch(() => null);
   }
 
+  /** Sends what GitHub has not got yet (it goes by itself after each answer; this is for when that failed). */
+  async function send() {
+    setWorking(true);
+    setFailed(false);
+    const res = await api.github.projects[":id"].push.$post({ param: { id: project.id } }).catch(() => null);
+    setWorking(false);
+    if (!res?.ok) setFailed(true);
+    await load();
+  }
+
   async function settle(action: "accept" | "reject") {
     setWorking(true);
     setFailed(false);
@@ -66,9 +77,48 @@ export function ProjectGitCard({ project, busy }: { project: ProjectView; busy: 
   const off = rules.commit === "never";
 
   return (
-    <>
-      <section className="card git-rules" aria-label={t("git.title")}>
-        <h3 className="card-h">{t("git.title")}</h3>
+    <div className="git-block">
+      {/* One line for where the work is (asked for: the branch and GitHub's push were two cards saying the same). */}
+      {state?.branch && (
+        <div className="git-state" aria-label={t("git.branchTitle")}>
+          <p>
+            <span className="mono">{state.base ? `${state.branch} → ${state.base}` : state.branch}</span>
+            {state.base ? ` · ${t("git.ahead", { n: state.ahead })}` : ""}
+          </p>
+          {state.author && <p className="muted">{t("git.author", { name: state.author })}</p>}
+          {state.github ? (
+            <p className={state.unsent ? "is-pencil-text" : "muted"}>
+              {state.unsent ? t("git.unsent", { n: state.unsent }) : t("git.sent")}
+              {state.pullRequest && (
+                <>
+                  {" · "}
+                  <a href={state.pullRequest.url} target="_blank" rel="noreferrer">
+                    {t("git.pr", { n: state.pullRequest.number })}
+                  </a>
+                </>
+              )}
+            </p>
+          ) : (
+            state.base && <p className="muted">{t("git.noGithub")}</p>
+          )}
+          <div className="actions">
+            {state.github && state.unsent > 0 && (
+              <button className="btn" disabled={busy || working} onClick={() => void send()}>
+                {t("git.sendNow")}
+              </button>
+            )}
+            {/* Without GitHub there is no pull request to merge: the branch goes into its base here. */}
+            {!state.github && state.base && state.ahead > 0 && (
+              <button className="btn" disabled={busy || working} onClick={() => void settle("accept")}>
+                {t("git.mergeHere", { base: state.base })}
+              </button>
+            )}
+          </div>
+          {failed && <p className="error-note">{t("git.failed")}</p>}
+        </div>
+      )}
+      <details className="git-rules">
+        <summary>{t("git.title")}</summary>
         {select("target", gitTargets, "git.target")}
         {select("commit", gitCommitModes, "git.commit")}
         {select("messages", gitMessageStyles, "git.messages")}
@@ -78,36 +128,7 @@ export function ProjectGitCard({ project, busy }: { project: ProjectView; busy: 
         <Toggle checked={rules.pullRequest} disabled={off || !rules.push} onChange={(pullRequest) => void save({ pullRequest })}>
           {t("git.pullRequest")}
         </Toggle>
-        <Toggle checked={rules.allowMain} disabled={off} onChange={(allowMain) => void save({ allowMain })}>
-          {t("git.allowMain")}
-        </Toggle>
-        {!off && rules.push && state && !state.github && <p className="muted git-note">{t("git.noGithub")}</p>}
-      </section>
-      {state?.base && state.branch && (
-        <section className="card git-branch" aria-label={t("git.branchTitle")}>
-          <h3 className="card-h">{state.pullRequest ? t("git.pr", { n: state.pullRequest.number }) : t("git.branchTitle")}</h3>
-          <p className="muted">
-            <span className="mono">
-              {state.branch} → {state.base}
-            </span>{" "}
-            · {t("git.ahead", { n: state.ahead })}
-          </p>
-          <div className="actions">
-            <button className="btn is-primary" disabled={busy || working} onClick={() => void settle("accept")}>
-              {t("git.accept")}
-            </button>
-            {state.pullRequest && (
-              <a className="btn" href={state.pullRequest.url} target="_blank" rel="noreferrer">
-                {t("git.openPr")}
-              </a>
-            )}
-            <button className="btn is-pencil" disabled={busy || working} onClick={() => void settle("reject")}>
-              {t("git.reject")}
-            </button>
-          </div>
-          {failed && <p className="error-note">{t("git.failed")}</p>}
-        </section>
-      )}
-    </>
+      </details>
+    </div>
   );
 }

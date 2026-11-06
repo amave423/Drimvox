@@ -12,7 +12,7 @@ const SECTIONS: { kind: View["kind"]; label: MessageKey; Icon: () => ReactNode }
 ];
 
 /**
- * The parameters (asked for): a page of their own over the whole window, the way back on the top left, the sections on
+ * The parameters (asked for): a page of their own over the whole window, the way back under the sections, the sections on
  * the left (asked for: easier there than on the right). The mode the user came from stays as it was.
  */
 export function ParamsPage({ children }: { children: ReactNode }) {
@@ -32,14 +32,15 @@ export function ParamsPage({ children }: { children: ReactNode }) {
             {t(label)}
           </button>
         ))}
-      </nav>
-      <div className="params-main">
+        {/* Under the sections, where it stays in view as they do (asked for: it was at the top of a long page). */}
         <button type="button" className="params-back" onClick={leaveParams}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M15 5l-7 7 7 7" />
           </svg>
           {t("params.back")}
         </button>
+      </nav>
+      <div className="params-main">
         {children}
       </div>
     </div>

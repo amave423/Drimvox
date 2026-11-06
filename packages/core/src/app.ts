@@ -46,6 +46,8 @@ import { localRoutes } from "./routes/local";
 import { imageToolsFor } from "./media/agent-tool";
 import { forgetCliProxy } from "./local/cliproxy-leftovers";
 import { ProjectGit } from "./work/project-git";
+import { ProjectExtensions } from "./projects/extensions";
+import { projectExtensionRoutes } from "./routes/project-extensions";
 import { SshServers } from "./tools/ssh";
 import { setMailApi } from "./tools/email";
 import { sshRoutes } from "./routes/ssh";
@@ -71,6 +73,7 @@ import { taskRoutes } from "./routes/tasks";
 import { setPriceCatalogUrl } from "./providers/native";
 import type { CliId } from "./cli/kinds";
 import { setCliCommands } from "./cli/resolve";
+import { setServiceModel } from "./agent/service-model";
 import { keepCliListsIn } from "./cli/models";
 import { forgetLimits } from "./cli/limits";
 import { setRateSource, usdRub, type RateSource } from "./rates";
@@ -140,6 +143,11 @@ const defaultHosts = ["127.0.0.1", "localhost", "[::1]"];
 export function createCore(o: AppOptions) {
   setRateSource(o.usdRub);
   setCliCommands(o.cliCommands);
+  setServiceModel(() => {
+    const ref = readSettings(o.db).serviceModel;
+    const conn = ref ? providers.connection(ref.providerId) : null;
+    return ref && conn ? { conn, model: ref.model } : null;
+  });
   keepCliListsIn(join(o.dataDir, "cli-models.json"));
   forgetLimits();
   // Prices of vendors' own APIs come from OpenRouter's public catalog (a fake one in tests).
@@ -235,11 +243,12 @@ export function createCore(o: AppOptions) {
     idleTimeoutMs,
   });
   const backlogService = new BacklogService(backlog, projects, chats);
-  const projectGit = new ProjectGit(o.db, github);
+  const projectGit = new ProjectGit(o.db, github, (id) => projects.get(id)?.name ?? null);
   // Other computers over SSH, downloads, mail, audits, before and after (tools/index.ts).
   const sshServers = new SshServers(o.db, cipher);
   setMailApi(o.mailApi);
   const tools = { dataDir: o.dataDir, ssh: sshServers, browser, webDir: o.webDir };
+  const extensions = new ProjectExtensions(o.db);
   const projectWork = new ProjectWork({
     repo: workRepo,
     runner,
@@ -262,6 +271,7 @@ export function createCore(o: AppOptions) {
       month: () => monthUsage(o.db, chats),
       vision: (conn, model) => resolveVision(readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
       git: projectGit,
+      extensions: (id) => extensions.get(id),
       toolbox: tools,
       agentFiles: () => readSettings(o.db).agentFiles.map((a) => agentFileNames[a]),
       imageTools: (worktree, taskId, hooks, onSpend, budgetLeft) => imageToolsFor(readSettings(o.db).imageModel, providers, { worktree, taskId, media, hooks, budgetLeft, onSpend }),
@@ -367,6 +377,7 @@ export function createCore(o: AppOptions) {
     .route("/projects", backlogRoutes(projects, backlog, backlogService))
     .route("/chains", chainRoutes(chains, freeWatch))
     .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo, projectGit))
+    .route("/projects", projectExtensionRoutes(projects, extensions, mcpRepo, join(o.dataDir, "skills")))
     .route("/tasks", taskRoutes(tasks, runner, shots, backlogService))
     .route(
       "/processes",

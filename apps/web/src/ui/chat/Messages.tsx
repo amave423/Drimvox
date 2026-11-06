@@ -167,7 +167,7 @@ export interface AnswerAction {
   /** A screenshot of a page: its address to show it. */
   shot?: string;
   /** A file written or changed: shown where it happened, with the lines that went in and out (asked for). */
-  file?: { paths: string[]; touch: "written" | "changed"; added?: number; removed?: number };
+  file?: { paths: string[]; touch: "written" | "changed"; added?: number; removed?: number; perFile?: Record<string, { added: number; removed: number }> };
   /** Drimvox sent the work back (its checks, the code or design review): said in plain sight, not folded away. */
   note?: true;
 }
@@ -392,12 +392,14 @@ function filesHere(actions: AnswerAction[]): { path: string; touch: "written" | 
     const one = a.file.paths.length === 1;
     for (const path of a.file.paths) {
       const had = found.get(path);
-      const counted = one && a.file.added !== undefined;
+      // One call that changed several files knows each file's lines.
+      const own = a.file.perFile?.[path] ?? (one && a.file.added !== undefined ? { added: a.file.added, removed: a.file.removed ?? 0 } : null);
+      const counted = !!own;
       found.set(path, {
         path,
         touch: had?.touch === "written" ? "written" : a.file.touch,
-        added: (had?.added ?? 0) + (counted ? a.file.added! : 0),
-        removed: (had?.removed ?? 0) + (counted ? (a.file.removed ?? 0) : 0),
+        added: (had?.added ?? 0) + (own?.added ?? 0),
+        removed: (had?.removed ?? 0) + (own?.removed ?? 0),
         counted: (had?.counted ?? false) || counted,
       });
     }

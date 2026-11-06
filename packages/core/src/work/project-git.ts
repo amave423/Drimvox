@@ -5,7 +5,6 @@ import type { GitHub } from "../github/github";
 
 /** Files that never go into the agent's commits: keys and passwords stay out of git (and so out of GitHub). */
 const SECRETS = [".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*", "id_ed25519*", "*.keystore"];
-const identity = ["-c", "user.name=Drimvox", "-c", "user.email=drimvox@localhost"];
 
 interface Kept {
   /** The agent's branch and the one it came from. */
@@ -26,7 +25,19 @@ export class ProjectGit {
   constructor(
     private readonly db: Database,
     private readonly github: GitHub,
+    /** The project's name, for its branch. */
+    private readonly nameOf: (projectId: string) => string | null = () => null,
   ) {}
+
+  /**
+   * Who the commits are made as (asked for: everything on GitHub in the user's name, not the app's): the GitHub account
+   * Drimvox is signed in to, else the user's own git name; the computer's user name only when git has none.
+   */
+  private async identity(folder: string): Promise<string[]> {
+    const login = this.github.status().user;
+    if (login) return ["-c", `user.name=${login}`, "-c", `user.email=${login}@users.noreply.github.com`];
+    return (await runGit(folder, ["var", "GIT_AUTHOR_IDENT"], true)).code === 0 ? [] : ["-c", "user.name=Drimvox user", "-c", "user.email=user@localhost"];
+  }
 
   rules(projectId: string): ProjectGitRules {
     const row = this.db.sql.prepare("select value from settings where key = ?").get(rulesKey(projectId)) as { value: string } | undefined;
@@ -70,7 +81,8 @@ export class ProjectGit {
       if (main && here !== main) await runGit(folder, ["switch", main], true);
       return;
     }
-    const branch = rules.target === "work-branch" ? "drimvox/work" : `drimvox/task-${stamp()}`;
+    const branch =
+      rules.target === "project-branch" ? `drimvox/${slug(this.nameOf(projectId) ?? "") || "work"}` : rules.target === "work-branch" ? "drimvox/work" : `drimvox/task-${stamp()}`;
     const exists = (await runGit(folder, ["rev-parse", "--verify", "-q", `refs/heads/${branch}`], true)).code === 0;
     const switched = await runGit(folder, exists ? ["switch", branch] : ["switch", "-c", branch], true);
     if (switched.code === 0) this.keep(projectId, { branch, base: kept?.branch === branch ? kept.base : here, pullRequest: null });
@@ -85,7 +97,7 @@ export class ProjectGit {
     if (add.code !== 0) return false;
     if ((await runGit(folder, ["diff", "--cached", "--quiet"], true)).code === 0) return false;
     const text = message.trim().split("\n")[0]!.slice(0, 200) || "Work by Drimvox";
-    return (await runGit(folder, [...identity, "commit", "-q", "--no-verify", "-m", text], true)).code === 0;
+    return (await runGit(folder, [...(await this.identity(folder)), "commit", "-q", "--no-verify", "-m", text], true)).code === 0;
   }
 
   /** After the agent's work: its branch to GitHub, and the pull request, as the rules say. */
@@ -108,12 +120,16 @@ export class ProjectGit {
     const branch = await currentBranch(folder);
     const kept = this.kept(projectId);
     const mine = kept && kept.branch === branch ? kept : null;
+    const github = await this.github.ready(folder).catch(() => false);
+    const login = this.github.status().user;
     return {
       branch,
       base: mine?.base ?? null,
       ahead: mine ? await ahead(folder, mine.base) : 0,
-      github: await this.github.ready(folder).catch(() => false),
+      github,
       pullRequest: mine?.pullRequest ?? null,
+      unsent: github && branch ? await unsent(folder, branch) : 0,
+      author: login ?? ((await runGit(folder, ["config", "user.name"], true)).stdout.trim() || null),
     };
   }
 
@@ -123,7 +139,7 @@ export class ProjectGit {
     if (!kept) return false;
     await this.commit(projectId, folder, "Work by Drimvox");
     if ((await runGit(folder, ["switch", kept.base], true)).code !== 0) return false;
-    const merged = await runGit(folder, [...identity, "merge", "--no-ff", "--no-edit", kept.branch], true);
+    const merged = await runGit(folder, [...(await this.identity(folder)), "merge", "--no-ff", "--no-edit", kept.branch], true);
     if (merged.code !== 0) {
       await runGit(folder, ["merge", "--abort"], true);
       await runGit(folder, ["switch", kept.branch], true);
@@ -182,6 +198,25 @@ async function mainBranch(folder: string): Promise<string | null> {
 async function ahead(folder: string, base: string): Promise<number> {
   const res = await runGit(folder, ["rev-list", "--count", `${base}..HEAD`], true);
   return res.code === 0 ? Number(res.stdout.trim()) || 0 : 0;
+}
+
+/** Commits of `branch` that its copy on GitHub has not; all of them when it was never sent. */
+async function unsent(folder: string, branch: string): Promise<number> {
+  const remote = await runGit(folder, ["rev-list", "--count", `origin/${branch}..HEAD`], true);
+  if (remote.code === 0) return Number(remote.stdout.trim()) || 0;
+  const all = await runGit(folder, ["rev-list", "--count", "HEAD"], true);
+  return all.code === 0 ? Number(all.stdout.trim()) || 0 : 0;
+}
+
+/** A branch name of a project's name: lower case, words joined by "-", letters of any script kept (drimvox/сайт-погоды). */
+export function slug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/, "");
 }
 
 /** A branch name's date part: month, day, hours and minutes. */

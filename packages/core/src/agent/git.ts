@@ -86,7 +86,8 @@ export async function ensureIdentity(dir: string): Promise<void> {
  * in git, this repository alone gets the computer's user name: the user need not know about git to start.
  */
 export async function initWithCommit(dir: string): Promise<void> {
-  await runGit(dir, ["init", "-q"]);
+  // "main", whatever git's own default (seen: a project got a "master" beside the agent's branch).
+  await runGit(dir, ["init", "-q", "-b", "main"]);
   if ((await runGit(dir, ["var", "GIT_AUTHOR_IDENT"], true)).code !== 0) {
     const name = userInfo().username || "Drimvox user";
     await runGit(dir, ["config", "user.name", name]);

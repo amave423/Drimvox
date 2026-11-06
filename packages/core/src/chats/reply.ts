@@ -22,7 +22,7 @@ import { findModel } from "../providers/catalog";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";
 import { usdRub } from "../rates";
 import { describeError } from "../providers/errors";
-import { nowLine } from "../now";
+import { hourLine } from "../now";
 import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
 import type { ChatRepo } from "./repo";
@@ -184,7 +184,7 @@ export async function reply(i: ReplyInput): Promise<void> {
       const result = streamText({
         model: languageModel(i.conn, i.model),
         system: [
-          nowLine(),
+          hourLine(),
           LANGUAGE_HINT,
           FORMAT_HINT,
           // With the internet the rule comes in WEB_HINT; the user's own tools (a browser server) need it too.

@@ -88,9 +88,9 @@ export function GithubPublish({ project }: { project: ProjectView }) {
 
   return (
     <section className="github" aria-labelledby="github-h">
-      <h2 className="sheet-h" id="github-h">
+      <h3 className="margin-h" id="github-h">
         {t("github.title")}
-      </h2>
+      </h3>
 
       {!status.user && !status.pending && (
         <>
@@ -141,30 +141,7 @@ export function GithubPublish({ project }: { project: ProjectView }) {
                   <span className="mono">{repo.remote}</span>
                 )}
               </p>
-              {done === "pushed" && <p className="is-ok">{t("github.pushed")}</p>}
-              {errorText}
-              {confirm ? (
-                <div className="actions">
-                  <span>{t("github.pushConfirm")}</span>
-                  <button className="btn is-primary" disabled={busy} onClick={() => void run("push")}>
-                    {busy ? t("github.working") : t("github.pushYes")}
-                  </button>
-                  <button className="btn" onClick={() => setConfirm(false)}>
-                    {t("providers.cancel")}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setDone(null);
-                    setConfirm(true);
-                  }}
-                >
-                  {t("github.push")}
-                </button>
-              )}
-              <p className="muted">{t("github.onlyCommits")}</p>
+              {/* The agent's branch goes to GitHub by itself after each answer: no button to push by hand (asked for). */}
             </>
           ) : (
             <>
