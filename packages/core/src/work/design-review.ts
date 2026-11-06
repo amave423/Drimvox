@@ -1,5 +1,5 @@
 import type { DesignBrief, ProjectPlan } from "@drimvox/shared";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DESKTOP, MAX_REVIEW_PAGES, PHONE } from "../agent/design-check";
 import { parseReview, reviewQuestion } from "../agent/design";
@@ -94,6 +94,37 @@ async function answers(url: string): Promise<boolean> {
 }
 
 /** The agent's round of polish after the review: then it looks again and calls finish_work. */
+/** Asked for motion: animation, live, moving, in the user's words. */
+const ASKS_MOTION = /анимац|анимир|оживл|движени|animat|motion|lively/i;
+/** Motion in the code: keyframes, animations and transitions, scripted animation. */
+const MOTION = /@keyframes|animation(?:-name)?\s*:|transition\s*:|\.animate\(|requestAnimationFrame|IntersectionObserver/g;
+
+/**
+ * The motion asked for, where screenshots cannot see it: the plan or the task asked for animation and the pages' styles
+ * and scripts have next to none (seen live: "beautiful and animated" came out still). Null when it is there or not asked.
+ */
+export function missingMotion(folder: string, asked: string): string | null {
+  if (!ASKS_MOTION.test(asked)) return null;
+  let found = 0;
+  const walk = (dir: string, depth: number) => {
+    if (depth > 4) return;
+    for (const name of readdirSync(dir)) {
+      if (name.startsWith(".") || name === "node_modules" || name === "dist") continue;
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path, depth + 1);
+      else if (/\.(css|scss|js|mjs|ts|tsx|jsx|vue|svelte|html)$/i.test(name) && statSync(path).size < 2_000_000) found += readFileSync(path, "utf8").match(MOTION)?.length ?? 0;
+    }
+  };
+  try {
+    walk(folder, 0);
+  } catch {
+    return null;
+  }
+  return found >= 4
+    ? null
+    : "Motion was asked for, and the pages have next to none (no keyframes or transitions worth the name). Add the motion the brief describes: an entrance for the main content, transitions on state changes (a new city, loading, hover and focus), motion that fits the subject (weather, data) — with prefers-reduced-motion respected.";
+}
+
 export function polishWorkMessage(issues: string[]): string {
   return [
     "Drimvox's design review looked at the result on a desktop (1280 px) and a phone (390 px) against the design brief and asks for one round of polish before the work is done:",

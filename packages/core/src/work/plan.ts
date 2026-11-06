@@ -104,6 +104,10 @@ export function savePlan(ctx: PassContext, id: string, row: TaskRow, plan: Proje
     if (messages.some((m) => m.role === "user" && m.content === PLAN_REMINDER)) return finish(ctx, "failed", empty ? "empty_answer" : "no_spec");
     return PLAN_REMINDER;
   }
+  // The skills the plan was made with go to the work (seen live: Claude opened the design skill for the plan, and the
+  // free model that built the page never did; the page came out plain).
+  const opened = [...new Set(messages.flatMap((m) => (m.role === "assistant" && Array.isArray(m.content) ? m.content : [])).flatMap((p) => (p.type === "tool-call" && p.toolName === "use_skill" ? [String((p.input as { name?: unknown }).name ?? "")] : [])).filter(Boolean))];
+  if (opened.length) plan = { ...plan, skills: opened };
   ctx.backlog.setPlan(row.project_id, plan);
   ctx.work.update(row.project_id, { status: "ready", checklist: (plan.steps ?? []).map((text) => ({ text, done: false })) });
   ctx.event("project_plan", plan);

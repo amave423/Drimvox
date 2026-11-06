@@ -158,7 +158,9 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   const plan = page.getByRole("region", { name: "Итоговый план" });
   await expect(plan).toContainText("Сайт клиники с онлайн-записью.", { timeout: 30_000 });
   await expect(plan.getByRole("listitem")).toHaveText(["Онлайн-запись", "Проверить страницу"]);
-  await expect(plan.getByLabel("Время, часов")).toHaveValue("2");
+  // In the conversation, as in the agreed design: the plan is a card on the timeline, the box below corrects it.
+  await expect(page.locator(".timeline .planning-card.is-plan")).toBeVisible();
+  await expect(page.getByPlaceholder("Что поправить в плане")).toBeVisible();
   await plan.getByRole("button", { name: "Начать работу" }).click();
 
   // The workshop: the run's timeline with the plan as its first message, the state in the top bar, the checklist in
@@ -241,6 +243,46 @@ test("a project: the interview, the plan with Go, the agent works alone with its
 });
 
 // Asked for: a project is talked to like a chat (no interview, no plan to approve unless asked) with the agent's plan on
+// The agreed design (variant A, asked for: the questions and the plan opened as pages of their own): the questions as a
+// card of choices in the conversation, the answers as the user's message, the plan as a card below them.
+test("the interview's questions and the plan are cards in the project's conversation", async () => {
+  const page = await launch([
+    call("ask_questions", {
+      questions: [
+        { id: "city", question: "Какой город показывать сразу?", options: [{ label: "Мой по геолокации" }, { label: "Москва" }], recommended: 0 },
+        { id: "style", question: "Стиль", options: [{ label: "Тёмный, как приборы" }, { label: "Меняется с погодой" }], recommended: 1 },
+      ],
+      understood: "Сайт погоды",
+      unknown: [],
+    }),
+    // The answers start the next round: nothing more to ask, then the plan.
+    call("ask_questions", { questions: [], understood: "Сайт погоды", unknown: [] }),
+    call("write_plan", { summary: "Сайт погоды с живыми данными.", steps: ["Каркас и данные", "Анимированные сцены"], checks: [], pages: [] }),
+  ]);
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await addProject(page);
+  await pickCoder(page);
+  await askFirst(page, { interview: true, plan: true });
+  await page.keyboard.press("Escape");
+  await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт погоды");
+  await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
+  const questions = page.locator(".timeline").getByRole("region", { name: "Вопросы" });
+  await expect(questions).toContainText("Какой город показывать сразу?", { timeout: 30_000 });
+  // The recommended answers are picked already; another is a click.
+  await expect(questions.getByRole("radio", { name: "Меняется с погодой" })).toHaveAttribute("aria-checked", "true");
+  await questions.getByRole("radio", { name: "Москва" }).click();
+  await expect(page.locator(".timeline .msg-user").first()).toHaveText("Сайт погоды");
+  await questions.getByRole("button", { name: "Ответить" }).click();
+  await expect(page.locator(".timeline .msg-user", { hasText: "Москва · Меняется с погодой" })).toBeVisible({ timeout: 30_000 });
+  const plan = page.locator(".timeline").getByRole("region", { name: "Итоговый план" });
+  await expect(plan).toContainText("Сайт погоды с живыми данными.", { timeout: 30_000 });
+  await expect(plan.getByRole("listitem")).toHaveText(["Каркас и данные", "Анимированные сцены"]);
+  await expect(plan.getByRole("button", { name: "Начать работу" })).toBeVisible();
+  // "Correct the plan" goes to the box below, which now corrects it.
+  await plan.getByRole("button", { name: "Поправить план" }).click();
+  await expect(page.getByPlaceholder("Что поправить в плане")).toBeFocused();
+});
+
 // the left; the project comes first on the right, and removing it is at hand in the sidebar's "⋯".
 test("a project without the interview: talked to as in a chat, its plan on the left, removed from the sidebar", async () => {
   const page = await launch([

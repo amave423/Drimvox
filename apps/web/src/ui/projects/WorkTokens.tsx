@@ -44,7 +44,8 @@ export function WorkTokens({ work, onFresh }: { work: ProjectWorkView; /** A rea
         <dt>{t("workTokens.spent")}</dt>
         <dd className="mono">{formatUsd(work.spentUsd)}</dd>
       </dl>
-      <p className="muted work-tokens-note">{t("workTokens.note")}</p>
+      {/* The note explains the bar: none without the model's window (seen: it spoke of a bar that was not there). */}
+      {size && <p className="muted work-tokens-note">{t("workTokens.note")}</p>}
       {onFresh && work.status !== "running" && (
         <div className="work-tokens-fresh">
           {/* Said in a video on agents: a request late in a long conversation costs several times one at its start. */}

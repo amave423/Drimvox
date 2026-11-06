@@ -35,6 +35,9 @@ const OWN_LINES = [
   "look_at_image",
   "design_review",
   "code_review",
+  ...["look", "pdf", "upload", "audit", "console", "emulate", "eval", "hover", "network", "performance", "wait"].map((b) => `browser_${b}`),
+  "report_review",
+  "report_acceptance",
 ];
 
 /** One line of what the model did: "Reads app.js", "Searches the web: …". */

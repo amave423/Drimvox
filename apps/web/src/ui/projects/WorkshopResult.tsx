@@ -39,7 +39,7 @@ export function WorkshopResult(p: { project: ProjectView; work: ProjectWorkView 
         {part === "project" && (
           <>
             {work && <WorkTokens work={work} onFresh={() => void fresh()} />}
-            <ProjectPart project={p.project} busy={work?.status === "running"} />
+            <ProjectPart project={p.project} busy={work?.status === "running"} planTaskId={work?.planTaskId ?? null} />
           </>
         )}
       </div>
@@ -63,9 +63,10 @@ function ResultPart({ work, onChanged }: { work: ProjectWorkView; onChanged(): v
  * The project itself: its folder, tasks, skills, GitHub, and leaving Drimvox. No kind any more (asked for: one
  * conversation for every project, the interview and the plan picked in the box).
  */
-function ProjectPart({ project, busy }: { project: ProjectView; busy: boolean }) {
+function ProjectPart({ project, busy, planTaskId }: { project: ProjectView; busy: boolean; planTaskId: string | null }) {
   const { t, tasks, navigate } = useApp();
-  const own = tasks.filter((task) => task.projectId === project.id);
+  // The interview's own task is the conversation's, not one of the project's tasks.
+  const own = tasks.filter((task) => task.projectId === project.id && task.id !== planTaskId);
   return (
     <div className="workshop-project">
       <p className="mono muted">{project.path}</p>

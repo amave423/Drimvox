@@ -96,7 +96,8 @@ export async function askAboutPictures(vision: Vision, pictures: Picture[], prom
  */
 export async function resolveVision(
   setting: { providerId: string; model: string } | null,
-  providers: { connection(id: string): Connection | null },
+  /** With `list`, the other connected providers are looked through when the task's own has no model that sees. */
+  providers: { connection(id: string): Connection | null; list?(): { id: string }[] },
   task: { providerId: string | null; model: string },
   find: (conn: Connection, model: string) => Promise<ModelInfo | undefined>,
   /** The provider's models, to find one that sees when the task's own does not. */
@@ -112,9 +113,36 @@ export async function resolveVision(
   if (info?.vision) return { conn, model: task.model, price: info };
   // Seen live: DeepSeek V4 Pro built a whole service and nobody looked at its pages, while DeepSeek Flash on the same key
   // sees pictures. The cheapest model of the same provider that sees and can be asked in text looks instead.
+  const own = await cheapestSeeing(conn, list, task.model);
+  if (own) return own;
+  // Then any other provider's (seen live: a chain of free models has no models of its own, and no page of a project
+  // worked by one was ever looked at): a free one first, then the cheapest.
+  for (const other of providers.list?.() ?? []) {
+    const c = other.id === conn.id ? null : providers.connection(other.id);
+    if (!c || c.chain || NOT_VISION.has(c.preset)) continue;
+    const found = await cheapestSeeing(c, list, task.model);
+    if (found && free(found.price)) return found;
+  }
+  let best: Vision | null = null;
+  for (const other of providers.list?.() ?? []) {
+    const c = other.id === conn.id ? null : providers.connection(other.id);
+    if (!c || c.chain || NOT_VISION.has(c.preset)) continue;
+    const found = await cheapestSeeing(c, list, task.model);
+    if (found && (!best || price(found.price) < price(best.price))) best = found;
+  }
+  return best;
+}
+
+/** Providers that never answer about a picture: command-line agents and engines of pictures, speech and local models. */
+const NOT_VISION = new Set(["claude-code", "codex", "gemini-cli", "antigravity", "sdcpp", "whispercpp", "ollama", "lmstudio"]);
+const price = (m: ModelInfo | undefined) => m?.priceIn ?? Number.POSITIVE_INFINITY;
+const free = (m: ModelInfo | undefined) => !!m && (m.freeTier === true || (m.priceIn === 0 && m.priceOut === 0));
+
+/** A provider's cheapest model that sees and can be asked in text, never a picture maker; null when none. */
+async function cheapestSeeing(conn: Connection, list: ((c: Connection) => Promise<ModelInfo[]>) | undefined, not: string): Promise<Vision | null> {
   const models = list ? await list(conn).catch(() => []) : [];
   const seeing = models
-    .filter((m) => m.vision === true && m.id !== task.model && !/image|video|tts|whisper|embed/i.test(m.id))
-    .sort((a, b) => (a.priceIn ?? Number.POSITIVE_INFINITY) - (b.priceIn ?? Number.POSITIVE_INFINITY))[0];
+    .filter((m) => m.vision === true && m.id !== not && m.available !== "gone" && !/image|video|tts|whisper|embed/i.test(m.id))
+    .sort((a, b) => price(a) - price(b))[0];
   return seeing ? { conn, model: seeing.id, price: seeing } : null;
 }

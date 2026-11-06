@@ -91,3 +91,24 @@ describe("thinking on a local model", () => {
     expect(sent.at(-1).reasoning_effort).toBe("none");
   });
 });
+
+// Seen live: a chain went from DeepSeek to another provider mid-project and every request failed on the history's
+// reasoning ("'messages.2': property 'reasoning_content' is unsupported").
+describe("history reasoning a provider refuses", () => {
+  it("asks again without the earlier answers' reasoning", async () => {
+    const { withoutHistoryReasoning } = await import("../src/providers/model");
+    const sent: any[] = [];
+    const stub = (async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      sent.push(body);
+      return body.messages.some((m: any) => "reasoning_content" in m)
+        ? new Response(JSON.stringify({ error: { message: "'messages.2' : property 'reasoning_content' is unsupported" } }), { status: 400 })
+        : new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    const body = { messages: [{ role: "user", content: "a" }, { role: "assistant", content: "b", reasoning_content: "thought" }] };
+    const res = await withoutHistoryReasoning(stub)("http://x/v1/chat/completions", { method: "POST", body: JSON.stringify(body) });
+    expect(res.status).toBe(200);
+    expect(sent).toHaveLength(2);
+    expect(sent[1].messages[1]).toEqual({ role: "assistant", content: "b" });
+  });
+});

@@ -248,3 +248,35 @@
 .processes-command { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .processes-time, .processes-note { font-size: 12px; }
 .processes-note { margin: 0; line-height: 1.45; }
+
+/* The interview and the plan in the project's conversation (PlanningFeed.tsx, the agreed variant A): cards on the
+   timeline, answers as choices, the box below. */
+.planning-feed { flex: 1; }
+.planning-say > .md > :first-child { margin-top: 0; }
+.planning-say > .md > :last-child { margin-bottom: 0; }
+.planning-turn { display: grid; gap: 10px; }
+.planning-turn > p { margin: 0; }
+.planning-card { display: grid; gap: 10px; padding: 16px 20px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.planning-card h3 { margin: 0; font: 600 20px/1.2 var(--font-serif); }
+.planning-sub { margin: 0; color: var(--muted); font-size: 14px; }
+.planning-card.is-past { background: transparent; }
+.planning-card.is-past ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+.planning-question { border: 0; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.planning-question legend { padding: 0; margin-bottom: 8px; font-weight: 500; }
+.planning-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.planning-chip { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--sheet); color: var(--fg); font-size: 14px; }
+.planning-chip:hover { border-color: var(--muted); }
+.planning-chip.is-on { border-color: var(--ink); background: var(--ink-soft); color: var(--ink); }
+.planning-why { color: var(--muted); font-size: 12.5px; }
+.planning-question .field-input { max-width: 520px; }
+.planning-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.planning-steps { margin: 2px 0 0; padding-left: 22px; display: grid; gap: 4px; }
+.planning-more summary { cursor: pointer; color: var(--muted); font-size: 13.5px; }
+.planning-more[open] summary { margin-bottom: 8px; }
+.planning-limits { margin: 0; font-size: 12.5px; }
+.planning-box { position: sticky; bottom: 0; z-index: 4; }
+.planning-box .composer { position: static; }
+@media (prefers-reduced-motion: no-preference) {
+  .planning-card:not(.is-past) { animation: planning-in 0.24s ease; }
+}
+@keyframes planning-in { from { opacity: 0; transform: translateY(6px); } }

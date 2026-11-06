@@ -48,6 +48,11 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
     return last && (last.providerId === CHAIN_PROVIDER_ID || providers.some((p) => p.id === last.providerId)) ? last : null;
   });
   const [failed, setFailed] = useState<string | null>(null);
+  // The work's own model, once the work has loaded (seen: the box opened before it and said "Pick a model" after a run).
+  const workModel = work?.models?.work;
+  useEffect(() => {
+    if (workModel) setChoice((c) => c ?? { providerId: workModel.providerId, model: workModel.model });
+  }, [workModel?.providerId, workModel?.model]);
   useEffect(() => {
     try {
       localStorage.setItem(prefsKey(projectId), JSON.stringify(prefs));
@@ -57,9 +62,18 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
   }, [projectId, prefs]);
   const set = (patch: Partial<BoxPrefs>) => setPrefs((p) => ({ ...p, ...patch }));
   const running = work?.status === "running";
+  // The plan waits for "Start work": what is written now corrects it. While the questions or the plan are being made,
+  // the box waits (the questions are answered in their card).
+  const planReady = work?.status === "ready" && !!work.plan;
+  const preparing = work?.status === "planning";
 
   async function send(content: string) {
     setFailed(null);
+    if (planReady) {
+      const res = await api.projects[":id"].work.revise.$post({ param: { id: projectId }, json: { note: content } }).catch(() => null);
+      if (!res?.ok) setFailed("unknown");
+      return onSent();
+    }
     // While it works the message goes into the run on the way, as in a chat.
     if (running) {
       const res = await api.projects[":id"].work.message.$post({ param: { id: projectId }, json: { content, thinking: prefs.thinking } }).catch(() => null);
@@ -122,7 +136,7 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
     <>
       {failed && <p className="error-note">{t(failed === "unknown" ? "chat.sendFailed" : (`projectWork.error.${failed}` as MessageKey))}</p>}
       <Composer
-        disabled={!running && !choice}
+        disabled={preparing || (!running && !planReady && !choice)}
         streaming={false}
         onSend={(text) => void send(text)}
         onStop={() => {}}
@@ -169,7 +183,7 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
             { label: t("thinking.label"), control: <ThinkingSwitch value={prefs.thinking} onChange={(thinking) => set({ thinking })} /> },
           ],
         }}
-        placeholder={t(running ? "chat.workPlaceholder" : "chat.readyPlaceholder")}
+        placeholder={t(running ? "chat.workPlaceholder" : planReady ? "planning.fixPlaceholder" : preparing ? "planning.waitPlaceholder" : "chat.readyPlaceholder")}
       />
     </>
   );

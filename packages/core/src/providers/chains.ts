@@ -127,10 +127,17 @@ export class Chains {
 
   /** The chains as models of the "chain" provider: free, and calling tools when the chain is made of such models. */
   async models(): Promise<ModelInfo[]> {
+    // The smallest window of its models (seen live: a project on a chain showed no context bar at all); any of them may
+    // answer the next step, so the smallest is what the conversation must fit.
+    const windows = new Map((await this.freeModels()).map((f) => [keyOf(f), f.contextLength ?? null]));
+    const windowOf = (c: ModelChain) => {
+      const known = c.models.map((m) => windows.get(keyOf(m))).filter((n): n is number => typeof n === "number" && n > 0);
+      return known.length ? Math.min(...known) : null;
+    };
     return (await this.views()).map((c) => ({
       id: c.id,
       name: c.name,
-      contextLength: null,
+      contextLength: windowOf(c),
       priceIn: 0,
       priceOut: 0,
       priceEstimated: false,
@@ -254,12 +261,22 @@ function classify(err: unknown, chain: ModelChain): Pass | null {
   const headers = APICallError.isInstance(err) ? (err.responseHeaders ?? {}) : {};
   if (status === 429 || status === 402) {
     if (!chain.onLimit) return null;
+    // A day's limit rests until the day starts over, not a quarter of an hour (seen live: "Free tier daily limit
+    // reached (450,000 tokens/day). Resets 00:00 UTC", asked again and again through the evening).
+    const said = APICallError.isInstance(err) ? `${err.message} ${err.responseBody ?? ""}` : "";
+    if (/daily|per day|\/day\b/i.test(said)) return new Pass("limit", nextUtcMidnight(), err);
     return new Pass("limit", Date.now() + resetIn(headers), err);
   }
   // Any other refusal before the first word goes on to the next model too: a free model closed to this account (seen
   // with OpenRouter: 400, 403, 404), a model that takes no tools, a provider down. The next one may answer.
   if (!chain.onError) return null;
   return new Pass("error", Date.now() + (status === 400 || status === 403 || status === 404 ? GONE_MS : REST_MS), err);
+}
+
+/** The next 00:00 UTC, when daily limits start over. */
+function nextUtcMidnight(now = Date.now()): number {
+  const d = new Date(now);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 }
 
 /** When a limit resets, as the provider says it (Retry-After, x-ratelimit-reset…), within a day. */

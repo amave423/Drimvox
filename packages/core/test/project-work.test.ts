@@ -95,6 +95,47 @@ describe("work on a project", () => {
     expect(task).toMatchObject({ kind: "plan", status: "waiting", statusReason: "plan_ready" });
   });
 
+  // Seen live: Claude Opus wrote "уточню ключевые моменты" without a question mark and without ask_questions, and the
+  // interview the user had asked for was skipped for the plan.
+  it("asks an interviewer that wrote no questions at all to hold the interview", async () => {
+    const asked = call("ask_questions", {
+      questions: [{ id: "city", question: "Какой город сразу?", options: [{ label: "Москва" }, { label: "По геолокации" }], recommended: 1 }],
+      understood: "Сайт погоды",
+      unknown: [],
+    });
+    const s = await setup({ asker: [{ text: "Прежде чем начать, уточню ключевые моменты." }, asked], planner: [writePlan] });
+    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
+      task: "Сайт погоды",
+      models: { interview: s.ref("asker"), plan: s.ref("planner"), work: s.ref("coder"), strong: null },
+    });
+    const work = await until(s.project.id, (w) => w.status === "planning" && !!w.planTaskId);
+    let task: any;
+    for (let i = 0; i < 100; i++) {
+      task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
+      if (task.status === "waiting") break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(task).toMatchObject({ status: "waiting", statusReason: "questions" });
+    expect(task.questions.map((q: any) => q.question)).toEqual(["Какой город сразу?"]);
+    expect(JSON.stringify(requestsOf("asker").at(-1)!.body.messages)).toContain("You have not asked anything yet");
+    expect(requestsOf("planner")).toHaveLength(0);
+  });
+
+  // Seen live: Claude opened the design skill for the plan, and the free model that built the page never did.
+  it("gives the work the skills the plan was made with, whole", async () => {
+    mkdirSync(join(folder, ".drimvox", "skills", "frontend-design"), { recursive: true });
+    writeFileSync(
+      join(folder, ".drimvox", "skills", "frontend-design", "SKILL.md"),
+      ["---", "name: frontend-design", "description: Distinctive interfaces", "---", "Never the template look: one bold idea.", ""].join("\n"),
+    );
+    const s = await setup({ asker: [noQuestions], planner: [call("use_skill", { name: "frontend-design" }), writePlan] });
+    const work = await planned(s, { interview: "asker", plan: "planner" });
+    expect(work.plan.skills).toEqual(["frontend-design"]);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status !== "running" && !!w.startedAt);
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("Never the template look: one bold idea.");
+  });
+
   // Asked for: a small fix in an existing project should not start with a big interview.
   it("writes the plan at once with the plan's model for a small task, without an interview", async () => {
     const s = await setup({ asker: [noQuestions], planner: [writePlan] });
@@ -555,6 +596,8 @@ describe("work on a project", () => {
     writeFileSync(join(folder, ".drimvox", "skills", "owasp", "SKILL.md"), ["---", "name: owasp", "description: Security review checklist", "---", "Check every real-time channel.", ""].join("\n"));
     const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
     const finishing = call("finish_work", { report: "Готово." });
+    // A server: there is something to attack (a static page alone gets no review, below).
+    writeFileSync(join(folder, "server.js"), "const http = require('http');\n");
     const issue = { severity: "high", where: "src/ws.ts", problem: "Anyone can subscribe to any board", fix: "Check team membership on connect" };
     const s = await setup({
       // Finishing: first the skill not opened yet, then the review's problems, then done.
@@ -573,6 +616,16 @@ describe("work on a project", () => {
     expect(sent).toContain("Anyone can subscribe to any board");
     // Low ones are not worth a round of fixes.
     expect(sent).not.toContain("Naming");
+  });
+
+  // Asked for: a plain HTML page was reviewed for security; it has no server, no accounts and no one's data.
+  it("gives a static page no security review", async () => {
+    const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
+    const s = await setup({ coder: [noQuestions, writePlan, call("write_file", { path: "app.js", content: "document.title = 'Погода';\n" }), done, call("finish_work", { report: "Готово." })] });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status === "done");
+    expect(fake!.requests.filter((r) => r.path === "/v1/chat/completions" && isReviewer(r.body))).toHaveLength(0);
   });
 
   it("is done by Claude Code itself in the project's folder when the working model is on a subscription", async () => {

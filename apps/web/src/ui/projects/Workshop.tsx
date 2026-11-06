@@ -10,6 +10,7 @@ import { PaneSplit, usePaneWidth } from "../PaneSplit";
 import { useProjectWork } from "./useProjectWork";
 import { WorkshopResult } from "./WorkshopResult";
 import { ProjectComposer } from "./ProjectComposer";
+import { PlanningFeed } from "./PlanningFeed";
 
 export const LAST_PROJECT_KEY = "drimvox.lastProject";
 
@@ -68,8 +69,10 @@ export function Workshop({ projectId }: { projectId: string }) {
           {stage === "git" && <GitNotice project={project} />}
           {stage === "loading" && <p className="muted workshop-pad">{t("model.loading")}</p>}
           {stage === "talk" && <ReadyStart projectId={project.id} work={work} onStarted={() => void reload()} />}
-          {stage === "interview" && work?.planTaskId && <TaskSheet key={work.planTaskId} taskId={work.planTaskId} embedded />}
-          {stage === "plan" && work && (
+          {/* The interview and the plan in the conversation, as in the agreed design (variant A); a plan without its
+              interview's task (made before) keeps its own card. */}
+          {(stage === "interview" || stage === "plan") && work?.planTaskId && <PlanningFeed key={work.planTaskId} work={work} onChanged={() => void reload()} />}
+          {stage === "plan" && work && !work.planTaskId && (
             <div className="workshop-pad workshop-scroll">
               <PlanCard key={work.plan?.context} work={work} onChanged={() => void reload()} />
             </div>

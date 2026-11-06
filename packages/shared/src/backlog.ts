@@ -51,6 +51,8 @@ export interface ProjectPlan {
   screens?: { name: string; contents: string }[];
   /** The technical decisions and why: the stack, where data lives, outside services. */
   decisions?: { what: string; why: string }[];
+  /** The skills the plan's model opened: the work starts with them in hand (asked for: they reached only the plan). */
+  skills?: string[];
 }
 
 /** A task as the old interview listed it. */

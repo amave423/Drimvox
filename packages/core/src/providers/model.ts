@@ -23,7 +23,7 @@ export function languageModel(conn: Connection, modelId: string): LanguageModel 
     baseURL: conn.baseUrl,
     apiKey,
     includeUsage: true,
-    fetch: conn.preset === "ollama" || conn.preset === "lmstudio" ? withoutEffort(fetch ?? globalThis.fetch) : fetch,
+    fetch: withoutHistoryReasoning(conn.preset === "ollama" || conn.preset === "lmstudio" ? withoutEffort(fetch ?? globalThis.fetch) : (fetch ?? globalThis.fetch)),
     headers: conn.preset === "openrouter" ? { "X-Title": "Drimvox" } : undefined,
     metadataExtractor: billed,
   });
@@ -43,6 +43,23 @@ export function withoutEffort(fetchFn: typeof fetch): typeof fetch {
     if (!/reasoning|think/i.test(said)) return res;
     const body = JSON.parse(init.body) as Record<string, unknown>;
     delete body.reasoning_effort;
+    return fetchFn(input, { ...init, body: JSON.stringify(body) });
+  };
+}
+
+/**
+ * A request asked again without the earlier answers' reasoning when the provider refuses it. Seen live: a chain went
+ * from DeepSeek to another provider in the middle of a project, and every request failed with "'messages.2': property
+ * 'reasoning_content' is unsupported" (DeepSeek's thinking travels with the history; others do not take it).
+ */
+export function withoutHistoryReasoning(fetchFn: typeof fetch): typeof fetch {
+  return async (input, init) => {
+    const res = await fetchFn(input, init);
+    if (res.ok || typeof init?.body !== "string" || !init.body.includes('"reasoning_content"')) return res;
+    const said = await res.clone().text().catch(() => "");
+    if (!/reasoning_content/.test(said)) return res;
+    const body = JSON.parse(init.body) as { messages?: Record<string, unknown>[] };
+    for (const m of body.messages ?? []) delete m.reasoning_content;
     return fetchFn(input, { ...init, body: JSON.stringify(body) });
   };
 }

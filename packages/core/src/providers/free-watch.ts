@@ -20,6 +20,8 @@ export interface FreeModel {
   tools: boolean | null;
   /** The provider is paid by a flat fee, not by tokens: all its models are free to Drimvox. */
   flat: boolean;
+  /** Its context window, as the provider lists it; absent in lists kept before it was. */
+  contextLength?: number | null;
 }
 
 const keyOf = (m: ModelRef) => `${m.providerId}|${m.model}`;
@@ -86,7 +88,7 @@ export class FreeWatch {
             next.push(...kept.filter((m) => m.providerId === p.id));
             return;
           }
-          for (const m of models) if (isFree(m) && m.available !== "gone") next.push({ providerId: p.id, model: m.id, name: m.name, providerName: p.name, tools: m.tools, flat: conn.flat });
+          for (const m of models) if (isFree(m) && m.available !== "gone") next.push({ providerId: p.id, model: m.id, name: m.name, providerName: p.name, tools: m.tools, flat: conn.flat, contextLength: m.contextLength });
         }),
       );
       if (this.closed) return;

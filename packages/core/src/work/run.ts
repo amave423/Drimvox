@@ -1,6 +1,6 @@
 import type { ActivityEntry, ChecklistItem, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { McpAsk, McpHooks } from "../mcp/hub";
-import { reviewProjectCode, reviewWorkMessage } from "./code-review";
+import { isStaticSite, reviewProjectCode, reviewWorkMessage } from "./code-review";
 import { compactHistory } from "./compact";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
@@ -15,7 +15,7 @@ import type { WebAccess } from "../internet/web";
 import { nowLine } from "../now";
 import { findModel } from "../providers/catalog";
 import type { Connection, ProviderRepo } from "../providers/repo";
-import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
+import { findSkills, projectSkillRoots, skillsGiven, skillsInstructions, skillTools } from "../skills/skills";
 import { askAboutPictures, type Vision } from "../visual/look";
 import { VISUAL_HINT, visualTools, type VisualKit } from "../visual/tools";
 import { existingRules, nudgeMessage, projectRules } from "./prompt";
@@ -23,7 +23,7 @@ import type { ProjectGit } from "./project-git";
 import { changedSince, checkpoint, dropCheckpoint } from "../chats/checkpoint";
 import { writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
-import { polishWorkMessage, reviewProjectDesign } from "./design-review";
+import { missingMotion, polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
 import { projectMap } from "../agent/repo-map";
@@ -418,6 +418,8 @@ export class WorkRun {
         codeReview: async () => {
           if (this.codeReviewed || this.chatMode) return null;
           this.codeReviewed = true;
+          // A static page has nothing to attack: no server, no accounts, no one's data.
+          if (isStaticSite(this.folder)) return null;
           // The working model reviews, in a fresh conversation with only this to do (asked for: no expensive model for it).
           const row = this.row();
           const ref = row.models?.work ?? null;
@@ -451,8 +453,12 @@ export class WorkRun {
           ].join("\n");
         },
         review: async (start) => {
-          if (this.designReviewed || this.chatMode || !vision || !this.d.visualKit.screenshot) return null;
+          if (this.designReviewed || this.chatMode) return null;
           this.designReviewed = true;
+          // Motion asked for is checked in the code: screenshots cannot see it (seen live: "animated" came out still).
+          const asked = [plan?.context ?? "", this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? ""].join("\n");
+          const motion = missingMotion(this.folder, asked);
+          if (!vision || !this.d.visualKit.screenshot) return motion ? polishWorkMessage([motion]) : null;
           onCall("design_review", "");
           const issues = await reviewProjectDesign(
             {
@@ -470,7 +476,8 @@ export class WorkRun {
             },
             start,
           );
-          return issues ? polishWorkMessage(issues) : null;
+          const all = [...(issues ?? []), ...(motion ? [motion] : [])];
+          return all.length ? polishWorkMessage(all) : null;
         },
         onCall,
         ...(this.d.git && this.d.git.rules(this.projectId).commit !== "never"
@@ -513,6 +520,8 @@ export class WorkRun {
         VISUAL_HINT,
         WEB_HINT,
         skillsInstructions(skills),
+        // The skills the plan was made with, whole: the working model follows them without having to open them.
+        this.chatMode ? "" : skillsGiven(skills, plan?.skills ?? []),
         // A ready project's files and what each defines (as Aider's repo map): fewer steps spent finding the right file.
         this.chatMode ? await projectMap(this.folder).catch(() => "") : "",
       ]

@@ -118,6 +118,14 @@ export const QUESTIONS_UNREADABLE =
 export const QUESTIONS_AS_TEXT =
   "You wrote your questions as text: the user cannot answer them there. Call ask_questions with them (each with short options and the recommended one), or ask_questions with an empty list if there is nothing to ask.";
 
+/**
+ * An interviewer that ended its first turn without ask_questions at all is asked once to call it. Seen live: Claude
+ * Opus wrote "Прежде чем начать, уточню ключевые моменты" with no question mark and no call, and the interview the user
+ * asked for was skipped for the plan.
+ */
+export const ASK_NOW =
+  "You have not asked anything yet, and the user asked for an interview. Call ask_questions now: 3-4 questions about what matters for this task, each with short options and the recommended one. Call it with an empty list only if truly nothing is unclear.";
+
 export async function runPass(ctx: PassContext, id: string, userText: string, fromDrimvox = false): Promise<string | null> {
   const row = ctx.tasks.row(id)!;
   const phase = row.phase;
@@ -322,6 +330,8 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
     }
     // Questions written as text instead of ask_questions (seen live: they were lost and the plan came without them).
     if (!asked && said.includes("?") && !messages.some((m) => m.role === "user" && m.content === QUESTIONS_AS_TEXT)) return QUESTIONS_AS_TEXT;
+    // No call at all on the first round: the interview was asked for, so the model is asked once to hold it.
+    if (!asked && row.interview_round === 0 && !messages.some((m) => m.role === "user" && (m.content === ASK_NOW || m.content === QUESTIONS_AS_TEXT))) return ASK_NOW;
     if (row.kind === "plan") {
       enterPhase(ctx, id, "list");
       toPlanStep(ctx, id, row);

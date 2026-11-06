@@ -37,7 +37,7 @@ export function mediaKindByName(id: string): "image" | "video" | null {
 }
 
 /** Listed among chat models by every catalog, but they do not chat: safety classifiers and search rankers. */
-const notChat = /content-safety|guard|-guard-|rerank/i;
+const notChat = /content-safety|\bguard\b|-guard-|rerank/i;
 
 type Raw = Record<string, unknown>;
 

@@ -60,6 +60,24 @@ export function toSkillView(skill: Skill, projectDir?: string): SkillView {
 }
 
 /** What an agent is told: the skills there are, by name and description. */
+/**
+ * Skills given whole, for a model that would not open them itself (the work after a plan made with them). Each is cut
+ * to `limit` characters, so a long one does not crowd the instructions out.
+ */
+export function skillsGiven(skills: Skill[], names: string[], limit = 6000): string {
+  const given = names.flatMap((name) => {
+    const skill = skills.find((s) => s.name === name);
+    if (!skill) return [];
+    try {
+      const { body } = parseSkill(readFileSync(join(skill.dir, "SKILL.md"), "utf8"), name);
+      return [`### Skill "${name}" (already open: follow it)\n${body.slice(0, limit)}`];
+    } catch {
+      return [];
+    }
+  });
+  return given.length ? ["The plan was made with these skills; follow them in this work:", ...given].join("\n\n") : "";
+}
+
 export function skillsInstructions(skills: Skill[]): string {
   if (skills.length === 0) return "";
   return [
