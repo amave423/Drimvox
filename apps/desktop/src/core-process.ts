@@ -108,6 +108,7 @@ process.parentPort.once("message", ({ data }: { data: InitMessage }) => {
       ...(process.env.DRIMVOX_TEST_OLLAMA_URL ? { ollama: process.env.DRIMVOX_TEST_OLLAMA_URL } : {}),
     },
     proxyCheckUrl: process.env.DRIMVOX_TEST_PROXY_CHECK_URL,
+    freeCheckAfterMs: process.env.DRIMVOX_TEST_FREE_CHECK_MS ? Number(process.env.DRIMVOX_TEST_FREE_CHECK_MS) : undefined,
     // Tests: a fake Ollama program, fixed hardware and fake catalogs, as JSON of LocalOptions.
     local: process.env.DRIMVOX_TEST_LOCAL ? JSON.parse(process.env.DRIMVOX_TEST_LOCAL) : undefined,
     // Tests: a fake GitHub, as JSON of GithubOptions.

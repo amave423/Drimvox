@@ -1,6 +1,7 @@
 import type { ChecklistItem } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
+import { REPORT_STYLE } from "./prompt";
 
 export interface WorkToolHooks {
   checklist(): ChecklistItem[];
@@ -77,7 +78,7 @@ export function workTools(h: WorkToolHooks): ToolSet {
       description:
         "Call when the whole work is done and checked for real: every checklist item is done, the project starts, the pages look right and the main scenarios work. The report goes to the user.",
       inputSchema: z.object({
-        report: z.string().min(1).max(40_000).describe("In the user's language: what is done, how to start it, what is worth knowing"),
+        report: z.string().min(1).max(40_000).describe(REPORT_STYLE),
         start: z
           .object({
             command: z.string().min(1).max(2000).describe("The one command that starts the result in the project's folder, such as npm run dev"),

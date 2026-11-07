@@ -164,6 +164,8 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .catalog-grid { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .catalog-card { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 .catalog-card p { margin: 0; font-size: 13.5px; line-height: 1.45; }
+/* Two lines on the card; the whole text is in "More" (asked for: the cards took too much room). */
+.catalog-card > p.muted { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .catalog-card-head { display: flex; align-items: center; gap: 10px; }
 .catalog-card-title { display: grid; min-width: 0; }
 .catalog-card-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -177,22 +179,19 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .catalog-dialog-head p { margin: 2px 0 0; font-size: 13px; }
 .catalog-dialog p { line-height: 1.55; }
 .catalog-dialog h3 { margin: 18px 0 6px; font-size: 15px; }
+/* The example as request, steps and result, one under another. */
+.catalog-example-flow { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px 14px; margin: 0; }
+.catalog-example-flow dt { color: var(--muted); font-size: 13px; padding-top: 2px; }
+.catalog-example-flow dd { margin: 0; }
+.catalog-example-ask { font-style: italic; }
+.catalog-example-flow .catalog-example-steps { list-style: decimal; padding-left: 18px; display: grid; gap: 3px; color: var(--fg); font-size: 14px; }
+@media (max-width: 560px) { .catalog-example-flow { grid-template-columns: 1fr; } }
 .catalog-can { margin: 0; padding-left: 20px; display: grid; gap: 3px; }
 .catalog-close { position: absolute; top: 14px; right: 14px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: var(--muted); }
 .catalog-close:hover { background: var(--paper); color: var(--fg); }
 .catalog-command { overflow-wrap: anywhere; font-size: 13px; }
 .catalog-secret { display: grid; gap: 8px; }
 /* The example: a small Drimvox chat window. */
-.catalog-example { margin: 14px 0 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg); }
-.catalog-example-bar { display: flex; gap: 6px; padding: 8px 12px; background: var(--paper); border-bottom: 1px solid var(--line); }
-.catalog-example-bar span { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
-.catalog-example-body { display: grid; gap: 10px; padding: 14px; }
-.catalog-example-you { justify-self: end; max-width: 80%; margin: 0; padding: 8px 12px; border-radius: 12px 12px 4px 12px; background: var(--ink-soft); font-size: 14px; }
-.catalog-example-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
-.catalog-example-steps li { display: flex; align-items: center; gap: 8px; }
-.catalog-example-steps .catalog-logo { border-radius: 5px; }
-.catalog-example-answer { margin: 0; padding: 8px 12px; border-left: 2px solid var(--ink); background: var(--sheet); border-radius: 0 8px 8px 0; font-size: 14px; }
-.catalog-example figcaption { padding: 6px 12px; font-size: 12px; border-top: 1px solid var(--line); background: var(--paper); }
 
 /* Where the money went, by model, with cheaper models of the same maker. */
 .spending-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }

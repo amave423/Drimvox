@@ -221,8 +221,9 @@ export class WorkRun {
         if (this.d.month().over && !isFreeToRun(conn)) return stopWith("paused", "month_budget");
 
         // A big task goes in stages: after a checklist step, a grown context starts again from a brief (asked for: fewer
-        // tokens; every step sends the whole conversation again).
-        if (!this.chatMode) {
+        // tokens; every step sends the whole conversation again). In a ready project too: one long answer there read
+        // 4.6M tokens over 78 actions (seen live).
+        {
           const now = row.checklist.filter((i) => i.done).length;
           const left = row.checklist.length - now;
           const contextLength = (await findModel(conn, ref.model).catch(() => undefined))?.contextLength ?? null;
@@ -447,6 +448,12 @@ export class WorkRun {
         finish: (report, start) => {
           this.finished = true;
           this.d.repo.update(this.projectId, { report, site: start });
+          // The report is the answer's own last words: it stays in the conversation when the user writes on (seen: a
+          // card at its end vanished with the next message). Not twice when the model already said it.
+          if (!content.includes(report.trim().slice(0, 200))) {
+            content = content ? `${content}\n\n${report}` : report;
+            save();
+          }
         },
         checks: async () => {
           const commands = projectChecks(this.folder, plan);

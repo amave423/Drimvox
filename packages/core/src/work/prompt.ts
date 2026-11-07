@@ -6,6 +6,15 @@ import { BATCH_HINT, STUCK_HINT } from "../agent/prompt";
 export const WORK_STEPS = 200;
 
 /**
+ * How the last word of a piece of work is written (asked for: not a long story that everything is perfect, and ideas of
+ * what to improve at the end).
+ */
+export const REPORT_STYLE =
+  "Keep it short, at most about 8 lines, in the user's language: what you made or changed, how to open it, what you did " +
+  "not check or what may still be off. No praise of your own work, no \"everything works perfectly\". End with 2-3 concrete " +
+  "improvements you could make next, as a short list, for the user to choose from.";
+
+/**
  * What the agent is told in a task's conversation, besides the chat's own folder text (docs/specs/project-work.md).
  * Seen in the live run: files and page addresses in transliterated Russian, a project that did not start after it was
  * accepted (no dependencies installed), half a task done.
@@ -83,9 +92,10 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "
     "- Keep the project's notes current with update_notes: commands, decisions, what is done.",
     "- Do the work, then stop: no endless polishing. Look at each page once on each width, again only after a real fix.",
     "  Never grade your own result (\"8/10\") and polish toward a higher mark: the design review after you does that once.",
-    "When every checklist item is done and checked, call finish_work with a short report in the user's language: what is done,",
-    "how to start it; give start (the command and the address) when the result is something to open, a site or a server:",
-    "Drimvox starts it for the user. Stop your own background processes first. The report is the end: nothing after it.",
+    "When every checklist item is done and checked, call finish_work with the report; give start (the command and the",
+    "address) when the result is something to open, a site or a server: Drimvox starts it for the user. Stop your own",
+    "background processes first. The report is the end: nothing after it.",
+    `The report: ${REPORT_STYLE}`,
     ...(plan?.context ? [`The plan: ${plan.context}`] : []),
     ...(plan?.checks.length ? [`The project's checks: ${plan.checks.join("; ")}`] : []),
     ...(plan?.pages.length ? [`Pages: ${plan.pages.map((p) => `${p.url}${p.command ? ` (served by: ${p.command})` : ""}`).join("; ")}`] : []),
@@ -117,6 +127,11 @@ export function existingRules(canLook: boolean, git = "- Never commit or push: g
     "something. If you cannot decide something well yourself, ask_user with your assumption and go on: never wait.",
     "Write to the user in the language the user writes in.",
     "Rules:",
+    // Seen live: a question about a crooked 3D scene was answered by reading 12 files in the main conversation, and no
+    // sub-agent was ever called.
+    "- A question about how a part of the project works, or a bug whose cause you do not know yet: first hand the",
+    "  research to a sub-agent with delegate (it reads in its own context and gives back a short report, several can run",
+    "  in one step); read yourself only the files you are going to change.",
     "- Change only what the task needs; no unrelated refactoring, no new dependencies without a reason.",
     git,
     "- Keep the project's notes current with update_notes when you learn how the project works.",
@@ -126,8 +141,9 @@ export function existingRules(canLook: boolean, git = "- Never commit or push: g
     "  and polish toward a higher mark, even where a skill says to critique your work: once it does what was asked and nothing",
     "  is broken, stop and say what you made; the user asks for more if they want it. Do not read a file again that you",
     "  just read or wrote. A server you started stays running between the user's messages: open its address again first.",
-    "End your turn with a short reply: what you changed and how to check it, or the answer. finish_work is not needed;",
-    "call it only when the user asked to make something to open (a site or a server) and it is ready, with start.",
+    "End your turn with a reply, or the answer to a question. finish_work is not needed; call it only when the user asked",
+    "to make something to open (a site or a server) and it is ready, with start.",
+    `The reply after a change: ${REPORT_STYLE}`,
   ].join("\n");
 }
 

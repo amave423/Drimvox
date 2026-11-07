@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { ok } from "../api";
 import { useApp } from "../context";
 import { CATALOG, installed, type CatalogCategory, type CatalogEntry } from "../lib/catalog";
-import { TrashIcon } from "./SideChats";
 import { CatalogDetails, useEntryText } from "./catalog/CatalogDetails";
 import { CatalogLogo } from "./catalog/CatalogLogo";
 import { Hint } from "./Hint";
@@ -126,17 +125,20 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
                 <span className="muted">{entry.vendor}</span>
               </div>
             </div>
-            <p className="muted">{text(entry, "about")}</p>
+            {/* The first sentence only; the whole text is in "More" (asked for: shorter cards). */}
+            <p className="muted" title={text(entry, "about")}>
+              {firstSentence(text(entry, "about"))}
+            </p>
             <div className="catalog-card-foot">
               {isOn(entry) ? (
                 <button
                   type="button"
-                  className="btn is-small"
+                  className="link is-pencil catalog-remove"
                   aria-label={t("catalog.remove", { name: text(entry, "name") })}
                   disabled={busy === entry.id}
                   onClick={() => void remove(entry)}
                 >
-                  <TrashIcon /> {t("catalog.turnOff")}
+                  {t("catalog.turnOff")}
                 </button>
               ) : (
                 <button
@@ -182,4 +184,10 @@ export function Catalog({ kind, onChanged }: { kind: "mcp" | "skill"; onChanged(
       )}
     </section>
   );
+}
+
+/** A text's first sentence: up to the first full stop that ends one. */
+function firstSentence(text: string): string {
+  const end = text.search(/[.!?](\s|$)/);
+  return end > 0 ? text.slice(0, end + 1) : text;
 }

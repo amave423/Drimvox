@@ -149,19 +149,27 @@ export function BrowserPane({ onClose }: { onClose(): void }) {
           keepWidth(next);
         }}
         onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
+          e.preventDefault();
           dragging.current = true;
           setResizing(true);
           setWide(false);
-        }}
-        onPointerMove={(e) => {
-          if (!dragging.current) return;
-          setWidth(fitWidth(window.innerWidth - e.clientX));
-        }}
-        onPointerUp={() => {
-          dragging.current = false;
-          setResizing(false);
-          keepWidth(width);
+          // The whole window follows the drag, not the edge's own capture: it was lost when the agent's tab stepped
+          // aside under the pointer, and the edge stopped hearing the mouse (seen in the tests).
+          let last = width;
+          const move = (ev: PointerEvent) => {
+            if (!dragging.current) return;
+            last = fitWidth(window.innerWidth - ev.clientX);
+            setWidth(last);
+          };
+          const up = () => {
+            dragging.current = false;
+            setResizing(false);
+            keepWidth(last);
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", up);
+          };
+          window.addEventListener("pointermove", move);
+          window.addEventListener("pointerup", up);
         }}
       />
       <header className="browser-bar">

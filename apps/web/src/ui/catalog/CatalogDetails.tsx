@@ -16,38 +16,32 @@ export function useEntryText() {
 }
 
 /**
- * What using it looks like, drawn as a small Drimvox chat: the request, the actions it leads to, the answer (seen: the
- * details said little and showed nothing).
+ * An example of use, said plainly (asked for: the drawn chat showed nothing): what one asks, what the agent does, in
+ * order, and what comes out.
  */
 function Example({ entry }: { entry: CatalogEntry }) {
   const { t } = useApp();
   const text = useEntryText();
   return (
-    <figure className="catalog-example" aria-label={t("catalog.exampleTitle")}>
-      <div className="catalog-example-bar" aria-hidden>
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="catalog-example-body">
-        <p className="catalog-example-you">
-          <span className="visually-hidden">{t("catalog.exampleYou")}: </span>
-          {text(entry, "example")}
-        </p>
-        <ol className="catalog-example-steps">
-          {text(entry, "steps")
-            .split("|")
-            .map((step, n) => (
-              <li key={n}>
-                <CatalogLogo logo={entry.logo} size={18} />
-                {step}
-              </li>
-            ))}
-        </ol>
-        <p className="catalog-example-answer">{text(entry, "result")}</p>
-      </div>
-      <figcaption className="muted">{t("catalog.exampleTitle")}</figcaption>
-    </figure>
+    <section className="catalog-example" aria-label={t("catalog.exampleTitle")}>
+      <h3>{t("catalog.exampleTitle")}</h3>
+      <dl className="catalog-example-flow">
+        <dt>{t("catalog.exampleAsk")}</dt>
+        <dd className="catalog-example-ask">«{text(entry, "example")}»</dd>
+        <dt>{t("catalog.exampleSteps")}</dt>
+        <dd>
+          <ol className="catalog-example-steps">
+            {text(entry, "steps")
+              .split("|")
+              .map((step, n) => (
+                <li key={n}>{step}</li>
+              ))}
+          </ol>
+        </dd>
+        <dt>{t("catalog.exampleResult")}</dt>
+        <dd>{text(entry, "result")}</dd>
+      </dl>
+    </section>
   );
 }
 
@@ -94,7 +88,6 @@ export function CatalogDetails(p: {
         </div>
       </header>
       <p>{text(e, "details")}</p>
-      <Example entry={e} />
       <h3>{t("catalog.can")}</h3>
       <ul className="catalog-can">
         {text(e, "can")
@@ -103,6 +96,9 @@ export function CatalogDetails(p: {
             <li key={n}>{item}</li>
           ))}
       </ul>
+      <Example entry={e} />
+      <h3>{t("catalog.how")}</h3>
+      <p>{t(e.kind === "mcp" ? "catalog.howMcp" : "catalog.howSkill")}</p>
       {e.kind === "mcp" ? (
         <>
           <p className="mono muted catalog-command">{e.server.command ? [e.server.command, ...(e.server.args ?? [])].join(" ") : e.server.url}</p>

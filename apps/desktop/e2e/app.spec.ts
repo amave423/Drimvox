@@ -170,12 +170,19 @@ test("the catalog switches a ready skill on and off, and shows a server's detail
   await expect(cards).toHaveCount(15);
   for (const name of ["Exa", "Context7", "GitHub", "Figma", "PostgreSQL", "SQLite", "Sentry", "Stripe"])
     await expect(page.locator(".catalog-grid")).toContainText(name);
-  // The cards say what a server is for in a few sentences (asked for: the lines said too little).
-  expect(((await cards.filter({ hasText: "Context7" }).locator("p.muted").first().textContent()) ?? "").length).toBeGreaterThan(120);
+  // A card says what a server is for in one sentence; the whole text is in its details (asked for: shorter cards).
+  const about = cards.filter({ hasText: "Context7" }).locator("p.muted").first();
+  const whole = (await about.getAttribute("title")) ?? "";
+  expect(whole.length).toBeGreaterThan(120);
+  expect(((await about.textContent()) ?? "").length).toBeLessThan(whole.length);
   for (const name of ["Playwright", "Chrome DevTools"]) await expect(page.locator(".catalog-grid")).not.toContainText(name);
   await cards.first().getByRole("button", { name: "Подробнее" }).click();
   const exa = page.getByRole("dialog", { name: "Exa" });
-  await expect(exa.getByRole("figure", { name: "Как это выглядит" })).toContainText("сравнения векторных баз данных");
+  // An example said plainly: the request, what the agent does, what comes out (asked for: the drawn chat showed nothing).
+  const example = exa.getByRole("region", { name: "Пример" });
+  await expect(example).toContainText("сравнения векторных баз данных");
+  await expect(example).toContainText("Что сделает агент");
+  await expect(exa).toContainText("Как это работает в Drimvox");
   await expect(exa).toContainText("Exa Labs · лицензия MIT");
   await page.keyboard.press("Escape");
 

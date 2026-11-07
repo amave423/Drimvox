@@ -220,9 +220,9 @@
 /* The chat's options: one button, a panel with a row per option; each option's own list opens to its right. */
 .composer-tools .chat-options { min-width: 0; }
 /* One width whatever is chosen (asked for: the button grew and shrank with its words); the words are cut to fit. */
-.chat-options .picker-button { gap: 8px; width: clamp(110px, 26cqw, 220px); justify-content: space-between; }
-.chat-options .options-text { flex: 1; min-width: 0; text-align: left; }
-.chat-options .picker-button.is-on { border-color: var(--ink); color: var(--ink); background: var(--ink-soft); }
+.chat-options > .picker-button { gap: 8px; width: clamp(110px, 26cqw, 220px); justify-content: space-between; }
+.chat-options > .picker-button .options-text { flex: 1; min-width: 0; text-align: left; }
+.chat-options > .picker-button.is-on { border-color: var(--ink); color: var(--ink); background: var(--ink-soft); }
 .chat-options .options-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* As wide as its rows, no wider (seen: a strip of empty panel to the right of the buttons). */
 .options-panel { width: max-content; min-width: 260px; max-width: min(380px, 86vw); grid-template-rows: none; gap: 10px; padding: 12px 14px; overflow: visible; max-height: none; }

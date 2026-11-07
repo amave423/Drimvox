@@ -176,14 +176,16 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   // The workshop: the run's timeline with the plan as its first message, the state in the top bar, the checklist in
   // the sidebar.
   await expect(page.locator(".timeline .msg-user").first()).toContainText("Онлайн-запись");
-  const state = page.locator(".topbar").getByRole("status");
-  await expect(state).toContainText("Агент работает");
+  // The state is on the project in the sidebar only (asked for: not in the top bar too).
+  await expect(page.locator(".topbar").getByRole("status")).toHaveCount(0);
+  const state = page.locator(".side-project.is-on").getByRole("status");
+  await expect(state).toContainText("работает");
   // A message while it works goes in at once and the agent takes it on the way.
   await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").fill("Сделай заголовок крупнее");
   await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").press("Enter");
   await expect(page.locator(".msg-user", { hasText: "Сделай заголовок крупнее" })).toBeVisible();
 
-  await expect(state).toContainText("Готово", { timeout: 30_000 });
+  await expect(state).toContainText("готово", { timeout: 30_000 });
   await expect(state).toContainText("2 из 2");
   await expect(page.getByRole("list", { name: "Чек-лист" })).toContainText("Проверить страницу");
   await expect(page.locator(".work-questions-note")).toContainText("Нужна доставка?");
@@ -198,10 +200,13 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await chip.click();
   await expect(page.getByRole("dialog", { name: "index.html" })).toContainText("Запись");
   await page.keyboard.press("Escape");
-  // No tabs anywhere: what came of the work is a card at the end of the conversation (asked for), the right side holds
-  // the context and the parameters.
+  // No tabs anywhere: the report is the agent's own last message and stays there (asked for: a card at the end vanished
+  // with the next message), the right side holds the context and the parameters.
   await expect(page.getByRole("tab", { name: "Ход работы" })).toHaveCount(0);
-  await expect(page.locator(".timeline").getByRole("region", { name: "Результат" }).locator(".work-report")).toContainText("Каталог готов");
+  await expect(page.locator(".timeline").getByRole("region", { name: "Результат" })).toHaveCount(0);
+  await expect(page.locator(".timeline")).toContainText("Каталог готов");
+  // The run's time and money are in the context window (asked for: not in the top bar).
+  await expect(page.getByRole("region", { name: "Контекст и токены" })).toContainText("Время работы");
   const result = page.getByRole("complementary", { name: "Контекст и параметры" });
   await expect(result.getByRole("tab")).toHaveCount(0);
   await expect(result.getByRole("region", { name: "Параметры" })).toBeVisible();
@@ -327,6 +332,17 @@ test("a project without the interview: talked to as in a chat, its plan on the l
   await expect(result.getByLabel("Ветка агента")).toHaveCount(0);
   await expect(result.getByText("Git: как работает агент")).toHaveCount(0);
   await expect(result.getByRole("region", { name: "Публикация" })).toBeVisible();
+  // The context folds to a button and opens again for good (seen: in a new project it closed right after the click).
+  const edge = result.getByRole("separator", { name: "Высота контекста" });
+  await edge.focus();
+  for (let i = 0; i < 30 && (await edge.count()); i++) await page.keyboard.press("ArrowUp");
+  await expect(result.getByRole("region", { name: "Контекст", exact: true })).toHaveCount(0);
+  await result.getByRole("button", { name: "Показать контекст" }).click();
+  await expect(result.getByRole("region", { name: "Контекст", exact: true })).toBeVisible();
+  await page.waitForTimeout(1000);
+  await expect(result.getByRole("region", { name: "Контекст", exact: true })).toBeVisible();
+  // Not kept as folded: the next time the panel is drawn it stays open.
+  expect(await page.evaluate(() => localStorage.getItem("drimvox.contextHeight"))).toBeNull();
   // The time and the budget are set in the parameters too (asked for: not a pop-up from the header's numbers).
   await expect(result.getByRole("region", { name: "Время и бюджет" }).getByLabel("Время, часов")).toBeVisible();
   await expect(page.locator(".workshop-bar-top").getByRole("button", { name: /из/ })).toHaveCount(0);
@@ -429,7 +445,6 @@ test("a project whose folder is gone asks where it is now, and goes on there", a
     await page.getByRole("button", { name: "Проекты", exact: true }).click();
     await page.locator(".side-project").first().click();
     await expect(page.getByRole("heading", { name: "Папка проекта не найдена" })).toBeVisible();
-    await expect(page.locator(".workshop-pill")).toHaveText("Папка не найдена");
   } finally {
     // The folder picker of the tests answers with the first place.
     renameSync(moved, repo);
@@ -471,7 +486,7 @@ test("a run's screenshots: a switch in the timeline, none in the result panel", 
     await page.getByPlaceholder("Вопрос или задача по проекту").fill("Две страницы");
     await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
     await page.getByRole("region", { name: "Итоговый план" }).getByRole("button", { name: "Начать работу" }).click({ timeout: 30_000 });
-    await expect(page.locator(".topbar").getByRole("status")).toContainText("Готово", { timeout: 30_000 });
+    await expect(page.locator(".side-project.is-on").getByRole("status")).toContainText("готово", { timeout: 30_000 });
 
     // The timeline: a screenshot opens over the window, the arrows go to the next one.
     await page.locator(".timeline .msg-shot").first().click();
@@ -486,10 +501,8 @@ test("a run's screenshots: a switch in the timeline, none in the result panel", 
     await page.keyboard.press("Escape");
     await expect(gallery).toHaveCount(0);
 
-    // What came of the work is a card at the end of the conversation, without the screenshots: they stay where taken.
-    const result = page.locator(".timeline").getByRole("region", { name: "Результат" });
-    await expect(result.locator(".work-report")).toContainText("Готово.");
-    await expect(result.locator("img")).toHaveCount(0);
+    // The report is the agent's last message; the screenshots stay where they were taken.
+    await expect(page.locator(".timeline")).toContainText("Готово.");
   } finally {
     // The window keeps its connections to the page open: they are cut, or closing waits for them.
     site.closeAllConnections();

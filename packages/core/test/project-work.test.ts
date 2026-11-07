@@ -282,6 +282,8 @@ describe("work on a project", () => {
     expect(chat.messages[0]).toMatchObject({ role: "user" });
     expect(chat.messages[0].content).toContain("Каталог");
     expect(chat.messages.at(-1)).toMatchObject({ role: "assistant", status: "done" });
+    // The report is the answer's own text: it stays when the user writes on (seen: a card at the end vanished).
+    expect(chat.messages.at(-1).content).toContain("Сделал каталог и калькулятор. Запуск: npm run dev.");
     // The work is committed in the branch the project is on, no branch of the agent's own (asked for).
     expect(git(folder, "branch", "--show-current")).toBe("main");
     expect(git(folder, "log", "--oneline", "main").split("\n").length).toBeGreaterThan(1);

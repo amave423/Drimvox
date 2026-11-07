@@ -1,25 +1,6 @@
-import type { ProjectWorkView } from "@drimvox/shared";
 import { useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
-import { Markdown } from "../chat/Markdown";
-
-/**
- * What came of the work, as a card at the end of the project's conversation: the agent's own report. Without the started
- * result's card and the run's figures (asked for: not needed there).
- */
-export function WorkResultCard({ work }: { work: ProjectWorkView }) {
-  const { t } = useApp();
-  return (
-    <section className="work-result-card" aria-label={t("workshop.result")}>
-      {work.escalated && <p className="muted">{t("projectWork.escalated")}</p>}
-      <div className="note work-report">
-        <h3 className="margin-h">{t("projectWork.report")}</h3>
-        <Markdown text={work.report ?? ""} />
-      </div>
-    </section>
-  );
-}
 
 /**
  * The finished site on the internet in one click (asked for): built if it has a build, put on GitHub Pages from a branch

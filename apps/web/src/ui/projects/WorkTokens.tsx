@@ -2,6 +2,7 @@ import type { ProjectWorkView } from "@drimvox/shared";
 import { useApp } from "../../context";
 import { formatTokens, formatUsd } from "../../lib/format";
 import { useModelInfo } from "../chat/ModelNote";
+import { hoursAndMinutes } from "./useProjectWork";
 
 /**
  * How full the working model's context is, as a chat's margin shows it, and what the tokens went to (asked for: after a
@@ -41,8 +42,11 @@ export function WorkTokens({ work, onFresh }: { work: ProjectWorkView; /** A rea
         <dd className="mono">{input > 0 ? t("workTokens.cachedShare", { tokens: tokens(cached), share: Math.round((cached / input) * 100) }) : tokens(cached)}</dd>
         <dt>{t("workTokens.written")}</dt>
         <dd className="mono">{tokens(output)}</dd>
+        {/* The time and the money of the run, with their limits (asked for: here, not in the top bar). */}
+        <dt>{t("workTokens.time")}</dt>
+        <dd className="mono">{t("workTokens.ofLimit", { used: hoursAndMinutes(work.workedMs, t), limit: t("projectWork.hoursShort", { h: work.hours }) })}</dd>
         <dt>{t("workTokens.spent")}</dt>
-        <dd className="mono">{formatUsd(work.spentUsd)}</dd>
+        <dd className="mono">{t("workTokens.ofLimit", { used: formatUsd(work.spentUsd), limit: formatUsd(work.budgetUsd) })}</dd>
       </dl>
       {/* The note explains the bar: none without the model's window (seen: it spoke of a bar that was not there). */}
       {size && <p className="muted work-tokens-note">{t("workTokens.note")}</p>}

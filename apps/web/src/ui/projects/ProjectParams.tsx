@@ -8,7 +8,6 @@ import type { ModelChoice } from "../../lib/lastModel";
 import { useEntryText } from "../catalog/CatalogDetails";
 import { ModelPicker } from "../chat/ModelPicker";
 import { ThinkingSwitch } from "../chat/ThinkingSwitch";
-import { Hint } from "../Hint";
 import { Toggle } from "../Toggle";
 import { GithubPublish } from "./GithubPublish";
 import { LimitsForm } from "./LimitsForm";
@@ -78,9 +77,9 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
 function WorkOptions({ projectId, vision, onVision }: { projectId: string; vision: ModelChoice | null; onVision(m: ModelChoice | null): void }) {
   const { t } = useApp();
   const [prefs, set] = useBoxPrefs(projectId);
-  const asWorking = (value: ModelChoice | null, change: (m: ModelChoice | null) => void, only?: { vision: true }) => (
+  const asWorking = (value: ModelChoice | null, change: (m: ModelChoice | null) => void) => (
     <span className="options-model">
-      <ModelPicker value={value} onChange={change} placement="above" empty={t("projectBox.asWorking")} vision={!!only?.vision} />
+      <ModelPicker value={value} onChange={change} placement="above" empty={t("projectBox.asWorking")} />
       {value && (
         <button type="button" className="link" onClick={() => change(null)}>
           {t("projectBox.asWorking")}
@@ -89,6 +88,8 @@ function WorkOptions({ projectId, vision, onVision }: { projectId: string; visio
     </span>
   );
   const strongOn = prefs.strongOn || !!prefs.strong;
+  const [visionChosen, setVisionOn] = useState(false);
+  const visionOn = visionChosen || !!vision;
   return (
     <section className="params-block" aria-labelledby="params-work-h">
       <h3 className="margin-h" id="params-work-h">
@@ -100,7 +101,7 @@ function WorkOptions({ projectId, vision, onVision }: { projectId: string; visio
         </span>
       </Toggle>
       {prefs.interview && (
-        <div className="params-row">
+        <div className="params-row is-model">
           <span className="muted">{t("projectBox.interviewModel")}</span>
           {asWorking(prefs.interviewModel, (interviewModel) => set({ interviewModel }))}
         </div>
@@ -111,7 +112,7 @@ function WorkOptions({ projectId, vision, onVision }: { projectId: string; visio
         </span>
       </Toggle>
       {prefs.plan && (
-        <div className="params-row">
+        <div className="params-row is-model">
           <span className="muted">{t("projectBox.planModel")}</span>
           {asWorking(prefs.planModel, (planModel) => set({ planModel }))}
         </div>
@@ -122,16 +123,21 @@ function WorkOptions({ projectId, vision, onVision }: { projectId: string; visio
         </span>
       </Toggle>
       {strongOn && (
-        <div className="params-row">
+        <div className="params-row is-model">
           <ModelPicker value={prefs.strong} onChange={(strong) => set({ strong })} placement="above" />
         </div>
       )}
-      <div className="params-row">
-        <span className="muted">
-          {t("projectParams.vision")} <Hint text={t("settings.visionModelHint")} />
+      {/* A switch as the strong model's (asked for): off, the working model looks at the screenshots when it can. */}
+      <Toggle checked={visionOn} onChange={(on) => (on ? setVisionOn(true) : (setVisionOn(false), onVision(null)))}>
+        <span>
+          {t("projectParams.vision")} <span className="options-about">{t("projectParams.visionHint")}</span>
         </span>
-        {asWorking(vision, onVision, { vision: true })}
-      </div>
+      </Toggle>
+      {visionOn && (
+        <div className="params-row is-model">
+          <ModelPicker value={vision} onChange={onVision} placement="above" vision />
+        </div>
+      )}
       <div className="params-row">
         <span className="muted">{t("thinking.label")}</span>
         <ThinkingSwitch value={prefs.thinking} onChange={(thinking) => set({ thinking })} />

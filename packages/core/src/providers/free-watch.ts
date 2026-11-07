@@ -138,9 +138,9 @@ export class FreeWatch {
   private kicked = 0;
 
   /** Every half hour in the background, the first a few seconds after the start. */
-  start(): void {
+  start(firstMs = FIRST_MS): void {
     if (this.timer) return;
-    const first = setTimeout(() => void this.checkAll().catch(() => {}), FIRST_MS);
+    const first = setTimeout(() => void this.checkAll().catch(() => {}), firstMs);
     first.unref();
     this.timer = setInterval(() => void this.checkAll().catch(() => {}), EVERY_MS);
     this.timer.unref();

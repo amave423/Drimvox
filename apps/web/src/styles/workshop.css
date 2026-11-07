@@ -317,8 +317,17 @@
 .params-publish .note { border-left: 0; padding: 0; }
 .params-publish .note .margin-h, .params-publish .github .margin-h { font-size: 13px; }
 /* The two windows' titles alike. */
-.panel-title, .panel-context .work-tokens > .margin-h { margin: 0; font-size: 15px; font-weight: 600; }
+.panel-title, .panel-context .work-tokens > .margin-h, .panel-context-body > .margin-h { margin: 0; font-size: 15px; font-weight: 600; }
 .params-row .picker-button { max-width: 100%; }
+/* A model row: its name above, the picker on one line with "As the working one" beside it; a long model name is cut,
+   never pushed past the window's edge (seen: "Google: Gemma 4 31B (free) OpenRouter" ran off the panel). */
+.params-row.is-model { grid-template-columns: minmax(0, 1fr); gap: 6px; padding-left: 44px; }
+.params-row.is-model > .muted { white-space: normal; }
+.params-row.is-model .options-model { display: flex; flex-wrap: nowrap; align-items: center; gap: 12px; min-width: 0; }
+.params-row.is-model .picker { min-width: 0; flex: 0 1 auto; }
+.params-row.is-model .picker-button { max-width: 100%; min-width: 0; overflow: hidden; }
+.params-row.is-model .picker-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.params-row.is-model .options-model > .link { flex: none; white-space: nowrap; }
 .params-block .link { justify-self: start; font-size: 13px; }
 .git-block { display: grid; gap: 8px; }
 .git-state p { margin: 0 0 4px; }

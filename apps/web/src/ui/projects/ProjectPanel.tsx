@@ -45,9 +45,12 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
     watch.observe(el);
     return () => watch.disconnect();
   }, [work?.projectId, height === 0]);
+  // Opened again, it is forgotten as folded too (seen: in a new project the panel drew itself again at once, read
+  // "folded" back and the context closed right after the click).
   useEffect(() => {
     try {
       if (height !== null) localStorage.setItem(HEIGHT_KEY, String(height));
+      else localStorage.removeItem(HEIGHT_KEY);
     } catch {
       // Kept for this visit only.
     }
@@ -61,8 +64,13 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
 
   const folded = height === 0;
   const shown = height === null ? full : Math.min(height, full);
-  const set = (h: number) => setHeight(h < FOLD_BELOW ? 0 : Math.min(h, full));
-  const context = work ? <WorkTokens work={work} onFresh={() => void fresh()} /> : null;
+  const set = (h: number) => {
+    if (h < FOLD_BELOW) drag.current = null;
+    setHeight(h < FOLD_BELOW ? 0 : Math.min(h, full));
+  };
+  // Before the first step there is nothing to count: the window says so under its title, not only the folder.
+  const counted = !!work?.startedAt && (work.tokens.input > 0 || work.tokens.output > 0 || work.tokens.context !== null);
+  const context = work && counted ? <WorkTokens work={work} onFresh={() => void fresh()} /> : null;
 
   return (
     <aside id="workshop-result" className="project-panel" aria-label={t("projectParams.panel")} aria-hidden={!p.open} inert={!p.open}>
@@ -70,7 +78,12 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
         // Made smaller, the context is cut, not scrolled (asked for).
         <section className="panel-context" aria-label={t("projectParams.context")} style={{ height: shown || undefined }}>
           <div ref={content} className="panel-context-body">
-            {context ?? <p className="muted">{t("workshop.noResult")}</p>}
+            {context ?? (
+              <>
+                <h3 className="margin-h">{t("margin.context")}</h3>
+                <p className="muted">{t("projectParams.noContext")}</p>
+              </>
+            )}
             <p className="mono muted panel-path">{p.project.path}</p>
           </div>
         </section>
@@ -88,7 +101,13 @@ export function ProjectPanel(p: { project: ProjectView; work: ProjectWorkView | 
             e.currentTarget.setPointerCapture(e.pointerId);
             drag.current = { y: e.clientY, from: shown };
           }}
-          onPointerMove={(e) => drag.current && set(drag.current.from + e.clientY - drag.current.y)}
+          // Only while the button is held: folded mid-drag, the edge goes before the button is let go, and a drag left
+          // behind moved the reopened context with the mouse and folded it again (seen).
+          onPointerMove={(e) => {
+            if (!drag.current) return;
+            if (!(e.buttons & 1)) return void (drag.current = null);
+            set(drag.current.from + e.clientY - drag.current.y);
+          }}
           onPointerUp={() => (drag.current = null)}
           onPointerCancel={() => (drag.current = null)}
           onKeyDown={(e) => {

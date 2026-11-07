@@ -205,7 +205,12 @@ function WorkLine({ work }: { work: ProjectWorkView | null }) {
   const total = work.checklist.length;
   return (
     <>
-      <small className={`side-work is-${tone}`}>
+      {/* The project's state, the only place it is shown (asked for); why it waits, on hover. */}
+      <small
+        className={`side-work is-${tone}`}
+        role="status"
+        title={tone === "wait" ? t(work.waitingApproval ? "projectWork.waitingApproval" : (`projectWork.reason.${work.reason ?? "user"}` as MessageKey), { detail: work.detail ?? "" }) : undefined}
+      >
         {t(`workshop.dot.${tone}` as MessageKey)}
         {total > 0 && ` · ${t("projectWork.progress", { done, total })}`}
       </small>

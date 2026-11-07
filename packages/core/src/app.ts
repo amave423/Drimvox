@@ -125,6 +125,8 @@ export interface AppOptions {
   cliCommands?: Partial<Record<CliId, string[]>>;
   /** What "Check the proxy" opens through it; a small page that answers fast by default. */
   proxyCheckUrl?: string;
+  /** When the free models are first asked a word after the start (tests: later, so no list redraws under a click). */
+  freeCheckAfterMs?: number;
   /** Where Tavily and Brave answer: fakes in tests. */
   searchUrls?: SearchUrls;
   /** Where GitHub answers for ready skills: a fake in tests. */
@@ -167,7 +169,7 @@ export function createCore(o: AppOptions) {
     save: (all) => void o.db.sql.prepare("insert into settings (key, value) values ('models.availability', ?) on conflict(key) do update set value = excluded.value").run(JSON.stringify(all)),
   });
   const freeWatch = new FreeWatch(o.db, providers);
-  if (!o.web) freeWatch.start();
+  if (!o.web) freeWatch.start(o.freeCheckAfterMs);
   const chains = new Chains(o.db, providers, freeWatch);
   providers.setChains(chains);
   void local.connectIfServed().catch(() => {});
