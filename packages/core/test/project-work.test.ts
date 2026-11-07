@@ -667,6 +667,27 @@ describe("work on a project", () => {
     expect(activity).toContainEqual(expect.objectContaining({ name: "sent_back", input: "skills:1" }));
   });
 
+  // Seen live: each "Go on" after the time limit ran the review again, it found new things each time, the work went in
+  // circles for hours.
+  it("reviews the code once for the task, not again after a Stop and Continue", async () => {
+    const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
+    const finishing = call("finish_work", { report: "Готово." });
+    writeFileSync(join(folder, "server.js"), "const http = require('http');\n");
+    const issue = { severity: "high", where: "server.js", problem: "No auth", fix: "Add auth" };
+    const s = await setup({
+      coder: [noQuestions, writePlan, done, finishing, { text: "Чиню.", delayMs: 3000 }, finishing],
+      reviewer: [call("report_review", { issues: [issue], summary: "One hole." }), call("report_review", { issues: [issue], summary: "Again." })],
+    });
+    await planned(s);
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, () => fake!.requests.some((r) => r.path === "/v1/chat/completions" && isReviewer(r.body)) && requestsOf("coder").length >= 5);
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/stop`)).status).toBe(200);
+    await until(s.project.id, (w) => w.status === "stopped");
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/continue`)).status).toBe(200);
+    await until(s.project.id, (w) => w.status === "done");
+    expect(fake!.requests.filter((r) => r.path === "/v1/chat/completions" && isReviewer(r.body))).toHaveLength(1);
+  });
+
   // Asked for: a plain HTML page was reviewed for security; it has no server, no accounts and no one's data.
   it("gives a static page no security review", async () => {
     const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });

@@ -107,15 +107,8 @@ export class WorkRun {
   done: Promise<void> = Promise.resolve();
   private readonly inbox: string[] = [];
   private finished = false;
-  /** Drimvox looked at the result's design in this run: one round of polish at most. */
-  /** Skills the agent opened in this run, and whether it was reminded of the others before finishing. */
+  /** Skills the agent opened in this run (the once-a-task reviews and reminders: repo.rounds). */
   private readonly skillsOpened = new Set<string>();
-  private skillsNudged = false;
-  /** Whether the code was reviewed in this run: once, before it is done. */
-  private codeReviewed = false;
-  private designReviewed = false;
-  /** How many times Drimvox's own run of the project's tests sent the agent back. */
-  private checkRounds = 0;
   /** The tests just sent the agent back from finish_work: the run goes on even in a ready project. */
   private sentBack = false;
   /** Actions since the checklist was last updated. */
@@ -469,9 +462,10 @@ export class WorkRun {
           if (!commands.length) return null;
           onCall("run_checks", commands.join("; "));
           const results = await runChecks(this.folder, commands, this.controller.signal);
-          this.checkRounds++;
-          // Twice back to the agent at most; then the report says honestly what still fails.
-          if (results.some((r) => !r.ok) && this.checkRounds <= MAX_CHECK_ROUNDS) {
+          const rounds = this.d.repo.rounds(this.projectId).checks + 1;
+          this.d.repo.setRounds(this.projectId, { checks: rounds });
+          // Twice back to the agent at most, for the whole task; then the report says honestly what still fails.
+          if (results.some((r) => !r.ok) && rounds <= MAX_CHECK_ROUNDS) {
             this.sentBack = true;
             onCall("sent_back", `checks:${results.filter((r) => !r.ok).length}`);
             return { fix: checksFailedMessage(results) };
@@ -486,8 +480,9 @@ export class WorkRun {
           return { report: checksReport(results, /[а-яё]/i.test(asked)) };
         },
         codeReview: async () => {
-          if (this.codeReviewed || this.chatMode) return null;
-          this.codeReviewed = true;
+          // Once for the task, whatever runs it takes (seen: each "Go on" reviewed again and found new things).
+          if (this.chatMode || this.d.repo.rounds(this.projectId).code) return null;
+          this.d.repo.setRounds(this.projectId, { code: true });
           // A static page has nothing to attack: no server, no accounts, no one's data.
           if (isStaticSite(this.folder)) return null;
           // The service model reviews, else the working one, in a fresh conversation with only this to do (asked for: no
@@ -517,8 +512,8 @@ export class WorkRun {
           return message;
         },
         skillsLeft: () => {
-          if (this.skillsNudged || this.chatMode) return null;
-          this.skillsNudged = true;
+          if (this.chatMode || this.d.repo.rounds(this.projectId).skills) return null;
+          this.d.repo.setRounds(this.projectId, { skills: true });
           const left = skills.filter((s) => !this.skillsOpened.has(s.name));
           if (!left.length) return null;
           onCall("sent_back", `skills:${left.length}`);
@@ -529,8 +524,8 @@ export class WorkRun {
           ].join("\n");
         },
         review: async (start) => {
-          if (this.designReviewed || this.chatMode) return null;
-          this.designReviewed = true;
+          if (this.chatMode || this.d.repo.rounds(this.projectId).design) return null;
+          this.d.repo.setRounds(this.projectId, { design: true });
           // Motion asked for is checked in the code: screenshots cannot see it (seen live: "animated" came out still).
           const asked = [plan?.context ?? "", this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? ""].join("\n");
           const motion = missingMotion(this.folder, asked);

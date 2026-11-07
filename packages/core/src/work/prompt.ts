@@ -1,6 +1,6 @@
 import type { ProjectPlan } from "@drimvox/shared";
 import { ASSETS_HINT, DESIGN_HINT, designInstructions } from "../agent/design";
-import { BATCH_HINT, STUCK_HINT } from "../agent/prompt";
+import { BATCH_HINT, SECRETS_HINT, STUCK_HINT } from "../agent/prompt";
 
 /** Steps one answer on a task may take: enough for a task of the list; past it, "go on" continues. */
 export const WORK_STEPS = 200;
@@ -26,6 +26,7 @@ export function workRules(plan: ProjectPlan | null): string {
     "edit_file for changes, write_file for new files. Keep files under ~400 lines: split by responsibility.",
     BATCH_HINT,
     STUCK_HINT,
+    SECRETS_HINT,
     ASSETS_HINT,
     DESIGN_HINT,
     // Seen live: a file written, then patched sixteen times in a row before it was run once.
@@ -61,6 +62,7 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "
     "edit_file for changes, write_file for new files. Keep files under ~400 lines: split by responsibility.",
     BATCH_HINT,
     STUCK_HINT,
+    SECRETS_HINT,
     ASSETS_HINT,
     DESIGN_HINT,
     "Your checklist: keep it current with update_checklist (short items, done marked) whenever an item is done or you find",
@@ -119,6 +121,7 @@ export function existingRules(canLook: boolean, git = "- Never commit or push: g
     "follow the project's own conventions, structure and tools. edit_file for changes, write_file for new files.",
     BATCH_HINT,
     STUCK_HINT,
+    SECRETS_HINT,
     ASSETS_HINT,
     DESIGN_HINT,
     "For a question, look at the code and answer it; change nothing unless asked.",

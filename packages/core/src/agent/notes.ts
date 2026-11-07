@@ -28,11 +28,27 @@ export function notesBlock(root: string): string {
   return `Project notes (${file.endsWith("CLAUDE.md") ? "CLAUDE.md" : "AGENTS.md"}), kept for every agent working here:\n${shown}`;
 }
 
+/**
+ * A password, key or token written out (seen live: "sudo password `…`" and "echo '…' | sudo -S" in AGENTS.md, which went
+ * to a public repository): a secret word with a quoted value or one after = or :, or a password piped into sudo.
+ */
+const SECRET_WORD = "(?:парол\\p{L}*|password|passwd|pwd|token|токен\\p{L}*|api[ _-]?key|secret|секрет\\p{L}*)";
+const QUOTED_SECRET = new RegExp(SECRET_WORD + "[^\\n`'\"]{0,16}[`'\"][^`'\"\\s]{4,}[`'\"]", "iu");
+const ASSIGNED_SECRET = new RegExp(SECRET_WORD + "\\s*[:=]\\s*[^\\s,.;]{4,}", "iu");
+const PIPED_SUDO = /echo\s+['"][^'"]+['"]\s*\|\s*sudo\s+-S/i;
+
+export function holdsSecret(text: string): boolean {
+  return QUOTED_SECRET.test(text) || ASSIGNED_SECRET.test(text) || PIPED_SUDO.test(text);
+}
+
 /** Replaces the agent's section of AGENTS.md, creating the file or the section when missing. */
 export function writeNotes(root: string, notes: string): void {
   const body = notes.trim();
   if (body.length > NOTES_LIMIT) {
     throw new Error(`The notes are ${body.length} characters; make them shorter than ${NOTES_LIMIT}: keep what the next agent must know, drop history.`);
+  }
+  if (holdsSecret(body)) {
+    throw new Error("The notes hold a password, key or token. They go into git: write only where the secret is kept (\"the user knows the sudo password\"), never the secret itself.");
   }
   writeSection(root, START, END, body);
 }

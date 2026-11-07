@@ -26,6 +26,15 @@ export const BATCH_HINT =
  * After two failed fixes of the same error a third one sinks deeper into the agent's own guesses (said in a video on agent
  * work, and seen here: 78 edits of one page). Go back and think again instead.
  */
+/**
+ * Seen live: the user gave the laptop's sudo password in the chat, the agent wrote it into AGENTS.md and it went to a
+ * public GitHub repository with the next commit.
+ */
+export const SECRETS_HINT =
+  "Never write a password, key or token into a file, the project's notes or a commit, even one the user gave you in the " +
+  "chat: use it only inside the command that needs it, and in the notes say only where it is kept (\"the user knows the " +
+  "sudo password\").";
+
 export const STUCK_HINT =
   "When the same error stays after two of your fixes, do not try a third patch: undo your changes to that part (back to " +
   "the last version that worked), find the real cause by reading the code and the raw error, then fix it anew.";
@@ -45,6 +54,7 @@ export function systemPrompt(root: string, platform = process.platform): string 
     "How to work:",
     `- ${BATCH_HINT}`,
     `- ${STUCK_HINT}`,
+    `- ${SECRETS_HINT}`,
     `- ${ASSETS_HINT}`,
     `- ${DESIGN_HINT}`,
     "- Explore first: list_files, read_file and search before editing. Read a file before you change it.",

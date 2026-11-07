@@ -80,12 +80,41 @@ const toWork = (r: Row): WorkRow => ({
 const MAX_SHOTS = 24;
 
 /** A project's work: who does what, the plan's task, the conversation, the checklist and the limits. */
+/** The once-a-task rounds of the work (ProjectWorkRepo.rounds). */
+export interface Rounds {
+  code: boolean;
+  design: boolean;
+  skills: boolean;
+  checks: number;
+}
+const NO_ROUNDS: Rounds = { code: false, design: false, skills: false, checks: 0 };
+const roundsKey = (projectId: string) => `work.rounds:${projectId}`;
+
 export class ProjectWorkRepo {
   constructor(private readonly db: Database) {}
 
   get(projectId: string): WorkRow | null {
     const row = this.db.sql.prepare("select * from project_work where project_id = ?").get(projectId) as Row | undefined;
     return row ? toWork(row) : null;
+  }
+
+  /**
+   * The rounds of a task that happen once (the code review, the design review, the skills' reminder) and how many times
+   * the checks sent it back: kept for the task, which starts at startedAt, not for one run of it (seen live: every
+   * "Go on" after the time limit ran the review again, it found new things each time, and the work went in circles).
+   */
+  rounds(projectId: string): Rounds {
+    const startedAt = this.get(projectId)?.startedAt ?? null;
+    const row = this.db.sql.prepare("select value from settings where key = ?").get(roundsKey(projectId)) as { value: string } | undefined;
+    const kept = row ? (JSON.parse(row.value) as Rounds & { startedAt: number | null }) : null;
+    return kept && kept.startedAt === startedAt ? { code: kept.code, design: kept.design, skills: kept.skills, checks: kept.checks } : { ...NO_ROUNDS };
+  }
+
+  setRounds(projectId: string, patch: Partial<Rounds>): void {
+    const startedAt = this.get(projectId)?.startedAt ?? null;
+    this.db.sql
+      .prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value")
+      .run(roundsKey(projectId), JSON.stringify({ ...this.rounds(projectId), ...patch, startedAt }));
   }
 
   /** Every project with work, for the notifications. */

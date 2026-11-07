@@ -1,7 +1,7 @@
 import type { AttachmentView, StreamEvent } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import { BATCH_HINT, STUCK_HINT } from "../agent/prompt";
+import { BATCH_HINT, SECRETS_HINT, STUCK_HINT } from "../agent/prompt";
 import { ASSETS_HINT, DESIGN_HINT } from "../agent/design";
 import { buildTools, type ToolHooks } from "../agent/tools";
 import { Workspace } from "../agent/workspace";
@@ -121,6 +121,7 @@ export function folderHint(folder: string, platform = process.platform): string 
     "when you learn something the next conversation must know.",
     BATCH_HINT,
     STUCK_HINT,
+    SECRETS_HINT,
     ASSETS_HINT,
     DESIGN_HINT,
     // Seen live: a model drove a hidden Word through COM; it waited for an answer nobody could give, for two hours.
