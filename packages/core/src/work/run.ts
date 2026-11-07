@@ -66,7 +66,12 @@ export interface RunDeps {
   /** Tools of the user's MCP servers; their questions come into the project's conversation. */
   mcp?: { toolsFor(ask: McpAsk, hooks: McpHooks, only?: (serverId: string) => boolean): Promise<ToolSet> };
   /** The downloaded skills and the MCP servers this project switched on; null in either: all of them. */
-  extensions?(projectId: string): { skills: string[] | null; mcp: string[] | null; vision: { providerId: string; model: string } | null };
+  extensions?(projectId: string): {
+    skills: string[] | null;
+    mcp: string[] | null;
+    vision: { providerId: string; model: string } | null;
+    service: { providerId: string; model: string } | null;
+  };
   idleTimeoutMs: number;
   plan(projectId: string): ProjectPlan | null;
   /** This month's spending against the app's budget. */
@@ -361,8 +366,10 @@ export class WorkRun {
     const price = await findModel(conn, model);
     const plan = this.d.plan(this.projectId);
     // The project's own skills, the downloaded ones it switched on, its model for screenshots (asked for: per project).
-    const chosen = this.d.extensions?.(this.projectId) ?? { skills: null, mcp: null, vision: null };
+    const chosen = this.d.extensions?.(this.projectId) ?? { skills: null, mcp: null, vision: null, service: null };
     const vision = await this.d.vision(conn, model, chosen.vision);
+    const serviceConn = chosen.service ? this.d.providers.connection(chosen.service.providerId) : null;
+    const service = chosen.service && serviceConn ? { conn: serviceConn, model: chosen.service.model } : null;
     const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]).filter(
       (s) => s.scope === "project" || chosen.skills === null || chosen.skills.includes(s.name),
     );
@@ -417,6 +424,7 @@ export class WorkRun {
       ...subagentTools({
         conn,
         model,
+        service,
         price,
         folder: this.folder,
         signal,
@@ -487,7 +495,7 @@ export class WorkRun {
           const ref = row.models?.work ?? null;
           const working = ref ? this.d.providers.connection(ref.providerId) : null;
           if (!ref || !working) return null;
-          const reviewer = serviceModel(working, ref.model);
+          const reviewer = serviceModel(working, ref.model, service);
           onCall("code_review", reviewer.model);
           const issues = await reviewProjectCode({
             conn: reviewer.conn,
@@ -560,6 +568,7 @@ export class WorkRun {
     const overBudget = () => !this.chatMode && spentBefore + cost >= this.row().budgetUsd;
     let limited = false;
     const outcome = await runAgent({
+      service,
       conn,
       model,
       price,

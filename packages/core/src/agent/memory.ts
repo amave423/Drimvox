@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { languageModel } from "../providers/model";
 import type { Connection } from "../providers/repo";
-import { serviceModel } from "./service-model";
+import { serviceModel, type ServiceModel } from "./service-model";
 
 /**
  * What the agent remembers of its older work. Seen live: cutting old file reads and command outputs piece by piece
@@ -92,10 +92,12 @@ export async function remember(
   signal?: AbortSignal,
   /** A chat's: the user's newest question, which is the task; its first message is not. */
   chat?: { task: string },
+  /** The project's own service model, when it chose one. */
+  own?: ServiceModel | null,
 ): Promise<Remembered> {
   const older = chat ? withMemory(messages.slice(0, upTo), memory, false) : withMemory(messages.slice(0, upTo), memory).slice(1);
   const log = transcript(older);
-  const service = serviceModel(conn, model);
+  const service = serviceModel(conn, model, own);
   const result = await generateText({
     model: languageModel(service.conn, service.model),
     system:

@@ -1,4 +1,5 @@
 import type { ModelInfo, ProviderError, ThinkingLevel } from "@drimvox/shared";
+import type { ServiceModel } from "./service-model";
 import { hasToolCall, isStepCount, streamText, type ModelMessage, type StopCondition, type ToolSet } from "ai";
 import { describeError } from "../providers/errors";
 import { billedUsd, costOf, usageOf } from "../providers/pricing";
@@ -36,6 +37,8 @@ const CUT_NOTE =
 export interface RunInput {
   conn: Connection;
   model: string;
+  /** The project's own model for the summaries of a long history, when it chose one. */
+  service?: ServiceModel | null;
   price: ModelInfo | undefined;
   worktree: string;
   /** Conversation so far, ending with the new user message. */
@@ -206,7 +209,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
             const upTo = cutPoint(messages, view, limit);
             if (upTo !== null) {
               const job: Summary = { result: Promise.resolve(null), done: undefined };
-              job.result = remember(i.conn, i.model, i.worktree, messages, view, upTo, i.signal).then(
+              job.result = remember(i.conn, i.model, i.worktree, messages, view, upTo, i.signal, undefined, i.service).then(
                 (r) => (job.done = r),
                 // Without a summary the whole conversation goes; a later step tries again.
                 () => (job.done = null),

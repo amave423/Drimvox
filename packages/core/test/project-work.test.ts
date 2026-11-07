@@ -1094,3 +1094,21 @@ describe("the project's branch name", () => {
     expect(slug("***")).toBe("");
   });
 });
+
+// Asked for: the cheaper model for sub-agents is the project's own choice, in its parameters.
+describe("a project's service model", () => {
+  it("does the sub-agents' research instead of the working model", async () => {
+    const isSub = (body: any) => JSON.stringify(body.messages?.[0] ?? "").includes("You are a sub-agent");
+    const s = await setup({
+      coder: [call("delegate", { description: "Найти заголовок", prompt: "Что написано в index.html?" }), { text: "Там «Клиника»." }],
+      cheap: [call("report", { report: "В index.html заголовок «Клиника»." })],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    expect((await env.call("PUT", `/api/projects/${s.project.id}/extensions`, { service: s.ref("cheap") })).status).toBe(200);
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Что за заголовок?", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done");
+    const asks = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
+    expect(asks.some((r) => r.body.model === "cheap" && isSub(r.body))).toBe(true);
+    expect(asks.some((r) => r.body.model === "coder" && isSub(r.body))).toBe(false);
+  });
+});

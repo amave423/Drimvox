@@ -17,8 +17,10 @@ interface Extensions {
   skills: { name: string; description: string; own: boolean; on: boolean }[];
   mcp: { id: string; name: string; on: boolean; installed: boolean }[];
   vision: ModelChoice | null;
+  service: ModelChoice | null;
 }
-type ExtensionsPatch = { skills?: string[]; mcp?: string[]; vision?: ModelChoice | null };
+type ExtensionsPatch = { skills?: string[]; mcp?: string[]; vision?: ModelChoice | null; service?: ModelChoice | null };
+const refOf = (m: ModelChoice | null) => (m ? { providerId: m.providerId, model: m.model } : null);
 
 /**
  * A project's parameters, in the lower window on the right (asked for: they were a pop-up under the box and a tab of
@@ -47,7 +49,9 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
       <WorkOptions
         projectId={project.id}
         vision={ext?.vision ?? null}
-        onVision={(m) => void save({ vision: m ? { providerId: m.providerId, model: m.model } : null })}
+        onVision={(m) => void save({ vision: refOf(m) })}
+        service={ext?.service ?? null}
+        onService={(m) => void save({ service: refOf(m) })}
       />
       {work && (
         <section className="params-block" aria-labelledby="params-limits-h">
@@ -74,7 +78,14 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
  * thinking (useBoxPrefs; the screenshots' model is kept by the core). A model left unchosen is the working one: the
  * button says so, and "As the working one" beside a chosen model puts it back.
  */
-function WorkOptions({ projectId, vision, onVision }: { projectId: string; vision: ModelChoice | null; onVision(m: ModelChoice | null): void }) {
+function WorkOptions(p: {
+  projectId: string;
+  vision: ModelChoice | null;
+  onVision(m: ModelChoice | null): void;
+  service: ModelChoice | null;
+  onService(m: ModelChoice | null): void;
+}) {
+  const { projectId } = p;
   const { t } = useApp();
   const [prefs, set] = useBoxPrefs(projectId);
   const asWorking = (value: ModelChoice | null, change: (m: ModelChoice | null) => void) => (
@@ -88,8 +99,6 @@ function WorkOptions({ projectId, vision, onVision }: { projectId: string; visio
     </span>
   );
   const strongOn = prefs.strongOn || !!prefs.strong;
-  const [visionChosen, setVisionOn] = useState(false);
-  const visionOn = visionChosen || !!vision;
   return (
     <section className="params-block" aria-labelledby="params-work-h">
       <h3 className="margin-h" id="params-work-h">
@@ -127,22 +136,34 @@ function WorkOptions({ projectId, vision, onVision }: { projectId: string; visio
           <ModelPicker value={prefs.strong} onChange={(strong) => set({ strong })} placement="above" />
         </div>
       )}
-      {/* A switch as the strong model's (asked for): off, the working model looks at the screenshots when it can. */}
-      <Toggle checked={visionOn} onChange={(on) => (on ? setVisionOn(true) : (setVisionOn(false), onVision(null)))}>
-        <span>
-          {t("projectParams.vision")} <span className="options-about">{t("projectParams.visionHint")}</span>
-        </span>
-      </Toggle>
-      {visionOn && (
-        <div className="params-row is-model">
-          <ModelPicker value={vision} onChange={onVision} placement="above" vision />
-        </div>
-      )}
+      {/* Switches as the strong model's (asked for): off, the working model does it. */}
+      <ModelSwitch label={t("projectParams.vision")} hint={t("projectParams.visionHint")} value={p.vision} onChange={p.onVision} vision />
+      <ModelSwitch label={t("projectParams.service")} hint={t("projectParams.serviceHint")} value={p.service} onChange={p.onService} />
       <div className="params-row">
         <span className="muted">{t("thinking.label")}</span>
         <ThinkingSwitch value={prefs.thinking} onChange={(thinking) => set({ thinking })} />
       </div>
     </section>
+  );
+}
+
+/** A model the project may choose for one job: a switch with its hint, the picker once it is on. */
+function ModelSwitch(p: { label: string; hint: string; value: ModelChoice | null; onChange(m: ModelChoice | null): void; vision?: boolean }) {
+  const [chosen, setChosen] = useState(false);
+  const on = chosen || !!p.value;
+  return (
+    <>
+      <Toggle checked={on} onChange={(next) => (next ? setChosen(true) : (setChosen(false), p.onChange(null)))}>
+        <span>
+          {p.label} <span className="options-about">{p.hint}</span>
+        </span>
+      </Toggle>
+      {on && (
+        <div className="params-row is-model">
+          <ModelPicker value={p.value} onChange={p.onChange} placement="above" vision={p.vision} />
+        </div>
+      )}
+    </>
   );
 }
 

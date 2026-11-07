@@ -512,6 +512,8 @@ export const en: Record<keyof typeof ru, string> = {
   "projectBox.strongHint": "If the working model gets stuck, the chosen strong one carries on.",
   "projectParams.noContext": "How much of the model's context is taken, and the time and money spent, show here after the first message.",
   "projectParams.vision": "Vision model",
+  "projectParams.service": "Service model",
+  "projectParams.serviceHint": "Sub-agents, summaries of a long history and the code review run on it, not on the working one. A cheaper model with a good cache will do.",
   "projectParams.visionHint": "Looks at the page screenshots when the working model does not understand pictures.",
   "projectBox.strong": "Strong model",
   "projectBox.strongShort": "Strong model",

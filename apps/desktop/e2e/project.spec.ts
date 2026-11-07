@@ -161,6 +161,8 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(options.getByRole("button", { name: "Выбери модель" })).toHaveCount(1);
   // The model for screenshots is the project's too (asked for: not in the settings).
   await expect(options).toContainText("Модель для зрения");
+  // The service model is the project's own too, a switch with its hint (asked for: moved from the settings).
+  await expect(options.getByRole("switch", { name: /Подагенты, сводки длинной истории/ })).not.toBeChecked();
   await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт клиники");
   await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
 

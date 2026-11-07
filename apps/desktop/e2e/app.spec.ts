@@ -555,7 +555,7 @@ test("a model list near the bottom of the window opens upwards and stays inside 
   await expect(paramsButton(page)).toBeVisible();
   await openSection(page, "Настройки");
   await page.getByRole("tab", { name: "Модели и деньги" }).click();
-  const setting = page.getByRole("region", { name: "Служебная модель" });
+  const setting = page.getByRole("region", { name: "Модель для диктовки" });
   const button = setting.getByRole("button", { name: "Выбери модель" });
   await button.scrollIntoViewIfNeeded();
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));

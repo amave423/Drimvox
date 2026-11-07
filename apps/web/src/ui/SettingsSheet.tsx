@@ -2,7 +2,6 @@ import { agentFiles, currencies, locales, searchEngines, themes, type Settings, 
 import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../context";
 import { shownSign } from "../lib/format";
-import { ProjectModels } from "./ProjectModels";
 import { Segmented } from "./Segmented";
 import { McpSection } from "./McpSection";
 import { ProxySection } from "./ProxySection";
@@ -194,8 +193,6 @@ export function SettingsSheet() {
         <SpeechVoiceSetting />
 
         <SpendingSection />
-
-        <ProjectModels save={(patch) => void save(patch)} />
       </>
     ),
     chains: <ChainsSection />,
