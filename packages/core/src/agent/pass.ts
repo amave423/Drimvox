@@ -66,6 +66,8 @@ export interface PassContext {
   strongModel(): { providerId: string; model: string } | null;
   /** The user writes code: the interview may ask about technology. */
   developer(): boolean;
+  /** The user's saved SSH servers, as the steps are told of them. */
+  sshNote?(): string;
   /** Who accepts the work: the acceptance model from the settings, else the strong one; null means the task's own. */
   acceptanceModel(): { providerId: string; model: string } | null;
   signal: AbortSignal;
@@ -241,6 +243,7 @@ export async function runPass(ctx: PassContext, id: string, userText: string, fr
             : phaseInstructions(phase, JSON.parse(row.checks) as string[], { developer: ctx.developer(), round: row.interview_round + 1 }),
       designNote,
       skillsInstructions(skills),
+      ctx.sshNote?.() ?? "",
     ]
       .filter(Boolean)
       .join("\n\n"),

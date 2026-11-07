@@ -53,6 +53,11 @@ export interface ProjectPlan {
   decisions?: { what: string; why: string }[];
   /** The skills the plan's model opened: the work starts with them in hand (asked for: they reached only the plan). */
   skills?: string[];
+  /**
+   * How the work is checked (asked for: tests first on big new projects with real logic, none written for a simple page):
+   * "first" — a failing test, then the code; "light" — the build and a look at the pages. Absent: as before.
+   */
+  testing?: "first" | "light";
 }
 
 /** A task as the old interview listed it. */

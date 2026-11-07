@@ -203,6 +203,20 @@ const clip = (text: string, secret: string | null) => {
 };
 
 /**
+ * What every step is told of the saved servers, the interview and the plan too (seen: with a laptop saved in the
+ * settings, the interview asked the user twice for its address and password).
+ */
+export function sshNote(servers: SshServers): string {
+  const saved = servers.list();
+  if (!saved.length) return "";
+  return [
+    `The user saved SSH servers in Drimvox: ${saved.map((s) => `${s.name} (${s.user}@${s.host})`).join(", ")}.`,
+    "The work reaches them by name with ssh_run, ssh_upload and ssh_download (load them with find_tools when they are not",
+    "in the list); Drimvox signs in. Never ask the user for a server's address, login or password.",
+  ].join(" ");
+}
+
+/**
  * The agent's SSH tools: the saved servers by name, a command on one (asked first unless the server is trusted), a file
  * there and back. Files on this side are inside the chat's or the project's folder.
  */

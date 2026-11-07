@@ -26,6 +26,8 @@ interface Live extends ApprovalSlot {
 export class TaskBusy extends Error {}
 
 export interface RunnerOptions extends ExtrasOptions {
+  /** What the steps are told of the user's saved SSH servers. */
+  sshNote?(): string;
   tasks: TaskRepo;
   backlog: BacklogRepo;
   work: ProjectWorkRepo;
@@ -382,6 +384,7 @@ export class AgentRunner {
       strongModel: this.o.strongModel,
       acceptanceModel: () => this.o.acceptanceModel() ?? this.o.strongModel(),
       developer: this.o.developer,
+      sshNote: this.o.sshNote,
       signal: controller.signal,
       closed: () => this.closed,
       event: (kind, data) => this.event(id, kind, data),

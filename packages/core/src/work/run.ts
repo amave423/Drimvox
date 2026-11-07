@@ -25,6 +25,7 @@ import type { ProjectGit } from "./project-git";
 import { changedSince, checkpoint, dropCheckpoint } from "../chats/checkpoint";
 import { writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
+import { sshNote } from "../tools/ssh";
 import { missingMotion, polishWorkMessage, reviewProjectDesign } from "./design-review";
 import type { ProjectWorkRepo } from "./repo";
 import { workTools } from "./tools";
@@ -599,6 +600,7 @@ export class WorkRun {
           : projectRules(plan, !!vision && !!this.d.visualKit.screenshot, gitLine),
         VISUAL_HINT,
         WEB_HINT,
+        this.d.toolbox ? sshNote(this.d.toolbox.ssh) : "",
         skillsInstructions(skills),
         // The skills the plan was made with, whole: the working model follows them without having to open them.
         this.chatMode ? "" : skillsGiven(skills, plan?.skills ?? []),

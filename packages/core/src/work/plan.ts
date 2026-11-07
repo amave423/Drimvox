@@ -29,6 +29,10 @@ export function planInstructions(developer: boolean, quick = false): string {
     "  libraries, how it is started and deployed;",
     "- steps: the checklist of the work, 5-20 short items (a few words each), in the order of work, the smallest working",
     "  version first; the last steps check the result for real (run it, look at the pages, go through the main scenarios);",
+    "- testing: \"first\" when the project has real logic on a serious stack (a server, data, accounts, payments, rules,",
+    "  calculations, real-time): the agent writes a failing test for each piece of logic, then the code; the steps say so.",
+    "  \"light\" for a simple page, a landing, a small static site or a game toy: no test suite, the build and a look at",
+    "  the pages check it. Tests cost time and money: \"first\" only where a mistake would hurt;",
     "- checks: commands that exit 0 when the project works (build, tests), once they exist; empty if unsure;",
     "- pages: addresses to look at and the command that serves them, if there is an interface;",
     "- the design brief, if there is an interface.",
@@ -67,6 +71,7 @@ export function planTools(onPlan: (plan: ProjectPlan) => void): ToolSet {
           .default([])
           .describe("Technical decisions with the reason for each"),
         design: briefInput,
+        testing: z.enum(["first", "light"]).default("light").describe("first: tests before the code, for real logic on a serious stack; light: no test suite"),
       }),
       execute: async (p) => {
         onPlan({
@@ -86,6 +91,7 @@ export function planTools(onPlan: (plan: ProjectPlan) => void): ToolSet {
             .map((x) => ({ what: clip(x.what, 200), why: clip(x.why, 600) }))
             .filter((x) => x.what && x.why)
             .slice(0, 20),
+          testing: p.testing,
         });
         return "Plan written. The user reads it now.";
       },

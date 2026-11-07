@@ -33,7 +33,8 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
   // The plan waits for "Start work": what is written now corrects it. While the questions or the plan are being made,
   // the box waits (the questions are answered in their card).
   const planReady = work?.status === "ready" && !!work.plan;
-  const preparing = work?.status === "planning";
+  // A plan that stopped on an error does not lock the box: a message goes on with it (seen: nothing could be written).
+  const preparing = work?.status === "planning" && !work.planStalled;
 
   /** The app's list of works too: the top bar says "working" at once (seen: only after leaving and coming back). */
   const sent = () => {
@@ -43,7 +44,7 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
 
   async function send(content: string) {
     setFailed(null);
-    if (planReady) {
+    if (planReady || work?.planStalled) {
       const res = await api.projects[":id"].work.revise.$post({ param: { id: projectId }, json: { note: content } }).catch(() => null);
       if (!res?.ok) setFailed("unknown");
       return sent();

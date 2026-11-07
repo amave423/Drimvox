@@ -137,6 +137,32 @@ describe("work on a project", () => {
     expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("Never the template look: one bold idea.");
   });
 
+  // Asked for: tests first on a big new project with real logic, no test suite for a simple page.
+  for (const [testing, said] of [
+    ["first", "Test first"],
+    ["light", "No test suite"],
+  ] as const) {
+    it(`tells the work "${said}" when the plan decided testing "${testing}"`, async () => {
+      const s = await setup({ planner: [noQuestions, call("write_plan", { ...PLAN, testing })] });
+      const work = await planned(s, { interview: "planner", plan: "planner" });
+      expect(work.plan.testing).toBe(testing);
+      await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+      await until(s.project.id, (w) => w.status !== "running" && !!w.startedAt);
+      expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain(said);
+    });
+  }
+
+  // Seen live: with a laptop saved in the settings, the interview asked the user twice for its address and password.
+  it("tells the interview and the work of the saved SSH servers", async () => {
+    expect((await env.call("POST", "/api/ssh", { name: "ноутбук", host: "192.168.1.129", user: "ml_server", auth: "key" })).status).toBe(201);
+    const s = await setup({ coder: [noQuestions, writePlan] });
+    await planned(s);
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("ноутбук (ml_server@192.168.1.129)");
+    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    await until(s.project.id, (w) => w.status !== "running" && !!w.startedAt);
+    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages[0])).toContain("Never ask the user for a server's address");
+  });
+
   // Asked for: a small fix in an existing project should not start with a big interview.
   it("writes the plan at once with the plan's model for a small task, without an interview", async () => {
     const s = await setup({ asker: [noQuestions], planner: [writePlan] });
@@ -256,6 +282,20 @@ describe("work on a project", () => {
     const work = await until(s.project.id, (w) => w.status === "ready" && w.plan.steps.includes("Доставка"));
     expect(work.checklist.map((i: any) => i.text)).toEqual(["Каталог", "Доставка"]);
     expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("Добавь доставку");
+  });
+
+  // Seen live: the provider's broken answer while the plan was rewritten left the project "planning", the box locked.
+  it("goes back to the plan there was when its rewrite fails, and takes the correction again", async () => {
+    const s = await setup({
+      coder: [noQuestions, writePlan, { fail: { status: 400, message: "Broken answer" } }, call("write_plan", { ...PLAN, steps: ["Каталог", "Тесты"] })],
+    });
+    await planned(s);
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Добавь тесты" })).status).toBe(200);
+    const back = await until(s.project.id, (w) => w.status === "ready" && w.planStalled === false);
+    expect(back.plan.steps).not.toContain("Тесты");
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Добавь тесты" })).status).toBe(200);
+    const work = await until(s.project.id, (w) => w.status === "ready" && w.plan.steps.includes("Тесты"));
+    expect(work.plan.steps).toEqual(["Каталог", "Тесты"]);
   });
 
   it("goes on \"Go\": the project's conversation in its folder, the agent's checklist, files, and done with finish_work", async () => {

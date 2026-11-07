@@ -48,7 +48,7 @@ import { forgetCliProxy } from "./local/cliproxy-leftovers";
 import { ProjectGit } from "./work/project-git";
 import { ProjectExtensions } from "./projects/extensions";
 import { projectExtensionRoutes } from "./routes/project-extensions";
-import { SshServers } from "./tools/ssh";
+import { SshServers, sshNote } from "./tools/ssh";
 import { setMailApi } from "./tools/email";
 import { sshRoutes } from "./routes/ssh";
 import { Chains } from "./providers/chains";
@@ -224,7 +224,10 @@ export function createCore(o: AppOptions) {
     // A fake internet (tests) gets the real browser only when it is given one too.
     ...(base.browser || (o.web && !o.browser) ? {} : { browser }),
   };
+  // Other computers over SSH, downloads, mail, audits, before and after (tools/index.ts).
+  const sshServers = new SshServers(o.db, cipher);
   const runner = new AgentRunner({
+    sshNote: () => sshNote(sshServers),
     tasks,
     backlog,
     work: workRepo,
@@ -246,8 +249,6 @@ export function createCore(o: AppOptions) {
   });
   const backlogService = new BacklogService(backlog, projects, chats);
   const projectGit = new ProjectGit(o.db, github, (id) => projects.get(id)?.name ?? null);
-  // Other computers over SSH, downloads, mail, audits, before and after (tools/index.ts).
-  const sshServers = new SshServers(o.db, cipher);
   setMailApi(o.mailApi);
   const tools = { dataDir: o.dataDir, ssh: sshServers, browser, webDir: o.webDir };
   const extensions = new ProjectExtensions(o.db);

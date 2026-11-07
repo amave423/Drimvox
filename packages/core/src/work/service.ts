@@ -47,6 +47,7 @@ export class ProjectWork {
   ) {}
 
   view(projectId: string): ProjectWorkView {
+    this.backToPlan(projectId);
     const row = this.o.repo.get(projectId);
     const chatId = row?.chatId ?? null;
     const spending =
@@ -56,7 +57,7 @@ export class ProjectWork {
       projectId,
       status: row?.status ?? "idle",
       // Seen: a plan that failed left its project "working" in the sidebar for good.
-      planStalled: row?.status === "planning" && !!row.planTaskId && ["failed", "stopped"].includes(this.o.runner.view(row.planTaskId)?.status ?? ""),
+      planStalled: this.stalled(projectId),
       reason: row?.reason ?? null,
       detail: row?.detail ?? null,
       models: row?.models ?? null,
@@ -131,11 +132,31 @@ export class ProjectWork {
     return view;
   }
 
+  /** The interview or the plan stopped on an error (a provider's broken answer, a Stop). */
+  private stalled(projectId: string): boolean {
+    const row = this.o.repo.get(projectId);
+    return row?.status === "planning" && !!row.planTaskId && ["failed", "stopped"].includes(this.o.runner.view(row.planTaskId)?.status ?? "");
+  }
+
+  /**
+   * A rewrite of the plan that failed leaves the plan there was: the project waits on it again, for "Go" or another
+   * correction (seen: a provider's broken answer while rewriting left the project "planning" and the box locked).
+   */
+  private backToPlan(projectId: string): void {
+    if (this.stalled(projectId) && this.o.backlog.plan(projectId)) this.o.repo.update(projectId, { status: "ready" });
+  }
+
   /** The user's corrections to the plan: its model writes it again. */
   revise(projectId: string, note: string): TaskView {
     const row = this.o.repo.get(projectId);
-    if (!row?.planTaskId || row.status !== "ready") throw new WorkRefused("no_plan");
-    const view = this.o.runner.revisePlan(row.planTaskId, note);
+    const stalled = this.stalled(projectId);
+    if (!row?.planTaskId || (row.status !== "ready" && !stalled)) throw new WorkRefused("no_plan");
+    const ask = `The user asks to change the plan: ${note}\n\nCall write_plan again with the whole new plan.`;
+    // After a failure the same task goes on with the user's words: the interview, or the plan written again.
+    const task = this.o.runner.view(row.planTaskId);
+    const view = ["failed", "stopped"].includes(task?.status ?? "")
+      ? this.o.runner.continue(row.planTaskId, this.o.backlog.plan(projectId) ? ask : note)
+      : this.o.runner.revisePlan(row.planTaskId, note);
     this.o.repo.update(projectId, { status: "planning" });
     return view;
   }

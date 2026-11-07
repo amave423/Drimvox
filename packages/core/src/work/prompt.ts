@@ -81,13 +81,18 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "
     "  language into Latin letters. Text people read stays in the user's language.",
     "- The project must start for the user with one command. Install the dependencies yourself, make sure the usual command",
     "  (npm run dev, or what the project uses) starts without errors: run it with start_background, read its output.",
-    "- Check your work for real: write and run tests for the logic; run the build;",
+    // Asked for: tests first on a big new project with real logic, none written for a simple page (they cost time and money).
+    plan?.testing === "first"
+      ? "- Test first: for each piece of logic (API, data, rules, calculations) write a test that fails, then the code that\n  makes it pass; run the tests after each step and keep them green. Check your work for real: run the build;"
+      : plan?.testing === "light"
+        ? "- No test suite for this project: check your work for real by running the build;"
+        : "- Check your work for real: write and run tests for the logic; run the build;",
     canLook
       ? "  start the interface and look at its pages with look_at_page on a desktop width and a phone width (390); go through the\n  main scenarios as a person would (add to cart, order, sign in): open the page with browser_open, act with browser_click\n  and browser_type, and look at the state it reached with browser_look. Never install Playwright or another browser into\n  the project and never write screenshot scripts: these tools do it."
       : "  start the interface and request its pages to make sure they answer.",
     // Seen live: a team board let anyone listen to any board over WebSocket; the tests covered only the HTTP routes.
     "- When the project has accounts, roles or anyone's private data, write a test for every way in (pages and API,",
-    "  real-time channels, files, invitations) proving that someone without the right is refused.",
+    "  real-time channels, files, invitations) proving that someone without the right is refused, whatever the testing.",
     git,
     "- Keep the project's notes current with update_notes: commands, decisions, what is done.",
     "- Do the work, then stop: no endless polishing. Look at each page once on each width, again only after a real fix.",
@@ -119,7 +124,8 @@ export function existingRules(canLook: boolean, git = "- Never commit or push: g
     "For a question, look at the code and answer it; change nothing unless asked.",
     "For a task: first write a short checklist of the steps with update_checklist (3-8 items, in the user's language); the",
     "user sees it as your plan beside the conversation. Keep it current: mark items done as you go, add found work. Then do",
-    "the task and check it for real: run the project's tests and build when it has them",
+    "the task and check it for real: run the project's tests and build when it has them (write new tests only when the",
+    "user asks: covering an old project with tests costs much time and money)",
     canLook
       ? "  and look at changed pages with look_at_page (desktop and phone width 390), or go through them with browser_open,\n  browser_click and browser_type."
       : "  and request changed pages to make sure they answer.",
