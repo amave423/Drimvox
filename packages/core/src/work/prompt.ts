@@ -10,7 +10,9 @@ export const WORK_STEPS = 200;
  * what to improve at the end).
  */
 export const REPORT_STYLE =
-  "Keep it short, at most about 8 lines, in the user's language: what you made or changed, how to open it, what you did " +
+  "Keep it short, at most about 8 lines, in the user's language: what you made or changed, how the user starts using it " +
+  "step by step (the address, and where the first sign-in's code, password or invitation is: never leave them unable " +
+  "to get in), what you did " +
   "not check or what may still be off. No praise of your own work, no \"everything works perfectly\". End with 2-3 concrete " +
   "improvements you could make next, as a short list, for the user to choose from.";
 

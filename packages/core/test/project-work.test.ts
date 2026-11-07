@@ -893,7 +893,8 @@ describe("a ready project", () => {
     expect(JSON.stringify(requestsOf("coder")[1]!.body.messages)).toContain("FAIL: сумма неверна");
     expect(work.report).toContain("Починил сумму.");
     expect(work.report).toMatch(/npm test.*прошли/);
-    expect(work.report).toContain("ok: 3 tests");
+    // A passed check is one line; its output is not pasted under the report (seen: a build's raw output, unreadable).
+    expect(work.report).not.toContain("ok: 3 tests");
   });
 
   // Asked for: changed files shown in the conversation where the agent changed them, with the lines added and removed.

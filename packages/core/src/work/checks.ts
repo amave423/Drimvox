@@ -64,11 +64,21 @@ export function checksFailedMessage(results: CheckResult[]): string {
   ].join("\n");
 }
 
-/** The checks as the report shows them to the user, in Russian or English, with the raw end of each output. */
+/**
+ * The checks as the report shows them to the user, in Russian or English: one line each, the output only of those that
+ * failed and without the terminal's colour codes (seen live: a passed build's raw output, "\u001b[32m" and all, ended
+ * the report and made it unreadable).
+ */
 export function checksReport(results: CheckResult[], ru: boolean): string {
   const lines = results.map((r) => {
     const verdict = r.ok ? (ru ? "прошли" : "passed") : ru ? "не прошли" : "failed";
-    return `- \`${r.command}\` — ${verdict}\n\n\`\`\`\n${r.tail || (ru ? "(без вывода)" : "(no output)")}\n\`\`\``;
+    const line = `- \`${r.command}\` — ${verdict}`;
+    if (r.ok) return line;
+    const tail = plain(r.tail).split("\n").slice(-20).join("\n").trim();
+    return `${line}\n\n\`\`\`\n${tail || (ru ? "(без вывода)" : "(no output)")}\n\`\`\``;
   });
-  return [ru ? "**Проверки, которые Drimvox запустил сам**" : "**Checks Drimvox ran itself**", ...lines].join("\n\n");
+  return [ru ? "**Проверки, которые Drimvox запустил сам**" : "**Checks Drimvox ran itself**", lines.join("\n")].join("\n\n");
 }
+
+/** A terminal's output without its colour and cursor codes. */
+export const plain = (text: string) => text.replace(/\u001b\[[0-9;?]*[A-Za-z]/g, "");
