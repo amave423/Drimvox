@@ -33,8 +33,11 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
   // The plan waits for "Start work": what is written now corrects it. While the questions or the plan are being made,
   // the box waits (the questions are answered in their card).
   const planReady = work?.status === "ready" && !!work.plan;
-  // A plan that stopped on an error does not lock the box: a message goes on with it (seen: nothing could be written).
-  const preparing = work?.status === "planning" && !work.planStalled;
+  // The plan phase (as Claude Code's): what is written answers the model's questions or corrects its plan.
+  const planPhase = !!work?.planPhase;
+  // A plan of the old kind being made keeps the box waiting; one that stopped on an error does not lock it (seen:
+  // nothing could be written).
+  const preparing = work?.status === "planning" && !work.planStalled && !planPhase;
 
   /** The app's list of works too: the top bar says "working" at once (seen: only after leaving and coming back). */
   const sent = () => {
@@ -44,7 +47,7 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
 
   async function send(content: string) {
     setFailed(null);
-    if (planReady || work?.planStalled) {
+    if (planReady || planPhase || work?.planStalled) {
       const res = await api.projects[":id"].work.revise.$post({ param: { id: projectId }, json: { note: content } }).catch(() => null);
       if (!res?.ok) setFailed("unknown");
       return sent();
@@ -65,9 +68,10 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
               param: { id: projectId },
               json: {
                 task: content,
+                // One model plans and then works, with everything it read (asked for: as Claude Code).
                 models: {
-                  interview: ref(prefs.interviewModel ?? choice),
-                  plan: ref(prefs.planModel ?? choice),
+                  interview: ref(choice),
+                  plan: ref(choice),
                   work: ref(choice),
                   strong: prefs.strong ? ref(prefs.strong) : null,
                 },
@@ -100,7 +104,17 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
         // The interview, the plan, their models and the thinking are in the project's parameters on the right (asked
         // for: they were a pop-up here).
         options={{ changed: [], rows: [] }}
-        placeholder={t(running ? "chat.workPlaceholder" : planReady ? "planning.fixPlaceholder" : preparing ? "planning.waitPlaceholder" : "chat.readyPlaceholder")}
+        placeholder={t(
+          running
+            ? "chat.workPlaceholder"
+            : planReady
+              ? "planning.fixPlaceholder"
+              : planPhase
+                ? "planning.answerPlaceholder"
+                : preparing
+                  ? "planning.waitPlaceholder"
+                  : "chat.readyPlaceholder",
+        )}
       />
     </>
   );

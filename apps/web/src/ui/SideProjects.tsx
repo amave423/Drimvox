@@ -45,12 +45,6 @@ export function SideProjects() {
   const currentProject = view.kind === "project" ? view.projectId : undefined;
   const currentTask = view.kind === "task" ? view.taskId : undefined;
 
-  const current = works.find((w) => w.projectId === currentProject);
-  // Without an approved plan the checklist is the agent's own plan for what it was asked last.
-  const plainTalk = !current?.plan;
-  // The item being worked on: the first one not done yet.
-  const now = current?.status === "running" ? current.checklist.findIndex((i) => !i.done) : -1;
-
   return (
     <section className="side-group side-projects">
       <div className="side-row">
@@ -168,57 +162,42 @@ export function SideProjects() {
           })}
         </ul>
       )}
-      {current && current.checklist.length > 0 && (
-        <>
-          <h2 className="side-h side-checklist-h">{t(plainTalk ? "projectWork.agentPlan" : "projectWork.checklist")}</h2>
-          <ul className="checklist side-checklist" aria-label={t(plainTalk ? "projectWork.agentPlan" : "projectWork.checklist")}>
-            {current.checklist.map((item, n) => (
-              <li key={n} className={item.done ? "is-done" : n === now ? "is-now" : undefined}>
-                <span className="check-mark" aria-hidden>
-                  {item.done ? "✓" : ""}
-                </span>
-                <span className="visually-hidden">{item.done ? t("projectWork.itemDone") : t("projectWork.itemOpen")}</span>
-                {item.text}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </section>
   );
 }
 
-/** How a project's work goes, under its name: working, waiting, done, with the checklist's progress as a bar. */
+/** How a project's work goes, under its name: working, waiting, done (asked for: no checklist any more). */
 function WorkLine({ work }: { work: ProjectWorkView | null }) {
   const { t } = useApp();
   if (!work || work.status === "idle") return null;
   // A plan that stopped on an error waits for the user, it does not run.
+  // In the plan phase the project waits for the user between the model's turns: its questions, its plan.
   const tone =
-    work.status === "running" || (work.status === "planning" && !work.planStalled)
-      ? work.waitingApproval
-        ? "wait"
-        : "run"
-      : work.status === "done"
-        ? "ok"
-        : "wait";
-  const done = work.checklist.filter((i) => i.done).length;
-  const total = work.checklist.length;
+    work.planPhase && work.status !== "running"
+      ? "wait"
+      : work.status === "running" || (work.status === "planning" && !work.planStalled)
+        ? work.waitingApproval
+          ? "wait"
+          : "run"
+        : work.status === "done"
+          ? "ok"
+          : "wait";
   return (
     <>
       {/* The project's state, the only place it is shown (asked for); why it waits, on hover. */}
       <small
         className={`side-work is-${tone}`}
         role="status"
-        title={tone === "wait" ? t(work.waitingApproval ? "projectWork.waitingApproval" : (`projectWork.reason.${work.reason ?? "user"}` as MessageKey), { detail: work.detail ?? "" }) : undefined}
+        title={
+          tone === "wait"
+            ? t(work.waitingApproval ? "projectWork.waitingApproval" : (`projectWork.reason.${work.reason ?? "user"}` as MessageKey), {
+                detail: work.detail ?? "",
+              })
+            : undefined
+        }
       >
         {t(`workshop.dot.${tone}` as MessageKey)}
-        {total > 0 && ` · ${t("projectWork.progress", { done, total })}`}
       </small>
-      {total > 0 && tone !== "ok" && (
-        <span className="side-bar" aria-hidden>
-          <span style={{ width: `${Math.round((done / total) * 100)}%` }} />
-        </span>
-      )}
     </>
   );
 }

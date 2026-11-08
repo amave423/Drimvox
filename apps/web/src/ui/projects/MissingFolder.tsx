@@ -44,7 +44,13 @@ export function MissingFolder({ project }: { project: ProjectView }) {
             if (path.trim()) void move(path.trim());
           }}
         >
-          <input className="field-input" placeholder={t("folder.pathPlaceholder")} aria-label={t("project.missingPath")} value={path} onChange={(e) => setPath(e.target.value)} />
+          <input
+            className="field-input"
+            placeholder={t("folder.pathPlaceholder")}
+            aria-label={t("project.missingPath")}
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+          />
           <button className="btn is-primary" disabled={busy || !path.trim()}>
             {t("project.missingSave")}
           </button>

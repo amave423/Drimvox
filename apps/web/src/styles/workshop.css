@@ -334,3 +334,9 @@
 .git-rules summary { cursor: pointer; color: var(--muted); }
 .git-rules[open] { display: grid; gap: 8px; }
 .work-result-card { display: grid; gap: 10px; }
+
+/* The plan the model proposed, in the project's conversation (as Claude Code shows it), with "Go". */
+.chat-plan { display: grid; gap: 10px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.chat-plan-h { margin: 0; font-size: 15px; font-weight: 600; }
+.chat-plan .actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.chat-plan .actions .muted { font-size: 13px; }

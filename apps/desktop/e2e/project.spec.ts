@@ -88,13 +88,6 @@ async function pickCoder(page: Page, opener = page.locator(".composer").getByRol
   await page.getByRole("option", { name: /Coder/ }).click();
 }
 
-/** Picks a model by name in the open model list, on the fake provider's tab. */
-async function pickCoderIn(page: Page, name: RegExp): Promise<void> {
-  const tabs = page.getByRole("navigation", { name: "Провайдеры" });
-  if (await tabs.count()) await tabs.getByRole("button", { name: new URL(fake!.baseUrl).host }).click();
-  await page.getByRole("option", { name }).click();
-}
-
 /** Turns the interview and/or the plan on in the project's parameters on the right, before the first message. */
 async function askFirst(page: Page, o: { interview?: boolean; plan?: boolean }): Promise<void> {
   const options = page.getByRole("region", { name: "Параметры" });
@@ -105,21 +98,12 @@ async function askFirst(page: Page, o: { interview?: boolean; plan?: boolean }):
   if (o.plan) await expect(options.getByRole("switch", { name: /План на утверждение/ })).toBeChecked();
 }
 
-// docs/specs/project-work.md: one conversation per project; the interview and the plan with "Go" when the box asks for
-// them, their own model, then one long run with its checklist in the sidebar.
-test("a project: the interview, the plan with Go, the agent works alone with its checklist, a message on the way", async () => {
+// docs/specs/project-work.md: one conversation per project; the plan as Claude Code makes it when the box asks for it:
+// the same model reads, proposes a plan as a card in the conversation, and goes on from it after "Go".
+test("a project: the plan in the conversation, Go, the same conversation goes on, a message on the way", async () => {
   const page = await launch([
-    call("ask_questions", { questions: [], understood: "Сайт клиники", unknown: [] }),
-    call("write_plan", { summary: "Сайт клиники с онлайн-записью.", steps: ["Онлайн-запись", "Проверить страницу"], checks: [], pages: [] }),
+    call("propose_plan", { plan: "# План\n- Онлайн-запись\n- Проверить страницу" }),
     { ...call("write_file", { path: "index.html", content: "<h1>Запись</h1>\n" }), delayMs: 1500 },
-    call("ask_user", { question: "Нужна доставка?", assumption: "Пока без доставки" }),
-    call("update_checklist", {
-      items: [
-        { text: "Онлайн-запись", done: true },
-        { text: "Проверить страницу", done: true },
-      ],
-    }),
-    call("finish_work", { report: "Каталог готов: откройте index.html." }),
     { text: "Каталог готов: откройте index.html." },
   ]);
 
@@ -138,47 +122,36 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   expect(await page.locator(".workshop-main").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.keyboard.press("Escape");
   await pickCoder(page);
-  // The interview and the plan are asked for in the options; their model, the strong one and the thinking are there too.
-  await askFirst(page, { interview: true, plan: true });
-  // They are in the parameters on the right now (asked for: not a pop-up under the box).
+  await askFirst(page, { plan: true });
+  // They are in the parameters on the right (asked for: not a pop-up under the box).
   await expect(page.locator(".composer").getByRole("button", { name: /^Параметры/ })).toHaveCount(0);
   const options = page.getByRole("region", { name: "Параметры" });
   await expect(options).toContainText("Сильная модель");
   await expect(options).toContainText("Мышление");
-  // The interview and the plan each have a model of their own (asked for), the working one until picked.
-  await expect(options).toContainText("Модель опроса");
-  await expect(options).toContainText("Модель плана");
-  // An unchosen model says it is the working one; beside a chosen one, "As the working one" puts it back (asked for).
-  await expect(options.getByRole("button", { name: "Выбери модель" })).toHaveCount(0);
-  await options.locator(".picker-button", { hasText: "Как рабочая" }).first().click();
-  await pickCoderIn(page, /Planner/);
-  await expect(options.getByRole("button", { name: /Planner/ })).toHaveCount(1);
-  await expect(options.locator("button.link", { hasText: "Как рабочая" })).toBeVisible();
+  // One model plans and works (asked for: as Claude Code): no models of the interview and of the plan.
+  await expect(options).not.toContainText("Модель опроса");
+  await expect(options).not.toContainText("Модель плана");
   // The strong model is a switch with its hint, its model chosen once it is on.
   await expect(options.getByRole("switch", { name: /Если рабочая модель застрянет/ })).not.toBeChecked();
   await options.getByText(/^Если рабочая модель застрянет/).click();
   await expect(options.getByRole("switch", { name: /Если рабочая модель застрянет/ })).toBeChecked();
   await expect(options.getByRole("button", { name: "Выбери модель" })).toHaveCount(1);
-  // The model for screenshots is the project's too (asked for: not in the settings).
+  await options.getByText(/^Если рабочая модель застрянет/).click();
+  // The model for screenshots and the service model are the project's too, switches with their hints.
   await expect(options).toContainText("Модель для зрения");
-  // The service model is the project's own too, a switch with its hint (asked for: moved from the settings).
   await expect(options.getByRole("switch", { name: /Подагенты, сводки длинной истории/ })).not.toBeChecked();
   await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт клиники");
   await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
 
-  // The plan comes right under the interview: read it, then "Go".
-  const plan = page.getByRole("region", { name: "Итоговый план" });
-  await expect(plan).toContainText("Сайт клиники с онлайн-записью.", { timeout: 30_000 });
-  await expect(plan.getByRole("listitem")).toHaveText(["Онлайн-запись", "Проверить страницу"]);
-  // In the conversation, as in the agreed design: the plan is a card on the timeline, the box below corrects it.
-  await expect(page.locator(".timeline .planning-card.is-plan")).toBeVisible();
+  // The plan is a card in the conversation: read it, then "Go"; the box below corrects it.
+  const plan = page.locator(".timeline").getByRole("region", { name: "Итоговый план" });
+  await expect(plan).toContainText("Онлайн-запись", { timeout: 30_000 });
   await expect(page.getByPlaceholder("Что поправить в плане")).toBeVisible();
   await plan.getByRole("button", { name: "Начать работу" }).click();
 
-  // The workshop: the run's timeline with the plan as its first message, the state in the top bar, the checklist in
-  // the sidebar.
-  await expect(page.locator(".timeline .msg-user").first()).toContainText("Онлайн-запись");
-  // The state is on the project in the sidebar only (asked for: not in the top bar too).
+  // "Go" is the user's word in the same conversation; the state is on the project in the sidebar only.
+  await expect(page.locator(".timeline .msg-user", { hasText: "Одобряю план" })).toBeVisible();
+  await expect(page.locator(".timeline .msg-user").first()).toContainText("Сайт клиники");
   await expect(page.locator(".topbar").getByRole("status")).toHaveCount(0);
   const state = page.locator(".side-project.is-on").getByRole("status");
   await expect(state).toContainText("работает");
@@ -188,14 +161,8 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   await expect(page.locator(".msg-user", { hasText: "Сделай заголовок крупнее" })).toBeVisible();
 
   await expect(state).toContainText("готово", { timeout: 30_000 });
-  await expect(state).toContainText("2 из 2");
-  await expect(page.getByRole("list", { name: "Чек-лист" })).toContainText("Проверить страницу");
-  await expect(page.locator(".work-questions-note")).toContainText("Нужна доставка?");
-  await expect(page.locator(".work-questions-note")).toContainText("Пока считает: Пока без доставки");
-  // The interview was the planner's; the plan and the work are the working model's.
-  const asked = fake!.requests.filter((r) => r.path.endsWith("/chat/completions")).map((r) => (r.body as { model?: string }).model);
-  expect(asked[0]).toBe("planner");
-  expect(asked.at(-1)).toBe("coder");
+  // No checklist any more (asked for).
+  await expect(page.getByRole("list", { name: "Чек-лист" })).toHaveCount(0);
   // The file written stands where it was written, with its lines (asked for), and opens to look at.
   const chip = page.locator(".timeline .file-chips.is-inline .file-chip", { hasText: "index.html" });
   await expect(chip).toContainText("+1");
@@ -252,66 +219,35 @@ test("a project: the interview, the plan with Go, the agent works alone with its
   expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toBe("main");
   expect(execFileSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" }).trim()).toBe("");
   expect(fake!.requests.some((r) => JSON.stringify(r.body?.messages ?? []).includes("Сделай заголовок крупнее"))).toBe(true);
-  // An answer closes the question's note over the box (seen: it stayed after the reply).
-  await page.locator(".side-project").first().click();
-  await expect(page.locator(".work-questions-note")).toContainText("Нужна доставка?");
-  await page.getByPlaceholder("Вопрос или задача по проекту").fill("Доставка нужна");
-  await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
-  await expect(page.locator(".work-questions-note")).toHaveCount(0);
 });
 
-// Asked for: a project is talked to like a chat (no interview, no plan to approve unless asked) with the agent's plan on
-// The agreed design (variant A, asked for: the questions and the plan opened as pages of their own): the questions as a
-// card of choices in the conversation, the answers as the user's message, the plan as a card below them.
-test("the interview's questions and the plan are cards in the project's conversation", async () => {
+// Asked for: as Claude Code, the model asks what it must know in its reply; the answer is the user's next message, the
+// plan a card below it.
+test("the questions come in the conversation, the answer in the box, then the plan as a card", async () => {
   const page = await launch([
-    call("ask_questions", {
-      questions: [
-        { id: "city", question: "Какой город показывать сразу?", options: [{ label: "Мой по геолокации" }, { label: "Москва" }], recommended: 0 },
-        { id: "style", question: "Стиль", options: [{ label: "Тёмный, как приборы" }, { label: "Меняется с погодой" }], recommended: 1 },
-      ],
-      understood: "Сайт погоды",
-      unknown: [],
-    }),
-    // The answers start the next round: nothing more to ask, then the plan.
-    call("ask_questions", { questions: [], understood: "Сайт погоды", unknown: [] }),
-    call("write_plan", { summary: "Сайт погоды с живыми данными.", steps: ["Каркас и данные", "Анимированные сцены"], checks: [], pages: [] }),
+    { text: "1. Какой город показывать сразу? Москва или по геолокации (советую по геолокации)." },
+    call("propose_plan", { plan: "# План\n- Каркас и данные\n- Анимированные сцены" }),
   ]);
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await addProject(page);
   await pickCoder(page);
   await askFirst(page, { interview: true, plan: true });
-  await page.keyboard.press("Escape");
   await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт погоды");
   await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
-  const questions = page.locator(".timeline").getByRole("region", { name: "Вопросы" });
-  await expect(questions).toContainText("Какой город показывать сразу?", { timeout: 30_000 });
-  // The recommended answers are picked already; another is a click.
-  await expect(questions.getByRole("radio", { name: "Меняется с погодой" })).toHaveAttribute("aria-checked", "true");
-  await questions.getByRole("radio", { name: "Москва" }).click();
-  await expect(page.locator(".timeline .msg-user").first()).toHaveText("Сайт погоды");
-  await questions.getByRole("button", { name: "Ответить" }).click();
-  await expect(page.locator(".timeline .msg-user", { hasText: "Москва · Меняется с погодой" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".timeline")).toContainText("Какой город показывать сразу?", { timeout: 30_000 });
+  const box = page.getByPlaceholder("Ответь на вопросы или напиши, что поправить");
+  await expect(box).toBeVisible();
+  await box.fill("Москва");
+  await box.press("Enter");
   const plan = page.locator(".timeline").getByRole("region", { name: "Итоговый план" });
-  await expect(plan).toContainText("Сайт погоды с живыми данными.", { timeout: 30_000 });
-  await expect(plan.getByRole("listitem")).toHaveText(["Каркас и данные", "Анимированные сцены"]);
+  await expect(plan).toContainText("Анимированные сцены", { timeout: 30_000 });
   await expect(plan.getByRole("button", { name: "Начать работу" })).toBeVisible();
-  // "Correct the plan" goes to the box below, which now corrects it.
-  await plan.getByRole("button", { name: "Поправить план" }).click();
-  await expect(page.getByPlaceholder("Что поправить в плане")).toBeFocused();
+  await expect(page.getByPlaceholder("Что поправить в плане")).toBeVisible();
 });
 
-// the left; the project comes first on the right, and removing it is at hand in the sidebar's "⋯".
-test("a project without the interview: talked to as in a chat, its plan on the left, removed from the sidebar", async () => {
-  const page = await launch([
-    call("update_checklist", {
-      items: [
-        { text: "Прочитать README", done: true },
-        { text: "Ответить", done: false },
-      ],
-    }),
-    { text: "Это сайт клиники." },
-  ]);
+// Asked for: a project is talked to like a chat (no plan to approve unless asked); removing it is in the sidebar's "⋯".
+test("a project without a plan: talked to as in a chat, removed from the sidebar", async () => {
+  const page = await launch([{ text: "Это сайт клиники." }]);
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await addProject(page);
   await expect(page.getByRole("heading", { name: "Что сделать в проекте?" })).toBeVisible();
@@ -322,7 +258,6 @@ test("a project without the interview: talked to as in a chat, its plan on the l
 
   await expect(page.locator(".timeline .msg-user")).toContainText("Что это за проект?");
   await expect(page.locator(".timeline")).toContainText("Это сайт клиники.", { timeout: 30_000 });
-  await expect(page.getByRole("list", { name: "План агента" })).toContainText("Прочитать README");
   // No plan or questions tabs: the conversation is the whole middle.
   await expect(page.getByRole("tab", { name: "Ход работы" })).toHaveCount(0);
   const result = page.getByRole("complementary", { name: "Контекст и параметры" });
@@ -469,13 +404,10 @@ test("a run's screenshots: a switch in the timeline, none in the result panel", 
   try {
     const page = await launch(
       [
-        call("ask_questions", { questions: [], understood: "Сайт", unknown: [] }),
-        call("write_plan", { summary: "Две страницы.", steps: ["Страницы"], checks: [], pages: [] }),
+        call("propose_plan", { plan: "Две страницы." }),
         call("write_file", { path: "index.html", content: "<h1>Первая</h1>\n" }),
         call("look_at_page", { url: `http://localhost:${port}/a`, question: "Видна первая?" }),
         call("look_at_page", { url: `http://localhost:${port}/b`, question: "Видна вторая?" }),
-        call("update_checklist", { items: [{ text: "Страницы", done: true }] }),
-        call("finish_work", { report: "Готово." }),
         { text: "Готово." },
       ],
       true,
@@ -483,11 +415,10 @@ test("a run's screenshots: a switch in the timeline, none in the result panel", 
     await page.getByRole("button", { name: "Проекты", exact: true }).click();
     await addProject(page);
     await pickCoder(page);
-    await askFirst(page, { interview: true });
-    await page.keyboard.press("Escape");
+    await askFirst(page, { plan: true });
     await page.getByPlaceholder("Вопрос или задача по проекту").fill("Две страницы");
     await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
-    await page.getByRole("region", { name: "Итоговый план" }).getByRole("button", { name: "Начать работу" }).click({ timeout: 30_000 });
+    await page.locator(".timeline").getByRole("region", { name: "Итоговый план" }).getByRole("button", { name: "Начать работу" }).click({ timeout: 30_000 });
     await expect(page.locator(".side-project.is-on").getByRole("status")).toContainText("готово", { timeout: 30_000 });
 
     // The timeline: a screenshot opens over the window, the arrows go to the next one.

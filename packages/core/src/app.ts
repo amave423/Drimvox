@@ -271,6 +271,7 @@ export function createCore(o: AppOptions) {
       mcp,
       idleTimeoutMs,
       plan: (projectId) => backlog.plan(projectId),
+      setPlan: (projectId, plan) => backlog.setPlan(projectId, plan),
       month: () => monthUsage(o.db, chats),
       vision: (conn, model, chosen) => resolveVision(chosen ?? readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
       git: projectGit,

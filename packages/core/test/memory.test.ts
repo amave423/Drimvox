@@ -36,7 +36,8 @@ async function start(coder: FakeTurn[]) {
   const queue = [...coder];
   fake = await startFakeProvider({
     key: KEY,
-    models: [{ id: "coder" }],
+    // A window of 64 thousand tokens: the summary comes at 80 % of it (about 179 thousand characters).
+    models: [{ id: "coder", context_length: 64_000 }],
     respond: (body) => (isSummarizer(body) ? { text: SUMMARY, delayMs: slowSummary } : (queue.shift() ?? call("finish", { summary: "Готово", commit_message: "Notes" }))),
   });
   const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
@@ -64,7 +65,7 @@ const coderRequests = () => fake!.requests.filter((r) => r.path === "/v1/chat/co
 // Seen live: cutting old reads piece by piece made the agent forget the file it edited and read it 156 times.
 describe("the agent's memory", () => {
   it("replaces the older work with one summary near the limit, with the files it changed, and keeps the start the same", async () => {
-    const reads = Array.from({ length: 14 }, () => call("read_file", { path: "big.txt" }));
+    const reads = Array.from({ length: 12 }, () => call("read_file", { path: "big.txt" }));
     const id = await start([call("write_file", { path: "notes.md", content: "# Заметки\nпервая\n" }), ...reads]);
     const task = await settle(id);
     expect(task.status).toBe("review");
@@ -88,7 +89,7 @@ describe("the agent's memory", () => {
   // As OpenCode does: the summary is written in the background before the limit, so the agent does not stand and wait.
   it("starts the summary before the limit and goes on working while it is written", async () => {
     slowSummary = 3000;
-    const reads = Array.from({ length: 14 }, () => call("read_file", { path: "big.txt" }));
+    const reads = Array.from({ length: 12 }, () => call("read_file", { path: "big.txt" }));
     const id = await start([call("write_file", { path: "notes.md", content: "# Заметки\n" }), ...reads]);
     await settle(id);
     const all = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
@@ -118,11 +119,13 @@ describe("the agent's memory", () => {
     }
   });
 
-  it("sums up before a request grows past 400 000 characters, however large the model's context", () => {
+  // Asked for: as OpenCode, the whole history until the model's window nears (the old 400 000 characters cap made the
+  // agent forget what it had read and read it again).
+  it("sums up at 80 % of the model's window, a large window too", () => {
     const model = (contextLength: number) => ({ id: "m", name: "m", contextLength, priceIn: 0, priceOut: 0, priceEstimated: false, tools: true, vision: null });
-    expect(memoryLimit(model(1_000_000))).toBe(400_000);
-    expect(memoryLimit(model(32_000))).toBe(67_200);
-    expect(memoryLimit(undefined)).toBe(200_000);
+    expect(memoryLimit(model(1_000_000))).toBe(2_800_000);
+    expect(memoryLimit(model(32_000))).toBe(89_600);
+    expect(memoryLimit(undefined)).toBe(358_400);
   });
 
   it("leaves a short conversation as it is", async () => {

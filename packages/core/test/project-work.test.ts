@@ -9,7 +9,7 @@ import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-prov
 import { git, makeRepo } from "./git-repo";
 import { setRetryDelays } from "../src/agent/pass";
 
-// docs/specs/project-work.md: an interview, a plan, "Go", then one long run of the agent with its own checklist.
+// docs/specs/project-work.md: one conversation per project, as a chat with a folder; a plan first, as Claude Code makes it.
 vi.setConfig({ testTimeout: 30_000 });
 
 const KEY = "good-key";
@@ -30,14 +30,15 @@ afterEach(async () => {
 });
 
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
-const noQuestions = call("ask_questions", { questions: [], understood: "Сайт клиники", unknown: [] });
 const PLAN = {
   summary: "Сайт клиники: онлайн-запись к врачу и прайс-лист.",
   steps: ["Каталог", "Калькулятор", "Проверить страницы"],
   checks: ["Каталог открывается", "npm test"],
   pages: [{ url: "http://localhost:5173/", command: "npm run dev" }],
 };
-const writePlan = call("write_plan", PLAN);
+/** The plan as the plan mode proposes it (plan-mode.ts). */
+const PLAN_TEXT = "# План\n- Каталог врачей\n- Онлайн-запись";
+const proposePlan = call("propose_plan", { plan: PLAN_TEXT });
 const PRICED = [{ id: "coder", supported_parameters: ["tools"], pricing: { prompt: "0.000001", completion: "0.000002" } }];
 
 /** A fake provider answering each model from its own queue: who wrote what shows in the requests. */
@@ -66,96 +67,30 @@ async function until(projectId: string, done: (w: any) => boolean) {
   throw new Error(`stuck: ${JSON.stringify(await workOf(projectId))}`);
 }
 
-/** The interview with one model, the plan with another; the plan waits for "Go". */
-async function planned(s: Awaited<ReturnType<typeof setup>>, models: { interview?: string; plan?: string; work?: string; strong?: string | null } = {}) {
+/** The plan mode reads and proposes a plan in the project's conversation; it waits for "Go" (plan-mode.ts). */
+async function planned(s: Awaited<ReturnType<typeof setup>>, models: { work?: string; strong?: string | null } = {}, quick = true) {
   const res = await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
     task: "Сайт клиники",
     models: {
-      interview: s.ref(models.interview ?? "coder"),
-      plan: s.ref(models.plan ?? "coder"),
+      interview: s.ref(models.work ?? "coder"),
+      plan: s.ref(models.work ?? "coder"),
       work: s.ref(models.work ?? "coder"),
       strong: models.strong ? s.ref(models.strong) : null,
     },
+    quick,
   });
   expect(res.status).toBe(201);
-  return until(s.project.id, (w) => w.status === "ready");
+  return until(s.project.id, (w) => w.status === "ready" && w.planPhase);
 }
 
 const isReviewer = (body: any) => /You are the code reviewer/.test(JSON.stringify(body.messages?.[0]?.content ?? ""));
 const requestsOf = (model: string) => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === model && !isReviewer(r.body));
 
 describe("work on a project", () => {
-  it("ends the interview with a plan by the plan's model: its steps are the first checklist, its checks real commands", async () => {
-    const s = await setup({ asker: [noQuestions], planner: [writePlan] });
-    const work = await planned(s, { interview: "asker", plan: "planner" });
-    expect(work.plan).toMatchObject({ context: PLAN.summary, steps: PLAN.steps, checks: ["npm test"] });
-    expect(work.checklist).toEqual(PLAN.steps.map((text) => ({ text, done: false })));
-    expect(requestsOf("asker")).toHaveLength(1);
-    expect(requestsOf("planner")).toHaveLength(1);
-    const task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
-    expect(task).toMatchObject({ kind: "plan", status: "waiting", statusReason: "plan_ready" });
-  });
-
-  // Seen live: Claude Opus wrote "уточню ключевые моменты" without a question mark and without ask_questions, and the
-  // interview the user had asked for was skipped for the plan.
-  it("asks an interviewer that wrote no questions at all to hold the interview", async () => {
-    const asked = call("ask_questions", {
-      questions: [{ id: "city", question: "Какой город сразу?", options: [{ label: "Москва" }, { label: "По геолокации" }], recommended: 1 }],
-      understood: "Сайт погоды",
-      unknown: [],
-    });
-    const s = await setup({ asker: [{ text: "Прежде чем начать, уточню ключевые моменты." }, asked], planner: [writePlan] });
-    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
-      task: "Сайт погоды",
-      models: { interview: s.ref("asker"), plan: s.ref("planner"), work: s.ref("coder"), strong: null },
-    });
-    const work = await until(s.project.id, (w) => w.status === "planning" && !!w.planTaskId);
-    let task: any;
-    for (let i = 0; i < 100; i++) {
-      task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
-      if (task.status === "waiting") break;
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    expect(task).toMatchObject({ status: "waiting", statusReason: "questions" });
-    expect(task.questions.map((q: any) => q.question)).toEqual(["Какой город сразу?"]);
-    expect(JSON.stringify(requestsOf("asker").at(-1)!.body.messages)).toContain("You have not asked anything yet");
-    expect(requestsOf("planner")).toHaveLength(0);
-  });
-
-  // Seen live: Claude opened the design skill for the plan, and the free model that built the page never did.
-  it("gives the work the skills the plan was made with, whole", async () => {
-    mkdirSync(join(folder, ".drimvox", "skills", "frontend-design"), { recursive: true });
-    writeFileSync(
-      join(folder, ".drimvox", "skills", "frontend-design", "SKILL.md"),
-      ["---", "name: frontend-design", "description: Distinctive interfaces", "---", "Never the template look: one bold idea.", ""].join("\n"),
-    );
-    const s = await setup({ asker: [noQuestions], planner: [call("use_skill", { name: "frontend-design" }), writePlan] });
-    const work = await planned(s, { interview: "asker", plan: "planner" });
-    expect(work.plan.skills).toEqual(["frontend-design"]);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    await until(s.project.id, (w) => w.status !== "running" && !!w.startedAt);
-    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("Never the template look: one bold idea.");
-  });
-
-  // Asked for: tests first on a big new project with real logic, no test suite for a simple page.
-  for (const [testing, said] of [
-    ["first", "Test first"],
-    ["light", "No test suite"],
-  ] as const) {
-    it(`tells the work "${said}" when the plan decided testing "${testing}"`, async () => {
-      const s = await setup({ planner: [noQuestions, call("write_plan", { ...PLAN, testing })] });
-      const work = await planned(s, { interview: "planner", plan: "planner" });
-      expect(work.plan.testing).toBe(testing);
-      await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-      await until(s.project.id, (w) => w.status !== "running" && !!w.startedAt);
-      expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain(said);
-    });
-  }
-
   // Seen live: with a laptop saved in the settings, the interview asked the user twice for its address and password.
   it("tells the interview and the work of the saved SSH servers", async () => {
     expect((await env.call("POST", "/api/ssh", { name: "ноутбук", host: "192.168.1.129", user: "ml_server", auth: "key" })).status).toBe(201);
-    const s = await setup({ coder: [noQuestions, writePlan] });
+    const s = await setup({ coder: [proposePlan] });
     await planned(s);
     expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("ноутбук (ml_server@192.168.1.129)");
     await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
@@ -163,173 +98,83 @@ describe("work on a project", () => {
     expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages[0])).toContain("Never ask the user for a server's address");
   });
 
-  // Asked for: a small fix in an existing project should not start with a big interview.
-  it("writes the plan at once with the plan's model for a small task, without an interview", async () => {
-    const s = await setup({ asker: [noQuestions], planner: [writePlan] });
-    const res = await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
-      task: "Кнопка уезжает за край на телефоне",
-      quick: true,
-      models: { interview: s.ref("asker"), plan: s.ref("planner"), work: s.ref("planner"), strong: null },
-    });
-    expect(res.status).toBe(201);
-    const work = await until(s.project.id, (w) => w.status === "ready");
-    expect(work.plan).toMatchObject({ steps: PLAN.steps });
-    expect(requestsOf("asker")).toHaveLength(0);
-    expect(JSON.stringify(requestsOf("planner")[0]!.body.messages[0])).toContain("There was no interview");
-  });
-
-  // Seen live: an interviewer wrote its questions as text; they were lost and the plan came without them.
-  it("asks an interviewer that wrote its questions as text to ask them properly", async () => {
-    const asks = call("ask_questions", { questions: [{ id: "look", question: "Какой стиль?", options: [{ label: "Тёплый" }, { label: "Строгий" }] }], understood: "Сайт", unknown: [] });
-    const s = await setup({ asker: [{ text: "Уточню: какой стиль вам ближе — тёплый или строгий?" }, asks] });
-    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, { task: "Сайт", models: { interview: s.ref("asker"), plan: s.ref("asker"), work: s.ref("asker"), strong: null } });
-    const work = await until(s.project.id, (w) => !!w.planTaskId);
-    let task: any;
-    for (let i = 0; i < 200; i++) {
-      task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
-      if (task.status !== "running") break;
-      await new Promise((r) => setTimeout(r, 30));
-    }
-    expect(task).toMatchObject({ status: "waiting", statusReason: "questions" });
-    expect(JSON.stringify(requestsOf("asker").at(-1)!.body.messages)).toContain("You wrote your questions as text");
-  });
-
-  // Seen live: DeepSeek wrote its questions with one "}" too many; the call failed and the interview was skipped.
-  const QUESTIONS = { questions: [{ id: "look", question: "Какой стиль?", options: [{ label: "Тёплый" }, { label: "Строгий" }] }], understood: "Сайт", unknown: [] };
-  async function interviewOf(s: Awaited<ReturnType<typeof setup>>) {
-    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, { task: "Сайт", models: { interview: s.ref("asker"), plan: s.ref("asker"), work: s.ref("asker"), strong: null } });
-    const work = await until(s.project.id, (w) => !!w.planTaskId);
-    let task: any;
-    for (let i = 0; i < 200; i++) {
-      task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
-      if (task.status !== "running") break;
-      await new Promise((r) => setTimeout(r, 30));
-    }
-    return task;
-  }
-
-  it("reads questions whose JSON has a bracket too many", async () => {
-    const extra = JSON.stringify(QUESTIONS).replace(/\]\}$/, "}]}");
-    const s = await setup({ asker: [{ toolCalls: [{ name: "ask_questions", args: {}, raw: extra }] }] });
-    expect(await interviewOf(s)).toMatchObject({ status: "waiting", statusReason: "questions" });
-    expect(requestsOf("asker")).toHaveLength(1);
-  });
-
-  it("asks again for questions it cannot read, instead of skipping the interview", async () => {
-    const s = await setup({ asker: [{ toolCalls: [{ name: "ask_questions", args: {}, raw: '{"questions": [{"id": look}]' }] }, call("ask_questions", QUESTIONS)] });
-    expect(await interviewOf(s)).toMatchObject({ status: "waiting", statusReason: "questions" });
-    expect(JSON.stringify(requestsOf("asker").at(-1)!.body.messages)).toContain("could not be read");
-  });
-
-  // Seen live: Opus sent what is still open as one sentence; the call failed on its type and the interview was skipped.
-  it("takes what is still open written as one sentence", async () => {
-    const s = await setup({ asker: [call("ask_questions", { ...QUESTIONS, unknown: "Стиль сайта и цены доставки" })] });
-    expect(await interviewOf(s)).toMatchObject({ status: "waiting", statusReason: "questions" });
-    expect(requestsOf("asker")).toHaveLength(1);
-  });
-
-  // Seen live: "The service is temporarily busy" ended a plan for good; a moment later it would have worked.
-  it("tries a busy provider again a moment later instead of failing the interview", async () => {
-    setRetryDelays([10, 10, 10]);
-    const busy = { fail: { status: 400, message: "The service is temporarily busy. Please retry in a few seconds." } };
-    const s = await setup({ asker: [busy, busy, call("ask_questions", QUESTIONS)] });
-    expect(await interviewOf(s)).toMatchObject({ status: "waiting", statusReason: "questions" });
-    expect(requestsOf("asker")).toHaveLength(3);
-    setRetryDelays([5_000, 15_000, 30_000]);
-  });
-
-  // Seen: a plan that failed left its project "working" in the sidebar for good.
-  it("says a plan that failed for good has stalled", async () => {
-    setRetryDelays([10, 10, 10]);
-    const broken = { fail: { status: 400, message: "Bad request" } };
-    const s = await setup({ asker: [broken] });
-    expect(await interviewOf(s)).toMatchObject({ status: "failed" });
-    expect(await workOf(s.project.id)).toMatchObject({ status: "planning", planStalled: true });
-    setRetryDelays([5_000, 15_000, 30_000]);
-  });
-
-  // Seen live: a plan model answered with nothing through a reseller, and "no plan" did not say why.
-  it("says a model that answers with nothing answered with nothing", async () => {
-    const s = await setup({ asker: [noQuestions], planner: [{ text: "" }, { text: "" }] });
-    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, { task: "Сайт", models: { interview: s.ref("asker"), plan: s.ref("planner"), work: s.ref("asker"), strong: null } });
-    const work = await until(s.project.id, (w) => !!w.planTaskId);
-    let task: any;
-    for (let i = 0; i < 300; i++) {
-      task = await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json();
-      if (task.status === "failed") break;
-      await new Promise((r) => setTimeout(r, 30));
-    }
-    expect(task).toMatchObject({ status: "failed", statusReason: "empty_answer" });
-  });
-
-  // Seen live: the plan was thin even from a strong model; the user wants the pages, the technology and the look in it.
-  it("keeps the plan's pages with what is on them and the technical decisions with their reasons", async () => {
-    const full = {
-      ...PLAN,
-      screens: [{ name: "Каталог", contents: "Врачи по специальностям, свободное время, кнопка «Заказ»" }],
-      decisions: [{ what: "Vite + React", why: "быстрый старт и простая сборка" }],
-    };
-    const s = await setup({ coder: [noQuestions, call("write_plan", full)] });
+  // Asked for: the plan as Claude Code makes it. The same model in the same conversation reads only, proposes a short
+  // plan; "Go" lets it go on with everything it read, not a fresh conversation with only the plan's text.
+  it("plans in the project's conversation reading only, and goes on from the plan in the same conversation after Go", async () => {
+    const s = await setup({ coder: [call("read_file", { path: "index.html" }), proposePlan, call("write_file", { path: "about.html", content: "<h1>О нас</h1>\n" }), { text: "Сделал страницу «О нас»." }] });
     const work = await planned(s);
-    expect(work.plan).toMatchObject({ screens: full.screens, decisions: full.decisions });
-    expect(JSON.stringify(requestsOf("coder")[1]!.body.messages[0])).toMatch(/screens.*decisions/s);
+    expect(work.plan.context).toBe(PLAN_TEXT);
+    // Reading only while it plans: no writing, no commands.
+    const planning = requestsOf("coder")[0]!.body;
+    const names = (planning.tools ?? []).map((t: any) => t.function.name);
+    expect(names).toContain("read_file");
+    expect(names).toContain("propose_plan");
+    expect(names).not.toContain("write_file");
+    expect(names).not.toContain("run_command");
+    expect(JSON.stringify(planning.messages[0])).toContain("Plan mode");
+    // Nothing committed for a plan.
+    expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
+
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 })).status).toBe(200);
+    const done = await until(s.project.id, (w) => w.status === "done" && !w.planPhase);
+    expect(done.chatId).toBe(work.chatId);
+    expect(readFileSync(join(folder, "about.html"), "utf8")).toBe("<h1>О нас</h1>\n");
+    // The work's model still has what it read while planning, and the user's "Go".
+    const working = JSON.stringify(requestsOf("coder").at(-1)!.body.messages);
+    expect(working).toContain("<h1>Клиника</h1>");
+    expect(working).toContain("Одобряю план");
+    const names2 = (requestsOf("coder").at(-1)!.body.tools ?? []).map((t: any) => t.function.name);
+    expect(names2).toContain("write_file");
+    expect(names2).not.toContain("propose_plan");
   });
 
-  it("rewrites the plan with the user's corrections", async () => {
-    const s = await setup({ coder: [noQuestions, writePlan, call("write_plan", { ...PLAN, steps: ["Каталог", "Доставка"] })] });
-    await planned(s);
+  it("asks first when the interview is on, plans after the answers, and takes corrections to the plan", async () => {
+    const s = await setup({
+      coder: [
+        { text: "1. Какой стиль: тёплый или строгий? (советую тёплый)" },
+        proposePlan,
+        call("propose_plan", { plan: "# План\n- Каталог\n- Доставка" }),
+      ],
+    });
+    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
+      task: "Сайт клиники",
+      models: { interview: s.ref("coder"), plan: s.ref("coder"), work: s.ref("coder"), strong: null },
+      quick: false,
+    });
+    // It asked and stopped: the project waits for the answers, still in the plan phase.
+    const asked = await until(s.project.id, (w) => w.status !== "running" && w.planPhase && requestsOf("coder").length === 1);
+    expect(asked.plan).toBeNull();
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("2 to 6 short questions");
+    expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Тёплый" })).status).toBe(200);
+    await until(s.project.id, (w) => w.status === "ready" && w.plan?.context === PLAN_TEXT);
     expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Добавь доставку" })).status).toBe(200);
-    const work = await until(s.project.id, (w) => w.status === "ready" && w.plan.steps.includes("Доставка"));
-    expect(work.checklist.map((i: any) => i.text)).toEqual(["Каталог", "Доставка"]);
+    const fixed = await until(s.project.id, (w) => w.status === "ready" && w.plan?.context.includes("Доставка"));
+    expect(fixed.planPhase).toBe(true);
     expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("Добавь доставку");
   });
 
-  // Seen live: the provider's broken answer while the plan was rewritten left the project "planning", the box locked.
-  it("goes back to the plan there was when its rewrite fails, and takes the correction again", async () => {
-    const s = await setup({
-      coder: [noQuestions, writePlan, { fail: { status: 400, message: "Broken answer" } }, call("write_plan", { ...PLAN, steps: ["Каталог", "Тесты"] })],
-    });
-    await planned(s);
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Добавь тесты" })).status).toBe(200);
-    const back = await until(s.project.id, (w) => w.status === "ready" && w.planStalled === false);
-    expect(back.plan.steps).not.toContain("Тесты");
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Добавь тесты" })).status).toBe(200);
-    const work = await until(s.project.id, (w) => w.status === "ready" && w.plan.steps.includes("Тесты"));
-    expect(work.plan.steps).toEqual(["Каталог", "Тесты"]);
+  // Asked for: a cap that really stops: the budget is for one message's work.
+  it("stops a message's work at its budget, whatever the project spent before", async () => {
+    const big = { prompt_tokens: 1_000_000, completion_tokens: 0 };
+    const s = await setup({ coder: [{ text: "Первое.", usage: big }, { ...call("list_files", { path: "." }), usage: big }, { text: "Второе." }] }, PRICED);
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("PATCH", `/api/projects/${s.project.id}/work`, { budgetUsd: 0.5 });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Первое", model: s.ref("coder") });
+    // The first message spent a dollar in one step: it was over at its end.
+    await until(s.project.id, (w) => w.status !== "running" && requestsOf("coder").length === 1);
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Второе", model: s.ref("coder") });
+    const paused = await until(s.project.id, (w) => w.status === "paused" && requestsOf("coder").length === 2);
+    expect(paused.reason).toBe("budget");
   });
 
-  it("goes on \"Go\": the project's conversation in its folder, the agent's checklist, files, and done with finish_work", async () => {
-    const s = await setup({
-      coder: [
-        noQuestions,
-        writePlan,
-        call("write_file", { path: "catalog.html", content: "<ul></ul>\n" }),
-        call("update_checklist", { items: [{ text: "Каталог", done: true }, { text: "Калькулятор", done: true }, { text: "Проверить страницы", done: true }] }),
-        call("finish_work", { report: "Сделал каталог и калькулятор. Запуск: npm run dev." }),
-        { text: "Готово: каталог и калькулятор." },
-      ],
-    });
-    await planned(s);
-    const res = await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    expect(res.status).toBe(200);
-    const { chatId } = await res.json();
-    const work = await until(s.project.id, (w) => w.status === "done");
-    expect(work.checklist.every((i: any) => i.done)).toBe(true);
-    expect(work.actions).toBeGreaterThanOrEqual(3);
-    expect(readFileSync(join(folder, "catalog.html"), "utf8")).toBe("<ul></ul>\n");
-    const chat = await (await env.call("GET", `/api/chats/${chatId}`)).json();
-    expect(chat).toMatchObject({ projectId: s.project.id, itemId: null, folder });
-    expect(chat.messages[0]).toMatchObject({ role: "user" });
-    expect(chat.messages[0].content).toContain("Каталог");
-    expect(chat.messages.at(-1)).toMatchObject({ role: "assistant", status: "done" });
-    // The report is the answer's own text: it stays when the user writes on (seen: a card at the end vanished).
-    expect(chat.messages.at(-1).content).toContain("Сделал каталог и калькулятор. Запуск: npm run dev.");
-    // The work is committed in the branch the project is on, no branch of the agent's own (asked for).
-    expect(git(folder, "branch", "--show-current")).toBe("main");
-    expect(git(folder, "log", "--oneline", "main").split("\n").length).toBeGreaterThan(1);
-    expect(git(folder, "status", "--porcelain")).toBe("");
-    // The plan's task is over once the work started.
-    expect((await (await env.call("GET", `/api/tasks/${work.planTaskId}`)).json()).statusReason).toBe("started");
+  // The working model keeps failing: the strong one takes over, when the project has one.
+  it("hands the work to the strong model when the working one keeps failing", async () => {
+    const s = await setup({ coder: [{ fail: { status: 400, message: "Broken" } }, { fail: { status: 400, message: "Broken" } }], strong: [{ text: "Сделал." }] });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай", model: s.ref("coder"), strong: s.ref("strong") });
+    const done = await until(s.project.id, (w) => w.status === "done");
+    expect(done.escalated).toBe(true);
+    expect(requestsOf("strong")).toHaveLength(1);
   });
 
   // Seen: four MCP servers were switched on and the project's run had none of them (only the interview did).
@@ -338,11 +183,9 @@ describe("work on a project", () => {
     await env.call("POST", "/api/mcp", { name: "demo", command: process.execPath, args: [server], trust: "trusted" });
     const s = await setup({
       coder: [
-        noQuestions,
-        writePlan,
+        proposePlan,
         call("mcp_demo_echo", { text: "кедр" }),
-        call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
-        call("finish_work", { report: "Готово." }),
+        { text: "Готово." },
         { text: "Готово." },
       ],
     });
@@ -357,11 +200,9 @@ describe("work on a project", () => {
   it("takes a message the user writes while it works into the next answer, and goes on", async () => {
     const s = await setup({
       coder: [
-        noQuestions,
-        writePlan,
+        proposePlan,
         { ...call("list_files", { path: "." }), delayMs: 600 },
-        call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
-        call("finish_work", { report: "Готово, кнопка зелёная." }),
+        { text: "Готово, кнопка зелёная." },
       ],
     });
     await planned(s);
@@ -370,7 +211,7 @@ describe("work on a project", () => {
     const sent = await (await env.call("POST", `/api/projects/${s.project.id}/work/message`, { content: "Сделай кнопку зелёной" })).json();
     expect(sent.queued).toBe(true);
     await until(s.project.id, (w) => w.status === "done");
-    const later = requestsOf("coder").slice(3);
+    const later = requestsOf("coder").slice(2);
     expect(later.some((r) => JSON.stringify(r.body.messages).includes("Сделай кнопку зелёной"))).toBe(true);
     const chat = await (await env.call("GET", `/api/chats/${sent.chatId}`)).json();
     expect(chat.messages.filter((m: any) => m.role === "user").map((m: any) => m.content)).toContain("Сделай кнопку зелёной");
@@ -381,41 +222,22 @@ describe("work on a project", () => {
     const s = await setup(
       {
         coder: [
-          noQuestions,
-          writePlan,
+          proposePlan,
           { ...call("list_files", { path: "." }), usage: { prompt_tokens: 100_000, completion_tokens: 1000 } },
           { ...call("list_files", { path: "." }), delayMs: 1500 },
-          call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
-          call("finish_work", { report: "Готово." }),
+          { text: "Готово." },
         ],
       },
       PRICED,
     );
     await planned(s);
     await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 5, hours: 2 });
-    const during = await until(s.project.id, (w) => w.status === "running" && w.spentUsd > 0);
+    const during = await until(s.project.id, (w) => w.status === "running" && w.spentUsd > 0.05);
     expect(during.workedMs).toBeGreaterThan(0);
     expect(during.spentUsd).toBeCloseTo(0.102, 3);
     const done = await until(s.project.id, (w) => w.status === "done");
-    // The code review before the end costs a little too.
     expect(done.spentUsd).toBeGreaterThanOrEqual(during.spentUsd);
     expect(done.spentUsd).toBeLessThan(during.spentUsd + 0.01);
-  });
-
-  it("asks without waiting: the question is kept and the work goes on", async () => {
-    const s = await setup({
-      coder: [
-        noQuestions,
-        writePlan,
-        call("ask_user", { question: "Нужна доставка?", assumption: "Пока без доставки" }),
-        call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
-        call("finish_work", { report: "Готово." }),
-      ],
-    });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    const work = await until(s.project.id, (w) => w.status === "done");
-    expect(work.questions).toEqual([expect.objectContaining({ question: "Нужна доставка?", assumption: "Пока без доставки" })]);
   });
 
   it("stops when the budget runs out, and goes on once it is raised", async () => {
@@ -423,11 +245,9 @@ describe("work on a project", () => {
     const s = await setup(
       {
         coder: [
-          noQuestions,
-          writePlan,
+          proposePlan,
           { ...call("list_files", { path: "." }), usage: big },
-          call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
-          call("finish_work", { report: "Готово." }),
+          { text: "Готово." },
         ],
       },
       PRICED,
@@ -440,26 +260,6 @@ describe("work on a project", () => {
     await env.call("PATCH", `/api/projects/${s.project.id}/work`, { budgetUsd: 5 });
     expect((await env.call("POST", `/api/projects/${s.project.id}/work/continue`)).status).toBe(200);
     expect(await until(s.project.id, (w) => w.status === "done")).toMatchObject({ budgetUsd: 5 });
-  });
-
-  it("reminds a model that stops without finish_work, then hands the work to the strong model", async () => {
-    const s = await setup({
-      coder: [noQuestions, writePlan, { text: "Сделал." }, { text: "Всё." }, { text: "Готово." }, { text: "Точно готово." }],
-      strong: [call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Доделал." })],
-    });
-    await planned(s, { strong: "strong" });
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    const work = await until(s.project.id, (w) => w.status === "done" || w.status === "paused");
-    expect(work).toMatchObject({ status: "done", escalated: true });
-    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toMatch(/Open checklist items: Каталог; Калькулятор; Проверить страницы/);
-    expect(requestsOf("strong").length).toBeGreaterThan(0);
-  });
-
-  it("waits as stuck when there is no strong model", async () => {
-    const s = await setup({ coder: [noQuestions, writePlan, { text: "1" }, { text: "2" }, { text: "3" }, { text: "4" }] });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    expect(await until(s.project.id, (w) => w.status === "paused")).toMatchObject({ reason: "stuck" });
   });
 
   it("refuses to plan in a folder without git", async () => {
@@ -477,27 +277,16 @@ describe("work on a project", () => {
 
   // Seen live: after "Go" the agent wrote in English until the user asked in Russian.
   it("tells the working model to write in the user's language", async () => {
-    const s = await setup({ coder: [noQuestions, writePlan, call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Готово." })] });
+    const s = await setup({ coder: [proposePlan, { text: "Готово." }] });
     await planned(s);
     await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
     await until(s.project.id, (w) => w.status === "done");
     expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages[0])).toMatch(/language the user writes in/);
   });
 
-  // Seen live: the checklist stayed unticked for an hour and a half until the user asked why.
-  it("reminds the agent to tick the checklist after many actions without it", async () => {
-    const busy = Array.from({ length: 26 }, () => call("list_files", { path: "." }));
-    const s = await setup({ coder: [noQuestions, writePlan, ...busy, call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Готово." })] });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    await until(s.project.id, (w) => w.status === "done");
-    expect(requestsOf("coder").some((r) => JSON.stringify(r.body.messages).includes("Tick off in the checklist"))).toBe(true);
-  });
-
-  // Seen live: the report came before the end and the work trailed off in thoughts; the user wants the result started.
   // The workspace's "Changes": what the agent did to the folder since the last commit, new files too, index untouched.
   it("shows the folder's changes since the last commit", async () => {
-    const s = await setup({ coder: [noQuestions] });
+    const s = await setup({ coder: [proposePlan] });
     writeFileSync(join(folder, "index.html"), "<h1>Клиника «Здоровье»</h1>\n");
     mkdirSync(join(folder, "src"));
     writeFileSync(join(folder, "src", "app.js"), "export const a = 1;\n");
@@ -509,193 +298,18 @@ describe("work on a project", () => {
     expect(git(folder, "diff", "--cached", "--name-only")).toBe("");
   });
 
-  it("keeps the report apart and starts the finished project, until it is stopped", async () => {
-    const port = 41000 + Math.floor(Math.random() * 2000);
-    writeFileSync(join(folder, "server.js"), `require("http").createServer((q, r) => r.end("ok")).listen(${port});\n`);
-    const s = await setup({
-      coder: [
-        noQuestions,
-        writePlan,
-        call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }),
-        call("finish_work", { report: "Сделал сайт. Запуск: node server.js.", start: { command: "node server.js", url: `http://localhost:${port}/` } }),
-      ],
-    });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    const done = await until(s.project.id, (w) => w.status === "done" && w.site?.running);
-    expect(done).toMatchObject({ report: "Сделал сайт. Запуск: node server.js.", site: { url: `http://localhost:${port}/`, running: true } });
-    // The report after the work: the actions it took and the checklist.
-    const report = await (await env.call("GET", `/api/projects/${s.project.id}/work/report`)).json();
-    expect(report).toMatchObject({ checklist: { done: PLAN.steps.length, total: PLAN.steps.length } });
-    expect(report.actions.map((a: { name: string }) => a.name)).toEqual(expect.arrayContaining(["update_checklist", "finish_work"]));
-    // The process runs at once; the server listens a moment later.
-    let answer = "";
-    for (let i = 0; i < 50 && answer !== "ok"; i++) {
-      answer = await fetch(`http://localhost:${port}/`).then((r) => r.text(), () => "");
-      if (answer !== "ok") await new Promise((r) => setTimeout(r, 100));
-    }
-    expect(answer).toBe("ok");
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/site/stop`)).status).toBe(200);
-    expect((await workOf(s.project.id)).site).toMatchObject({ running: false });
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/site/start`)).status).toBe(200);
-    await until(s.project.id, (w) => w.site?.running);
-    await env.call("POST", `/api/projects/${s.project.id}/work/site/stop`);
-    // The folder is free once the process is gone.
-    for (let i = 0; i < 50 && (await fetch(`http://localhost:${port}/`).then(() => true, () => false)); i++) await new Promise((r) => setTimeout(r, 100));
-    await new Promise((r) => setTimeout(r, 300));
-  });
-
-  // Asked for: the agent judged its pages only by "is it there", never by how they look.
-  it("has the result's look reviewed once before it is done: the pages on a desktop and a phone, notes for one round of polish", async () => {
-    const port = 43000 + Math.floor(Math.random() * 2000);
-    writeFileSync(join(folder, "server.js"), `require("http").createServer((q, r) => r.end("<h1>ok</h1>")).listen(${port});\n`);
-    const shots: { url: string; width: number }[] = [];
-    env.setScreenshot(async (url, size) => {
-      shots.push({ url, width: size.width });
-      return Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
-    });
-    const url = `http://localhost:${port}/`;
-    const brief = { direction: "Тихая бухгалтерия", concept: "Спокойный светлый кабинет", palette: [{ role: "фон", hex: "#F6F7F4" }, { role: "текст", hex: "#111827" }, { role: "акцент", hex: "#157F5B" }], fonts: { heading: { name: "Golos Text", kind: "sans-serif" }, body: { name: "Inter", kind: "sans-serif" } }, rules: ["Иконки — линейные SVG"] };
-    const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
-    const finishing = call("finish_work", { report: "Готово.", start: { command: "node server.js", url } });
-    const reviews: string[] = [];
-    fake = await startFakeProvider({
-      key: KEY,
-      models: [
-        { id: "coder", supported_parameters: ["tools"] },
-        { id: "eyes", architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } },
-      ],
-      respond: (body) => {
-        if (body.model === "eyes") {
-          reviews.push(JSON.stringify(body.messages));
-          return { text: "POLISH\n- Иконки категорий — эмодзи: заменить на линейные SVG\n- На телефоне суммы налезают на названия: перенести суммы на новую строку" };
-        }
-        if (isReviewer(body)) return call("report_review", { issues: [], summary: "Проблем нет." });
-        return queue.shift() ?? { text: "Готово." };
-      },
-    });
-    const queue: FakeTurn[] = [noQuestions, call("write_plan", { ...PLAN, pages: [{ url, command: "node server.js" }], design: brief }), done, finishing, call("write_file", { path: "index.html", content: "<h1>ok</h1>\n" }), finishing];
-    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
-    await env.call("PATCH", "/api/settings", { visionModel: { providerId: provider.id, model: "eyes" } });
-    const project = await (await env.call("POST", "/api/projects", { path: folder })).json();
-    const ref = { providerId: provider.id, model: "coder" };
-    await env.call("POST", `/api/projects/${project.id}/work/plan`, { task: "Сайт", models: { interview: ref, plan: ref, work: ref, strong: null } });
-    await until(project.id, (w) => w.status === "ready");
-    await env.call("POST", `/api/projects/${project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    const w = await until(project.id, (x) => x.status === "done");
-
-    // One review, against the plan's brief, of the page on a desktop and a phone.
-    expect(reviews).toHaveLength(1);
-    expect(reviews[0]).toContain("Тихая бухгалтерия");
-    // The report counts the agent's actions, not the screenshots' marks or Drimvox's own review (seen: "Calls screenshot").
-    const report = await (await env.call("GET", `/api/projects/${project.id}/work/report`)).json();
-    expect(report.actions.map((a: { name: string }) => a.name)).not.toEqual(expect.arrayContaining(["screenshot"]));
-    expect(report.actions.map((a: { name: string }) => a.name)).not.toEqual(expect.arrayContaining(["design_review"]));
-    expect(shots).toEqual(expect.arrayContaining([{ url, width: 1280 }, { url, width: 390 }]));
-    // The first finish_work brought the notes, not the end; the second one ended the work.
-    const coder = requestsOf("coder").map((r) => JSON.stringify(r.body.messages));
-    expect(coder.some((m) => m.includes("Иконки категорий — эмодзи"))).toBe(true);
-    expect(w.report).toBe("Готово.");
-    await env.call("POST", `/api/projects/${project.id}/work/site/stop`);
-    for (let i = 0; i < 50 && (await fetch(url).then(() => true, () => false)); i++) await new Promise((r) => setTimeout(r, 100));
-    // The folder is free once both processes (the review's and the started site) are gone: Windows lets go of it late.
-    await new Promise((r) => setTimeout(r, 1500));
-  });
-
   it("offers the project's skills in the run, and the agent can open one", async () => {
     mkdirSync(join(folder, ".drimvox", "skills", "style"), { recursive: true });
     writeFileSync(join(folder, ".drimvox", "skills", "style", "SKILL.md"), ["---", "name: style", "description: When making pages for this site", "---", "Use the brand green.", ""].join("\n"));
     const s = await setup({
-      coder: [noQuestions, writePlan, call("use_skill", { name: "style" }), call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), call("finish_work", { report: "Готово." })],
+      coder: [proposePlan, call("use_skill", { name: "style" }), { text: "Готово." }],
     });
     await planned(s);
     await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
     await until(s.project.id, (w) => w.status === "done");
-    const run = requestsOf("coder").slice(2);
+    const run = requestsOf("coder").slice(1);
     expect(JSON.stringify(run[0]!.body.messages[0])).toContain("style: When making pages for this site");
     expect(JSON.stringify(run[1]!.body.messages)).toContain("Use the brand green.");
-  });
-
-  // Seen live: three skills were switched on and only one was ever opened, at the very start.
-  it("names the skills not opened yet before the work is done, once", async () => {
-    mkdirSync(join(folder, ".drimvox", "skills", "verify"), { recursive: true });
-    writeFileSync(join(folder, ".drimvox", "skills", "verify", "SKILL.md"), ["---", "name: verify", "description: Use when about to claim work is complete", "---", "Run the checks first.", ""].join("\n"));
-    const done = call("finish_work", { report: "Готово." });
-    const s = await setup({
-      coder: [noQuestions, writePlan, call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) }), done, call("use_skill", { name: "verify" }), done],
-    });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    await until(s.project.id, (w) => w.status === "done");
-    const sent = JSON.stringify(requestsOf("coder").at(-1)!.body.messages);
-    expect(sent).toContain("Before you finish: these skills are ready and you have not opened them.");
-    expect(sent).toContain("verify: Use when about to claim work is complete");
-    expect(sent).toContain("Run the checks first.");
-  });
-
-  // Seen live: a team board let anyone listen to any board over WebSocket; the coder's own tests never looked there.
-  it("has the code reviewed once before it is done, by the working model, with the user's security skills", async () => {
-    mkdirSync(join(folder, ".drimvox", "skills", "owasp"), { recursive: true });
-    writeFileSync(join(folder, ".drimvox", "skills", "owasp", "SKILL.md"), ["---", "name: owasp", "description: Security review checklist", "---", "Check every real-time channel.", ""].join("\n"));
-    const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
-    const finishing = call("finish_work", { report: "Готово." });
-    // A server: there is something to attack (a static page alone gets no review, below).
-    writeFileSync(join(folder, "server.js"), "const http = require('http');\n");
-    const issue = { severity: "high", where: "src/ws.ts", problem: "Anyone can subscribe to any board", fix: "Check team membership on connect" };
-    const s = await setup({
-      // Finishing: first the skill not opened yet, then the review's problems, then done.
-      coder: [noQuestions, writePlan, done, finishing, call("use_skill", { name: "owasp" }), finishing, call("write_file", { path: "ws.js", content: "// checked\n" }), finishing],
-      reviewer: [call("report_review", { issues: [issue, { ...issue, severity: "low", problem: "Naming" }], summary: "One hole." })],
-    });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    await until(s.project.id, (w) => w.status === "done");
-    const reviews = fake!.requests.filter((r) => r.path === "/v1/chat/completions" && isReviewer(r.body));
-    expect(reviews).toHaveLength(1);
-    expect(reviews[0]!.body.model).toBe("coder");
-    expect(JSON.stringify(reviews[0]!.body.messages[0])).toContain("Check every real-time channel.");
-    const sent = JSON.stringify(requestsOf("coder").at(-1)!.body.messages);
-    expect(sent).toContain("A code reviewer read the project");
-    expect(sent).toContain("Anyone can subscribe to any board");
-    // Low ones are not worth a round of fixes.
-    expect(sent).not.toContain("Naming");
-    // The sending back is in the conversation for the user to see (seen live: "the review asks for…" out of nowhere).
-    const work = await (await env.call("GET", `/api/projects/${s.project.id}/work`)).json();
-    const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
-    const activity = chat.messages.flatMap((m: any) => m.activity);
-    expect(activity).toContainEqual(expect.objectContaining({ name: "sent_back", input: "code:1" }));
-    expect(activity).toContainEqual(expect.objectContaining({ name: "sent_back", input: "skills:1" }));
-  });
-
-  // Seen live: each "Go on" after the time limit ran the review again, it found new things each time, the work went in
-  // circles for hours.
-  it("reviews the code once for the task, not again after a Stop and Continue", async () => {
-    const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
-    const finishing = call("finish_work", { report: "Готово." });
-    writeFileSync(join(folder, "server.js"), "const http = require('http');\n");
-    const issue = { severity: "high", where: "server.js", problem: "No auth", fix: "Add auth" };
-    const s = await setup({
-      coder: [noQuestions, writePlan, done, finishing, { text: "Чиню.", delayMs: 3000 }, finishing],
-      reviewer: [call("report_review", { issues: [issue], summary: "One hole." }), call("report_review", { issues: [issue], summary: "Again." })],
-    });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    await until(s.project.id, () => fake!.requests.some((r) => r.path === "/v1/chat/completions" && isReviewer(r.body)) && requestsOf("coder").length >= 5);
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/stop`)).status).toBe(200);
-    await until(s.project.id, (w) => w.status === "stopped");
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/continue`)).status).toBe(200);
-    await until(s.project.id, (w) => w.status === "done");
-    expect(fake!.requests.filter((r) => r.path === "/v1/chat/completions" && isReviewer(r.body))).toHaveLength(1);
-  });
-
-  // Asked for: a plain HTML page was reviewed for security; it has no server, no accounts and no one's data.
-  it("gives a static page no security review", async () => {
-    const done = call("update_checklist", { items: PLAN.steps.map((text) => ({ text, done: true })) });
-    const s = await setup({ coder: [noQuestions, writePlan, call("write_file", { path: "app.js", content: "document.title = 'Погода';\n" }), done, call("finish_work", { report: "Готово." })] });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    await until(s.project.id, (w) => w.status === "done");
-    expect(fake!.requests.filter((r) => r.path === "/v1/chat/completions" && isReviewer(r.body))).toHaveLength(0);
   });
 
   it("is done by Claude Code itself in the project's folder when the working model is on a subscription", async () => {
@@ -703,22 +317,21 @@ describe("work on a project", () => {
     process.env.FAKE_CLI_DIR = dir;
     writeFileSync(join(dir, "script.json"), JSON.stringify([{ text: "Сделал калькулятор.", files: { "calculator.html": "<form></form>\n" } }]));
     env.setCliCommand("claude-code", [process.execPath, fileURLToPath(new URL("./fake-cli.mjs", import.meta.url)), "claude"]);
-    const s = await setup({ coder: [noQuestions, writePlan] });
+    const s = await setup({ coder: [proposePlan] });
     const cli = await (await env.call("POST", "/api/providers", { preset: "claude-code" })).json();
     await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
       task: "Сайт клиники",
       models: { interview: s.ref("coder"), plan: s.ref("coder"), work: { providerId: cli.id, model: "default" }, strong: null },
     });
-    await until(s.project.id, (w) => w.status === "ready");
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
-    await until(s.project.id, (w) => w.status === "done");
+    // Its tools cannot be held to reading: the request goes to it as a message, without a plan phase.
+    const done = await until(s.project.id, (w) => w.status === "done");
+    expect(done.planPhase).toBe(false);
     expect(readFileSync(join(folder, "calculator.html"), "utf8")).toBe("<form></form>\n");
     rmSync(dir, { recursive: true, force: true });
   });
 });
 
-// Asked for: a ready project works like the chat with a folder (no interview, no plan to approve), and the agent keeps
-// its own plan for the sidebar.
+// Asked for: a project works like the chat with a folder: each message is a turn, no checklist.
 describe("a ready project", () => {
   it("guesses a ready project by the files in its folder", async () => {
     expect(await (await env.call("POST", "/api/projects/peek", { path: folder })).json()).toEqual({ files: 1, guess: "existing" });
@@ -764,10 +377,9 @@ describe("a ready project", () => {
     expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("60 steps on this message");
   });
 
-  it("answers the first message at once, keeps its plan, ends without finish_work and goes on with the next message", async () => {
+  it("answers the first message at once, ends as a chat does and goes on with the next message", async () => {
     const s = await setup({
       coder: [
-        call("update_checklist", { items: [{ text: "Найти ошибку", done: true }, { text: "Поправить", done: false }] }),
         { text: "Нашёл и поправил: сумма считается заново." },
         { text: "Это главная страница." },
       ],
@@ -777,23 +389,22 @@ describe("a ready project", () => {
     expect(res.status).toBe(200);
     let work = await until(s.project.id, (w) => w.status === "done");
     expect(work.plan).toBeNull();
-    expect(work.checklist).toEqual([{ text: "Найти ошибку", done: true }, { text: "Поправить", done: false }]);
     // No reminders to finish: it answered and stopped, as in a chat.
-    expect(requestsOf("coder")).toHaveLength(2);
-    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("existing project");
+    expect(requestsOf("coder")).toHaveLength(1);
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("connected a folder");
     const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
     expect(chat.messages.map((m: any) => m.content)).toEqual(["Почини сумму", "Нашёл и поправил: сумма считается заново."]);
 
     // Written to once, the project's kind stays (asked for).
     expect((await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "new" })).status).toBe(409);
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "А это что?", model: s.ref("coder") });
-    work = await until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length === 3);
+    work = await until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length === 2);
     const again = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
     expect(again.messages.at(-1).content).toBe("Это главная страница.");
   });
 
   // Seen live: the agent started the same server three times, as each answer's end stopped it.
-  it("keeps a server the agent started running between the user's messages, and asks for no endless polishing", async () => {
+  it("keeps a server the agent started running between the user's messages", async () => {
     const s = await setup({
       coder: [
         call("start_background", { command: 'node -e "setInterval(() => {}, 1000)"' }),
@@ -806,7 +417,6 @@ describe("a ready project", () => {
     await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Запусти сайт", model: s.ref("coder") });
     await until(s.project.id, (w) => w.status === "done");
-    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("no endless polishing");
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Он работает?", model: s.ref("coder") });
     await until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length === 5);
     expect(JSON.stringify(requestsOf("coder")[3]!.body.messages)).toContain("Process 1 (running)");
@@ -872,29 +482,6 @@ describe("a ready project", () => {
     expect(sent).not.toContain("Первая задача готова.");
     expect(sent).toContain("Сайт клиники, запуск: npm run dev");
     expect((await env.call("GET", `/api/chats/${first.chatId}`)).status).toBe(200);
-  });
-
-  // Said in a video on agents: take the raw output of the tests, not the model's word that all is fixed.
-  it("runs the project's tests itself before the work is done: a failure goes back to the agent, a pass into the report", async () => {
-    writeFileSync(join(folder, "package.json"), JSON.stringify({ name: "shop", scripts: { test: "node check.js" } }));
-    writeFileSync(join(folder, "check.js"), "console.error('FAIL: сумма неверна'); process.exit(1);\n");
-    git(folder, "add", "-A");
-    git(folder, "commit", "-q", "-m", "Tests");
-    const s = await setup({
-      coder: [
-        call("finish_work", { report: "Всё починил, тесты проходят." }),
-        call("write_file", { path: "check.js", content: "console.log('ok: 3 tests');\n" }),
-        call("finish_work", { report: "Починил сумму." }),
-      ],
-    });
-    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
-    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Почини сумму", model: s.ref("coder") });
-    const work = await until(s.project.id, (w) => w.status === "done");
-    expect(JSON.stringify(requestsOf("coder")[1]!.body.messages)).toContain("FAIL: сумма неверна");
-    expect(work.report).toContain("Починил сумму.");
-    expect(work.report).toMatch(/npm test.*прошли/);
-    // A passed check is one line; its output is not pasted under the report (seen: a build's raw output, unreadable).
-    expect(work.report).not.toContain("ok: 3 tests");
   });
 
   // Asked for: changed files shown in the conversation where the agent changed them, with the lines added and removed.
@@ -1040,29 +627,21 @@ describe("a project's git rules", () => {
     return until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length >= turns);
   };
 
-  it("commits in the project's branch when the agent says, leaves secrets out, and tells the agent how to write", async () => {
-    const s = await ready([
-      call("write_file", { path: "cart.js", content: "total()\n" }),
-      call("write_file", { path: ".env", content: "KEY=secret\n" }),
-      call("commit_changes", { message: "Fix cart total" }),
-      { text: "Готово." },
-    ]);
-    await ask(s, "Почини корзину", 4);
+  // Asked for: no commits by hand and no agent's rituals; Drimvox commits the answer's changes at its end.
+  it("commits the answer's changes in the project's branch in one commit, leaves secrets out", async () => {
+    const s = await ready([call("write_file", { path: "cart.js", content: "total()\n" }), call("write_file", { path: ".env", content: "KEY=secret\n" }), { text: "Готово." }]);
+    await ask(s, "Почини корзину", 3);
     expect(git(folder, "branch", "--show-current")).toBe("main");
-    // The agent's own commit, then Drimvox's with the project's state for whoever picks it up next.
-    expect(git(folder, "log", "--format=%s", "-2").split("\n")).toEqual(["Почини корзину", "Fix cart total"]);
-    expect(git(folder, "show", "--name-only", "--format=", "HEAD~1").split("\n")).toEqual(["cart.js"]);
-    // AGENTS.md only: pointer files for other agents only when the settings ask (asked for: not every agent is Claude).
-    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n")).toEqual(["AGENTS.md"]);
+    expect(git(folder, "log", "--format=%s", "-1")).toBe("Почини корзину");
+    // With the project's state for whoever picks it up next; pointer files only when the settings ask.
+    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["AGENTS.md", "cart.js"]);
     const agents = readFileSync(join(folder, "AGENTS.md"), "utf8");
     expect(agents).toContain("## Project state (kept by Drimvox)");
     expect(agents).toContain("Goal: Почини корзину");
     expect(agents).toContain("Git branch: main");
     expect(existsSync(join(folder, "CLAUDE.md"))).toBe(false);
     expect(git(folder, "status", "--porcelain")).toBe("?? .env");
-    const system = JSON.stringify(requestsOf("coder")[0]!.body.messages[0]);
-    expect(system).toContain("commit_changes");
-    expect(system).toContain("in English");
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.tools ?? []).includes("commit_changes")).toBe(false);
     const view = await (await env.call("GET", `/api/projects/${s.project.id}/git`)).json();
     expect(view.state).toMatchObject({ branch: "main", base: null, github: false, pullRequest: null });
   });

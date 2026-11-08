@@ -43,6 +43,7 @@ import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
 import { useLiveAnswer } from "./useLiveAnswer";
 import { useProjectWork } from "../projects/useProjectWork";
+import { ChatPlanCard } from "../projects/ChatPlanCard";
 import { noticeLookNow } from "../NoticeSoundSetting";
 import { ShotsContext, type Shot } from "../ShotGallery";
 
@@ -538,6 +539,12 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                   />
                 </>
               )}
+              {/* The plan the model proposed, with "Go" (asked for: as Claude Code, in the same conversation). */}
+              {workshop &&
+                work?.planPhase &&
+                work.status === "ready" &&
+                work.plan &&
+                at("plan", Date.now(), <ChatPlanCard work={work} onChanged={() => void reloadWork()} />, true)}
               <div ref={end} />
             </div>
           </ShotsContext.Provider>

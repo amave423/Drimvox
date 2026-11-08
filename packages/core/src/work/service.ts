@@ -9,7 +9,8 @@ import type { ChatRepo } from "../chats/repo";
 import { isCli } from "../cli/kinds";
 import { planMessage, projectRules } from "./prompt";
 import type { ProjectWorkRepo } from "./repo";
-import { WorkRun, type RunDeps } from "./run";
+import { WorkRun, type Carried, type RunDeps } from "./run";
+import { GO_MESSAGE } from "./plan-mode";
 
 /** Refusals the API turns into 409 with a code the UI explains. */
 export class WorkRefused extends Error {
@@ -30,6 +31,12 @@ const QUICK = { interview: false, spec: false, approveSpec: false, testsFirst: f
  */
 export class ProjectWork {
   private readonly runs = new Map<string, WorkRun>();
+  /** Each project's last conversation as the model had it (RunDeps.carry); kept in memory, made again after a restart. */
+  private readonly kept = new Map<string, Carried>();
+  private readonly carried = {
+    get: (projectId: string) => this.kept.get(projectId) ?? null,
+    set: (projectId: string, carried: Carried | null) => void (carried ? this.kept.set(projectId, carried) : this.kept.delete(projectId)),
+  };
   /** The finished project Drimvox started for the user, by project: its background process. */
   private readonly sites = new Map<string, number>();
 
@@ -58,6 +65,7 @@ export class ProjectWork {
       status: row?.status ?? "idle",
       // Seen: a plan that failed left its project "working" in the sidebar for good.
       planStalled: this.stalled(projectId),
+      planPhase: this.o.repo.phase(projectId).plan,
       reason: row?.reason ?? null,
       detail: row?.detail ?? null,
       models: row?.models ?? null,
@@ -115,21 +123,39 @@ export class ProjectWork {
     return this.o.repo.projectIds().map((id) => this.view(id));
   }
 
-  /** The interview, then the plan: a task of the project, with the interview's model first. */
-  async plan(projectId: string, task: string, models: ProjectModels, quick = false): Promise<TaskView> {
+  /**
+   * The plan as Claude Code makes it (asked for): in the project's own conversation, by its working model, reading only;
+   * with `quick` false it asks what it must know first. The interview's and the plan's own models are gone: one model
+   * plans and then works, with everything it read.
+   */
+  async plan(projectId: string, task: string, models: ProjectModels, quick = false): Promise<{ chatId: string }> {
     const project = this.o.projects.get(projectId);
     if (!project || !(await isRepoRoot(project.path))) throw new WorkRefused("not_repo");
     if (this.runs.has(projectId)) throw new WorkRefused("busy");
-    const first = quick ? models.plan : models.interview;
-    const view = await this.o.runner.start(projectId, {
-      task,
-      providerId: first.providerId,
-      model: first.model,
-      stages: quick ? QUICK : INTERVIEW,
-      kind: "plan",
+    const row = this.o.repo.get(projectId);
+    const work = models.work;
+    // Claude Code, Codex and the like work with their own loop: their tools cannot be held to reading, so the message
+    // goes to them as it is.
+    const conn = this.o.run.providers.connection(work.providerId);
+    if (conn && isCli(conn.preset)) return { chatId: this.chat(projectId, task, work, { strong: models.strong ?? null }).chatId };
+    const known = row?.chatId ? this.o.chats.get(row.chatId) : null;
+    const chat = known ?? this.o.chats.create(work.providerId, work.model, "text", { folder: project.path, projectId, itemId: null, title: project.name });
+    if (known) this.o.chats.update(chat.id, { providerId: work.providerId, model: work.model });
+    this.o.backlog.clearPlan(projectId);
+    this.o.repo.setPhase(projectId, { plan: true, interview: !quick });
+    this.o.repo.update(projectId, {
+      models: { interview: work, plan: work, work, strong: models.strong ?? null },
+      chatId: chat.id,
+      planTaskId: null,
+      planned: false,
+      ...(row?.startedAt ? {} : { startedAt: Date.now(), workedMs: 0, checklist: [] }),
+      reason: null,
+      detail: null,
+      escalated: false,
+      report: null,
     });
-    this.o.repo.update(projectId, { models, planTaskId: view.id, status: "planning", reason: null, detail: null, escalated: false });
-    return view;
+    this.launch(projectId, chat.id, project.path, task, "plan");
+    return { chatId: chat.id };
   }
 
   /** The interview or the plan stopped on an error (a provider's broken answer, a Stop). */
@@ -146,28 +172,48 @@ export class ProjectWork {
     if (this.stalled(projectId) && this.o.backlog.plan(projectId)) this.o.repo.update(projectId, { status: "ready" });
   }
 
-  /** The user's corrections to the plan: its model writes it again. */
-  revise(projectId: string, note: string): TaskView {
+  /**
+   * The user's answers or corrections in the plan phase: the same model, in the same conversation, still reading only,
+   * proposes the plan again. A plan of the old kind (a separate task) is rewritten by its task as before.
+   */
+  revise(projectId: string, note: string): { chatId: string | null } {
     const row = this.o.repo.get(projectId);
+    const project = this.o.projects.get(projectId);
+    if (row?.chatId && project && this.o.repo.phase(projectId).plan) {
+      const live = this.runs.get(projectId);
+      if (live) {
+        this.o.chats.addMessage({ chatId: row.chatId, role: "user", content: note, status: "done" });
+        live.post(note);
+      } else this.launch(projectId, row.chatId, project.path, note, "plan");
+      return { chatId: row.chatId };
+    }
     const stalled = this.stalled(projectId);
     if (!row?.planTaskId || (row.status !== "ready" && !stalled)) throw new WorkRefused("no_plan");
     const ask = `The user asks to change the plan: ${note}\n\nCall write_plan again with the whole new plan.`;
     // After a failure the same task goes on with the user's words: the interview, or the plan written again.
     const task = this.o.runner.view(row.planTaskId);
-    const view = ["failed", "stopped"].includes(task?.status ?? "")
-      ? this.o.runner.continue(row.planTaskId, this.o.backlog.plan(projectId) ? ask : note)
-      : this.o.runner.revisePlan(row.planTaskId, note);
+    if (["failed", "stopped"].includes(task?.status ?? "")) this.o.runner.continue(row.planTaskId, this.o.backlog.plan(projectId) ? ask : note);
+    else this.o.runner.revisePlan(row.planTaskId, note);
     this.o.repo.update(projectId, { status: "planning" });
-    return view;
+    return { chatId: row.chatId };
   }
 
-  /** "Go": the project's conversation (one per project), the plan as its message, and the run. */
+  /**
+   * "Go": the same model goes on from its plan in the same conversation (plan-mode.ts). A plan of the old kind starts
+   * the project's conversation with the plan as its message, as before.
+   */
   start(projectId: string, limits: { budgetUsd: number; hours: number }): { chatId: string } {
     const row = this.o.repo.get(projectId);
     const project = this.o.projects.get(projectId);
     const plan = this.o.backlog.plan(projectId);
     if (!row || !project || !plan || row.status !== "ready" || !row.models) throw new WorkRefused("no_plan");
     if (this.runs.has(projectId)) throw new WorkRefused("busy");
+    if (this.o.repo.phase(projectId).plan && row.chatId) {
+      this.o.repo.setPhase(projectId, null);
+      this.o.repo.update(projectId, { ...limits, escalated: false, report: null });
+      this.launch(projectId, row.chatId, project.path, GO_MESSAGE);
+      return { chatId: row.chatId };
+    }
     if (row.planTaskId) {
       try {
         this.o.runner.closePlan(row.planTaskId);
@@ -187,7 +233,6 @@ export class ProjectWork {
       escalated: false,
       questions: [],
       report: null,
-      planned: true,
     });
     this.launch(projectId, chat.id, project.path, planMessage(plan));
     return { chatId: chat.id };
@@ -223,13 +268,13 @@ export class ProjectWork {
     if (!project) throw new WorkRefused("not_repo");
     const row = this.o.repo.get(projectId);
     if (this.runs.has(projectId) && row?.startedAt) return this.message(projectId, content, o.thinking);
+    this.o.repo.setPhase(projectId, null);
     const known = row?.chatId ? this.o.chats.get(row.chatId) : null;
     const chat = known ?? this.o.chats.create(model.providerId, model.model, "text", { folder: project.path, projectId, itemId: null, title: project.name });
     if (known) this.o.chats.update(chat.id, { providerId: model.providerId, model: model.model });
     this.o.repo.update(projectId, {
       models: { interview: model, plan: model, work: model, strong: o.strong !== undefined ? o.strong : (row?.models?.strong ?? null) },
       chatId: chat.id,
-      // As in a chat: each answer ends the turn (an approved plan's run goes to the end of its checklist instead).
       planned: false,
       ...(o.thinking ? { thinking: o.thinking } : {}),
       ...(row?.startedAt ? {} : { startedAt: Date.now(), workedMs: 0, checklist: [] }),
@@ -252,6 +297,7 @@ export class ProjectWork {
    */
   fresh(projectId: string): ProjectWorkView {
     if (this.runs.has(projectId)) throw new WorkRefused("busy");
+    this.o.repo.setPhase(projectId, null);
     this.o.repo.update(projectId, {
       chatId: null,
       startedAt: null,
@@ -291,7 +337,7 @@ export class ProjectWork {
     await Promise.all([...this.runs.values()].map((r) => r.done.catch(() => {})));
   }
 
-  private launch(projectId: string, chatId: string, folder: string, content: string): void {
+  private launch(projectId: string, chatId: string, folder: string, content: string, mode: "work" | "plan" = "work"): void {
     const row = this.o.repo.get(projectId)!;
     const work = row.models?.work;
     const conn = work ? this.o.run.providers.connection(work.providerId) : null;
@@ -311,8 +357,8 @@ export class ProjectWork {
         }
       }
     };
-    // One conversation per project (asked for): it answers as a chat, unless its run goes by an approved plan.
-    const run = new WorkRun({ ...this.o.run, ended }, projectId, chatId, folder, !row.planned);
+    // One conversation per project (asked for), answering as a chat with a folder; in the plan phase, reading only.
+    const run = new WorkRun({ ...this.o.run, ended, carry: this.carried }, projectId, chatId, folder, mode);
     this.runs.set(projectId, run);
     // Claude Code and Codex work with their own loop: the message goes to them as it is (reply() keeps it).
     if (isCli(conn.preset)) {

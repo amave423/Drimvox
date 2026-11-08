@@ -24,25 +24,24 @@ export function stageOf(project: ProjectView, work: ProjectWorkView | null): Sta
   if (project.gitState === "missing") return "folder";
   if (project.gitState === "not_repo") return "git";
   if (!work) return "loading";
-  if (work.status === "planning" && !work.plan) return "interview";
-  if (work.status === "ready" || work.status === "planning") return "plan";
+  // A plan of the old kind, a separate task, keeps its own page until it is done with.
+  if (work.planTaskId && !work.planPhase && work.status === "planning" && !work.plan) return "interview";
+  if (work.planTaskId && !work.planPhase && (work.status === "ready" || work.status === "planning")) return "plan";
   return work.chatId && work.startedAt ? "work" : "talk";
 }
 
 /**
  * A project's workshop: its one conversation in the middle (asked for: as a ready project had; the interview and the
  * plan to approve come first only when the box asks for them), the project on the right, its width dragged at the
- * edge between them. The state and the controls are in the top bar (WorkshopBar), the projects and the checklist in
- * the sidebar.
+ * edge between them. The controls are in the top bar (WorkshopBar), the projects and their state in the sidebar.
  */
 export function Workshop({ projectId }: { projectId: string }) {
   const { t, projects, reloadWorks, reloadProjects } = useApp();
   const project = projects.find((p) => p.id === projectId);
   const { work, reload } = useProjectWork(projectId);
   const split = usePaneWidth();
-  // The top bar and the sidebar show this work's state and checklist: kept in step with what the workshop sees.
-  const doneItems = work?.checklist.filter((i) => i.done).length;
-  useEffect(reloadWorks, [work?.status, work?.checklist.length, doneItems, work?.spentUsd, work?.questions.length]);
+  // The top bar and the sidebar show this work's state: kept in step with what the workshop sees.
+  useEffect(reloadWorks, [work?.status, work?.planPhase, work?.spentUsd]);
   // Its folder looked at again on every opening: renamed meanwhile, it is followed or asked for.
   useEffect(() => void reloadProjects(), [projectId]);
   // The last project opened is where the projects' mode comes back to.
@@ -71,7 +70,9 @@ export function Workshop({ projectId }: { projectId: string }) {
           {stage === "talk" && <ReadyStart projectId={project.id} work={work} onStarted={() => void reload()} />}
           {/* The interview and the plan in the conversation, as in the agreed design (variant A); a plan without its
               interview's task (made before) keeps its own card. */}
-          {(stage === "interview" || stage === "plan") && work?.planTaskId && <PlanningFeed key={work.planTaskId} work={work} onChanged={() => void reload()} />}
+          {(stage === "interview" || stage === "plan") && work?.planTaskId && (
+            <PlanningFeed key={work.planTaskId} work={work} onChanged={() => void reload()} />
+          )}
           {stage === "plan" && work && !work.planTaskId && (
             <div className="workshop-pad workshop-scroll">
               <PlanCard key={work.plan?.context} work={work} onChanged={() => void reload()} />

@@ -9,7 +9,8 @@ import { isLocal, NO_LIMIT_MS } from "../budget";
 import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
-import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory, type Remembered } from "./memory";
+import { codeTool } from "./code-mode";
+import { cutPoint, memoryLimit, remember, sizeOf, TRIM_SHARE, withMemory, type Memory, type Remembered } from "./memory";
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
@@ -128,7 +129,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
     onFinish: (result: { summary: string; commitMessage: string }) => (finished = result),
   };
   const { finish: finishTool, ...base } = buildTools(new Workspace(i.worktree), hooks, i.mode, i.extraTools);
-  const tools = paused({ ...base, ...(i.noFinish || !finishTool ? {} : { finish: finishTool }), ...i.ownTools }, {
+  const clock = {
     start: () => {
       running++;
       clearTimeout(timer);
@@ -137,7 +138,11 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
       running--;
       resetClock();
     },
-  });
+  };
+  const tools = paused({ ...base, ...(i.noFinish || !finishTool ? {} : { finish: finishTool }), ...i.ownTools }, clock);
+
+  // Many actions in one step: JavaScript that calls the other tools (asked for: as OpenCode's Code Mode).
+  if (!i.only) Object.assign(tools, paused({ execute: codeTool(() => tools, ["finish", ...(i.stopTools ?? [])]) }, clock));
 
   // The rare tools wait until the model loads them (deferred.ts); a step with one tool to call keeps just that one.
   const deferral = i.only ? null : deferTools(tools);
@@ -145,7 +150,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   // A summary of the older work being written in the background, and what came of it (undefined while it is written).
   let writing = null as Summary | null;
   const adopt = (r: Remembered) => {
-    const cost = costOf(i.price, i.conn.preset, usageOf({ inputTokens: r.inputTokens, outputTokens: r.outputTokens })) ?? 0;
+    const cost = r.costUsd;
     spent += cost;
     memory = r.memory;
     i.onMemory!(memory, { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd: cost });
@@ -230,9 +235,9 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
               resetClock();
             }
           }
-          // Within one pass every step resent every file and output read before (seen in the user's runs: 3 million input
-          // tokens per answer). Older outputs go shortened, on a copy; the newest steps and the skills stay whole.
-          if (sent.length > KEEP_WHOLE) {
+          // Older outputs go shortened, on a copy, only once the history is half way to the model's limit: before it the
+          // agent keeps what it read (asked for: as OpenCode; shortened at every step, files were read again and again).
+          if (sent.length > KEEP_WHOLE && sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE) {
             sent = structuredClone(sent);
             compactHistory(sent);
           }

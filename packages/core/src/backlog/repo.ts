@@ -105,6 +105,11 @@ export class BacklogRepo {
     return row ? (JSON.parse(row.data) as ProjectPlan) : null;
   }
 
+  /** A new plan starts from nothing: the old one is not shown as the new one's. */
+  clearPlan(projectId: string): void {
+    this.db.sql.prepare("delete from project_plans where project_id = ?").run(projectId);
+  }
+
   setPlan(projectId: string, plan: ProjectPlan): void {
     this.db.sql
       .prepare("insert into project_plans (project_id, data) values (?, ?) on conflict(project_id) do update set data = excluded.data")

@@ -128,17 +128,52 @@ describe("a chat with a folder", () => {
   });
 
   // Seen in the user's chats: one answer with 22 pages took 1.2 million input tokens, every step resending all of them.
-  it("sends older outputs of a long answer shortened and the newest ones whole", async () => {
+  // Asked for: as OpenCode, the agent keeps what it read; shortened at every step, it read the same files again and again.
+  it("sends a long answer's history whole while it is far from the model's limit", async () => {
     writeFileSync(join(folder, "big.txt"), "строка данных\n".repeat(1000));
-    // Enough steps for the line between shortened and whole, which moves by a stride, to pass the first read.
     const listing = Array.from({ length: 17 }, () => call("list_files", { path: "." }));
     const chat = await chatWith([call("read_file", { path: "big.txt" }), ...listing, call("read_file", { path: "big.txt" }), { text: "Прочитал." }]);
     await connect(chat.id, folder);
     await readEvents(await send(chat.id, "Прочитай big.txt"));
     const last = fake!.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!.body.messages as { role: string; content: unknown }[];
     const outputs = last.filter((m) => m.role === "tool").map((m) => String(m.content));
-    expect(outputs[0]).toContain("trimmed by Drimvox");
+    expect(outputs[0]).not.toContain("trimmed by Drimvox");
+    expect(outputs[0]!.length).toBeGreaterThan(10_000);
+  });
+
+  it("sends older outputs shortened and the newest ones whole once the history is half way to the limit", async () => {
+    writeFileSync(join(folder, "big.txt"), "строка данных\n".repeat(1000));
+    // Enough steps for the line between shortened and whole, which moves by a stride, to pass the first read.
+    const listing = Array.from({ length: 17 }, () => call("list_files", { path: "." }));
+    const chat = await chatWith(
+      [call("read_file", { path: "big.txt" }), ...listing, call("read_file", { path: "big.txt" }), { text: "Прочитал." }],
+      // A window of 12 thousand tokens: half way to its limit is about 17 thousand characters.
+      [{ id: "coder", context_length: 12_000 }],
+    );
+    await connect(chat.id, folder);
+    await readEvents(await send(chat.id, "Прочитай big.txt"));
+    const last = fake!.requests.filter((r) => r.path === "/v1/chat/completions" && !JSON.stringify(r.body.messages?.[0] ?? "").includes("working memory")).at(-1)!.body.messages as { role: string; content: unknown }[];
+    const outputs = last.filter((m) => m.role === "tool").map((m) => String(m.content));
+    expect(outputs.some((o) => o.includes("trimmed by Drimvox"))).toBe(true);
     expect(outputs.at(-1)!.length).toBeGreaterThan(10_000);
+  });
+
+  // Asked for: many actions in one step (as OpenCode's Code Mode): two files read with one call of the model.
+  it("reads several files in one step through the execute tool, each read in the feed", async () => {
+    writeFileSync(join(folder, "a.txt"), "первый файл");
+    writeFileSync(join(folder, "b.txt"), "второй файл");
+    const code = 'const out = []; for (const p of ["a.txt", "b.txt"]) out.push(await tools.read_file({ path: p })); return out.join(" | ");';
+    const chat = await chatWith([call("execute", { code }), { text: "Прочитал оба." }]);
+    await connect(chat.id, folder);
+    await readEvents(await send(chat.id, "Прочитай a.txt и b.txt"));
+    const asks = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
+    expect(asks).toHaveLength(2);
+    const result = JSON.stringify(asks[1]!.body.messages);
+    expect(result).toContain("первый файл");
+    expect(result).toContain("второй файл");
+    const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
+    const names = saved.messages.at(-1).activity.map((a: any) => a.name);
+    expect(names.filter((n: string) => n === "read_file")).toHaveLength(2);
   });
 
   it("has no file tools without a folder", async () => {
@@ -225,7 +260,7 @@ describe("summary of a long chat between messages", () => {
           summaries++;
           return { text: "SUMMARY: говорили про игру." };
         }
-        return answers++ < 2 ? { text: `Ответ: ${"слово ".repeat(900)}` } : { text: "Коротко." };
+        return answers++ < 2 ? { text: `Ответ: ${"слово ".repeat(1300)}` } : { text: "Коротко." };
       },
     });
     const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
@@ -265,5 +300,24 @@ describe("sub-agents", () => {
     const saved = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
     expect(saved.messages.at(-1).activity).toContainEqual(expect.objectContaining({ name: "delegate", input: "Найти константу a" }));
     expect(saved.messages.at(-1).content).toContain("Константа a = 1");
+  });
+
+  // Seen live: chats saved no cached tokens, and with the provider's own bill the sub-agents' cost was left out.
+  it("counts the provider's bill of the answer and of its sub-agent, and what came from the cache", async () => {
+    const isSub = (body: any) => JSON.stringify(body.messages?.[0] ?? "").includes("You are a sub-agent");
+    const usage = (cost: number) => ({ prompt_tokens: 1000, completion_tokens: 10, prompt_tokens_details: { cached_tokens: 800 }, cost });
+    const main: FakeTurn[] = [
+      { toolCalls: [{ name: "delegate", args: { description: "Найти a", prompt: "Где задана a?" } }], usage: usage(0.01) },
+      { text: "a = 1.", usage: usage(0.01) },
+    ];
+    const sub: FakeTurn[] = [{ toolCalls: [{ name: "report", args: { report: "a = 1" } }], usage: usage(0.002) }];
+    fake = await startFakeProvider({ key: KEY, models: [{ id: "coder" }], respond: (body) => (isSub(body) ? (sub.shift() ?? { text: "—" }) : (main.shift() ?? { text: "Готово." })) });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const chat = (await (await env.call("POST", "/api/chats", { providerId: provider.id, model: "coder" })).json()) as { id: string };
+    await connect(chat.id, folder);
+    await readEvents(await env.call("POST", `/api/chats/${chat.id}/messages`, { content: "Где a?" }));
+    const row = env.db.sql.prepare("select cost_usd, cached_tokens from messages where chat_id = ? and role = 'assistant'").get(chat.id) as { cost_usd: number; cached_tokens: number };
+    expect(row.cost_usd).toBeCloseTo(0.022, 5);
+    expect(row.cached_tokens).toBe(1600);
   });
 });

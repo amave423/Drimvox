@@ -2,7 +2,10 @@ import type { ModelInfo } from "@drimvox/shared";
 import { generateText, type ModelMessage } from "ai";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { findModel } from "../providers/catalog";
 import { languageModel } from "../providers/model";
+import { billedUsd, costOf, usageOf } from "../providers/pricing";
+import { usdRub } from "../rates";
 import type { Connection } from "../providers/repo";
 import { serviceModel, type ServiceModel } from "./service-model";
 
@@ -26,16 +29,20 @@ const WORKING_SET = 40_000;
 /** How much of the older work the summarizer reads, at most: the newest part. */
 const SUMMARIZER_INPUT = 300_000;
 
-/** Characters of conversation that trigger a summary: 60 % of the model's context, about 3.5 characters a token. */
+/**
+ * Characters of conversation that trigger a summary: 80 % of the model's context, about 3.5 characters a token, as
+ * OpenCode keeps the whole history until the model's window nears (asked for: the old limit of about 115 thousand tokens,
+ * whatever the model held, made the agent forget what it had read and read it again).
+ */
 export function memoryLimit(price: ModelInfo | undefined): number {
-  return price?.contextLength ? Math.min(Math.floor(price.contextLength * 0.6 * 3.5), MAX_SENT) : 200_000;
+  return Math.floor((price?.contextLength || UNKNOWN_CONTEXT) * 0.8 * 3.5);
 }
 
-/**
- * At most this much is sent a step, whatever the model holds: a million-token model got whole histories of 100 000
- * tokens a step (seen live), which cost money and the model's focus.
- */
-const MAX_SENT = 400_000;
+/** A model whose window is not listed is taken to hold this many tokens. */
+const UNKNOWN_CONTEXT = 128_000;
+
+/** Older tools' outputs are shortened only past this share of the limit; before it, the history goes whole. */
+export const TRIM_SHARE = 0.5;
 
 /**
  * The conversation as the model gets it: the task, the summary, then the newer messages. A chat has no task at its start
@@ -79,6 +86,8 @@ export interface Remembered {
   memory: Memory;
   inputTokens: number;
   outputTokens: number;
+  /** What writing it cost: the provider's own bill when it sends one, else by the model that wrote it. */
+  costUsd: number;
 }
 
 /** Writes a new summary of everything before the cut, the earlier summary included. */
@@ -122,7 +131,16 @@ export async function remember(
     result.text.trim(),
     files ? `\nCurrent text of the files you changed earlier:\n${files}` : "",
   ].join("\n");
-  return { memory: { upTo, summary }, inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 };
+  const inputTokens = result.usage.inputTokens ?? 0;
+  const outputTokens = result.usage.outputTokens ?? 0;
+  // Seen: the summaries were counted at the working model's catalog price, or not at all in chats, and the app's spending
+  // fell short of the provider's bill.
+  const usdPerUnit = service.conn.currency === "RUB" ? 1 / (await usdRub()) : 1;
+  const costUsd =
+    billedUsd(result.providerMetadata, usdPerUnit) ??
+    costOf(await findModel(service.conn, service.model).catch(() => undefined), service.conn.preset, usageOf(result.usage)) ??
+    0;
+  return { memory: { upTo, summary }, inputTokens, outputTokens, costUsd };
 }
 
 /** The log as plain text: what the agent said and called, and the start of each result. */

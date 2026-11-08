@@ -1,6 +1,5 @@
-import type { ActivityEntry, ChecklistItem, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
+import type { ActivityEntry, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { McpAsk, McpHooks } from "../mcp/hub";
-import { isStaticSite, reviewProjectCode, reviewWorkMessage } from "./code-review";
 import { compactHistory } from "./compact";
 import type { ModelMessage, ToolSet } from "ai";
 import { runAgent } from "../agent/run";
@@ -14,41 +13,31 @@ import { WEB_HINT, webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { nowLine } from "../now";
 import { findModel } from "../providers/catalog";
-import { serviceModel } from "../agent/service-model";
-import { lastWords, newStage, stageMessages } from "./stage";
 import type { Connection, ProviderRepo } from "../providers/repo";
-import { findSkills, projectSkillRoots, skillsGiven, skillsInstructions, skillTools } from "../skills/skills";
+import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 import { askAboutPictures, type Vision } from "../visual/look";
-import { VISUAL_HINT, visualTools, type VisualKit } from "../visual/tools";
-import { existingRules, nudgeMessage, projectRules } from "./prompt";
+import { visualTools, type VisualKit } from "../visual/tools";
 import type { ProjectGit } from "./project-git";
 import { changedSince, checkpoint, dropCheckpoint } from "../chats/checkpoint";
 import { writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
 import { sshNote } from "../tools/ssh";
-import { missingMotion, polishWorkMessage, reviewProjectDesign } from "./design-review";
+import { memoryLimit, sizeOf, TRIM_SHARE } from "../agent/memory";
 import type { ProjectWorkRepo } from "./repo";
-import { workTools } from "./tools";
 import { projectMap } from "../agent/repo-map";
 import { proxyHint } from "../internet/blocked";
-import { checksFailedMessage, checksReport, projectChecks, runChecks } from "./checks";
 import { lineStat } from "./line-stat";
 import { subagentTools } from "../agent/subagent";
+import { FORMAT_HINT, LANGUAGE_HINT } from "../chats/reply";
+import { planModeInstructions, planModeTools } from "./plan-mode";
 
 /** Steps one answer of the run takes before the next answer goes on with the same context. */
 export const SEGMENT_STEPS = 60;
 /** Drimvox's word to a project worked as a chat, at every 60 steps of one answer. */
 export const DONE_YET =
   "[Drimvox: 60 steps on this message.] If what the user asked is done and nothing is broken, stop now and reply what you made. Otherwise go on with what is left, without polishing what already works.";
-/** Times in a row the model may stop without finish_work, and without ticking anything off, before it counts as stuck. */
-export const MAX_NUDGES = 3;
-/** Actions without touching the checklist before the agent is reminded of it (seen live: unticked for an hour and a half). */
-export const CHECKLIST_EVERY = 25;
-const CHECKLIST_NOTE = "Tick off in the checklist what is done by now with update_checklist, then go on.";
 /** Provider errors in a row before the run stops and waits. */
 const MAX_ERRORS = 2;
-/** Times a failing test run sends the agent back before the report says it fails. */
-const MAX_CHECK_ROUNDS = 2;
 const RETRY_MS = 5000;
 /** Looks at pages per answer: the desktop and the phone, scenarios, and again after fixes. */
 const LOOKS = {
@@ -75,6 +64,8 @@ export interface RunDeps {
   };
   idleTimeoutMs: number;
   plan(projectId: string): ProjectPlan | null;
+  /** Keeps the plan the plan mode proposed (plan-mode.ts). */
+  setPlan(projectId: string, plan: ProjectPlan): void;
   /** This month's spending against the app's budget. */
   month(): MonthUsage;
   /** The model that sees pictures for this one: the project's own choice, else the settings', else the model itself. */
@@ -89,6 +80,15 @@ export interface RunDeps {
   imageTools?(folder: string, owner: string, hooks: Omit<ToolHooks, "onFinish">, onSpend: (usd: number) => void, budgetLeft: () => number): Promise<ToolSet>;
   /** The run ended (done, paused or stopped): notifications, the sidebar. */
   ended(projectId: string): void;
+  /**
+   * The conversation as the model had it at the end of the last run, tool calls and results included (asked for: as
+   * OpenCode; rebuilt from the saved text, every message started without what the agent had read, and "Go" lost what the
+   * plan had read).
+   */
+  carry?: {
+    get(projectId: string): Carried | null;
+    set(projectId: string, carried: Carried | null): void;
+  };
 }
 
 const sleep = (ms: number, signal: AbortSignal) =>
@@ -109,10 +109,6 @@ export class WorkRun {
   private finished = false;
   /** Skills the agent opened in this run (the once-a-task reviews and reminders: repo.rounds). */
   private readonly skillsOpened = new Set<string>();
-  /** The tests just sent the agent back from finish_work: the run goes on even in a ready project. */
-  private sentBack = false;
-  /** Actions since the checklist was last updated. */
-  private sinceChecklist = 0;
   /**
    * The start of the system prompt, the same for every answer of this run (asked for: a stable prefix the provider's cache
    * keeps): the time it started and a ready project's map, not computed again for every answer.
@@ -125,8 +121,11 @@ export class WorkRun {
     readonly projectId: string,
     readonly chatId: string,
     private readonly folder: string,
-    /** A ready project, worked on as in a chat: an answer may end without finish_work, no limits but the month's. */
-    private readonly chatMode = false,
+    /**
+     * "plan": the plan as Claude Code makes it, reading only, ending with propose_plan (plan-mode.ts); "work": the work
+     * itself, as in a chat with a folder (asked for: that loop made the better site, for half the money).
+     */
+    private readonly mode: "work" | "plan" = "work",
   ) {}
 
   /** A message the user wrote while the run goes on; it is already in the conversation. */
@@ -169,23 +168,30 @@ export class WorkRun {
     };
   }
 
+  /** When this run began: the budget and the hours are for one message's work (asked for: a cap that really stops). */
+  private runStart = Date.now();
+
   private spent(): number {
-    const row = this.row();
-    return this.d.repo.spending(this.chatId, row.startedAt ?? 0).spentUsd;
+    return this.d.repo.spending(this.chatId, this.runStart).spentUsd;
   }
 
   private async loop(): Promise<void> {
     const signal = this.controller.signal;
     const chat = this.d.chats.get(this.chatId)!;
-    const messages: ModelMessage[] = toModelMessages(this.d.chats.history(this.chatId), this.d.chats.attachments, true);
+    const history = this.d.chats.history(this.chatId);
+    const kept = this.d.carry?.get(this.projectId);
+    // The last run's whole conversation when only the user's new message came since; the saved text otherwise (a restart,
+    // an undone answer, an edited message).
+    const fresh = kept && kept.chatId === this.chatId && history.length === kept.turns + 1 && history.at(-1)?.role === "user";
+    const messages: ModelMessage[] = fresh
+      ? [...kept.messages, ...toModelMessages(history.slice(-1), this.d.chats.attachments, true)]
+      : toModelMessages(history, this.d.chats.attachments, true);
     let workedBase = this.row().workedMs;
     let since = Date.now();
     const worked = () => workedBase + (Date.now() - since);
     this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
-    let nudges = 0;
     let errors = 0;
-    let doneBefore = this.row().checklist.filter((i) => i.done).length;
-    let doneAtStage = doneBefore;
+    this.runStart = Date.now();
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
     // The branch the project's git rules ask for, before anything changes.
     await this.d.git?.prepare(this.projectId, this.folder).catch(() => {});
@@ -209,8 +215,9 @@ export class WorkRun {
       for (;;) {
         if (signal.aborted) return stopWith("stopped", "user");
         const row = this.row();
-        if (!this.chatMode && this.spent() >= row.budgetUsd) return stopWith("paused", "budget");
-        if (!this.chatMode && worked() >= row.hours * 3_600_000 && !this.localNow()) return stopWith("paused", "time");
+        const ranMs = () => Date.now() - this.runStart;
+        if (this.spent() >= row.budgetUsd) return stopWith("paused", "budget");
+        if (ranMs() >= row.hours * 3_600_000 && !this.localNow()) return stopWith("paused", "time");
 
         const escalated = row.escalated && row.models?.strong;
         const ref = escalated ? row.models!.strong! : (row.models?.work ?? { providerId: chat.providerId!, model: chat.model! });
@@ -219,23 +226,12 @@ export class WorkRun {
         // The app's budget for the month is used up: the run waits until it is raised.
         if (this.d.month().over && !isFreeToRun(conn)) return stopWith("paused", "month_budget");
 
-        // A big task goes in stages: after a checklist step, a grown context starts again from a brief (asked for: fewer
-        // tokens; every step sends the whole conversation again). In a ready project too: one long answer there read
-        // 4.6M tokens over 78 actions (seen live).
-        {
-          const now = row.checklist.filter((i) => i.done).length;
-          const left = row.checklist.length - now;
-          const contextLength = (await findModel(conn, ref.model).catch(() => undefined))?.contextLength ?? null;
-          if (newStage({ contextTokens: row.contextTokens ?? 0, contextLength, doneNow: now, doneAtStage, left })) {
-            messages.splice(0, messages.length, ...stageMessages(messages, row.checklist, lastWords(messages)));
-            doneAtStage = now;
-          }
-        }
-        // The older part of a long run is shortened between answers: old outputs and written files, not the words.
-        compactHistory(messages);
+        // The older part of a long run is shortened between answers only half way to the model's limit (asked for: as
+        // OpenCode; trimmed every time, the agent read the same files again and again).
+        if (sizeOf(messages) > memoryLimit(await findModel(conn, ref.model).catch(() => undefined)) * TRIM_SHARE) compactHistory(messages);
         const outcome = await this.answer(messages, conn, ref.model, () => {
           const now = this.row();
-          return !this.chatMode && worked() >= now.hours * 3_600_000 && !isLocal(conn);
+          return ranMs() >= now.hours * 3_600_000 && !isLocal(conn);
         });
         this.d.repo.update(this.projectId, { workedMs: worked() });
         workedBase = worked();
@@ -244,76 +240,64 @@ export class WorkRun {
         if (signal.aborted || outcome.kind === "stopped") return stopWith("stopped", "user");
         if (this.finished) return stopWith("done", null);
         if (outcome.kind === "error") {
-          if (++errors >= MAX_ERRORS) return stopWith("paused", "error", outcome.error.detail ?? outcome.error.code);
-          await sleep(RETRY_MS, signal);
-          continue;
+          if (++errors < MAX_ERRORS) {
+            await sleep(RETRY_MS, signal);
+            continue;
+          }
+          // The working model keeps failing: the strong one takes over, when the project has one.
+          if (row.models?.strong && !row.escalated) {
+            this.d.repo.update(this.projectId, { escalated: true });
+            errors = 0;
+            continue;
+          }
+          return stopWith("paused", "error", outcome.error.detail ?? outcome.error.code);
         }
         errors = 0;
         // What the user wrote while the agent worked: in the conversation already, now in the model's context too.
         if (this.inbox.length) {
           for (const text of this.inbox.splice(0)) messages.push({ role: "user", content: text });
-          nudges = 0;
           continue;
         }
         if (outcome.kind === "budget") return stopWith("paused", "budget");
         // A long answer goes on without a pause (asked for: as Claude Code, give the task and get it done), with one word
         // at each 60 steps: if what was asked is done, stop now (seen live: a site fine at 20 rubles, polished on and on).
-        if (this.chatMode && outcome.kind === "steps") messages.push({ role: "user", content: DONE_YET });
+        if (outcome.kind === "steps") messages.push({ role: "user", content: DONE_YET });
         if (outcome.kind === "limit" || outcome.kind === "steps") continue;
-        // As in a chat: the answer is the end of the turn; the next message goes on. Unless the project's own tests sent
-        // the agent back from finish_work: it fixes them first.
-        if (this.chatMode && !this.sentBack) return stopWith("done", null);
-        this.sentBack = false;
-
-        // The model stopped on its own without finish_work: remind it, unless it keeps stopping without progress.
-        const checklist = this.row().checklist;
-        const doneNow = checklist.filter((i) => i.done).length;
-        if (doneNow > doneBefore) nudges = 0;
-        doneBefore = doneNow;
-        if (++nudges <= MAX_NUDGES) {
-          messages.push({ role: "user", content: nudgeMessage(checklist.filter((i) => !i.done).map((i) => i.text)) });
-          continue;
-        }
-        if (row.models?.strong && !row.escalated) {
-          this.d.repo.update(this.projectId, { escalated: true });
-          nudges = 0;
-          messages.push({
-            role: "user",
-            content: `A stronger model takes over the work now. ${nudgeMessage(checklist.filter((i) => !i.done).map((i) => i.text))}`,
-          });
-          continue;
-        }
-        return stopWith("paused", "stuck");
+        // As in a chat: the answer is the end of the turn; the next message goes on.
+        return stopWith("done", null);
       }
     } finally {
       // A dev server the agent started does not hold the port once the run is over. In a ready project, talked to as in a
       // chat, it stays between messages (seen live: the agent started the same server three times over).
       const how = (final as { status: string } | null)?.status;
-      if (!(this.chatMode && how === "done" && !this.row().site)) this.d.visualKit.background.stopAll(this.chatId);
+      if (!(how === "done" && !this.row().site)) this.d.visualKit.background.stopAll(this.chatId);
       // The project's state for whoever picks it up next, in Drimvox or another program (AGENTS.md, notes.ts).
       try {
         const row = this.row();
         const goal = this.d.plan(this.projectId)?.context ?? this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? "";
         const branch = this.d.git ? ((await this.d.git.state(this.projectId, this.folder).catch(() => null))?.branch ?? null) : null;
-        writeState(this.folder, { goal, checklist: row.checklist, start: row.site, branch, report: row.report, at: Date.now() }, this.d.agentFiles?.() ?? []);
+        if (this.mode === "work")
+          writeState(this.folder, { goal, checklist: [], start: row.site, branch, report: row.report, at: Date.now() }, this.d.agentFiles?.() ?? []);
       } catch {
         // A folder that cannot be written: the state is only in Drimvox.
       }
       // What the agent left uncommitted goes in one commit; then its branch to GitHub, as the rules say.
-      if (this.d.git) {
-        const done = this.row()
-          .checklist.filter((i) => i.done)
-          .at(-1)?.text;
+      if (this.d.git && this.mode === "work") {
         const asked =
           this.d.chats
             .history(this.chatId)
             .filter((m) => m.role === "user")
             .at(-1)
             ?.content.split("\n")[0] ?? "";
-        await this.d.git.commit(this.projectId, this.folder, done ?? asked).catch(() => false);
-        await this.d.git.finish(this.projectId, this.folder, asked || done || "").catch(() => {});
+        await this.d.git.commit(this.projectId, this.folder, asked).catch(() => false);
+        await this.d.git.finish(this.projectId, this.folder, asked).catch(() => {});
       }
-      if (final) this.d.repo.update(this.projectId, final);
+      this.d.carry?.set(this.projectId, { chatId: this.chatId, turns: this.d.chats.history(this.chatId).length, messages });
+      if (final)
+        this.d.repo.update(
+          this.projectId,
+          this.finished && this.mode === "plan" && (final as { status: string }).status === "done" ? { ...(final as object), status: "ready" } : final,
+        );
       this.d.ended(this.projectId);
     }
   }
@@ -340,7 +324,6 @@ export class WorkRun {
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
     const onCall = (name: string, what: string, stat?: Pick<ActivityEntry, "added" | "removed" | "perFile"> | null) => {
       if (name === "use_skill") this.skillsOpened.add(what);
-      this.sinceChecklist = name === "update_checklist" ? 0 : this.sinceChecklist + 1;
       activity.push({ name, input: what, at: content.length, ...(stat ?? {}) });
       save();
     };
@@ -367,9 +350,6 @@ export class WorkRun {
     const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]).filter(
       (s) => s.scope === "project" || chosen.skills === null || chosen.skills.includes(s.name),
     );
-    // The plan's skills are given whole in the instructions: no reminder to open them before the end (seen live: a round
-    // spent opening two skills the agent already had).
-    if (!this.chatMode) for (const name of plan?.skills ?? []) this.skillsOpened.add(name);
     const files = { list: () => this.d.chats.attachments.ofChat(this.chatId), file: (id: string) => this.d.chats.attachments.file(id) };
     // The user's MCP servers work in the run too (seen: four were switched on and the run had none of them).
     const mcpTools = this.d.mcp
@@ -390,7 +370,7 @@ export class WorkRun {
           this.chatId,
           hooks,
           (usd) => (cost += usd),
-          () => (this.chatMode ? Number.POSITIVE_INFINITY : this.row().budgetUsd - spentNow - cost),
+          () => this.row().budgetUsd - spentNow - cost,
         )
       : {};
     const own: ToolSet = {
@@ -443,125 +423,17 @@ export class WorkRun {
         },
         LOOKS,
       ),
-      ...workTools({
-        checklist: () => this.row().checklist,
-        setChecklist: (items: ChecklistItem[]) => this.d.repo.update(this.projectId, { checklist: items }),
-        ask: (question, assumption) => this.d.repo.update(this.projectId, { questions: [...this.row().questions, { question, assumption, at: Date.now() }] }),
-        finish: (report, start) => {
-          this.finished = true;
-          this.d.repo.update(this.projectId, { report, site: start });
-          // The report is the answer's own last words: it stays in the conversation when the user writes on (seen: a
-          // card at its end vanished with the next message). Not twice when the model already said it.
-          if (!content.includes(report.trim().slice(0, 200))) {
-            content = content ? `${content}\n\n${report}` : report;
-            save();
-          }
-        },
-        checks: async () => {
-          const commands = projectChecks(this.folder, plan);
-          if (!commands.length) return null;
-          onCall("run_checks", commands.join("; "));
-          const results = await runChecks(this.folder, commands, this.controller.signal);
-          const rounds = this.d.repo.rounds(this.projectId).checks + 1;
-          this.d.repo.setRounds(this.projectId, { checks: rounds });
-          // Twice back to the agent at most, for the whole task; then the report says honestly what still fails.
-          if (results.some((r) => !r.ok) && rounds <= MAX_CHECK_ROUNDS) {
-            this.sentBack = true;
-            onCall("sent_back", `checks:${results.filter((r) => !r.ok).length}`);
-            return { fix: checksFailedMessage(results) };
-          }
-          const asked =
-            this.d.chats
-              .history(this.chatId)
-              .filter((m) => m.role === "user")
-              .at(-1)?.content ??
-            plan?.context ??
-            "";
-          return { report: checksReport(results, /[а-яё]/i.test(asked)) };
-        },
-        codeReview: async () => {
-          // Once for the task, whatever runs it takes (seen: each "Go on" reviewed again and found new things).
-          if (this.chatMode || this.d.repo.rounds(this.projectId).code) return null;
-          this.d.repo.setRounds(this.projectId, { code: true });
-          // A static page has nothing to attack: no server, no accounts, no one's data.
-          if (isStaticSite(this.folder)) return null;
-          // The service model reviews, else the working one, in a fresh conversation with only this to do (asked for: no
-          // expensive model for it).
-          const row = this.row();
-          const ref = row.models?.work ?? null;
-          const working = ref ? this.d.providers.connection(ref.providerId) : null;
-          if (!ref || !working) return null;
-          const reviewer = serviceModel(working, ref.model, service);
-          onCall("code_review", reviewer.model);
-          const issues = await reviewProjectCode({
-            conn: reviewer.conn,
-            model: reviewer.model,
-            price: await findModel(reviewer.conn, reviewer.model),
-            folder: this.folder,
-            plan,
-            skills,
-            ownTools: pick(own, ["start_background", "read_background", "stop_background"]),
-            signal: this.controller.signal,
-            idleTimeoutMs: this.d.idleTimeoutMs,
-            hooks,
-            onSpend: (usd) => (cost += usd),
-          }).catch(() => null);
-          if (!issues) return null;
-          const message = reviewWorkMessage(issues);
-          if (message) onCall("sent_back", `code:${issues.filter((i) => i.severity !== "low").length}`);
-          return message;
-        },
-        skillsLeft: () => {
-          if (this.chatMode || this.d.repo.rounds(this.projectId).skills) return null;
-          this.d.repo.setRounds(this.projectId, { skills: true });
-          const left = skills.filter((s) => !this.skillsOpened.has(s.name));
-          if (!left.length) return null;
-          onCall("sent_back", `skills:${left.length}`);
-          return [
-            "Before you finish: these skills are ready and you have not opened them.",
-            ...left.map((s) => `- ${s.name}: ${s.description}`),
-            "If one is meant for this moment (checking the work before you say it is done, say), open it with use_skill and follow it. Then call finish_work again.",
-          ].join("\n");
-        },
-        review: async (start) => {
-          if (this.chatMode || this.d.repo.rounds(this.projectId).design) return null;
-          this.d.repo.setRounds(this.projectId, { design: true });
-          // Motion asked for is checked in the code: screenshots cannot see it (seen live: "animated" came out still).
-          const asked = [plan?.context ?? "", this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? ""].join("\n");
-          const motion = missingMotion(this.folder, asked);
-          if (!vision || !this.d.visualKit.screenshot) {
-            if (motion) onCall("sent_back", "design:1");
-            return motion ? polishWorkMessage([motion]) : null;
-          }
-          onCall("design_review", "");
-          const issues = await reviewProjectDesign(
-            {
-              kit: this.d.visualKit,
-              vision,
-              owner: this.chatId,
-              folder: this.folder,
-              plan,
-              signal: this.controller.signal,
-              onShot: (id, url, width) => {
-                this.shot("screenshot", { id, url, width });
-                onCall("screenshot", id);
-              },
-              onSpend: (usd) => (cost += usd),
-            },
-            start,
-          );
-          const all = [...(issues ?? []), ...(motion ? [motion] : [])];
-          if (all.length) onCall("sent_back", `design:${all.length}`);
-          return all.length ? polishWorkMessage(all) : null;
-        },
-        onCall,
-        ...(this.d.git && this.d.git.rules(this.projectId).commit !== "never"
-          ? { commit: (message: string) => this.d.git!.commit(this.projectId, this.folder, message) }
-          : {}),
-      }),
+      ...(this.mode === "plan"
+        ? planModeTools((proposed: ProjectPlan) => {
+            this.finished = true;
+            this.d.setPlan(this.projectId, proposed);
+          })
+        : {}),
     };
+    // The plan mode only reads: the project, the web, sub-agents, skills; no writing, no commands, no browser yet.
+    const tools: ToolSet = this.mode === "plan" ? pick(own, ["delegate", "use_skill", "read_skill_file", "web_search", "open_page", "propose_plan"]) : own;
     const spentBefore = this.spent();
-    const overBudget = () => !this.chatMode && spentBefore + cost >= this.row().budgetUsd;
+    const overBudget = () => spentBefore + cost >= this.row().budgetUsd;
     let limited = false;
     const outcome = await runAgent({
       service,
@@ -570,37 +442,31 @@ export class WorkRun {
       price,
       worktree: this.folder,
       messages,
-      mode: "write",
+      mode: this.mode === "plan" ? "read" : "write",
       noFinish: true,
       thinkingLevel: this.row().thinking,
-      ownTools: own,
-      stopTools: ["finish_work"],
+      ownTools: tools,
+      stopTools: ["propose_plan"],
       maxSteps: SEGMENT_STEPS,
-      remind: () => {
-        if (this.sinceChecklist < CHECKLIST_EVERY) return null;
-        this.sinceChecklist = 0;
-        return CHECKLIST_NOTE;
-      },
       stopWhen: () => {
         limited = outOfTime();
         return this.inbox.length > 0 || limited || overBudget();
       },
+      // As a chat with a folder says it (asked for: that loop made the better site for half the money): the folder, the
+      // language, the format; no long rules of design, checks, notes and git.
       system: [
         this.startedAt,
+        LANGUAGE_HINT,
+        FORMAT_HINT,
         folderHint(this.folder),
         // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
         proxyHint(this.d.web),
-        this.chatMode
-          ? existingRules(!!vision && !!this.d.visualKit.screenshot, gitLine)
-          : projectRules(plan, !!vision && !!this.d.visualKit.screenshot, gitLine),
-        VISUAL_HINT,
         WEB_HINT,
         this.d.toolbox ? sshNote(this.d.toolbox.ssh) : "",
         skillsInstructions(skills),
-        // The skills the plan was made with, whole: the working model follows them without having to open them.
-        this.chatMode ? "" : skillsGiven(skills, plan?.skills ?? []),
         // A ready project's files and what each defines (as Aider's repo map): fewer steps spent finding the right file.
-        this.chatMode ? await (this.map ??= projectMap(this.folder).catch(() => "")) : "",
+        await (this.map ??= projectMap(this.folder).catch(() => "")),
+        this.mode === "plan" ? planModeInstructions(this.d.repo.phase(this.projectId).interview) : "",
       ]
         .filter(Boolean)
         .join("\n\n"),
@@ -664,6 +530,14 @@ export class WorkRun {
     const s = data as { id: string; url: string };
     this.d.repo.update(this.projectId, { shots: [...this.row().shots, { id: s.id, url: s.url, at: Date.now() }] });
   }
+}
+
+/** A run's whole conversation kept for the next one (RunDeps.carry). */
+export interface Carried {
+  chatId: string;
+  /** How many turns the chat's saved history had when it was kept. */
+  turns: number;
+  messages: ModelMessage[];
 }
 
 /** Only the named tools of a set, those it has. */

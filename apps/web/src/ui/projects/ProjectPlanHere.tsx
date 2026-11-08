@@ -7,7 +7,8 @@ export function ProjectPlanHere({ projectId }: { projectId: string }) {
   const { t, navigate } = useApp();
   const { work, reload } = useProjectWork(projectId);
   if (!work) return null;
-  if (work.status === "ready" || work.status === "planning") return work.plan ? <PlanCard key={work.plan.context} work={work} onChanged={() => void reload()} /> : null;
+  if (work.status === "ready" || work.status === "planning")
+    return work.plan ? <PlanCard key={work.plan.context} work={work} onChanged={() => void reload()} /> : null;
   if (!work.chatId) return null;
   return (
     <div className="note is-ok">

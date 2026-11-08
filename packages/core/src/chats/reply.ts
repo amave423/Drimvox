@@ -5,7 +5,8 @@ import { subagentTools } from "../agent/subagent";
 import { notesBlock } from "../agent/notes";
 import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
 import { FOLDER_STEPS, folderHint } from "./folder";
-import { cutPoint, memoryLimit, remember, sizeOf, withMemory, type Memory } from "../agent/memory";
+import { codeTool } from "../agent/code-mode";
+import { cutPoint, memoryLimit, remember, sizeOf, TRIM_SHARE, withMemory, type Memory } from "../agent/memory";
 import { learnFromAnswer } from "../providers/availability";
 import type { ModelInfo, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { ThinkingLevel, WebMode } from "@drimvox/shared";
@@ -40,7 +41,7 @@ const MAX_CONTINUES = 2;
 const CONTINUE = "Your answer was cut off by its length. Continue exactly where it stopped: no repeating, no introduction.";
 
 /** Seen live: "I need names in English" turned the whole conversation into English. */
-const LANGUAGE_HINT =
+export const LANGUAGE_HINT =
   "Answer in the language the user writes in. When the user asks for names, words or a text in another language, only those are in that language; your answer stays in the user's.";
 
 /** How long a model on this computer may stay silent: reading a long context before the first word takes a while. */
@@ -98,8 +99,9 @@ const STRIDE = 8;
  * with 22 pages took 1.2 million input tokens). The older outputs are shortened on a copy; the model's own words and
  * what each step did stay whole, and the newest steps are sent as they are.
  */
-function shortened(messages: ModelMessage[]): ModelMessage[] {
-  if (messages.length <= KEEP_WHOLE) return messages;
+function shortened(messages: ModelMessage[], limit: number): ModelMessage[] {
+  // Whole until half way to the model's limit (asked for: as OpenCode, the agent keeps what it read).
+  if (messages.length <= KEEP_WHOLE || sizeOf(messages) <= limit * TRIM_SHARE) return messages;
   const copy = structuredClone(messages);
   compactHistory(copy, KEEP_WHOLE, STRIDE, OUTPUT_KEPT);
   return copy;
@@ -135,6 +137,8 @@ export async function reply(i: ReplyInput): Promise<void> {
   let finishReason: string | undefined;
   /** The provider's own bill in its currency, summed over the steps, when it sends one. */
   let billed: number | null = null;
+  /** What the sub-agents and the history's summaries cost, beside the answer's own steps. */
+  let extraUsd = 0;
 
   // Some hosted models sit in a queue or hang; every streamed part resets the clock. A model on this computer reads a
   // long context (pages it opened) for minutes before its first word, so it gets longer.
@@ -149,6 +153,7 @@ export async function reply(i: ReplyInput): Promise<void> {
 
   // Memory for long work: the model's context decides when the older part of the answer is summarized.
   const limit = i.folder ? memoryLimit(await findModel(i.conn, i.model)) : 0;
+  const trimLimit = limit || memoryLimit(await findModel(i.conn, i.model));
   let extraUsage = { inputTokens: 0, outputTokens: 0 };
   const tools: ToolSet = {
     ...(i.web === "free" ? webTools(i.webAccess, { onCall: (call) => void i.emit({ type: "tool", name: call.name, input: call.input }) }, { owner: i.chatId }) : {}),
@@ -163,15 +168,25 @@ export async function reply(i: ReplyInput): Promise<void> {
           signal: i.signal,
           idleTimeoutMs: i.idleTimeoutMs,
           tools: i.web === "free" ? () => webTools(i.webAccess, { onCall: () => {} }, { owner: i.chatId }) : undefined,
-          onSpend: (_, tokens) => (extraUsage = addUsage(extraUsage, tokens)),
+          onSpend: (usd, tokens) => {
+            extraUsage = addUsage(extraUsage, tokens);
+            extraUsd += usd;
+          },
           onCall: (name, what) => void i.emit({ type: "tool", name, input: what }),
         })
       : {}),
   };
+  // Many actions in one step, in a chat with a folder too (code-mode.ts).
+  if (i.folder) tools.execute = codeTool(() => tools, []);
   const deferral = deferTools(tools);
   // Research takes room: the internet, or tools of the user's servers (seen: a browser server stopped at 8 steps).
   const steps = i.work?.steps || (i.folder ? FOLDER_STEPS : i.web === "free" || Object.keys(i.extraTools ?? {}).length ? WEB_STEPS : 8);
-  const memory = i.folder ? memoryStep(i, limit, (u) => (extraUsage = addUsage(extraUsage, u))) : null;
+  const memory = i.folder
+    ? memoryStep(i, limit, (u, usd) => {
+        extraUsage = addUsage(extraUsage, u);
+        extraUsd += usd;
+      })
+    : null;
   /** The answer reached its last step: what it says there is a summary of unfinished work. */
   let lastStep = false;
   /** What the earlier rounds said and did: a round cut by the answer's length goes on from there. */
@@ -210,7 +225,7 @@ export async function reply(i: ReplyInput): Promise<void> {
                 const kept: { messages?: ModelMessage[] } = memory ? await memory(o) : {};
                 // The rare tools wait until the model loads them (agent/deferred.ts).
                 const active = deferral.active();
-                const base = { messages: shortened(kept.messages ?? o.messages), ...(active ? { activeTools: active } : {}) };
+                const base = { messages: shortened(kept.messages ?? o.messages, trimLimit), ...(active ? { activeTools: active } : {}) };
                 if (o.stepNumber < steps - 1) return base;
                 lastStep = true;
                 return { ...base, toolChoice: "none" as const, messages: [...(base.messages ?? o.messages), { role: "user" as const, content: LAST_STEP }] };
@@ -285,6 +300,7 @@ export async function reply(i: ReplyInput): Promise<void> {
   const inputTokens = usage?.inputTokens ?? null;
   const outputTokens = usage?.outputTokens ?? null;
   const price = inputTokens !== null && outputTokens !== null ? await findModel(i.conn, i.model) : undefined;
+  const rub = i.conn.currency === "RUB" ? await usdRub() : 1;
 
   // Undo only for an answer that changed something.
   if (snapshot && i.folder) {
@@ -297,12 +313,19 @@ export async function reply(i: ReplyInput): Promise<void> {
     status: stopped ? "stopped" : error ? "error" : "done",
     inputTokens,
     outputTokens,
-    costUsd:
-      billed !== null
-        ? billed / (i.conn.currency === "RUB" ? await usdRub() : 1)
-        : inputTokens !== null && outputTokens !== null
-          ? costOf(price, i.conn.preset, usageOf(usage))
-          : null,
+    // What the provider served from its cache (seen: chats always saved 0, though the cache worked).
+    cachedTokens: usage ? usageOf(usage).cacheRead : null,
+    // The provider's own bill when it sends one; the sub-agents and the summaries on top (seen: left out, and the app's
+    // spending fell short of RouterAI's by a fifth).
+    costUsd: (() => {
+      const own =
+        billed !== null
+          ? billed / (i.conn.currency === "RUB" ? rub : 1)
+          : inputTokens !== null && outputTokens !== null
+            ? costOf(price, i.conn.preset, usageOf(usage))
+            : null;
+      return own === null && extraUsd === 0 ? null : (own ?? 0) + extraUsd;
+    })(),
     error: stopped ? null : (error ?? (cutOff ? { code: "cut_off" } : lastStep ? { code: "step_limit" } : null)),
     activity: i.activity?.(),
   });
@@ -338,7 +361,7 @@ const markOf = (m: ModelMessage | undefined) => (m ? `${m.role}:${JSON.stringify
  * model writes, with the current text of the files it changed. Without this a task's answer of 200 steps outgrew the
  * model's context.
  */
-function memoryStep(i: ReplyInput, limit: number, spent: (u: { inputTokens: number; outputTokens: number }) => void) {
+function memoryStep(i: ReplyInput, limit: number, spent: (u: { inputTokens: number; outputTokens: number }, usd: number) => void) {
   let memory: Memory | null = null;
   let first = true;
   return async ({ messages }: { messages: ModelMessage[] }) => {
@@ -364,7 +387,7 @@ function memoryStep(i: ReplyInput, limit: number, spent: (u: { inputTokens: numb
         memory = r.memory;
         // Kept for the next message: only a summary counted on the chat's own history, as the next answer gets it.
         if (atStart) chatMemories.set(i.chatId, { memory, mark: markOf(messages[memory.upTo - 1]) });
-        spent({ inputTokens: r.inputTokens, outputTokens: r.outputTokens });
+        spent({ inputTokens: r.inputTokens, outputTokens: r.outputTokens }, r.costUsd);
         sent = withMemory(messages, memory, false);
       } catch {
         // Without a summary the step goes as it is; the next one tries again.

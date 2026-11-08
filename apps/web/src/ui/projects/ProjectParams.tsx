@@ -88,16 +88,6 @@ function WorkOptions(p: {
   const { projectId } = p;
   const { t } = useApp();
   const [prefs, set] = useBoxPrefs(projectId);
-  const asWorking = (value: ModelChoice | null, change: (m: ModelChoice | null) => void) => (
-    <span className="options-model">
-      <ModelPicker value={value} onChange={change} placement="above" empty={t("projectBox.asWorking")} />
-      {value && (
-        <button type="button" className="link" onClick={() => change(null)}>
-          {t("projectBox.asWorking")}
-        </button>
-      )}
-    </span>
-  );
   const strongOn = prefs.strongOn || !!prefs.strong;
   return (
     <section className="params-block" aria-labelledby="params-work-h">
@@ -109,23 +99,11 @@ function WorkOptions(p: {
           {t("projectBox.interview")} <span className="options-about">{t("projectBox.interviewHint")}</span>
         </span>
       </Toggle>
-      {prefs.interview && (
-        <div className="params-row is-model">
-          <span className="muted">{t("projectBox.interviewModel")}</span>
-          {asWorking(prefs.interviewModel, (interviewModel) => set({ interviewModel }))}
-        </div>
-      )}
       <Toggle checked={prefs.plan} onChange={(plan) => set({ plan })}>
         <span>
           {t("projectBox.plan")} <span className="options-about">{t("projectBox.planHint")}</span>
         </span>
       </Toggle>
-      {prefs.plan && (
-        <div className="params-row is-model">
-          <span className="muted">{t("projectBox.planModel")}</span>
-          {asWorking(prefs.planModel, (planModel) => set({ planModel }))}
-        </div>
-      )}
       <Toggle checked={strongOn} onChange={(on) => set(on ? { strongOn: true } : { strongOn: false, strong: null })}>
         <span>
           {t("projectBox.strong")} <span className="options-about">{t("projectBox.strongHint")}</span>
