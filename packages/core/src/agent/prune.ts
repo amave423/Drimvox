@@ -14,12 +14,16 @@ const MIN_PRUNED = 300;
 /** A skill's instructions are followed the whole run (compact.ts). */
 const KEPT_WHOLE = new Set(["use_skill", "read_skill_file"]);
 
+/** What is left of an old step's thinking; not empty, as providers that take thinking back may want some. */
+const THOUGHT = "(earlier thinking, removed to keep the conversation short)";
+
 type Part = Record<string, unknown>;
 interface Item {
   message: number;
   part: number;
   /** A tool-call's argument, or the tool-result's output when absent. */
   key?: string;
+  thinking?: boolean;
   size: number;
 }
 
@@ -32,8 +36,12 @@ const textOf = (output: unknown): string | null => {
 };
 const linesOf = (text: string) => text.replace(/\n$/, "").split("\n").length;
 
-/** The conversation with its older outputs pruned, on a copy; the messages given stay as they are. */
-export function pruneOutputs(messages: ModelMessage[], protect = PROTECT, chunk = CHUNK): { messages: ModelMessage[]; saved: number } {
+/**
+ * The conversation with its older outputs pruned, on a copy; the messages given stay as they are. `thinking` shortens old
+ * thinking too: DeepSeek gets it back as input at every step, billed each time. Not for Anthropic, whose thinking is signed
+ * and refused once changed.
+ */
+export function pruneOutputs(messages: ModelMessage[], protect = PROTECT, chunk = CHUNK, thinking = false): { messages: ModelMessage[]; saved: number } {
   const items: Item[] = [];
   // What each call was about, for the line that replaces its result: the file, the command, the address.
   const about = new Map<string, string>();
@@ -46,6 +54,9 @@ export function pruneOutputs(messages: ModelMessage[], protect = PROTECT, chunk 
         if (what) about.set(String(part.toolCallId), String(what).slice(0, 120));
         if (KEPT_WHOLE.has(String(part.toolName))) return;
         for (const [key, value] of Object.entries(input)) if (typeof value === "string" && value.length >= MIN_PRUNED) items.push({ message: mi, part: pi, key, size: value.length });
+      }
+      if (thinking && part.type === "reasoning" && typeof part.text === "string" && part.text.length >= MIN_PRUNED) {
+        items.push({ message: mi, part: pi, thinking: true, size: part.text.length });
       }
       if (part.type === "tool-result" && !KEPT_WHOLE.has(String(part.toolName))) {
         const text = textOf(part.output);
@@ -75,7 +86,11 @@ export function pruneOutputs(messages: ModelMessage[], protect = PROTECT, chunk 
   let saved = 0;
   for (const it of chosen) {
     const part = (sent[it.message]!.content as unknown as Part[])[it.part]!;
-    if (it.key) {
+    if (it.thinking) {
+      const before = String(part.text);
+      part.text = THOUGHT;
+      saved += before.length - THOUGHT.length;
+    } else if (it.key) {
       const input = { ...(part.input as Record<string, unknown>) };
       const value = String(input[it.key]);
       input[it.key] = `[${linesOf(value)} lines written; removed from the history to keep it short, the file holds them]`;

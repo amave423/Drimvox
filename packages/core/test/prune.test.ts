@@ -44,6 +44,24 @@ describe("pruning old tool outputs", () => {
     expect(JSON.stringify(next.slice(0, first.length))).toBe(JSON.stringify(first));
   });
 
+  // DeepSeek gets its thinking back as input at every step, billed again each time.
+  it("shortens old thinking too, when asked, and leaves the newest whole", () => {
+    const thought = (n: number, size: number): ModelMessage => ({
+      role: "assistant",
+      content: [
+        { type: "reasoning", text: "t".repeat(size) },
+        { type: "text", text: `Шаг ${n}` },
+      ],
+    });
+    const messages: ModelMessage[] = [{ role: "user", content: "Сделай" }, thought(1, 6000), thought(2, 6000), thought(3, 6000), thought(4, 6000)];
+    const kept = pruneOutputs(messages, 10_000, 5_000).messages;
+    expect(kept).toBe(messages);
+    const { messages: sent } = pruneOutputs(messages, 10_000, 5_000, true);
+    expect((sent[1]!.content as any)[0].text).toMatch(/earlier thinking/);
+    expect((sent[1]!.content as any)[1].text).toBe("Шаг 1");
+    expect((sent[4]!.content as any)[0].text).toHaveLength(6000);
+  });
+
   it("never prunes a skill's instructions", () => {
     const skill: ModelMessage[] = [
       { role: "assistant", content: [{ type: "tool-call", toolCallId: "s", toolName: "use_skill", input: { name: "frontend-design" } }] },

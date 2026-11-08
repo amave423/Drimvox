@@ -14,7 +14,8 @@ import { cutPoint, memoryLimit, remember, sizeOf, TRIM_SHARE, withMemory, type M
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
-import { pruneOutputs } from "./prune";
+import { CHUNK, PROTECT, pruneOutputs } from "./prune";
+import { traceStep } from "./trace";
 import { deferTools } from "./deferred";
 import { learnFromAnswer } from "../providers/availability";
 import { thinkingOptions } from "../chats/thinking";
@@ -240,7 +241,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
               resetClock();
             }
           }
-          if (i.prune) sent = pruneOutputs(sent).messages;
+          // Old thinking too, except Anthropic's: it is signed and refused once changed.
+          if (i.prune) sent = pruneOutputs(sent, PROTECT, CHUNK, i.conn.preset !== "anthropic").messages;
           // Older outputs go shortened, on a copy, only once the history is half way to the model's limit: before it the
           // agent keeps what it read (asked for: as OpenCode; shortened at every step, files were read again and again).
           if (sent.length > KEEP_WHOLE && sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE) {
@@ -251,6 +253,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           if (note) sent = [...sent, { role: "user", content: note }];
           // The same text as long as the notes stay the same: the provider's cache holds.
           const active = deferral?.active();
+          traceStep(system(), deferral?.tools ?? tools, active, sent);
           // Thinking on "auto" (asked for: fewer tokens, the same quality): the first step, a step after a failed tool and
           // every tenth (to look at the plan again) think as the provider decides; the routine steps between think little.
           const routine = autoThinking && round === 0 && stepNumber > 0 && !lastFailed && (stepsBefore + stepNumber) % THINK_AGAIN_EVERY !== 0;

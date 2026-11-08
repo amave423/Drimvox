@@ -31,6 +31,8 @@ const SIZE = { width: 1280, height: 800 };
 const sizeOf = (width?: number) => (width ? { width, height: width < 768 ? 844 : 800 } : SIZE);
 /** Looks per turn: enough to check a page and its fix; the polish comes from Drimvox's design review. */
 export const MAX_LOOKS = 4;
+/** check_page calls per answer: once, and once more after the fixes. */
+export const MAX_CHECKS = 2;
 const CODER_LIMIT = `Finish with what you have: Drimvox's design review looks at the screens after acceptance and sends concrete notes.`;
 
 /** Who looks: the coder by default; the acceptance agent checks every requirement and gets more looks. */
@@ -135,6 +137,7 @@ ${d.kit.background.read(d.taskId, already.id)}`;
         return (await look(d, url, question, o.abortSignal, width, steps)).answer;
       }),
   });
+  let checks = 0;
   // Seen live: a weather site was checked with 8 openings, 13 looks and 29 scripts in the page, each a request to the model.
   tools.check_page = tool({
     description:
@@ -148,6 +151,8 @@ ${d.kit.background.read(d.taskId, already.id)}`;
     execute: ({ url, focus }, o: Options) =>
       run(o.toolCallId, "check_page", { url, focus }, async () => {
         if (!mayLookAt(url)) throw new Error("Only this computer (localhost) and public addresses can be opened");
+        // Seen live: told to check twice at most, the agent checked five times, tweaking details between.
+        if (++checks > MAX_CHECKS) throw new Error(`You have checked pages ${MAX_CHECKS} times in this answer: that is enough. Stop and give the user your short reply.`);
         if (++looks > limit.looks) throw new Error(`You have looked at pages ${limit.looks} times in this turn. ${limit.then}`);
         const taken = [];
         for (const width of [1280, 390]) taken.push(await d.kit.screenshot!(url, sizeOf(width)));

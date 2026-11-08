@@ -162,6 +162,16 @@ describe("look_at_page", () => {
     expect(result.data.output).toContain("- Uncaught TypeError: x is undefined (app.js:3)");
   });
 
+  // Seen live: told to check twice at most, the agent checked five times, tweaking details between.
+  it("lets an agent check a page twice per answer, then tells it to stop", async () => {
+    const check = call("check_page", { url: "http://localhost:5173/" });
+    const id = await start([check, check, check, finish], ["Всё на месте.", "Всё на месте."]);
+    await waitTask(id, (t) => t.status === "done_empty");
+    const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "check_page");
+    expect(results.map((r) => r.data.ok)).toEqual([true, true, false]);
+    expect(results.at(-1).data.output).toMatch(/give the user your short reply/);
+  });
+
   // Seen live: checking fourteen requirements, the acceptance agent ran out of the coder's four looks.
   it("lets the acceptance agent look more than the coder", async () => {
     const look = call("look_at_page", { url: "http://localhost:5173/", question: "Что видно?" });
