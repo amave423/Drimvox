@@ -6,10 +6,10 @@ import { runAgent } from "../agent/run";
 import { isFreeToRun, isLocal } from "../budget";
 import type { ToolHooks } from "../agent/tools";
 import type { ChatApprovals } from "../chats/approvals";
-import { describeCall, folderHint, folderTools } from "../chats/folder";
+import { describeCall, folderTools } from "../chats/folder";
 import { toModelMessages } from "../chats/history";
 import type { ChatRepo } from "../chats/repo";
-import { WEB_HINT, webTools } from "../internet/tools";
+import { webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { nowLine } from "../now";
 import { findModel } from "../providers/catalog";
@@ -28,8 +28,9 @@ import { projectMap } from "../agent/repo-map";
 import { proxyHint } from "../internet/blocked";
 import { lineStat } from "./line-stat";
 import { subagentTools } from "../agent/subagent";
-import { FORMAT_HINT, LANGUAGE_HINT } from "../chats/reply";
+import { LANGUAGE_HINT } from "../chats/reply";
 import { planModeInstructions, planModeTools } from "./plan-mode";
+import { agentPrompt } from "./agent-prompt";
 
 /** Steps one answer of the run takes before the next answer goes on with the same context. */
 export const SEGMENT_STEPS = 60;
@@ -454,14 +455,14 @@ export class WorkRun {
       },
       // As a chat with a folder says it (asked for: that loop made the better site for half the money): the folder, the
       // language, the format; no long rules of design, checks, notes and git.
+      // Short as OpenCode's (agent-prompt.ts): the folder, the tone, how to do a task and stop; no rules of design.
       system: [
         this.startedAt,
+        agentPrompt(this.folder),
         LANGUAGE_HINT,
-        FORMAT_HINT,
-        folderHint(this.folder),
         // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
         proxyHint(this.d.web),
-        WEB_HINT,
+        TOOLS_NOTE,
         this.d.toolbox ? sshNote(this.d.toolbox.ssh) : "",
         skillsInstructions(skills),
         // A ready project's files and what each defines (as Aider's repo map): fewer steps spent finding the right file.
@@ -531,6 +532,11 @@ export class WorkRun {
     this.d.repo.update(this.projectId, { shots: [...this.row().shots, { id: s.id, url: s.url, at: Date.now() }] });
   }
 }
+
+/** What the web and the browser are for, in a line, instead of the chats' long rules of searching and browsing. */
+const TOOLS_NOTE =
+  "You have web_search and open_page for documentation and current facts, and a real browser (browser_open, browser_look " +
+  "and the other browser_ tools) to open pages, the project's own too. Never solve captchas or bot checks yourself.";
 
 /** A run's whole conversation kept for the next one (RunDeps.carry). */
 export interface Carried {

@@ -391,7 +391,7 @@ describe("a ready project", () => {
     expect(work.plan).toBeNull();
     // No reminders to finish: it answered and stopped, as in a chat.
     expect(requestsOf("coder")).toHaveLength(1);
-    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("connected a folder");
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("Drimvox's coding agent");
     const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
     expect(chat.messages.map((m: any) => m.content)).toEqual(["Почини сумму", "Нашёл и поправил: сумма считается заново."]);
 
