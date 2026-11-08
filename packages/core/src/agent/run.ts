@@ -14,6 +14,7 @@ import { cutPoint, memoryLimit, remember, sizeOf, TRIM_SHARE, withMemory, type M
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
+import { pruneOutputs } from "./prune";
 import { deferTools } from "./deferred";
 import { learnFromAnswer } from "../providers/availability";
 import { thinkingOptions } from "../chats/thinking";
@@ -61,6 +62,10 @@ export interface RunInput {
   /** What the agent remembers of its older work; with onMemory, a new summary replaces the older part when it grows. */
   memory?: Memory | null;
   onMemory?(memory: Memory, usage: { inputTokens: number; outputTokens: number; costUsd: number }): void;
+  /** Old tool outputs leave the conversation as OpenCode prunes them (prune.ts): a project's run. */
+  prune?: boolean;
+  /** More tools kept out of every step until the model loads them, such as the user's MCP servers' (deferred.ts). */
+  rare?: string[];
   /** Steps this pass may take; MAX_STEPS when not given. */
   maxSteps?: number;
   /** The one tool the model may and must call now, such as the acceptance verdict once looking is over. */
@@ -145,7 +150,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   if (!i.only) Object.assign(tools, paused({ execute: codeTool(() => tools, ["finish", ...(i.stopTools ?? [])]) }, clock));
 
   // The rare tools wait until the model loads them (deferred.ts); a step with one tool to call keeps just that one.
-  const deferral = i.only ? null : deferTools(tools);
+  const deferral = i.only ? null : deferTools(tools, i.rare);
 
   // A summary of the older work being written in the background, and what came of it (undefined while it is written).
   let writing = null as Summary | null;
@@ -235,6 +240,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
               resetClock();
             }
           }
+          if (i.prune) sent = pruneOutputs(sent).messages;
           // Older outputs go shortened, on a copy, only once the history is half way to the model's limit: before it the
           // agent keeps what it read (asked for: as OpenCode; shortened at every step, files were read again and again).
           if (sent.length > KEEP_WHOLE && sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE) {

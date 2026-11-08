@@ -147,6 +147,21 @@ describe("look_at_page", () => {
     expect(widths).toEqual([390, 1280]);
   });
 
+  // Seen live: a weather site was checked with 8 openings, 13 looks and 29 scripts in the page, a model request each.
+  it("checks a page in one call: a desktop and a phone screenshot in one question, and the console's errors", async () => {
+    env.setScreenshot(async (_url, size) => (widths.push(size.width), { png: PNG, console: ["Uncaught TypeError: x is undefined (app.js:3)"] }));
+    const id = await start([call("check_page", { url: "http://localhost:5173/", focus: "Метеограмма" }), finish], ["Компьютер: всё на месте. Телефон: таблица вылезает за край."]);
+    await waitTask(id, (t) => t.status === "done_empty");
+    expect(widths).toEqual([1280, 390]);
+    expect(visionRequests()).toHaveLength(1);
+    const asked = JSON.stringify(visionRequests()[0]!.body.messages);
+    expect(asked.match(/data:image\/png;base64,/g)).toHaveLength(2);
+    expect(asked).toContain("Метеограмма");
+    const result = (await events(id)).find((e) => e.kind === "tool_result" && e.data.name === "check_page");
+    expect(result.data.output).toContain("таблица вылезает за край");
+    expect(result.data.output).toContain("- Uncaught TypeError: x is undefined (app.js:3)");
+  });
+
   // Seen live: checking fourteen requirements, the acceptance agent ran out of the coder's four looks.
   it("lets the acceptance agent look more than the coder", async () => {
     const look = call("look_at_page", { url: "http://localhost:5173/", question: "Что видно?" });

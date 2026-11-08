@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Background } from "../agent/background";
 import { classifyCommand } from "../agent/commands";
 import type { ToolHooks } from "../agent/tools";
-import { askAboutPicture, mayLookAt, type Screenshotter, type Shots, type Vision } from "./look";
+import { askAboutPicture, askAboutPictures, mayLookAt, type Screenshotter, type Shots, type Vision } from "./look";
 
 /** What looking at pages needs from the core. */
 export interface VisualKit {
@@ -133,6 +133,46 @@ ${d.kit.background.read(d.taskId, already.id)}`;
         if (!mayLookAt(url)) throw new Error("Only this computer (localhost) and public addresses can be opened");
         if (++looks > limit.looks) throw new Error(`You have looked at pages ${limit.looks} times in this turn. ${limit.then}`);
         return (await look(d, url, question, o.abortSignal, width, steps)).answer;
+      }),
+  });
+  // Seen live: a weather site was checked with 8 openings, 13 looks and 29 scripts in the page, each a request to the model.
+  tools.check_page = tool({
+    description:
+      "Check a page once it is built, in one call: Drimvox opens it at a desktop width (1280) and a phone width (390), a model " +
+      "that sees pictures looks at both, and you get what is broken or looks wrong on each, with the errors of the page's " +
+      "console. Use it instead of opening the page and looking at it step by step.",
+    inputSchema: z.object({
+      url: z.string().min(1).max(2000),
+      focus: z.string().max(1000).optional().describe("What to look at closely, such as the part you just changed"),
+    }),
+    execute: ({ url, focus }, o: Options) =>
+      run(o.toolCallId, "check_page", { url, focus }, async () => {
+        if (!mayLookAt(url)) throw new Error("Only this computer (localhost) and public addresses can be opened");
+        if (++looks > limit.looks) throw new Error(`You have looked at pages ${limit.looks} times in this turn. ${limit.then}`);
+        const taken = [];
+        for (const width of [1280, 390]) taken.push(await d.kit.screenshot!(url, sizeOf(width)));
+        const errors = [...new Set(taken.flatMap((t) => (Buffer.isBuffer(t) ? [] : t.console)))];
+        const pictures = taken.map((t) => {
+          const png = Buffer.isBuffer(t) ? t : t.png;
+          d.event("screenshot", { id: d.kit.shots.save(png), url });
+          return { data: png, mediaType: "image/png" };
+        });
+        const { text, costUsd } = await askAboutPictures(
+          d.vision!,
+          pictures,
+          [
+            "These are screenshots of one page: the first at a desktop width, the second at a phone width.",
+            "Say briefly, for each, what is broken or looks wrong: overlapping or cut text, parts out of the screen, empty or",
+            "half-drawn areas, unreadable contrast, a layout that falls apart. When it all looks right, say so in one line.",
+            focus ? `Look closely at: ${focus}.` : "",
+            "Answer in the language of this request's focus when it has one, else in English.",
+          ]
+            .filter(Boolean)
+            .join(" "),
+          o.abortSignal,
+        );
+        d.onSpend(costUsd);
+        return errors.length ? `${text}\n\nErrors in the page's console:\n${errors.map((e) => `- ${e}`).join("\n")}` : text;
       }),
   });
   return tools;

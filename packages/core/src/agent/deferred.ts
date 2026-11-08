@@ -35,8 +35,8 @@ const MIN_RARE = 4;
  * has loaded. The list of rare names stays in find_tools' description, the same for the whole pass, so the provider's
  * cache holds until one is loaded.
  */
-export function deferTools(tools: ToolSet): { tools: ToolSet; active(): string[] | undefined } {
-  const rare = Object.keys(tools).filter(isRare);
+export function deferTools(tools: ToolSet, more: string[] = []): { tools: ToolSet; active(): string[] | undefined } {
+  const rare = Object.keys(tools).filter((n) => isRare(n) || more.includes(n));
   if (rare.length < MIN_RARE) return { tools, active: () => undefined };
   const loaded = new Set<string>();
   const first = (name: string) => `${name}: ${String(tools[name]!.description ?? "").split(/(?<=\.)\s/)[0]}`;

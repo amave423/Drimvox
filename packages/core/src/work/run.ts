@@ -31,6 +31,8 @@ import { subagentTools } from "../agent/subagent";
 import { LANGUAGE_HINT } from "../chats/reply";
 import { planModeInstructions, planModeTools } from "./plan-mode";
 import { agentPrompt } from "./agent-prompt";
+import { oneBrowser } from "../browser/one";
+import { isRare } from "../agent/deferred";
 
 /** Steps one answer of the run takes before the next answer goes on with the same context. */
 export const SEGMENT_STEPS = 60;
@@ -432,7 +434,11 @@ export class WorkRun {
         : {}),
     };
     // The plan mode only reads: the project, the web, sub-agents, skills; no writing, no commands, no browser yet.
-    const tools: ToolSet = this.mode === "plan" ? pick(own, ["delegate", "use_skill", "read_skill_file", "web_search", "open_page", "propose_plan"]) : own;
+    // The browser's usual tools go as one (browser/one.ts); its rare ones stay apart, loaded when needed (deferred.ts).
+    const tools: ToolSet =
+      this.mode === "plan"
+        ? pick(own, ["delegate", "use_skill", "read_skill_file", "web_search", "open_page", "propose_plan"])
+        : oneBrowser(own, Object.keys(own).filter(isRare));
     const spentBefore = this.spent();
     const overBudget = () => spentBefore + cost >= this.row().budgetUsd;
     let limited = false;
@@ -447,6 +453,9 @@ export class WorkRun {
       noFinish: true,
       thinkingLevel: this.row().thinking,
       ownTools: tools,
+      // Old outputs leave the conversation (prune.ts); the MCP servers' tools wait until loaded, as the rare ones do.
+      prune: true,
+      rare: Object.keys(mcpTools),
       stopTools: ["propose_plan"],
       maxSteps: SEGMENT_STEPS,
       stopWhen: () => {
@@ -535,8 +544,8 @@ export class WorkRun {
 
 /** What the web and the browser are for, in a line, instead of the chats' long rules of searching and browsing. */
 const TOOLS_NOTE =
-  "You have web_search and open_page for documentation and current facts, and a real browser (browser_open, browser_look " +
-  "and the other browser_ tools) to open pages, the project's own too. Never solve captchas or bot checks yourself.";
+  "You have web_search and open_page for documentation and current facts, and a real browser (the browser tool) to open " +
+  "pages and go through them as a person would. Never solve captchas or bot checks yourself.";
 
 /** A run's whole conversation kept for the next one (RunDeps.carry). */
 export interface Carried {

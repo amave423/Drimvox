@@ -178,12 +178,14 @@ describe("work on a project", () => {
   });
 
   // Seen: four MCP servers were switched on and the project's run had none of them (only the interview did).
-  it("gives the run the tools of the user's MCP servers", async () => {
+  // Their descriptions wait until loaded, as the rare tools' do (asked for: fewer tools sent with every step).
+  it("gives the run the tools of the user's MCP servers, loaded when the model asks for them", async () => {
     const server = fileURLToPath(new URL("./mcp-server.mjs", import.meta.url));
     await env.call("POST", "/api/mcp", { name: "demo", command: process.execPath, args: [server], trust: "trusted" });
     const s = await setup({
       coder: [
         proposePlan,
+        call("find_tools", { names: ["mcp_demo_echo"] }),
         call("mcp_demo_echo", { text: "кедр" }),
         { text: "Готово." },
         { text: "Готово." },
@@ -192,6 +194,9 @@ describe("work on a project", () => {
     await planned(s);
     await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
     await until(s.project.id, (w) => w.status === "done");
+    const first = requestsOf("coder").find((r) => r.body.tools?.some((t: any) => t.function.name === "find_tools"))!.body;
+    expect(first.tools.map((t: any) => t.function.name)).not.toContain("mcp_demo_echo");
+    expect(JSON.stringify(first.tools)).toContain("mcp_demo_echo");
     const sent = requestsOf("coder").at(-1)!.body;
     expect(sent.tools.map((t: any) => t.function.name)).toContain("mcp_demo_echo");
     expect(JSON.stringify(sent.messages)).toContain("echo: кедр");
