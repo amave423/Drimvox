@@ -85,6 +85,23 @@ describe("a chat with a folder", () => {
 
   // Seen live: a task took all 40 steps on tools, the last one too, and the answer came empty, called "thought a lot and
   // did not answer" though the files were made. The last step is for the summary: no tools, a word on what is done.
+  // Seen live: the context bar showed the sum over an answer's 43 steps, 1.6 million tokens, far past the model's window;
+  // and a model, its old answers kept as text only, wrote "I checked…" with no tool called.
+  it("keeps the last step's context, and tells the next answer which tools the earlier one called", async () => {
+    const chat = await chatWith([
+      { toolCalls: [{ name: "read_file", args: { path: "app.js" } }], usage: { prompt_tokens: 5_000, completion_tokens: 100 } },
+      { text: "В app.js a = 1.", usage: { prompt_tokens: 6_000, completion_tokens: 50 } },
+      { text: "Да." },
+    ]);
+    await connect(chat.id, folder);
+    const answer = (await readEvents(await send(chat.id, "Что в app.js?"))).at(-1).message;
+    expect(answer).toMatchObject({ inputTokens: 11_000, contextTokens: 6_050 });
+    await readEvents(await send(chat.id, "Точно?"));
+    const second = JSON.stringify(fake!.requests.filter((r) => r.path === "/v1/chat/completions").at(-1)!.body.messages);
+    expect(second).toContain("[Drimvox: tools called in this answer: read_file.");
+    expect(second).toContain("Never say you checked");
+  });
+
   it("ends with a summary when the steps run out, not with an empty answer", async () => {
     const chat = await chatWith([...Array.from({ length: FOLDER_STEPS - 1 }, () => call("list_files", { path: "." })), { text: "Сделал шаблон; осталось проверить сноски." }]);
     await connect(chat.id, folder);

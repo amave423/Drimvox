@@ -453,6 +453,7 @@ export const ru = {
   "project.removeConfirm": "Убрать {name} из Drimvox? Папка и её файлы останутся на месте.",
   "git.title": "Git: как работает агент",
   "git.author": "Коммиты от имени: {name}",
+  "git.pushError": "GitHub не принял отправку: {reason}",
   "git.unsent": "Не отправлено на GitHub: {n}",
   "git.sent": "Всё отправлено на GitHub",
   "git.sendNow": "Отправить сейчас",

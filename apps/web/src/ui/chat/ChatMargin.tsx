@@ -13,6 +13,7 @@ interface Answer {
   costUsd: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  contextTokens?: number | null;
   activity: ActivityEntry[];
 }
 
@@ -70,15 +71,17 @@ export function ChatMargin({
   const tokens = answers.reduce((sum, m) => sum + (m.inputTokens ?? 0) + (m.outputTokens ?? 0), 0);
   const unpriced = answers.some((m) => m.costUsd === null && m.outputTokens !== null);
   const subscription = !!choice && providers.find((p) => p.id === choice.providerId)?.billing === "subscription";
-  // How full the context is: what the latest answer sent and got back, against the model's window.
+  // How full the context is: what the latest answer's last step sent and got back, against the model's window (seen: the
+  // sum over an answer's 43 steps showed 1.6 million tokens, far past a window the context never filled). An older answer
+  // without it counts whole only when it took one step; otherwise the bar waits for the next answer.
   const last = answers.findLast((m) => m.inputTokens !== null);
-  const used = last ? (last.inputTokens ?? 0) + (last.outputTokens ?? 0) : 0;
+  const used = !last ? 0 : (last.contextTokens ?? (last.activity.length ? null : (last.inputTokens ?? 0) + (last.outputTokens ?? 0)));
   const files = chat?.folder ? filesOf(answers.flatMap((m) => m.activity)) : [];
 
   return (
     // Sticks to the top while the conversation scrolls, so these stay within reach.
     <aside className="margin chat-margin">
-      {model?.contextLength && (
+      {model?.contextLength && used !== null && (
         <section className="margin-sec" aria-label={t("margin.context")}>
           <h3 className="margin-label">{t("margin.context")}</h3>
           <div className="context-bar" role="meter" aria-valuemin={0} aria-valuemax={model.contextLength} aria-valuenow={Math.min(used, model.contextLength)} aria-label={t("margin.context")}>

@@ -7,11 +7,11 @@ import { isFreeToRun, isLocal } from "../budget";
 import type { ToolHooks } from "../agent/tools";
 import type { ChatApprovals } from "../chats/approvals";
 import { describeCall, folderTools } from "../chats/folder";
-import { toModelMessages } from "../chats/history";
+import { toModelMessages, HONEST_HINT } from "../chats/history";
 import type { ChatRepo } from "../chats/repo";
 import { webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
-import { nowLine } from "../now";
+import { todayLine } from "../now";
 import { findModel } from "../providers/catalog";
 import type { Connection, ProviderRepo } from "../providers/repo";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
@@ -116,7 +116,8 @@ export class WorkRun {
    * The start of the system prompt, the same for every answer of this run (asked for: a stable prefix the provider's cache
    * keeps): the time it started and a ready project's map, not computed again for every answer.
    */
-  private readonly startedAt = nowLine();
+  // The day only: the minute changed the start of every message's request, and the whole history went at full price.
+  private readonly startedAt = todayLine();
   private map: Promise<string> | null = null;
 
   constructor(
@@ -324,6 +325,7 @@ export class WorkRun {
     let cached = 0;
     let cost = 0;
     let priced = true;
+    let lastStep = 0;
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
     const onCall = (name: string, what: string, stat?: Pick<ActivityEntry, "added" | "removed" | "perFile"> | null) => {
       if (name === "use_skill") this.skillsOpened.add(what);
@@ -467,8 +469,9 @@ export class WorkRun {
       // Short as OpenCode's (agent-prompt.ts): the folder, the tone, how to do a task and stop; no rules of design.
       system: [
         this.startedAt,
-        agentPrompt(this.folder),
+        agentPrompt(this.folder, process.platform, !!gitLine?.startsWith("- Never commit")),
         LANGUAGE_HINT,
+        HONEST_HINT,
         // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
         proxyHint(this.d.web),
         TOOLS_NOTE,
@@ -501,6 +504,7 @@ export class WorkRun {
         this.stretch.cachedTokens = cached;
         // What this step sent is what the model holds now: the context bar.
         if (step.inputTokens) this.d.repo.update(this.projectId, { contextTokens: step.inputTokens });
+        lastStep = step.inputTokens + step.outputTokens || lastStep;
         if (!step.priced) priced = false;
       },
     });
@@ -522,6 +526,7 @@ export class WorkRun {
       inputTokens: input,
       outputTokens: output,
       cachedTokens: cached,
+      contextTokens: lastStep || null,
       costUsd: priced || cost > 0 ? cost : null,
       error,
       activity,

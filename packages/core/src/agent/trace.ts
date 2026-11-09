@@ -41,3 +41,35 @@ export function traceStep(system: string, tools: ToolSet, active: string[] | und
     // A trace that cannot be written does not stop the work.
   }
 }
+
+/**
+ * What a step cost, by part, in the same file: input from the cache and not, the answer and its thinking, and the bill
+ * (asked for: to know whether the input or the answer makes the cost).
+ */
+export function traceUsage(usage: {
+  inputTokens?: number;
+  outputTokens?: number;
+  inputTokenDetails?: { cacheReadTokens?: number };
+  outputTokenDetails?: { reasoningTokens?: number };
+  reasoningTokens?: number;
+}, costUsd: number): void {
+  const file = process.env.DRIMVOX_TRACE_STEPS;
+  if (!file) return;
+  const input = usage.inputTokens ?? 0;
+  const cached = usage.inputTokenDetails?.cacheReadTokens ?? 0;
+  const row = {
+    at: Date.now(),
+    usage: true,
+    input,
+    cached,
+    uncached: input - cached,
+    output: usage.outputTokens ?? 0,
+    reasoning: usage.outputTokenDetails?.reasoningTokens ?? usage.reasoningTokens ?? 0,
+    costUsd,
+  };
+  try {
+    appendFileSync(file, `${JSON.stringify(row)}\n`);
+  } catch {
+    // A trace that cannot be written does not stop the work.
+  }
+}

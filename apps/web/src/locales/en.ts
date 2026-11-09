@@ -453,6 +453,7 @@ export const en: Record<keyof typeof ru, string> = {
   "project.removeConfirm": "Remove {name} from Drimvox? The folder and its files stay where they are.",
   "git.title": "Git: how the agent works",
   "git.author": "Commits as: {name}",
+  "git.pushError": "GitHub refused the push: {reason}",
   "git.unsent": "Not on GitHub yet: {n}",
   "git.sent": "All on GitHub",
   "git.sendNow": "Send now",

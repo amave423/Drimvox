@@ -1,5 +1,5 @@
 import { defaultGitRules, projectGitRulesSchema, type ProjectGitRules, type ProjectGitState } from "@drimvox/shared";
-import { anywhere, currentBranch, NEVER_ADDED, runGit } from "../agent/git";
+import { addWork, currentBranch, runGit } from "../agent/git";
 import type { Database } from "../db";
 import type { GitHub } from "../github/github";
 
@@ -15,6 +15,7 @@ interface Kept {
 
 const rulesKey = (projectId: string) => `git.rules:${projectId}`;
 const keptKey = (projectId: string) => `git.branch:${projectId}`;
+const pushErrorKey = (projectId: string) => `git.pushError:${projectId}`;
 
 /**
  * The agent's git in a project, by the project's rules (docs/specs/project-git.md, asked for: the agent works with git on
@@ -101,10 +102,7 @@ export class ProjectGit {
   /** What the agent did so far, as one commit; false when there was nothing to commit or the rules say not to. */
   async commit(projectId: string, folder: string, message: string): Promise<boolean> {
     if (this.rules(projectId).commit === "never") return false;
-    const tracked = (await runGit(folder, ["ls-files", "--", ...NEVER_ADDED.map(anywhere)], true)).stdout.split("\n").filter(Boolean).map((p) => p.split("/"));
-    const skipped = NEVER_ADDED.filter((name) => !tracked.some((parts) => parts.includes(name)));
-    const add = await runGit(folder, ["add", "-A", "--", ".", ...skipped.map((n) => `:(exclude,glob)**/${n}/**`), ...SECRETS.map((s) => `:(exclude,glob)**/${s}`)], true);
-    if (add.code !== 0) return false;
+    if (!(await addWork(folder, SECRETS.map((s) => `**/${s}`)))) return false;
     if ((await runGit(folder, ["diff", "--cached", "--quiet"], true)).code === 0) return false;
     const text = message.trim().split("\n")[0]!.slice(0, 200) || "Work by Drimvox";
     return (await runGit(folder, [...(await this.identity(folder)), "commit", "-q", "--no-verify", "-m", text], true)).code === 0;
@@ -115,13 +113,13 @@ export class ProjectGit {
     const rules = this.rules(projectId);
     // The project's own branch goes to GitHub as it is, when the project is there.
     if (rules.target === "current") {
-      if (rules.push && (await this.github.ready(folder).catch(() => false))) await this.github.push(folder).catch(() => {});
+      if (rules.push && (await this.github.ready(folder).catch(() => false))) await this.send(projectId, folder);
       return;
     }
     const kept = this.kept(projectId);
     if (!kept || !rules.push || (await currentBranch(folder)) !== kept.branch || !(await this.github.ready(folder))) return;
     try {
-      await this.github.push(folder);
+      if (!(await this.send(projectId, folder))) return;
       if (rules.pullRequest && !kept.pullRequest && (await ahead(folder, kept.base)) > 0) {
         const pr = await this.github.pullRequest(folder, kept.branch, kept.base, title.slice(0, 120) || kept.branch, "Made by the agent in Drimvox.");
         this.keep(projectId, { ...kept, pullRequest: pr });
@@ -129,6 +127,26 @@ export class ProjectGit {
     } catch {
       // Shown as not sent: the branch stays here and goes the next time.
     }
+  }
+
+  /**
+   * Sends the branch to GitHub; why it failed is kept for the project's git card (seen live: a 180 MB installer in a
+   * commit made GitHub refuse every push, silently, and the user's "put it on GitHub" never happened).
+   */
+  private async send(projectId: string, folder: string): Promise<boolean> {
+    try {
+      await this.github.push(folder);
+      this.db.sql.prepare("delete from settings where key = ?").run(pushErrorKey(projectId));
+      return true;
+    } catch (err) {
+      this.put(pushErrorKey(projectId), (err instanceof Error ? err.message : String(err)).slice(0, 600));
+      return false;
+    }
+  }
+
+  private pushError(projectId: string): string | null {
+    const row = this.db.sql.prepare("select value from settings where key = ?").get(pushErrorKey(projectId)) as { value: string } | undefined;
+    return row ? (JSON.parse(row.value) as string) : null;
   }
 
   async state(projectId: string, folder: string): Promise<ProjectGitState> {
@@ -144,6 +162,7 @@ export class ProjectGit {
       github,
       pullRequest: mine?.pullRequest ?? null,
       unsent: github && branch ? await unsent(folder, branch) : 0,
+      pushError: github ? this.pushError(projectId) : null,
       author: login ?? ((await runGit(folder, ["config", "user.name"], true)).stdout.trim() || null),
     };
   }
@@ -161,7 +180,7 @@ export class ProjectGit {
       return false;
     }
     this.keep(projectId, null);
-    if (this.rules(projectId).push && (await this.github.ready(folder))) await this.github.push(folder).catch(() => {});
+    if (this.rules(projectId).push && (await this.github.ready(folder))) await this.send(projectId, folder);
     return true;
   }
 

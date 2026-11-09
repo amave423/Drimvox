@@ -1,6 +1,6 @@
 import { isLocal, NO_LIMIT_MS } from "../budget";
 import { mergeOptions, thinkingOptions } from "./thinking";
-import { toModelMessages } from "./history";
+import { HONEST_HINT, toModelMessages } from "./history";
 import { subagentTools } from "../agent/subagent";
 import { notesBlock } from "../agent/notes";
 import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
@@ -134,6 +134,8 @@ export async function reply(i: ReplyInput): Promise<void> {
   let reasoning = "";
   let error: ProviderError | null = null;
   let usage: Parameters<typeof usageOf>[0];
+  /** What the latest step sent and got back: the context bar. */
+  let stepTokens: number | null = null;
   let finishReason: string | undefined;
   /** The provider's own bill in its currency, summed over the steps, when it sends one. */
   let billed: number | null = null;
@@ -206,6 +208,7 @@ export async function reply(i: ReplyInput): Promise<void> {
           Object.keys(tools).length && i.web !== "free" ? FAIR_USE_HINT : "",
           i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
           i.folder ? folderHint(i.folder) : "",
+          Object.keys(tools).length ? HONEST_HINT : "",
           // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
           i.folder && i.web === "free" ? proxyHint(i.webAccess) : "",
           i.folder ? notesBlock(i.folder) : "",
@@ -261,6 +264,7 @@ export async function reply(i: ReplyInput): Promise<void> {
           error = describeError(part.error);
         } else if (part.type === "finish-step") {
           newStep = true;
+          stepTokens = (part.usage.inputTokens ?? 0) + (part.usage.outputTokens ?? 0) || stepTokens;
           // Each step's own bill, when the provider sends one: an answer with searches takes several steps.
           const step = billedUsd(part.providerMetadata, 1);
           if (step !== null) billed = (billed ?? 0) + step;
@@ -315,6 +319,7 @@ export async function reply(i: ReplyInput): Promise<void> {
     outputTokens,
     // What the provider served from its cache (seen: chats always saved 0, though the cache worked).
     cachedTokens: usage ? usageOf(usage).cacheRead : null,
+    contextTokens: stepTokens,
     // The provider's own bill when it sends one; the sub-agents and the summaries on top (seen: left out, and the app's
     // spending fell short of RouterAI's by a fifth).
     costUsd: (() => {

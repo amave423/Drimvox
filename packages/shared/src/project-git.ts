@@ -42,6 +42,8 @@ export interface ProjectGitState {
   pullRequest: { number: number; url: string } | null;
   /** Commits on the branch that GitHub does not have yet; 0 when all went. */
   unsent: number;
+  /** Why the last push after an answer failed (GitHub's own words); null when it went. */
+  pushError: string | null;
   /** Who the commits are made as: the user's GitHub account, or their git name. */
   author: string | null;
 }

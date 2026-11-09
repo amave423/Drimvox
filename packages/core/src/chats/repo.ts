@@ -39,6 +39,7 @@ interface MessageRow {
   media_job: string | null;
   checkpoint: string | null;
   activity: string | null;
+  context_tokens?: number | null;
   parent_id: string | null;
 }
 
@@ -48,6 +49,8 @@ export interface HistoryTurn {
   role: "user" | "assistant";
   content: string;
   attachments?: (AttachmentView & { text: string | null })[];
+  /** An answer's tool calls, counted by name: the model is told it really called them (history.ts). */
+  actions?: Record<string, number>;
 }
 
 export interface PendingJob {
@@ -79,6 +82,8 @@ export interface FinishedAnswer {
   outputTokens: number | null;
   /** Of the input, what came from the provider's cache. */
   cachedTokens?: number | null;
+  /** What the answer's last step sent: how full the model's context is. */
+  contextTokens?: number | null;
   costUsd: number | null;
   error: ProviderError | null;
   /** The tools called while answering. */
@@ -300,7 +305,7 @@ export class ChatRepo {
       .prepare(
         `update messages set content = :content, reasoning = :reasoning, status = :status, input_tokens = :input_tokens,
          output_tokens = :output_tokens, cost_usd = :cost_usd, error_code = :error_code, error_detail = :error_detail,
-         activity = :activity, cached_tokens = :cached_tokens
+         activity = :activity, cached_tokens = :cached_tokens, context_tokens = :context_tokens
          where id = :id`,
       )
       .run({
@@ -315,6 +320,7 @@ export class ChatRepo {
         error_detail: a.error?.detail ?? null,
         activity: a.activity?.length ? JSON.stringify(a.activity) : null,
         cached_tokens: a.cachedTokens ?? null,
+        context_tokens: a.contextTokens ?? null,
       });
     return this.message(id)!;
   }
@@ -339,7 +345,11 @@ export class ChatRepo {
     // The current branch only: an edited message's older versions and what followed them are not said again.
     const rows = branchOf(this.rows(chatId), this.head(chatId)).filter((r) => r.role === "user" || ((r.status === "done" || r.status === "stopped") && r.content !== ""));
     const files = this.attachments.forMessages(rows.filter((r) => r.role === "user").map((r) => r.id));
-    return rows.map(({ id, role, content }) => (files.has(id) ? { role, content, attachments: files.get(id)! } : { role, content }));
+    return rows.map(({ id, role, content, activity }) => {
+      if (files.has(id)) return { role, content, attachments: files.get(id)! };
+      const actions = role === "assistant" ? countActions(activity) : null;
+      return actions ? { role, content, actions } : { role, content };
+    });
   }
 
   usageSince(since: number): UsageSummary {
@@ -406,6 +416,7 @@ function toMessage(r: MessageRow, media: MessageView["media"], attachments: Mess
     model: r.model,
     inputTokens: r.input_tokens,
     outputTokens: r.output_tokens,
+    contextTokens: r.context_tokens ?? null,
     costUsd: r.cost_usd,
     status: r.status,
     error: r.error_code ? ({ code: r.error_code, ...(r.error_detail ? { detail: r.error_detail } : {}) } as ProviderError) : null,
@@ -416,4 +427,16 @@ function toMessage(r: MessageRow, media: MessageView["media"], attachments: Mess
     versions: null,
     createdAt: r.created_at,
   };
+}
+
+/** An answer's activity, counted by tool; null when it called none. */
+function countActions(activity: string | null | undefined): Record<string, number> | null {
+  if (!activity) return null;
+  try {
+    const counts: Record<string, number> = {};
+    for (const a of JSON.parse(activity) as { name?: unknown }[]) if (typeof a.name === "string" && a.name !== "screenshot") counts[a.name] = (counts[a.name] ?? 0) + 1;
+    return Object.keys(counts).length ? counts : null;
+  } catch {
+    return null;
+  }
 }

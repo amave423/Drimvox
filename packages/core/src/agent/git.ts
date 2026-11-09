@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
+import { statSync } from "node:fs";
 import { userInfo } from "node:os";
+import { join } from "node:path";
 
 export interface GitResult {
   code: number;
@@ -126,10 +128,37 @@ export const anywhere = (name: string) => `:(glob)**/${name}/**`;
 /** Pathspecs that leave dependency folders out of `git add`, wherever they are. */
 export const withoutDependencies = () => NEVER_ADDED.map((name) => `:(exclude,glob)**/${name}/**`);
 
-export async function commitAll(worktree: string, message: string): Promise<boolean> {
-  const tracked = lines(await out(worktree, ["ls-files", "--", ...NEVER_ADDED.map(anywhere)])).map((p) => p.split("/"));
+/**
+ * What an app's build leaves: installers and unpacked apps (seen live: an Electron app's Fiit.exe of 180 MB went into the
+ * commit, and GitHub refused every push after it). They are published as release files, never committed.
+ */
+const BUILT = ["**/win-unpacked/**", "**/linux-unpacked/**", "**/mac-unpacked/**", "**/*.exe", "**/*.msi", "**/*.dmg", "**/*.AppImage", "**/*.blockmap", "**/*.nupkg"];
+/** A file this big is left out: GitHub warns at 50 MB and refuses the push of a file over 100 MB. */
+export const BIG_FILE = 50 * 1024 * 1024;
+
+/**
+ * Stages the work: everything but dependency folders the project does not track, built apps and files too big for
+ * GitHub, and what `exclude` adds (secrets). Returns false when git refused.
+ */
+export async function addWork(folder: string, exclude: string[] = []): Promise<boolean> {
+  const tracked = lines(await out(folder, ["ls-files", "--", ...NEVER_ADDED.map(anywhere)])).map((p) => p.split("/"));
   const skipped = NEVER_ADDED.filter((name) => !tracked.some((parts) => parts.includes(name)));
-  await runGit(worktree, ["add", "-A", "--", ".", ...skipped.map((name) => `:(exclude,glob)**/${name}/**`)]);
+  const specs = [...skipped.map((name) => `**/${name}/**`), ...BUILT, ...exclude].map((glob) => `:(exclude,glob)${glob}`);
+  if ((await runGit(folder, ["add", "-A", "--", ".", ...specs], true)).code !== 0) return false;
+  const added = (await runGit(folder, ["diff", "--cached", "--name-only", "-z", "--diff-filter=AM"], true)).stdout.split("\0").filter(Boolean);
+  const big = added.filter((path) => {
+    try {
+      return statSync(join(folder, path)).size > BIG_FILE;
+    } catch {
+      return false;
+    }
+  });
+  if (big.length) await runGit(folder, ["reset", "-q", "--", ...big], true);
+  return true;
+}
+
+export async function commitAll(worktree: string, message: string): Promise<boolean> {
+  await addWork(worktree);
   const staged = await runGit(worktree, ["diff", "--cached", "--quiet"], true);
   if (staged.code === 0) return false;
   await runGit(worktree, [...drimvoxIdentity, "commit", "-q", "--no-verify", "-m", message]);

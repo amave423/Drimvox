@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { commitAll, discardChanges } from "../src/agent/git";
+import { BIG_FILE, commitAll, discardChanges } from "../src/agent/git";
 import { git, makeRepo } from "./git-repo";
 
 let repo: string | undefined;
@@ -36,6 +36,20 @@ describe("commitAll", () => {
     put("node_modules/local/extra.js");
     expect(await commitAll(repo, "Work")).toBe(true);
     expect(committed()).toEqual(["node_modules/local/extra.js", "node_modules/local/index.js"]);
+  });
+
+  // Seen live: an Electron app's installer and unpacked build (Fiit.exe, 180 MB) went into the commit; GitHub refused the
+  // push of every commit after it, and the user's "put it on GitHub" never happened.
+  it("leaves built installers, unpacked builds and files too big for GitHub out", async () => {
+    repo = makeRepo({ "README.md": "# Demo\n" });
+    put("src/main.js");
+    put("desktop/release/Fiit-Setup-1.0.0.exe");
+    put("desktop/release/Fiit-Setup-1.0.0.exe.blockmap");
+    put("desktop/release2/win-unpacked/resources/app.asar");
+    put("desktop/release2/win-unpacked/icudtl.dat");
+    put("assets/video.mp4", "v".repeat(BIG_FILE + 1));
+    expect(await commitAll(repo, "Work")).toBe(true);
+    expect(committed()).toEqual(["src/main.js"]);
   });
 
   it("says there was nothing to commit when only ignored folders changed", async () => {

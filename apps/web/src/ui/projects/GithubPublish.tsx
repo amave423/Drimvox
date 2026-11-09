@@ -1,4 +1,4 @@
-import type { GithubProject, GithubStatus, ProjectView } from "@drimvox/shared";
+import type { GithubProject, GithubStatus, ProjectGitState, ProjectView } from "@drimvox/shared";
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
@@ -28,6 +28,8 @@ export function GithubPublish({ project }: { project: ProjectView }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ code: string; detail?: string } | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  /** What GitHub has not got yet, and why it refused (seen live: a 180 MB installer in a commit, every push refused). */
+  const [sent, setSent] = useState<ProjectGitState | null>(null);
 
   const load = useCallback(async () => {
     const [s, r] = await Promise.all([
@@ -36,6 +38,13 @@ export function GithubPublish({ project }: { project: ProjectView }) {
     ]).catch(() => [null, null] as const);
     setStatus(s);
     setRepo(r);
+    if (r?.remote) {
+      const git = await api.projects[":id"].git
+        .$get({ param: { id: project.id } })
+        .then((res) => (res.ok ? (res.json() as Promise<{ state: ProjectGitState }>) : null))
+        .catch(() => null);
+      setSent(git?.state ?? null);
+    }
   }, [api, project.id]);
 
   useEffect(() => {
@@ -142,6 +151,10 @@ export function GithubPublish({ project }: { project: ProjectView }) {
                 )}
               </p>
               {/* The agent's branch goes to GitHub by itself after each answer: no button to push by hand (asked for). */}
+              {sent?.github && (
+                <p className={sent.unsent ? "is-pencil-text" : "muted"}>{sent.unsent ? t("git.unsent", { n: sent.unsent }) : t("git.sent")}</p>
+              )}
+              {sent?.pushError && sent.unsent > 0 && <p className="error-note">{t("git.pushError", { reason: sent.pushError })}</p>}
             </>
           ) : (
             <>

@@ -165,7 +165,7 @@ describe("a task", () => {
     expect(system.content).toContain(process.platform === "win32" ? "PowerShell" : "sh");
   });
 
-  it("starts every request with the project's AGENTS.md and lets the agent keep its notes there", async () => {
+  it("starts every request of a pass with the project's AGENTS.md as it was, and lets the agent keep its notes there", async () => {
     writeFileSync(join(repo, "AGENTS.md"), "# Правила\nТолько TypeScript.\n");
     git(repo, "add", "AGENTS.md");
     git(repo, "commit", "-q", "-m", "Rules");
@@ -177,7 +177,8 @@ describe("a task", () => {
     await waitFor(id, ["review"]);
     const systems = fake!.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => r.body.messages[0].content as string);
     expect(systems[0]).toContain("Только TypeScript.");
-    expect(systems[1]).toContain("Приветствие в src/app.ts.");
+    // The same start for the whole pass, so the provider's cache holds; the notes are in the file for the next one.
+    expect(systems[1]).toBe(systems[0]);
     const diff = await (await env.call("GET", `/api/tasks/${id}/diff`)).json();
     expect(diff.map((f: any) => f.path)).toContain("AGENTS.md");
   });

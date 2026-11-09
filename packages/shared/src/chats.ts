@@ -145,6 +145,8 @@ export interface MessageView {
   model: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  /** What the answer's last step sent and got back: how full the model's context is; null for older answers. */
+  contextTokens: number | null;
   /** USD; null when the price of the model is unknown. */
   costUsd: number | null;
   status: MessageStatus;

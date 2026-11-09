@@ -15,7 +15,7 @@ import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
 import { CHUNK, PROTECT, pruneOutputs } from "./prune";
-import { traceStep } from "./trace";
+import { traceStep, traceUsage } from "./trace";
 import { deferTools } from "./deferred";
 import { learnFromAnswer } from "../providers/availability";
 import { thinkingOptions } from "../chats/thinking";
@@ -108,6 +108,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let spent = i.spentUsd;
   let steps = 0;
   let memory = i.memory ?? null;
+  /** The provider served part of a request from its cache: the history is then kept as it is (see prepareStep). */
+  let cacheSeen = false;
 
   // The provider's own bill when it sends one (in rubles for RouterAI), else the catalog's prices.
   const usdPerUnit = i.conn.currency === "RUB" ? 1 / (await usdRub()) : 1;
@@ -162,8 +164,11 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
     i.onMemory!(memory, { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd: cost });
   };
 
-  // The project's notes (AGENTS.md) start every request, read afresh: the agent's own update shows at the next step.
-  const system = () => [i.system ?? systemPrompt(i.worktree), i.system ? "" : i.instructions, notesBlock(i.worktree)].filter(Boolean).join("\n\n");
+  // The project's notes (AGENTS.md) start every request, read once a pass (measured: the agent's update of its notes
+  // changed the start of the next request, and the whole conversation went at full price, 50 times the cached one); the
+  // update shows from the next pass.
+  const notes = notesBlock(i.worktree);
+  const system = () => [i.system ?? systemPrompt(i.worktree), i.system ? "" : i.instructions, notes].filter(Boolean).join("\n\n");
 
   // A round cut by the provider's output limit goes on from what it said and did (seen live: "Now I write the styles…",
   // and the answer ended there, counted as done, the file never written).
@@ -242,7 +247,9 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
             }
           }
           // Old thinking too, except Anthropic's: it is signed and refused once changed.
-          if (i.prune) sent = pruneOutputs(sent, PROTECT, CHUNK, i.conn.preset !== "anthropic").messages;
+          // Only where the provider caches nothing, or near the model's window (measured on DeepSeek: a cached token costs a
+          // fiftieth of a new one, and each move of the line sent the whole conversation at full price again).
+          if (i.prune && (!cacheSeen || sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE)) sent = pruneOutputs(sent, PROTECT, CHUNK, i.conn.preset !== "anthropic").messages;
           // Older outputs go shortened, on a copy, only once the history is half way to the model's limit: before it the
           // agent keeps what it read (asked for: as OpenCode; shortened at every step, files were read again and again).
           if (sent.length > KEEP_WHOLE && sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE) {
@@ -285,6 +292,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           const input = step.usage.inputTokens ?? 0;
           const output = step.usage.outputTokens ?? 0;
           const cost = stepCost(step);
+          traceUsage(step.usage, cost);
+          if (usageOf(step.usage).cacheRead > 0) cacheSeen = true;
           spent += cost;
           i.onStep({
             messages: step.response.messages as ModelMessage[],

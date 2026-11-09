@@ -287,6 +287,9 @@ const migrations: string[] = [
   // (to the end of the checklist) or answers as a chat.
   `alter table project_work add column thinking text;
    alter table project_work add column planned integer not null default 0;`,
+  // What an answer's last step sent: the chat's context bar (seen: the sum over all steps of an answer with 43 actions,
+  // 1.6 million tokens, showed a context far past the model's window that was never there).
+  `alter table messages add column context_tokens integer;`,
 ];
 
 export interface Database {
