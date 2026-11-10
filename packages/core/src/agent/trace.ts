@@ -52,7 +52,7 @@ export function traceUsage(usage: {
   inputTokenDetails?: { cacheReadTokens?: number };
   outputTokenDetails?: { reasoningTokens?: number };
   reasoningTokens?: number;
-}, costUsd: number): void {
+}, costUsd: number, raw?: unknown): void {
   const file = process.env.DRIMVOX_TRACE_STEPS;
   if (!file) return;
   const input = usage.inputTokens ?? 0;
@@ -66,6 +66,8 @@ export function traceUsage(usage: {
     output: usage.outputTokens ?? 0,
     reasoning: usage.outputTokenDetails?.reasoningTokens ?? usage.reasoningTokens ?? 0,
     costUsd,
+    // As the provider sent it: its own names for the cache and the thinking, and its bill in its currency.
+    raw: raw ?? null,
   };
   try {
     appendFileSync(file, `${JSON.stringify(row)}\n`);

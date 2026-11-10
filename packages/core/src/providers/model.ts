@@ -2,8 +2,9 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible, type MetadataExtractor } from "@ai-sdk/openai-compatible";
-import type { LanguageModel } from "ai";
+import type { JSONValue, LanguageModel } from "ai";
 import type { Connection } from "./repo";
+import { withCheapestProvider } from "./routing";
 
 /**
  * Anthropic, OpenAI and Google go through their own SDK packages, so tools, reasoning and pictures work as
@@ -23,7 +24,14 @@ export function languageModel(conn: Connection, modelId: string): LanguageModel 
     baseURL: conn.baseUrl,
     apiKey,
     includeUsage: true,
-    fetch: withoutHistoryReasoning(conn.preset === "ollama" || conn.preset === "lmstudio" ? withoutEffort(fetch ?? globalThis.fetch) : (fetch ?? globalThis.fetch)),
+    fetch: withoutHistoryReasoning(
+      conn.preset === "ollama" || conn.preset === "lmstudio"
+        ? withoutEffort(fetch ?? globalThis.fetch)
+        : // Behind RouterAI and OpenRouter one model has many providers: the cheapest one, kept, so its cache holds.
+          conn.preset === "routerai" || conn.preset === "openrouter"
+          ? withCheapestProvider(conn.baseUrl, fetch ?? globalThis.fetch)
+          : (fetch ?? globalThis.fetch),
+    ),
     headers: conn.preset === "openrouter" ? { "X-Title": "Drimvox" } : undefined,
     metadataExtractor: billed,
   });
@@ -77,15 +85,22 @@ function billOf(body: unknown): number | undefined {
 const billed: MetadataExtractor = {
   extractMetadata: async ({ parsedBody }) => {
     const cost = billOf(parsedBody);
-    return cost === undefined ? undefined : { drimvox: { billed: cost } };
+    return cost === undefined ? undefined : { drimvox: { billed: cost, usage: usageOf(parsedBody) } };
   },
   createStreamExtractor: () => {
     let cost: number | undefined;
+    let usage: JSONValue | undefined;
     return {
       processChunk: (chunk) => {
         cost = billOf(chunk) ?? cost;
+        usage = usageOf(chunk) ?? usage;
       },
-      buildMetadata: () => (cost === undefined ? undefined : { drimvox: { billed: cost } }),
+      buildMetadata: () => (cost === undefined ? undefined : { drimvox: { billed: cost, usage } }),
     };
   },
 };
+
+/** The provider's own usage object as sent, for the step trace (how it counts cache, thinking and the bill). */
+function usageOf(body: unknown): JSONValue | undefined {
+  return ((body as { usage?: JSONValue } | null)?.usage ?? undefined) as JSONValue | undefined;
+}

@@ -292,7 +292,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           const input = step.usage.inputTokens ?? 0;
           const output = step.usage.outputTokens ?? 0;
           const cost = stepCost(step);
-          traceUsage(step.usage, cost);
+          traceUsage(step.usage, cost, (step.providerMetadata as { drimvox?: { usage?: unknown } } | undefined)?.drimvox?.usage);
           if (usageOf(step.usage).cacheRead > 0) cacheSeen = true;
           spent += cost;
           i.onStep({
