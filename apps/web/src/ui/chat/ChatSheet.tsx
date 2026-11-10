@@ -43,8 +43,8 @@ import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
 import { useLiveAnswer } from "./useLiveAnswer";
 import { useProjectWork } from "../projects/useProjectWork";
-import { ChatPlanCard } from "../projects/ChatPlanCard";
 import { noticeLookNow } from "../NoticeSoundSetting";
+import { QuestionCard } from "./QuestionCard";
 import { ShotsContext, type Shot } from "../ShotGallery";
 
 interface Draft {
@@ -341,7 +341,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
       if (!id) {
         const created = await ok<ChatView>(await api.chats.$post({ json: target }));
         id = created.id;
-        setChat({ ...created, messages: [], approvals: [] });
+        setChat({ ...created, messages: [], approvals: [], questions: [] });
         // In the list at once: going elsewhere while the model answers must not lose the chat (seen: it showed up
         // only when the answer was done).
         void reloadChats();
@@ -418,6 +418,12 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
     setCutAt(null);
     void reloadChats();
     void reloadToday();
+  }
+
+  async function answerQuestion(questionId: string, answers: string[]) {
+    if (!chat) return;
+    await api.chats[":id"].questions[":questionId"].$post({ param: { id: chat.id, questionId }, json: { answers } }).catch(() => null);
+    await load(chat.id);
   }
 
   async function approve(approvalId: string, allow: boolean, always: boolean, server = false) {
@@ -539,16 +545,18 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                   />
                 </>
               )}
-              {/* The plan the model proposed, with "Go" (asked for: as Claude Code, in the same conversation). */}
-              {workshop &&
-                work?.planPhase &&
-                work.status === "ready" &&
-                work.plan &&
-                at("plan", Date.now(), <ChatPlanCard work={work} onChanged={() => void reloadWork()} />, true)}
               <div ref={end} />
             </div>
           </ShotsContext.Provider>
 
+          {/* The agent's questions wait on the user (as OpenCode's question tool); a message in the box answers them too. */}
+          {(chat?.questions ?? []).length > 0 && (
+            <section className="approval-dock" aria-label={t("question.title")}>
+              {chat!.questions.map((q) => (
+                <QuestionCard key={q.id} card={q} onAnswer={answerQuestion} />
+              ))}
+            </section>
+          )}
           {openApprovals.length > 0 && (
             <section className="approval-dock" ref={dock} aria-label={t("approval.waiting")}>
               {openApprovals.map((a) => (

@@ -19,7 +19,6 @@ import { PhaseSteps } from "./Stages";
 import { StatusChip } from "./StatusDot";
 import { GoalLink, SubtaskBoard } from "./Subtasks";
 import { useTaskStream } from "./useTaskStream";
-import { ProjectPlanHere } from "../projects/ProjectPlanHere";
 
 const REVIEW_STATES = new Set(["review", "done_empty", "accepted", "discarded"]);
 /** Waiting states with their own controls below the notice. */
@@ -96,7 +95,6 @@ export function TaskSheet({ taskId, embedded }: { taskId: string; embedded?: boo
         {waitingFor === "questions" && <Interview key={task.updatedAt} task={task} />}
         {waitingFor === "spec_review" && <SpecReview key={task.spec ?? ""} task={task} />}
         {waitingFor === "plan_review" && <PlanReview key={task.updatedAt} task={task} />}
-        {!embedded && (waitingFor === "plan_ready" || started) && <ProjectPlanHere projectId={task.projectId} />}
         {task.subtasks.length > 0 && <SubtaskBoard task={task} />}
 
         {answered && <Answer task={task} />}

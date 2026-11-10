@@ -1,11 +1,13 @@
 import type { ActivityEntry, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { McpAsk, McpHooks } from "../mcp/hub";
 import { compactHistory } from "./compact";
-import type { ModelMessage, ToolSet } from "ai";
+import { tool, type ModelMessage, type ToolSet } from "ai";
+import { z } from "zod";
 import { runAgent } from "../agent/run";
 import { isFreeToRun, isLocal } from "../budget";
 import type { ToolHooks } from "../agent/tools";
 import type { ChatApprovals } from "../chats/approvals";
+import type { ChatQuestions } from "../chats/questions";
 import { describeCall, folderTools } from "../chats/folder";
 import { toModelMessages, HONEST_HINT } from "../chats/history";
 import type { ChatRepo } from "../chats/repo";
@@ -29,7 +31,6 @@ import { proxyHint } from "../internet/blocked";
 import { lineStat } from "./line-stat";
 import { subagentTools } from "../agent/subagent";
 import { LANGUAGE_HINT } from "../chats/reply";
-import { planModeInstructions, planModeTools } from "./plan-mode";
 import { agentPrompt } from "./agent-prompt";
 import { oneBrowser } from "../browser/one";
 import { isRare } from "../agent/deferred";
@@ -52,6 +53,7 @@ export interface RunDeps {
   chats: ChatRepo;
   providers: ProviderRepo;
   approvals: ChatApprovals;
+  questions: ChatQuestions;
   repo: ProjectWorkRepo;
   visualKit: VisualKit;
   web: WebAccess;
@@ -67,8 +69,6 @@ export interface RunDeps {
   };
   idleTimeoutMs: number;
   plan(projectId: string): ProjectPlan | null;
-  /** Keeps the plan the plan mode proposed (plan-mode.ts). */
-  setPlan(projectId: string, plan: ProjectPlan): void;
   /** This month's spending against the app's budget. */
   month(): MonthUsage;
   /** The model that sees pictures for this one: the project's own choice, else the settings', else the model itself. */
@@ -76,7 +76,6 @@ export interface RunDeps {
   /** Downloads, mail, SSH, dependency audits, before and after of a page (tools/index.ts). */
   toolbox?: ToolboxDeps;
   /** Pointer files to AGENTS.md the settings ask for (CLAUDE.md, GEMINI.md, QWEN.md). */
-  agentFiles?(): string[];
   /** The project's git rules: the branch before the work, commits on the agent's word, the push at the end. */
   git?: ProjectGit;
   /** The picture tool when the settings name an image model: it draws straight into the project's folder. */
@@ -109,7 +108,6 @@ export class WorkRun {
   readonly controller = new AbortController();
   done: Promise<void> = Promise.resolve();
   private readonly inbox: string[] = [];
-  private finished = false;
   /** Skills the agent opened in this run (the once-a-task reviews and reminders: repo.rounds). */
   private readonly skillsOpened = new Set<string>();
   /**
@@ -125,11 +123,6 @@ export class WorkRun {
     readonly projectId: string,
     readonly chatId: string,
     private readonly folder: string,
-    /**
-     * "plan": the plan as Claude Code makes it, reading only, ending with propose_plan (plan-mode.ts); "work": the work
-     * itself, as in a chat with a folder (asked for: that loop made the better site, for half the money).
-     */
-    private readonly mode: "work" | "plan" = "work",
   ) {}
 
   /** A message the user wrote while the run goes on; it is already in the conversation. */
@@ -242,7 +235,6 @@ export class WorkRun {
         since = Date.now();
         this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
         if (signal.aborted || outcome.kind === "stopped") return stopWith("stopped", "user");
-        if (this.finished) return stopWith("done", null);
         if (outcome.kind === "error") {
           if (++errors < MAX_ERRORS) {
             await sleep(RETRY_MS, signal);
@@ -280,13 +272,12 @@ export class WorkRun {
         const row = this.row();
         const goal = this.d.plan(this.projectId)?.context ?? this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? "";
         const branch = this.d.git ? ((await this.d.git.state(this.projectId, this.folder).catch(() => null))?.branch ?? null) : null;
-        if (this.mode === "work")
-          writeState(this.folder, { goal, checklist: [], start: row.site, branch, report: row.report, at: Date.now() }, this.d.agentFiles?.() ?? []);
+        writeState(this.folder, { goal, checklist: [], start: row.site, branch, report: row.report, at: Date.now() });
       } catch {
         // A folder that cannot be written: the state is only in Drimvox.
       }
       // What the agent left uncommitted goes in one commit; then its branch to GitHub, as the rules say.
-      if (this.d.git && this.mode === "work") {
+      if (this.d.git) {
         const asked =
           this.d.chats
             .history(this.chatId)
@@ -297,11 +288,7 @@ export class WorkRun {
         await this.d.git.finish(this.projectId, this.folder, asked).catch(() => {});
       }
       this.d.carry?.set(this.projectId, { chatId: this.chatId, turns: this.d.chats.history(this.chatId).length, messages });
-      if (final)
-        this.d.repo.update(
-          this.projectId,
-          this.finished && this.mode === "plan" && (final as { status: string }).status === "done" ? { ...(final as object), status: "ready" } : final,
-        );
+      if (final) this.d.repo.update(this.projectId, final);
       this.d.ended(this.projectId);
     }
   }
@@ -428,19 +415,37 @@ export class WorkRun {
         },
         LOOKS,
       ),
-      ...(this.mode === "plan"
-        ? planModeTools((proposed: ProjectPlan) => {
-            this.finished = true;
-            this.d.setPlan(this.projectId, proposed);
-          })
-        : {}),
+      // Asking when it must, with answers to pick (asked for: as OpenCode, instead of the interview and plan switches).
+      question: tool({
+        description:
+          "Ask the user when you need a decision only they can make (what they want, a choice between ways that matters) and " +
+          "cannot find it in the project or the request. Each question gets 2-4 short answers to pick, the one you " +
+          "recommend first; the user may write their own instead. The work waits for the answer. Ask nothing you can " +
+          "decide well yourself, and ask all you need in one call.",
+        inputSchema: z.object({
+          questions: z
+            .array(
+              z.object({
+                question: z.string().min(1).max(500),
+                header: z.string().max(40).optional().describe("A very short label, such as \"Голос\" or \"Хранение\""),
+                options: z.array(z.object({ label: z.string().min(1).max(100), description: z.string().max(240).optional() })).min(2).max(4),
+                multiple: z.boolean().optional().describe("The user may pick several answers"),
+              }),
+            )
+            .min(1)
+            .max(4),
+        }),
+        execute: async ({ questions }, x: { toolCallId: string; abortSignal?: AbortSignal }) => {
+          onCall("question", questions.map((q) => q.question).join(" · ").slice(0, 300));
+          const answers = await this.d.questions.ask(this.chatId, questions, x.abortSignal ?? signal);
+          if (!answers) return "The user did not answer. Go on with what you think best and say what you assumed.";
+          const lines = questions.map((q, i) => `${i + 1}. ${q.question} → ${answers[i] ?? answers[0] ?? ""}`);
+          return `The user answered:\n${lines.join("\n")}`;
+        },
+      }),
     };
-    // The plan mode only reads: the project, the web, sub-agents, skills; no writing, no commands, no browser yet.
     // The browser's usual tools go as one (browser/one.ts); its rare ones stay apart, loaded when needed (deferred.ts).
-    const tools: ToolSet =
-      this.mode === "plan"
-        ? pick(own, ["delegate", "use_skill", "read_skill_file", "web_search", "open_page", "propose_plan"])
-        : oneBrowser(own, Object.keys(own).filter(isRare));
+    const tools = oneBrowser(own, Object.keys(own).filter(isRare));
     const spentBefore = this.spent();
     const overBudget = () => spentBefore + cost >= this.row().budgetUsd;
     let limited = false;
@@ -451,14 +456,13 @@ export class WorkRun {
       price,
       worktree: this.folder,
       messages,
-      mode: this.mode === "plan" ? "read" : "write",
+      mode: "write",
       noFinish: true,
       thinkingLevel: this.row().thinking,
       ownTools: tools,
       // Old outputs leave the conversation (prune.ts); the MCP servers' tools wait until loaded, as the rare ones do.
       prune: true,
       rare: Object.keys(mcpTools),
-      stopTools: ["propose_plan"],
       maxSteps: SEGMENT_STEPS,
       stopWhen: () => {
         limited = outOfTime();
@@ -479,7 +483,6 @@ export class WorkRun {
         skillsInstructions(skills),
         // A ready project's files and what each defines (as Aider's repo map): fewer steps spent finding the right file.
         await (this.map ??= projectMap(this.folder).catch(() => "")),
-        this.mode === "plan" ? planModeInstructions(this.d.repo.phase(this.projectId).interview) : "",
       ]
         .filter(Boolean)
         .join("\n\n"),

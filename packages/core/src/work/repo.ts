@@ -80,13 +80,6 @@ const toWork = (r: Row): WorkRow => ({
 const MAX_SHOTS = 24;
 
 /** A project's work: who does what, the plan's task, the conversation, the checklist and the limits. */
-/** The plan phase of a project's conversation (ProjectWorkRepo.phase). */
-export interface Phase {
-  plan: boolean;
-  interview: boolean;
-}
-const NO_PHASE: Phase = { plan: false, interview: false };
-const phaseKey = (projectId: string) => `work.phase:${projectId}`;
 
 /** The once-a-task rounds of the work (ProjectWorkRepo.rounds). */
 export interface Rounds {
@@ -123,23 +116,6 @@ export class ProjectWorkRepo {
     this.db.sql
       .prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value")
       .run(roundsKey(projectId), JSON.stringify({ ...this.rounds(projectId), ...patch, startedAt }));
-  }
-
-  /**
-   * The plan phase of the project's conversation (plan-mode.ts): the model reads and proposes a plan until "Go"; with
-   * `interview` it asks what it must know first.
-   */
-  phase(projectId: string): Phase {
-    const row = this.db.sql.prepare("select value from settings where key = ?").get(phaseKey(projectId)) as { value: string } | undefined;
-    return row ? { ...NO_PHASE, ...(JSON.parse(row.value) as Partial<Phase>) } : { ...NO_PHASE };
-  }
-
-  setPhase(projectId: string, phase: Phase | null): void {
-    if (!phase) this.db.sql.prepare("delete from settings where key = ?").run(phaseKey(projectId));
-    else
-      this.db.sql
-        .prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value")
-        .run(phaseKey(projectId), JSON.stringify(phase));
   }
 
   /** Every project with work, for the notifications. */

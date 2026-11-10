@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { projectGitRulesSchema, projectPlanReviseSchema, projectPlanStartSchema, projectWorkChatSchema, projectWorkMessageSchema, projectWorkStartSchema, projectWorkUpdateSchema } from "@drimvox/shared";
+import { projectGitRulesSchema, projectWorkChatSchema, projectWorkMessageSchema, projectWorkUpdateSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { readFile } from "node:fs/promises";
 import type { ProjectRepo } from "../agent/repo";
@@ -14,7 +14,7 @@ import { WorkRefused, type ProjectWork } from "../work/service";
 
 const notFound = { error: { code: "not_found" } } as const;
 
-/** A project's work (docs/specs/project-work.md): the interview and the plan, "Go", messages on the way, Stop, limits. */
+/** A project's work (docs/specs/project-work.md): its conversation, messages on the way, Stop, limits. */
 export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work: ProjectWork, shots: Shots, repo: ProjectWorkRepo, git: ProjectGit) {
   const refused = (err: unknown) => {
     if (err instanceof WorkRefused) return { error: { code: err.code } };
@@ -23,36 +23,6 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
   };
   return new Hono()
     .get("/:id/work", (c) => (projects.get(c.req.param("id")) ? c.json(work.view(c.req.param("id")), 200) : c.json(notFound, 404)))
-    .post("/:id/work/plan", zValidator("json", projectPlanStartSchema), async (c) => {
-      const id = c.req.param("id");
-      if (!projects.get(id)) return c.json(notFound, 404);
-      const { task, models, quick } = c.req.valid("json");
-      const refs = [models.interview, models.plan, models.work, ...(models.strong ? [models.strong] : [])];
-      if (refs.some((m) => !providers.get(m.providerId))) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
-      try {
-        return c.json(await work.plan(id, task, models, quick), 201);
-      } catch (err) {
-        return c.json(refused(err), 409);
-      }
-    })
-    .post("/:id/work/revise", zValidator("json", projectPlanReviseSchema), (c) => {
-      const id = c.req.param("id");
-      if (!projects.get(id)) return c.json(notFound, 404);
-      try {
-        return c.json(work.revise(id, c.req.valid("json").note), 200);
-      } catch (err) {
-        return c.json(refused(err), 409);
-      }
-    })
-    .post("/:id/work/start", zValidator("json", projectWorkStartSchema), (c) => {
-      const id = c.req.param("id");
-      if (!projects.get(id)) return c.json(notFound, 404);
-      try {
-        return c.json(work.start(id, c.req.valid("json")), 200);
-      } catch (err) {
-        return c.json(refused(err), 409);
-      }
-    })
     .post("/:id/work/message", zValidator("json", projectWorkMessageSchema), (c) => {
       const id = c.req.param("id");
       if (!projects.get(id)) return c.json(notFound, 404);

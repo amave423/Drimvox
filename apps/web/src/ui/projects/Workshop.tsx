@@ -5,35 +5,26 @@ import { useApp } from "../../context";
 import { ChatSheet } from "../chat/ChatSheet";
 import { TaskSheet } from "../tasks/TaskSheet";
 import { useAddProject } from "./AddProject";
-import { PlanCard } from "./PlanCard";
 import { PaneSplit, usePaneWidth } from "../PaneSplit";
 import { useProjectWork } from "./useProjectWork";
 import { ProjectPanel } from "./ProjectPanel";
 import { ProjectComposer } from "./ProjectComposer";
-import { PlanningFeed } from "./PlanningFeed";
 
 export const LAST_PROJECT_KEY = "drimvox.lastProject";
 
-export type Stage = "folder" | "git" | "loading" | "interview" | "plan" | "work" | "talk";
+export type Stage = "folder" | "git" | "loading" | "work" | "talk";
 
-/**
- * Where a project is (asked for: one conversation per project, as a ready project had): git first, then its
- * conversation; the interview and the plan to approve only when the box asked for them, while they go on.
- */
+/** Where a project is (asked for: one conversation per project, as a ready project had): git first, then its conversation. */
 export function stageOf(project: ProjectView, work: ProjectWorkView | null): Stage {
   if (project.gitState === "missing") return "folder";
   if (project.gitState === "not_repo") return "git";
   if (!work) return "loading";
-  // A plan of the old kind, a separate task, keeps its own page until it is done with.
-  if (work.planTaskId && !work.planPhase && work.status === "planning" && !work.plan) return "interview";
-  if (work.planTaskId && !work.planPhase && (work.status === "ready" || work.status === "planning")) return "plan";
   return work.chatId && work.startedAt ? "work" : "talk";
 }
 
 /**
- * A project's workshop: its one conversation in the middle (asked for: as a ready project had; the interview and the
- * plan to approve come first only when the box asks for them), the project on the right, its width dragged at the
- * edge between them. The controls are in the top bar (WorkshopBar), the projects and their state in the sidebar.
+ * A project's workshop: its one conversation in the middle (asked for: as a ready project had), the project on the
+ * right, its width dragged at the edge between them. The controls are in the top bar (WorkshopBar), the projects and their state in the sidebar.
  */
 export function Workshop({ projectId }: { projectId: string }) {
   const { t, projects, reloadWorks, reloadProjects } = useApp();
@@ -41,7 +32,7 @@ export function Workshop({ projectId }: { projectId: string }) {
   const { work, reload } = useProjectWork(projectId);
   const split = usePaneWidth();
   // The top bar and the sidebar show this work's state: kept in step with what the workshop sees.
-  useEffect(reloadWorks, [work?.status, work?.planPhase, work?.spentUsd]);
+  useEffect(reloadWorks, [work?.status, work?.spentUsd]);
   // Its folder looked at again on every opening: renamed meanwhile, it is followed or asked for.
   useEffect(() => void reloadProjects(), [projectId]);
   // The last project opened is where the projects' mode comes back to.
@@ -68,16 +59,6 @@ export function Workshop({ projectId }: { projectId: string }) {
           {stage === "git" && <GitNotice project={project} />}
           {stage === "loading" && <p className="muted workshop-pad">{t("model.loading")}</p>}
           {stage === "talk" && <ReadyStart projectId={project.id} work={work} onStarted={() => void reload()} />}
-          {/* The interview and the plan in the conversation, as in the agreed design (variant A); a plan without its
-              interview's task (made before) keeps its own card. */}
-          {(stage === "interview" || stage === "plan") && work?.planTaskId && (
-            <PlanningFeed key={work.planTaskId} work={work} onChanged={() => void reload()} />
-          )}
-          {stage === "plan" && work && !work.planTaskId && (
-            <div className="workshop-pad workshop-scroll">
-              <PlanCard key={work.plan?.context} work={work} onChanged={() => void reload()} />
-            </div>
-          )}
           {stage === "work" && work?.chatId && (
             <div className="workshop-feed">
               <ChatSheet key={work.chatId} chatId={work.chatId} viewKey={work.chatId} workshop />
@@ -91,7 +72,7 @@ export function Workshop({ projectId }: { projectId: string }) {
   );
 }
 
-/** A project before its first message: what it is for, and the box with the model, the interview and the plan. */
+/** A project before its first message: what it is for, and the box with the model. */
 function ReadyStart({ projectId, work, onStarted }: { projectId: string; work: ProjectWorkView | null; onStarted(): void }) {
   const { t } = useApp();
   return (

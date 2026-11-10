@@ -48,6 +48,15 @@
 .task-notice.is-asking { align-items: flex-start; }
 .task-notice.is-asking .approval { flex: 1 1 320px; min-width: 0; margin: 0; }
 .task-notice.is-asking .approval code { max-height: 180px; overflow: auto; }
+/* The agent's questions: answers to pick as buttons, the user's own in a field. */
+/* A question is no alarm: the calm ink of a choice, not the pencil red of a permission. */
+.approval.agent-question-card { border: 1.5px solid var(--ink); background: var(--sheet); }
+.agent-question { display: grid; gap: 8px; margin: 4px 0 0; padding: 0; border: 0; min-width: 0; }
+.agent-question legend { padding: 0; margin-bottom: 6px; font: inherit; font-weight: 600; }
+.agent-question-header { margin-right: 8px; color: var(--muted); font-weight: 500; }
+.agent-question-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-question-option { display: grid; gap: 2px; text-align: left; max-width: 100%; }
+.agent-question-option.is-picked { border-color: var(--ink); background: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--ink); }
 .task-notice p { margin: 0; flex: 1; min-width: 240px; }
 .task-notice.is-wait { border-color: var(--wait); }
 .task-notice.is-failed { border-color: var(--pencil); }

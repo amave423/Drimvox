@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { writeNotes } from "./notes";
+import { storeOf } from "./store";
+import { join } from "node:path";
 import { STUCK_HINT } from "./prompt";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
@@ -182,18 +184,19 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
 /** Long outputs of commands kept per folder, the newest ones. */
 const KEPT_OUTPUTS = 20;
 
-/** A command's whole output in the folder's .drimvox/output, out of git and of the agent's file list. */
+/**
+ * A command's whole output in Drimvox's data for this folder (store.ts), not in the project (asked for: no .drimvox
+ * there). read_file takes its full path: the workspace lets the agent read its own store.
+ */
 function keepOutput(ws: Workspace, full: string): { path: string; lines: number } | null {
   try {
-    const dir = ws.resolve(".drimvox/output");
+    const dir = join(storeOf(ws.root), "output");
     mkdirSync(dir, { recursive: true });
-    const ignore = ws.resolve(".drimvox/.gitignore");
-    if (!existsSync(ignore)) writeFileSync(ignore, "*\n");
     const numbers = readdirSync(dir).map((f) => Number(/^command-(\d+)\.txt$/.exec(f)?.[1] ?? 0)).filter((n) => n > 0);
     const next = Math.max(0, ...numbers) + 1;
-    for (const n of numbers.filter((n) => n <= next - KEPT_OUTPUTS)) rmSync(ws.resolve(`.drimvox/output/command-${n}.txt`), { force: true });
-    const path = `.drimvox/output/command-${next}.txt`;
-    writeFileSync(ws.resolve(path), full);
+    for (const n of numbers.filter((n) => n <= next - KEPT_OUTPUTS)) rmSync(join(dir, `command-${n}.txt`), { force: true });
+    const path = join(dir, `command-${next}.txt`);
+    writeFileSync(path, full);
     return { path, lines: full.split("\n").length };
   } catch {
     return null;

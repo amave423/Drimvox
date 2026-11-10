@@ -55,10 +55,6 @@ export interface WorkShot {
 export interface ProjectWorkView {
   projectId: string;
   status: ProjectWorkStatus;
-  /** The interview or the plan stopped on an error or by the user: nothing runs until it is tried again. */
-  planStalled: boolean;
-  /** The conversation is in the plan phase (as Claude Code's): the box answers the model's questions or corrects its plan. */
-  planPhase: boolean;
   reason: ProjectWorkReason | null;
   /** Details of an error that stopped the run. */
   detail: string | null;

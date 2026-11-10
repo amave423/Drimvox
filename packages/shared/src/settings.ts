@@ -12,6 +12,7 @@ export type SearchEngine = (typeof searchEngines)[number];
  * Agents that do not read AGENTS.md by default, each with the file it reads: a short pointer there (asked for; Codex,
  * Cursor, Kimi Code, Z Code, opencode and Amp read AGENTS.md themselves).
  */
+/** Pointer files earlier versions made in projects for other agents; only to remove them now (agent/notes.ts). */
 export const agentFiles = ["claude", "gemini", "qwen", "copilot", "windsurf", "cline", "roo", "kilo", "trae", "kiro", "junie", "crush", "iflow"] as const;
 export type AgentFile = (typeof agentFiles)[number];
 export const agentFileNames: Record<AgentFile, string> = {
@@ -77,8 +78,6 @@ export const settingsSchema = z.object({
   /** Models the user starred: the picker's "Favourites" tab, across providers. */
   /** The browser's address field searches with it (asked for: a choice instead of Yandex alone). */
   searchEngine: z.enum(searchEngines),
-  /** Pointer files to AGENTS.md for agents that read their own file (Claude Code, Gemini CLI, Qwen Code); none by default. */
-  agentFiles: z.array(z.enum(agentFiles)).max(agentFiles.length),
   favoriteModels: z.array(z.object({ providerId: z.string().min(1), model: z.string().min(1).max(200) })).max(100),
 });
 
@@ -107,7 +106,6 @@ export const defaultSettings: Settings = {
   folderAutoApprove: false,
   favoriteModels: [],
   searchEngine: "auto",
-  agentFiles: [],
   monthlyBudgetUsd: null,
   voiceModel: null,
   dictationLanguage: "interface",

@@ -8,18 +8,14 @@ import type { ModelChoice } from "./lastModel";
  * (asked for: they moved there from a pop-up under the box), read by the box when it sends.
  */
 export interface BoxPrefs {
-  interview: boolean;
-  plan: boolean;
-  /** The interview's model and the plan's (asked for: each its own); null: the working one. */
-  interviewModel: ModelChoice | null;
-  planModel: ModelChoice | null;
+  /** The model that takes over when the working one keeps failing; null: none. */
   strong: ModelChoice | null;
-  /** The strong model is switched on (asked for: a switch as for the interview); it is chosen after. */
+  /** The strong model is switched on; it is chosen after. */
   strongOn: boolean;
   thinking: ThinkingLevel;
 }
 
-const DEFAULTS: BoxPrefs = { interview: false, plan: false, interviewModel: null, planModel: null, strong: null, strongOn: false, thinking: "auto" };
+const DEFAULTS: BoxPrefs = { strong: null, strongOn: false, thinking: "auto" };
 const keyOf = (projectId: string) => `drimvox.projectBox.${projectId}`;
 const listeners = new Map<string, Set<(p: BoxPrefs) => void>>();
 

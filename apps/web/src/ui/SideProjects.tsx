@@ -170,18 +170,8 @@ export function SideProjects() {
 function WorkLine({ work }: { work: ProjectWorkView | null }) {
   const { t } = useApp();
   if (!work || work.status === "idle") return null;
-  // A plan that stopped on an error waits for the user, it does not run.
-  // In the plan phase the project waits for the user between the model's turns: its questions, its plan.
-  const tone =
-    work.planPhase && work.status !== "running"
-      ? "wait"
-      : work.status === "running" || (work.status === "planning" && !work.planStalled)
-        ? work.waitingApproval
-          ? "wait"
-          : "run"
-        : work.status === "done"
-          ? "ok"
-          : "wait";
+  // Waiting on the user's answer or permission counts as waiting, not as running.
+  const tone = work.status === "running" ? (work.waitingApproval ? "wait" : "run") : work.status === "done" ? "ok" : "wait";
   return (
     <>
       {/* The project's state, the only place it is shown (asked for); why it waits, on hover. */}

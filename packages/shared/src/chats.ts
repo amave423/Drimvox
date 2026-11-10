@@ -168,6 +168,17 @@ export interface ChatWithMessages extends ChatView {
   messages: MessageView[];
   /** Requests the answer being written waits on: a window that comes back to the chat shows them to answer. */
   approvals: ChatApprovalView[];
+  /** Questions the agent waits on the user's answers to (the question tool, as OpenCode's). */
+  questions: ChatQuestionView[];
+}
+
+/** The user's answers to the agent's questions: one per question, picked or written. */
+export const questionAnswerSchema = z.object({ answers: z.array(z.string().max(4000)).min(1).max(8) }).strict();
+
+/** The agent's questions, each with a few answers to pick and room for the user's own. */
+export interface ChatQuestionView {
+  id: string;
+  questions: { question: string; header?: string; options: { label: string; description?: string }[]; multiple?: boolean }[];
 }
 
 /** A tool that asks first: an MCP server's tool, or (with reason) a command in the chat's folder. */

@@ -88,21 +88,11 @@ async function pickCoder(page: Page, opener = page.locator(".composer").getByRol
   await page.getByRole("option", { name: /Coder/ }).click();
 }
 
-/** Turns the interview and/or the plan on in the project's parameters on the right, before the first message. */
-async function askFirst(page: Page, o: { interview?: boolean; plan?: boolean }): Promise<void> {
-  const options = page.getByRole("region", { name: "Параметры" });
-  // The switch's own box is drawn over by its track: the label is what is clicked.
-  if (o.interview) await options.getByText(/^Сначала пара вопросов/).click();
-  if (o.plan) await options.getByText(/^План на утверждение/).click();
-  if (o.interview) await expect(options.getByRole("switch", { name: /Сначала пара вопросов/ })).toBeChecked();
-  if (o.plan) await expect(options.getByRole("switch", { name: /План на утверждение/ })).toBeChecked();
-}
-
-// docs/specs/project-work.md: one conversation per project; the plan as Claude Code makes it when the box asks for it:
-// the same model reads, proposes a plan as a card in the conversation, and goes on from it after "Go".
-test("a project: the plan in the conversation, Go, the same conversation goes on, a message on the way", async () => {
+// docs/specs/project-work.md: one conversation per project, no interview and plan switches (asked for); the agent asks
+// what only the user can decide with a card of answers to pick, as OpenCode does, and goes on with the answer.
+test("a project: the agent's question as a card, the picked answer, the same conversation goes on, a message on the way", async () => {
   const page = await launch([
-    call("propose_plan", { plan: "# План\n- Онлайн-запись\n- Проверить страницу" }),
+    call("question", { questions: [{ question: "Запись по телефону или онлайн?", header: "Запись", options: [{ label: "Онлайн", description: "форма на сайте" }, { label: "По телефону" }] }] }),
     { ...call("write_file", { path: "index.html", content: "<h1>Запись</h1>\n" }), delayMs: 1500 },
     { text: "Каталог готов: откройте index.html." },
   ]);
@@ -122,15 +112,14 @@ test("a project: the plan in the conversation, Go, the same conversation goes on
   expect(await page.locator(".workshop-main").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await page.keyboard.press("Escape");
   await pickCoder(page);
-  await askFirst(page, { plan: true });
   // They are in the parameters on the right (asked for: not a pop-up under the box).
   await expect(page.locator(".composer").getByRole("button", { name: /^Параметры/ })).toHaveCount(0);
   const options = page.getByRole("region", { name: "Параметры" });
   await expect(options).toContainText("Сильная модель");
   await expect(options).toContainText("Мышление");
-  // One model plans and works (asked for: as Claude Code): no models of the interview and of the plan.
-  await expect(options).not.toContainText("Модель опроса");
-  await expect(options).not.toContainText("Модель плана");
+  // No interview and plan switches (asked for): the agent asks when it must.
+  await expect(options).not.toContainText("Опрос");
+  await expect(options).not.toContainText("План на утверждение");
   // The strong model is a switch with its hint, its model chosen once it is on.
   await expect(options.getByRole("switch", { name: /Если рабочая модель застрянет/ })).not.toBeChecked();
   await options.getByText(/^Если рабочая модель застрянет/).click();
@@ -143,14 +132,16 @@ test("a project: the plan in the conversation, Go, the same conversation goes on
   await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт клиники");
   await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
 
-  // The plan is a card in the conversation: read it, then "Go"; the box below corrects it.
-  const plan = page.locator(".timeline").getByRole("region", { name: "Итоговый план" });
-  await expect(plan).toContainText("Онлайн-запись", { timeout: 30_000 });
-  await expect(page.getByPlaceholder("Что поправить в плане")).toBeVisible();
-  await plan.getByRole("button", { name: "Начать работу" }).click();
+  // The question is a card with answers to pick and a field for one's own; the run waits on it.
+  const card = page.getByRole("region", { name: "Агент спрашивает" });
+  await expect(card).toContainText("Запись по телефону или онлайн?", { timeout: 30_000 });
+  await expect(card.getByPlaceholder("Свой ответ")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Ответить" })).toBeDisabled();
+  await card.getByRole("button", { name: /Онлайн/ }).click();
+  await card.getByRole("button", { name: "Ответить" }).click();
+  await expect(card).toHaveCount(0);
 
-  // "Go" is the user's word in the same conversation; the state is on the project in the sidebar only.
-  await expect(page.locator(".timeline .msg-user", { hasText: "Одобряю план" })).toBeVisible();
+  // The state is on the project in the sidebar only.
   await expect(page.locator(".timeline .msg-user").first()).toContainText("Сайт клиники");
   await expect(page.locator(".topbar").getByRole("status")).toHaveCount(0);
   const state = page.locator(".side-project.is-on").getByRole("status");
@@ -219,30 +210,6 @@ test("a project: the plan in the conversation, Go, the same conversation goes on
   expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toBe("main");
   expect(execFileSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" }).trim()).toBe("");
   expect(fake!.requests.some((r) => JSON.stringify(r.body?.messages ?? []).includes("Сделай заголовок крупнее"))).toBe(true);
-});
-
-// Asked for: as Claude Code, the model asks what it must know in its reply; the answer is the user's next message, the
-// plan a card below it.
-test("the questions come in the conversation, the answer in the box, then the plan as a card", async () => {
-  const page = await launch([
-    { text: "1. Какой город показывать сразу? Москва или по геолокации (советую по геолокации)." },
-    call("propose_plan", { plan: "# План\n- Каркас и данные\n- Анимированные сцены" }),
-  ]);
-  await page.getByRole("button", { name: "Проекты", exact: true }).click();
-  await addProject(page);
-  await pickCoder(page);
-  await askFirst(page, { interview: true, plan: true });
-  await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт погоды");
-  await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
-  await expect(page.locator(".timeline")).toContainText("Какой город показывать сразу?", { timeout: 30_000 });
-  const box = page.getByPlaceholder("Ответь на вопросы или напиши, что поправить");
-  await expect(box).toBeVisible();
-  await box.fill("Москва");
-  await box.press("Enter");
-  const plan = page.locator(".timeline").getByRole("region", { name: "Итоговый план" });
-  await expect(plan).toContainText("Анимированные сцены", { timeout: 30_000 });
-  await expect(plan.getByRole("button", { name: "Начать работу" })).toBeVisible();
-  await expect(page.getByPlaceholder("Что поправить в плане")).toBeVisible();
 });
 
 // Asked for: a project is talked to like a chat (no plan to approve unless asked); removing it is in the sidebar's "⋯".
@@ -404,7 +371,6 @@ test("a run's screenshots: a switch in the timeline, none in the result panel", 
   try {
     const page = await launch(
       [
-        call("propose_plan", { plan: "Две страницы." }),
         call("write_file", { path: "index.html", content: "<h1>Первая</h1>\n" }),
         call("look_at_page", { url: `http://localhost:${port}/a`, question: "Видна первая?" }),
         call("look_at_page", { url: `http://localhost:${port}/b`, question: "Видна вторая?" }),
@@ -415,10 +381,8 @@ test("a run's screenshots: a switch in the timeline, none in the result panel", 
     await page.getByRole("button", { name: "Проекты", exact: true }).click();
     await addProject(page);
     await pickCoder(page);
-    await askFirst(page, { plan: true });
     await page.getByPlaceholder("Вопрос или задача по проекту").fill("Две страницы");
     await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
-    await page.locator(".timeline").getByRole("region", { name: "Итоговый план" }).getByRole("button", { name: "Начать работу" }).click({ timeout: 30_000 });
     await expect(page.locator(".side-project.is-on").getByRole("status")).toContainText("готово", { timeout: 30_000 });
 
     // The timeline: a screenshot opens over the window, the arrows go to the next one.

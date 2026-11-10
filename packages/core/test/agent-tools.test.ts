@@ -1,4 +1,5 @@
-import { readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { storeOf } from "../src/agent/store";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, runCommand } from "../src/agent/commands";
@@ -243,12 +244,11 @@ describe("runCommand", () => {
     const out = await call("run_command", { command: `node -e "for (let i = 1; i <= 3000; i++) console.log('line ' + i)"`, timeout_seconds: 60 });
     expect(out).toMatch(/^Exit code: 0\nline 1\r?\n/);
     expect(out).toContain("line 3000");
-    const saved = /saved whole to (\S+?) \(/.exec(out)?.[1];
-    expect(saved).toBe(".drimvox/output/command-1.txt");
+    const saved = /saved whole to (.+?) \(\d+ lines\)/.exec(out)?.[1];
+    // In Drimvox's data, not in the project (asked for); read_file reads it there.
+    expect(saved).toBe(join(storeOf(root), "output", "command-1.txt"));
     expect(await call("read_file", { path: saved, offset: 1500, limit: 1 })).toMatch(/^1500\tline 1500\n/);
-    // Out of git and out of the agent's file list.
-    expect(readFileSync(join(root, ".drimvox/.gitignore"), "utf8")).toBe("*\n");
-    expect(ws.listFiles(".", 3)).not.toContain(".drimvox/");
+    expect(existsSync(join(root, ".drimvox"))).toBe(false);
     // A short output is shown whole, with no file.
     expect(await call("run_command", { command: `node -e "console.log('short')"`, timeout_seconds: 60 })).not.toContain("saved whole");
   }, 30_000);

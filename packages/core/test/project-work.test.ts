@@ -1,5 +1,6 @@
 import { slug } from "../src/work/project-git";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { storeOf } from "../src/agent/store";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -36,9 +37,6 @@ const PLAN = {
   checks: ["Каталог открывается", "npm test"],
   pages: [{ url: "http://localhost:5173/", command: "npm run dev" }],
 };
-/** The plan as the plan mode proposes it (plan-mode.ts). */
-const PLAN_TEXT = "# План\n- Каталог врачей\n- Онлайн-запись";
-const proposePlan = call("propose_plan", { plan: PLAN_TEXT });
 const PRICED = [{ id: "coder", supported_parameters: ["tools"], pricing: { prompt: "0.000001", completion: "0.000002" } }];
 
 /** A fake provider answering each model from its own queue: who wrote what shows in the requests. */
@@ -67,20 +65,17 @@ async function until(projectId: string, done: (w: any) => boolean) {
   throw new Error(`stuck: ${JSON.stringify(await workOf(projectId))}`);
 }
 
-/** The plan mode reads and proposes a plan in the project's conversation; it waits for "Go" (plan-mode.ts). */
-async function planned(s: Awaited<ReturnType<typeof setup>>, models: { work?: string; strong?: string | null } = {}, quick = true) {
-  const res = await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
-    task: "Сайт клиники",
-    models: {
-      interview: s.ref(models.work ?? "coder"),
-      plan: s.ref(models.work ?? "coder"),
-      work: s.ref(models.work ?? "coder"),
-      strong: models.strong ? s.ref(models.strong) : null,
-    },
-    quick,
-  });
-  expect(res.status).toBe(201);
-  return until(s.project.id, (w) => w.status === "ready" && w.planPhase);
+/** The models a test's work goes with; go() sends the first message with them, after the limits. */
+const chosen = new Map<string, { work: string; strong: string | null }>();
+function prepared(s: Awaited<ReturnType<typeof setup>>, models: { work?: string; strong?: string | null } = {}) {
+  chosen.set(s.project.id, { work: models.work ?? "coder", strong: models.strong ?? null });
+}
+async function go(s: Awaited<ReturnType<typeof setup>>, limits: { budgetUsd: number; hours: number }) {
+  await env.call("PATCH", `/api/projects/${s.project.id}/work`, limits);
+  const m = chosen.get(s.project.id) ?? { work: "coder", strong: null };
+  const res = await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сайт клиники", model: s.ref(m.work), strong: m.strong ? s.ref(m.strong) : null });
+  expect(res.status).toBe(200);
+  return res;
 }
 
 const isReviewer = (body: any) => /You are the code reviewer/.test(JSON.stringify(body.messages?.[0]?.content ?? ""));
@@ -88,69 +83,14 @@ const requestsOf = (model: string) => fake!.requests.filter((r) => r.path === "/
 
 describe("work on a project", () => {
   // Seen live: with a laptop saved in the settings, the interview asked the user twice for its address and password.
-  it("tells the interview and the work of the saved SSH servers", async () => {
+  it("tells the work of the saved SSH servers", async () => {
     expect((await env.call("POST", "/api/ssh", { name: "ноутбук", host: "192.168.1.129", user: "ml_server", auth: "key" })).status).toBe(201);
-    const s = await setup({ coder: [proposePlan] });
-    await planned(s);
-    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("ноутбук (ml_server@192.168.1.129)");
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    const s = await setup({ coder: [] });
+    prepared(s);
+    await go(s, { budgetUsd: 1, hours: 2 });
     await until(s.project.id, (w) => w.status !== "running" && !!w.startedAt);
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("ноутбук (ml_server@192.168.1.129)");
     expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages[0])).toContain("Never ask the user for a server's address");
-  });
-
-  // Asked for: the plan as Claude Code makes it. The same model in the same conversation reads only, proposes a short
-  // plan; "Go" lets it go on with everything it read, not a fresh conversation with only the plan's text.
-  it("plans in the project's conversation reading only, and goes on from the plan in the same conversation after Go", async () => {
-    const s = await setup({ coder: [call("read_file", { path: "index.html" }), proposePlan, call("write_file", { path: "about.html", content: "<h1>О нас</h1>\n" }), { text: "Сделал страницу «О нас»." }] });
-    const work = await planned(s);
-    expect(work.plan.context).toBe(PLAN_TEXT);
-    // Reading only while it plans: no writing, no commands.
-    const planning = requestsOf("coder")[0]!.body;
-    const names = (planning.tools ?? []).map((t: any) => t.function.name);
-    expect(names).toContain("read_file");
-    expect(names).toContain("propose_plan");
-    expect(names).not.toContain("write_file");
-    expect(names).not.toContain("run_command");
-    expect(JSON.stringify(planning.messages[0])).toContain("Plan mode");
-    // Nothing committed for a plan.
-    expect(git(folder, "log", "--oneline").split("\n")).toHaveLength(1);
-
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 })).status).toBe(200);
-    const done = await until(s.project.id, (w) => w.status === "done" && !w.planPhase);
-    expect(done.chatId).toBe(work.chatId);
-    expect(readFileSync(join(folder, "about.html"), "utf8")).toBe("<h1>О нас</h1>\n");
-    // The work's model still has what it read while planning, and the user's "Go".
-    const working = JSON.stringify(requestsOf("coder").at(-1)!.body.messages);
-    expect(working).toContain("<h1>Клиника</h1>");
-    expect(working).toContain("Одобряю план");
-    const names2 = (requestsOf("coder").at(-1)!.body.tools ?? []).map((t: any) => t.function.name);
-    expect(names2).toContain("write_file");
-    expect(names2).not.toContain("propose_plan");
-  });
-
-  it("asks first when the interview is on, plans after the answers, and takes corrections to the plan", async () => {
-    const s = await setup({
-      coder: [
-        { text: "1. Какой стиль: тёплый или строгий? (советую тёплый)" },
-        proposePlan,
-        call("propose_plan", { plan: "# План\n- Каталог\n- Доставка" }),
-      ],
-    });
-    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
-      task: "Сайт клиники",
-      models: { interview: s.ref("coder"), plan: s.ref("coder"), work: s.ref("coder"), strong: null },
-      quick: false,
-    });
-    // It asked and stopped: the project waits for the answers, still in the plan phase.
-    const asked = await until(s.project.id, (w) => w.status !== "running" && w.planPhase && requestsOf("coder").length === 1);
-    expect(asked.plan).toBeNull();
-    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("2 to 6 short questions");
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Тёплый" })).status).toBe(200);
-    await until(s.project.id, (w) => w.status === "ready" && w.plan?.context === PLAN_TEXT);
-    expect((await env.call("POST", `/api/projects/${s.project.id}/work/revise`, { note: "Добавь доставку" })).status).toBe(200);
-    const fixed = await until(s.project.id, (w) => w.status === "ready" && w.plan?.context.includes("Доставка"));
-    expect(fixed.planPhase).toBe(true);
-    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("Добавь доставку");
   });
 
   // Asked for: a cap that really stops: the budget is for one message's work.
@@ -184,15 +124,14 @@ describe("work on a project", () => {
     await env.call("POST", "/api/mcp", { name: "demo", command: process.execPath, args: [server], trust: "trusted" });
     const s = await setup({
       coder: [
-        proposePlan,
         call("find_tools", { names: ["mcp_demo_echo"] }),
         call("mcp_demo_echo", { text: "кедр" }),
         { text: "Готово." },
         { text: "Готово." },
       ],
     });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    prepared(s);
+    await go(s, { budgetUsd: 1, hours: 2 });
     await until(s.project.id, (w) => w.status === "done");
     const first = requestsOf("coder").find((r) => r.body.tools?.some((t: any) => t.function.name === "find_tools"))!.body;
     expect(first.tools.map((t: any) => t.function.name)).not.toContain("mcp_demo_echo");
@@ -205,18 +144,17 @@ describe("work on a project", () => {
   it("takes a message the user writes while it works into the next answer, and goes on", async () => {
     const s = await setup({
       coder: [
-        proposePlan,
         { ...call("list_files", { path: "." }), delayMs: 600 },
         { text: "Готово, кнопка зелёная." },
       ],
     });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    prepared(s);
+    await go(s, { budgetUsd: 1, hours: 2 });
     await until(s.project.id, (w) => w.status === "running");
     const sent = await (await env.call("POST", `/api/projects/${s.project.id}/work/message`, { content: "Сделай кнопку зелёной" })).json();
     expect(sent.queued).toBe(true);
     await until(s.project.id, (w) => w.status === "done");
-    const later = requestsOf("coder").slice(2);
+    const later = requestsOf("coder").slice(1);
     expect(later.some((r) => JSON.stringify(r.body.messages).includes("Сделай кнопку зелёной"))).toBe(true);
     const chat = await (await env.call("GET", `/api/chats/${sent.chatId}`)).json();
     expect(chat.messages.filter((m: any) => m.role === "user").map((m: any) => m.content)).toContain("Сделай кнопку зелёной");
@@ -227,7 +165,6 @@ describe("work on a project", () => {
     const s = await setup(
       {
         coder: [
-          proposePlan,
           { ...call("list_files", { path: "." }), usage: { prompt_tokens: 100_000, completion_tokens: 1000 } },
           { ...call("list_files", { path: "." }), delayMs: 1500 },
           { text: "Готово." },
@@ -235,8 +172,8 @@ describe("work on a project", () => {
       },
       PRICED,
     );
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 5, hours: 2 });
+    prepared(s);
+    await go(s, { budgetUsd: 5, hours: 2 });
     const during = await until(s.project.id, (w) => w.status === "running" && w.spentUsd > 0.05);
     expect(during.workedMs).toBeGreaterThan(0);
     expect(during.spentUsd).toBeCloseTo(0.102, 3);
@@ -250,15 +187,14 @@ describe("work on a project", () => {
     const s = await setup(
       {
         coder: [
-          proposePlan,
           { ...call("list_files", { path: "." }), usage: big },
           { text: "Готово." },
         ],
       },
       PRICED,
     );
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 0.5, hours: 2 });
+    prepared(s);
+    await go(s, { budgetUsd: 0.5, hours: 2 });
     const paused = await until(s.project.id, (w) => w.status === "paused");
     expect(paused).toMatchObject({ reason: "budget" });
     expect(paused.spentUsd).toBeGreaterThanOrEqual(0.5);
@@ -267,31 +203,18 @@ describe("work on a project", () => {
     expect(await until(s.project.id, (w) => w.status === "done")).toMatchObject({ budgetUsd: 5 });
   });
 
-  it("refuses to plan in a folder without git", async () => {
-    const plain = mkdtempSync(join(tmpdir(), "drimvox-plain-"));
-    const s = await setup({});
-    const project = await (await env.call("POST", "/api/projects", { path: plain })).json();
-    const res = await env.call("POST", `/api/projects/${project.id}/work/plan`, {
-      task: "Сайт",
-      models: { interview: s.ref("coder"), plan: s.ref("coder"), work: s.ref("coder"), strong: null },
-    });
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: { code: "not_repo" } });
-    rmSync(plain, { recursive: true, force: true });
-  });
-
   // Seen live: after "Go" the agent wrote in English until the user asked in Russian.
   it("tells the working model to write in the user's language", async () => {
-    const s = await setup({ coder: [proposePlan, { text: "Готово." }] });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    const s = await setup({ coder: [{ text: "Готово." }] });
+    prepared(s);
+    await go(s, { budgetUsd: 1, hours: 2 });
     await until(s.project.id, (w) => w.status === "done");
     expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages[0])).toMatch(/language the user writes in/);
   });
 
   // The workspace's "Changes": what the agent did to the folder since the last commit, new files too, index untouched.
   it("shows the folder's changes since the last commit", async () => {
-    const s = await setup({ coder: [proposePlan] });
+    const s = await setup({ coder: [] });
     writeFileSync(join(folder, "index.html"), "<h1>Клиника «Здоровье»</h1>\n");
     mkdirSync(join(folder, "src"));
     writeFileSync(join(folder, "src", "app.js"), "export const a = 1;\n");
@@ -307,12 +230,12 @@ describe("work on a project", () => {
     mkdirSync(join(folder, ".drimvox", "skills", "style"), { recursive: true });
     writeFileSync(join(folder, ".drimvox", "skills", "style", "SKILL.md"), ["---", "name: style", "description: When making pages for this site", "---", "Use the brand green.", ""].join("\n"));
     const s = await setup({
-      coder: [proposePlan, call("use_skill", { name: "style" }), { text: "Готово." }],
+      coder: [call("use_skill", { name: "style" }), { text: "Готово." }],
     });
-    await planned(s);
-    await env.call("POST", `/api/projects/${s.project.id}/work/start`, { budgetUsd: 1, hours: 2 });
+    prepared(s);
+    await go(s, { budgetUsd: 1, hours: 2 });
     await until(s.project.id, (w) => w.status === "done");
-    const run = requestsOf("coder").slice(1);
+    const run = requestsOf("coder");
     expect(JSON.stringify(run[0]!.body.messages[0])).toContain("style: When making pages for this site");
     expect(JSON.stringify(run[1]!.body.messages)).toContain("Use the brand green.");
   });
@@ -322,15 +245,10 @@ describe("work on a project", () => {
     process.env.FAKE_CLI_DIR = dir;
     writeFileSync(join(dir, "script.json"), JSON.stringify([{ text: "Сделал калькулятор.", files: { "calculator.html": "<form></form>\n" } }]));
     env.setCliCommand("claude-code", [process.execPath, fileURLToPath(new URL("./fake-cli.mjs", import.meta.url)), "claude"]);
-    const s = await setup({ coder: [proposePlan] });
+    const s = await setup({ coder: [] });
     const cli = await (await env.call("POST", "/api/providers", { preset: "claude-code" })).json();
-    await env.call("POST", `/api/projects/${s.project.id}/work/plan`, {
-      task: "Сайт клиники",
-      models: { interview: s.ref("coder"), plan: s.ref("coder"), work: { providerId: cli.id, model: "default" }, strong: null },
-    });
-    // Its tools cannot be held to reading: the request goes to it as a message, without a plan phase.
-    const done = await until(s.project.id, (w) => w.status === "done");
-    expect(done.planPhase).toBe(false);
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сайт клиники", model: { providerId: cli.id, model: "default" } });
+    await until(s.project.id, (w) => w.status === "done");
     expect(readFileSync(join(folder, "calculator.html"), "utf8")).toBe("<form></form>\n");
     rmSync(dir, { recursive: true, force: true });
   });
@@ -380,6 +298,35 @@ describe("a ready project", () => {
     const work = await until(s.project.id, (w) => w.status === "done");
     expect(work.reason).toBeNull();
     expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("60 steps on this message");
+  });
+
+  // Asked for: no interview and plan switches; the agent asks when it must, as OpenCode does, with answers to pick.
+  it("waits on the agent's question, takes the picked answer or a written message, and goes on", async () => {
+    const question = { question: "Голос через сервер или напрямую?", header: "Голос", options: [{ label: "Напрямую (P2P)" }, { label: "Через сервер" }] };
+    const s = await setup({
+      coder: [call("question", { questions: [question] }), call("question", { questions: [question] }), { text: "Делаю P2P." }],
+    });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай голосовой чат", model: s.ref("coder") });
+    const waiting = async () => {
+      for (let i = 0; i < 100; i++) {
+        const chat = await (await env.call("GET", `/api/chats/${(await (await env.call("GET", `/api/projects/${s.project.id}/work`)).json()).chatId}`)).json();
+        if (chat.questions?.length) return chat;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      throw new Error("no question");
+    };
+    const chat = await waiting();
+    expect(chat.questions[0].questions[0]).toMatchObject({ question: "Голос через сервер или напрямую?", options: [{ label: "Напрямую (P2P)" }, { label: "Через сервер" }] });
+    expect((await (await env.call("GET", `/api/projects/${s.project.id}/work`)).json()).waitingApproval).toBe(true);
+    const picked = await env.call("POST", `/api/chats/${chat.id}/questions/${chat.questions[0].id}`, { answers: ["Напрямую (P2P)"] });
+    expect(picked.status).toBe(200);
+    // The second question is answered with a message written in the box.
+    await waiting();
+    await env.call("POST", `/api/projects/${s.project.id}/work/message`, { content: "Через сервер, но потом" });
+    await until(s.project.id, (w) => w.status === "done");
+    const sent = JSON.stringify(requestsOf("coder").at(-1)!.body.messages);
+    expect(sent).toContain("Голос через сервер или напрямую? → Напрямую (P2P)");
+    expect(sent).toContain("Голос через сервер или напрямую? → Через сервер, но потом");
   });
 
   it("answers the first message at once, ends as a chat does and goes on with the next message", async () => {
@@ -638,29 +585,27 @@ describe("a project's git rules", () => {
     await ask(s, "Почини корзину", 3);
     expect(git(folder, "branch", "--show-current")).toBe("main");
     expect(git(folder, "log", "--format=%s", "-1")).toBe("Почини корзину");
-    // With the project's state for whoever picks it up next; pointer files only when the settings ask.
-    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["AGENTS.md", "cart.js"]);
-    const agents = readFileSync(join(folder, "AGENTS.md"), "utf8");
-    expect(agents).toContain("## Project state (kept by Drimvox)");
-    expect(agents).toContain("Goal: Почини корзину");
-    expect(agents).toContain("Git branch: main");
-    expect(existsSync(join(folder, "CLAUDE.md"))).toBe(false);
+    // Only the work: the project's state is kept in Drimvox's data, not in the project (asked for).
+    expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["cart.js"]);
+    expect(existsSync(join(folder, "AGENTS.md"))).toBe(false);
+    const state = readFileSync(join(storeOf(folder), "state.md"), "utf8");
+    expect(state).toContain("Goal: Почини корзину");
+    expect(state).toContain("Git branch: main");
     expect(git(folder, "status", "--porcelain")).toBe("?? .env");
     expect(JSON.stringify(requestsOf("coder")[0]!.body.tools ?? []).includes("commit_changes")).toBe(false);
     const view = await (await env.call("GET", `/api/projects/${s.project.id}/git`)).json();
     expect(view.state).toMatchObject({ branch: "main", base: null, github: false, pullRequest: null });
   });
 
-  it("makes pointer files for the agents chosen in the settings", async () => {
-    const s = await ready([{ text: "Готово." }]);
-    await env.call("PATCH", "/api/settings", { agentFiles: ["gemini", "qwen", "copilot", "windsurf"] });
-    await ask(s, "Сделай что-нибудь", 1);
-    expect(readFileSync(join(folder, "GEMINI.md"), "utf8")).toBe("@AGENTS.md\n");
-    expect(readFileSync(join(folder, "QWEN.md"), "utf8")).toBe("@AGENTS.md\n");
-    // Agents without "@file" get the pointer in words, in their own folders (asked for: more agents than three).
-    expect(readFileSync(join(folder, ".github", "copilot-instructions.md"), "utf8")).toMatch(/^Read AGENTS\.md/);
-    expect(readFileSync(join(folder, ".windsurf", "rules", "drimvox.md"), "utf8")).toMatch(/^Read AGENTS\.md/);
-    expect(existsSync(join(folder, "CLAUDE.md"))).toBe(false);
+  // Asked for: no AGENTS.md, .drimvox or pointer files of Drimvox's in the project; the notes are kept in its data.
+  it("leaves nothing of its own in the project's folder: notes, state and long outputs are kept in Drimvox's data", async () => {
+    const long = `node -e "for (let i = 1; i <= 3000; i++) console.log('line ' + i)"`;
+    const s = await ready([call("update_notes", { notes: "Сборка: npm run build" }), call("run_command", { command: long, timeout_seconds: 60 }), { text: "Готово." }]);
+    await ask(s, "Запиши заметки", 3);
+    expect(existsSync(join(folder, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(folder, ".drimvox"))).toBe(false);
+    expect(git(folder, "status", "--porcelain")).toBe("");
+    expect(readFileSync(join(storeOf(folder), "notes.md"), "utf8")).toContain("npm run build");
   });
 
   // Seen live: a project left on "drimvox/task-1106-2048 → master" from before, which said nothing to its user.

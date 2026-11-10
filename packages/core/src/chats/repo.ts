@@ -116,7 +116,7 @@ export class ChatRepo {
   }
 
   /** The chat and its messages; the requests its answer waits on live in the core, not here (routes add them). */
-  get(id: string): Omit<ChatWithMessages, "approvals"> | null {
+  get(id: string): Omit<ChatWithMessages, "approvals" | "questions"> | null {
     const row = this.chatRow(id);
     if (!row) return null;
     const all = this.rows(id);

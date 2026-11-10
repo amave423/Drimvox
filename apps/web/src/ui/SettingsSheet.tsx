@@ -1,4 +1,4 @@
-import { agentFiles, currencies, locales, searchEngines, themes, type Settings, type SettingsPatch } from "@drimvox/shared";
+import { currencies, locales, searchEngines, themes, type Settings, type SettingsPatch } from "@drimvox/shared";
 import { useEffect, useState, type ReactNode } from "react";
 import { useApp } from "../context";
 import { shownSign } from "../lib/format";
@@ -86,16 +86,6 @@ export function SettingsSheet() {
         </Setting>
 
         <h2 className="sheet-h">{t("settings.group.work")}</h2>
-        <Setting id="agent-files-label" title={t("settings.agentFiles")} about={t("settings.agentFilesAbout")}>
-          <div className="agent-files">
-            {agentFiles.map((a) => (
-              <Toggle key={a} checked={settings.agentFiles.includes(a)} onChange={(on) => save({ agentFiles: on ? [...settings.agentFiles, a] : settings.agentFiles.filter((x) => x !== a) })}>
-                {t(`settings.agentFile.${a}`)}
-              </Toggle>
-            ))}
-          </div>
-        </Setting>
-
         <Setting id="notifications-label" title={t("settings.notifications")} about={t(window.drimvox ? "settings.notificationsAbout" : "settings.notificationsAboutBrowser")}>
           <Toggle
             checked={settings.notifications}

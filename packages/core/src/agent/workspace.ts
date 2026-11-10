@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { storeOf } from "./store";
 
 const SKIP = new Set([".git", ".drimvox", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".next", "target"]);
 const MAX_READ_LINES = 2000;
@@ -9,9 +10,13 @@ const MAX_SEARCH_RESULTS = 100;
 export class Workspace {
   constructor(readonly root: string) {}
 
-  /** Absolute path of `path` inside the copy; anything that escapes it throws. */
+  /** Absolute path of `path` inside the copy, or inside Drimvox's own store for it (saved outputs); else it throws. */
   resolve(path: string): string {
     const target = resolve(this.root, path);
+    if (isAbsolute(path)) {
+      const own = relative(storeOf(this.root), target);
+      if (own && !own.startsWith("..") && !isAbsolute(own)) return target;
+    }
     const rel = relative(this.root, target);
     if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
       throw new Error(`Path is outside the project copy: ${path}`);

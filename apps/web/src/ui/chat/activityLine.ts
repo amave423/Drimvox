@@ -14,6 +14,8 @@ const OWN_LINES = [
   "ask_user",
   "finish_work",
   "look_at_page",
+  "check_page",
+  "question",
   "start_background",
   "read_background",
   "stop_background",

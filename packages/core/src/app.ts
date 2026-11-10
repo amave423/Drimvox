@@ -1,4 +1,3 @@
-import { agentFileNames } from "@drimvox/shared";
 import { AttachmentRepo } from "./chats/attachment-repo";
 import { BacklogService } from "./backlog/service";
 import { backlogRoutes } from "./routes/backlog";
@@ -16,6 +15,8 @@ import { join } from "node:path";
 import { ProjectRepo, TaskRepo } from "./agent/repo";
 import { AgentRunner } from "./agent/runner";
 import { ChatApprovals } from "./chats/approvals";
+import { setStoreDir } from "./agent/store";
+import { ChatQuestions } from "./chats/questions";
 import { ChatRepo } from "./chats/repo";
 import type { Database } from "./db";
 import { hostGuard, tokenGuard } from "./guards";
@@ -195,7 +196,10 @@ export function createCore(o: AppOptions) {
   pushProxy();
   // The Playwright server can work in Chrome without a window; the desktop's tab inside the window has no address for it.
   const mcp = new McpHub(mcpRepo, agentBrowser instanceof AgentBrowser ? agentBrowser : undefined);
+  // What Drimvox writes about a folder (the agent's notes, the state, long outputs) lives here, not in the project.
+  setStoreDir(join(o.dataDir, "projects"));
   const approvals = new ChatApprovals();
+  const questions = new ChatQuestions();
   const shots = new Shots(join(o.dataDir, "screenshots"));
   const visualKit = { background: new Background(), screenshot: o.screenshot ?? null, shots };
   const media = new MediaRepo(o.db, o.dataDir);
@@ -259,11 +263,13 @@ export function createCore(o: AppOptions) {
     chats,
     backlog,
     approvals,
+    questions,
     cliDir: join(o.dataDir, "cli-chats"),
     run: {
       chats,
       providers,
       approvals,
+      questions,
       repo: workRepo,
       visualKit,
       web,
@@ -271,13 +277,11 @@ export function createCore(o: AppOptions) {
       mcp,
       idleTimeoutMs,
       plan: (projectId) => backlog.plan(projectId),
-      setPlan: (projectId, plan) => backlog.setPlan(projectId, plan),
       month: () => monthUsage(o.db, chats),
       vision: (conn, model, chosen) => resolveVision(chosen ?? readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
       git: projectGit,
       extensions: (id) => extensions.get(id),
       toolbox: tools,
-      agentFiles: () => readSettings(o.db).agentFiles.map((a) => agentFileNames[a]),
       imageTools: (worktree, taskId, hooks, onSpend, budgetLeft) => imageToolsFor(readSettings(o.db).imageModel, providers, { worktree, taskId, media, hooks, budgetLeft, onSpend }),
     },
   });
@@ -360,7 +364,7 @@ export function createCore(o: AppOptions) {
     })
     .route(
       "/chats",
-      chatRoutes(chats, providers, studio, web, mcp, approvals, idleTimeoutMs, join(o.dataDir, "cli-chats"), {
+      chatRoutes(chats, providers, studio, web, mcp, approvals, questions, idleTimeoutMs, join(o.dataDir, "cli-chats"), {
         service: backlogService,
         plan: (projectId) => backlog.plan(projectId),
         visualKit,

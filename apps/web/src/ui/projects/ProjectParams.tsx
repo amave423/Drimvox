@@ -94,16 +94,6 @@ function WorkOptions(p: {
       <h3 className="margin-h" id="params-work-h">
         {t("projectParams.work")}
       </h3>
-      <Toggle checked={prefs.interview} onChange={(interview) => set({ interview })}>
-        <span>
-          {t("projectBox.interview")} <span className="options-about">{t("projectBox.interviewHint")}</span>
-        </span>
-      </Toggle>
-      <Toggle checked={prefs.plan} onChange={(plan) => set({ plan })}>
-        <span>
-          {t("projectBox.plan")} <span className="options-about">{t("projectBox.planHint")}</span>
-        </span>
-      </Toggle>
       <Toggle checked={strongOn} onChange={(on) => set(on ? { strongOn: true } : { strongOn: false, strong: null })}>
         <span>
           {t("projectBox.strong")} <span className="options-about">{t("projectBox.strongHint")}</span>

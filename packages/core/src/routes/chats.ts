@@ -3,6 +3,7 @@ import { chatMarkdown } from "../chats/export";
 import { zValidator } from "@hono/zod-validator";
 import { type MonthUsage, type ModelSpending,
   approvalDecisionSchema,
+  questionAnswerSchema,
   chatCreateSchema,
   attachmentUploadSchema,
   chatFolderSchema,
@@ -31,6 +32,7 @@ import type { ChatRepo } from "../chats/repo";
 import { mediaModel } from "../media/catalog";
 import { findModel, listModels } from "../providers/catalog";
 import type { ChatApprovals } from "../chats/approvals";
+import type { ChatQuestions } from "../chats/questions";
 import type { WebAccess } from "../internet/web";
 import type { McpHub } from "../mcp/hub";
 import type { Studio } from "../media/studio";
@@ -90,6 +92,7 @@ export function chatRoutes(
   web: WebAccess,
   mcp: McpHub,
   approvals: ChatApprovals,
+  questions: ChatQuestions,
   idleTimeoutMs: number,
   cliDir: string,
   work: WorkDeps,
@@ -107,7 +110,7 @@ export function chatRoutes(
     })
     .get("/:id", (c) => {
       const chat = chats.get(c.req.param("id"));
-      return chat ? c.json({ ...chat, approvals: approvals.open(chat.id) }, 200) : c.json(notFound, 404);
+      return chat ? c.json({ ...chat, approvals: approvals.open(chat.id), questions: questions.open(chat.id) }, 200) : c.json(notFound, 404);
     })
     .patch("/:id", zValidator("json", chatUpdateSchema), (c) => {
       const patch = c.req.valid("json");
@@ -223,6 +226,10 @@ export function chatRoutes(
     .post("/:id/approvals/:approvalId", zValidator("json", approvalDecisionSchema), (c) => {
       const { allow, always, server } = c.req.valid("json");
       const known = approvals.answer(c.req.param("id"), c.req.param("approvalId"), allow, always, server);
+      return known ? c.json({ ok: true as const }, 200) : c.json(notFound, 404);
+    })
+    .post("/:id/questions/:questionId", zValidator("json", questionAnswerSchema), (c) => {
+      const known = questions.answer(c.req.param("id"), c.req.param("questionId"), c.req.valid("json").answers);
       return known ? c.json({ ok: true as const }, 200) : c.json(notFound, 404);
     })
     .post("/:id/messages", zValidator("json", messageSendSchema), async (c) => {
