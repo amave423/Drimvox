@@ -7,6 +7,13 @@ const failure = (status: number, message: string) =>
 
 // Seen live: free models refused for reasons of their own, and Drimvox told the user the key was wrong.
 describe("describeError", () => {
+  // Seen live: "Failed to process successful response" stopped a run; why it could not be read is in the cause.
+  it("says why a 200 answer could not be read", () => {
+    const err = new APICallError({ message: "Failed to process successful response", url: "u", requestBodyValues: {}, statusCode: 200, cause: Object.assign(new TypeError("terminated"), { cause: { code: "UND_ERR_SOCKET", message: "other side closed" } }) });
+    expect(describeError(err).code).toBe("bad_response");
+    expect(describeError(err).detail).toMatch(/terminated|other side closed|UND_ERR_SOCKET/);
+  });
+
   it("tells a wrong key from a model the key may not use", () => {
     expect(describeError(failure(401, "Invalid API key")).code).toBe("bad_key");
     expect(describeError(failure(403, "inkling:free is only available on agentic harnesses")).code).toBe("forbidden");

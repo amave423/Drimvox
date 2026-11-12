@@ -68,7 +68,8 @@ export function describeError(err: unknown): ProviderError {
     if (err.statusCode === undefined) return withDetail("unreachable", causeText(err.cause) ?? err.message);
     const detail = detailFromBody(err.data ?? err.responseBody) ?? err.message;
     // A 200 whose body could not be read as an answer: the provider speaks another dialect for this model.
-    if (err.statusCode < 300) return withDetail("bad_response", detail);
+    // Why it could not be read (the stream broke off, a field was wrong) is in its cause.
+    if (err.statusCode < 300) return withDetail("bad_response", causeText(err.cause) ?? detail);
     return withDetail(
       REGION.test(detail)
         ? "region"

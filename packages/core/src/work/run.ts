@@ -43,6 +43,19 @@ export const DONE_YET =
 /** Provider errors in a row before the run stops and waits. */
 const MAX_ERRORS = 2;
 const RETRY_MS = 5000;
+/**
+ * A provider that is busy, unreachable or cut its answer off on the way gets more tries, each after a longer pause (seen
+ * live: a long answer of DeepSeek through RouterAI broke off mid-stream twice in a row, and the run stopped in the middle
+ * of the voice of an app with nothing wrong in the work).
+ */
+const TRANSIENT = new Set(["bad_response", "unreachable", "overloaded", "rate_limited", "timeout"]);
+const TRANSIENT_WAITS_MS = [5_000, 15_000, 30_000, 60_000];
+
+/** How long to wait before trying again after the `failures`-th error in a row of this kind; null: stop trying. */
+export function retryWait(code: string, failures: number): number | null {
+  if (TRANSIENT.has(code)) return TRANSIENT_WAITS_MS[failures - 1] ?? null;
+  return failures < MAX_ERRORS ? RETRY_MS : null;
+}
 /** Looks at pages per answer: the desktop and the phone, scenarios, and again after fixes. */
 const LOOKS = {
   looks: 8,
@@ -235,8 +248,9 @@ export class WorkRun {
         this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
         if (signal.aborted || outcome.kind === "stopped") return stopWith("stopped", "user");
         if (outcome.kind === "error") {
-          if (++errors < MAX_ERRORS) {
-            await sleep(RETRY_MS, signal);
+          const wait = retryWait(outcome.error.code, ++errors);
+          if (wait !== null) {
+            await sleep(wait, signal);
             continue;
           }
           // The working model keeps failing: the strong one takes over, when the project has one.

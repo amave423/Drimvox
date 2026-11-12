@@ -168,7 +168,6 @@ export const ru = {
   "settings.group.look": "Внешний вид",
   "settings.group.work": "Работа",
   "settings.group.money": "Деньги",
-  "settings.agentBudgetLabel": "Бюджет проекта по умолчанию",
   "settings.monthlyBudgetLabel": "Бюджет на месяц",
   "voice.modelTitle": "Модель для диктовки",
   "settings.marginMcp": "Сервер MCP даёт моделям новые инструменты: браузер, поиск, GitHub, базы данных. Установи нужный карточкой, а настрой в списке под каталогом.",
@@ -552,8 +551,6 @@ export const ru = {
   "approval.denied": "Запрещено",
 
   "project.identityName": "Твоё имя",
-  "settings.agentBudget": "Бюджет агента на задачу, $",
-  "settings.agentBudgetHint": "С этой суммы начинается бюджет, когда агент пишет план проекта; перед «Начать работу» его можно поменять. На неё же рассчитан опрос перед планом. Бесплатные модели бюджет не тратят.",
   "settings.save": "Сохранить",
   "settings.clear": "Убрать",
 
@@ -628,7 +625,6 @@ export const ru = {
   "settings.currency.RUB": "Рубли",
   "settings.currency.USD": "Доллары",
   "settings.currencyHint": "Курс ЦБ на сегодня: {rate} ₽ за доллар. Цены в долларах пересчитываются по нему.",
-  "settings.agentBudgetRub": "Бюджет агента на задачу, ₽",
   "providers.hint.routerai": "Сотни моделей с оплатой в рублях: текст, картинки, видео",
 
   "web.label": "Интернет",
@@ -1014,9 +1010,6 @@ export const ru = {
   "account.wrong": "Текущий пароль неверный.",
   "account.signOut": "Выйти",
   "settings.notificationsBrowser": "Уведомлять в браузере",
-  "settings.developerTitle": "Кто ставит задачи",
-  "settings.developer": "Я разработчик",
-  "settings.developerHint": "Включено — агент спрашивает и про технологии, архитектуру, хранение данных. Выключено — только про то, что должно получиться, простыми словами; технологии выбирает сам.",
   "side.local": "Локальные модели",
   "local.part": "Раздел",
   "local.part.text": "Текст",

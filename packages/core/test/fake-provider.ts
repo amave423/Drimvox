@@ -26,6 +26,8 @@ export interface FakeTurn {
   fail?: { status: number; message: string };
   /** Why the answer ends: "stop" or "tool_calls" by default, "length" when the model ran out of room (calls cut too). */
   finishReason?: string;
+  /** A 200 whose body cannot be read: the stream starts, then the connection breaks off (seen live through RouterAI). */
+  brokenOff?: boolean;
 }
 
 export interface FakeProviderOptions {
@@ -139,6 +141,12 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
         scriptIndex++;
         if (turn.delayMs) await new Promise((r) => setTimeout(r, turn.delayMs));
         if (res.destroyed) return;
+        if (turn.brokenOff) {
+          res.writeHead(200, { "content-type": "text/event-stream" });
+          res.write('data: {"id":"x","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"На');
+          res.socket?.destroy();
+          return;
+        }
         if (turn.fail) {
           res.writeHead(turn.fail.status, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: { message: turn.fail.message } }));

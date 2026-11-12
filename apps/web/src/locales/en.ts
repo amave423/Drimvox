@@ -169,7 +169,6 @@ export const en: Record<keyof typeof ru, string> = {
   "settings.group.look": "Appearance",
   "settings.group.work": "Work",
   "settings.group.money": "Money",
-  "settings.agentBudgetLabel": "Default budget of a project",
   "settings.monthlyBudgetLabel": "Monthly budget",
   "voice.modelTitle": "Model for dictation",
   "settings.marginMcp": "An MCP server gives models new tools: a browser, search, GitHub, databases. Install one with its card and set it up in the list under the catalog.",
@@ -552,8 +551,6 @@ export const en: Record<keyof typeof ru, string> = {
   "approval.denied": "Denied",
 
   "project.identityName": "Your Name",
-  "settings.agentBudget": "Agent budget per task, $",
-  "settings.agentBudgetHint": "A project's budget starts at this sum when the agent writes its plan; change it before “Start the work”. The interview before the plan counts against it too. Free models do not spend it.",
   "settings.save": "Save",
   "settings.clear": "Remove",
 
@@ -628,7 +625,6 @@ export const en: Record<keyof typeof ru, string> = {
   "settings.currency.RUB": "Rubles",
   "settings.currency.USD": "Dollars",
   "settings.currencyHint": "Central Bank rate today: {rate} ₽ per dollar. Dollar prices are converted at it.",
-  "settings.agentBudgetRub": "Agent budget per task, ₽",
   "providers.hint.routerai": "Hundreds of models paid in rubles: text, pictures, video",
 
   "web.label": "Internet",
@@ -1014,9 +1010,6 @@ export const en: Record<keyof typeof ru, string> = {
   "account.wrong": "The current password is wrong.",
   "account.signOut": "Sign out",
   "settings.notificationsBrowser": "Notify in the browser",
-  "settings.developerTitle": "Who sets the tasks",
-  "settings.developer": "I am a developer",
-  "settings.developerHint": "On: agents also ask about technology, architecture and data storage. Off: only about the result, in plain words; agents choose the technology.",
   "side.local": "Local models",
   "local.part": "Part",
   "local.part.text": "Text",

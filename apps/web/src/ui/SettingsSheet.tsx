@@ -56,9 +56,7 @@ export function SettingsSheet() {
   // The budget is kept in dollars and edited in the currency on screen.
   const perUsd = settings.currency === "RUB" && usdRub > 0 ? usdRub : 1;
   const shown = (usd: number) => String(Number((usd * perUsd).toFixed(perUsd === 1 ? 2 : 0)));
-  const [budget, setBudget] = useState(shown(settings.agentBudgetUsd));
   const [monthly, setMonthly] = useState(settings.monthlyBudgetUsd === null ? "" : shown(settings.monthlyBudgetUsd));
-  useEffect(() => setBudget(shown(settings.agentBudgetUsd)), [perUsd]);
 
   async function save(patch: SettingsPatch) {
     setState((await updateSettings(patch)) ? "saved" : "failed");
@@ -106,11 +104,6 @@ export function SettingsSheet() {
           )}
         </Setting>
         <NoticeSoundSetting save={save} />
-        <Setting id="developer-label" title={t("settings.developerTitle")} about={t("settings.developerHint")}>
-          <Toggle checked={settings.developer} onChange={(developer) => void save({ developer })}>
-            {t("settings.developer")}
-          </Toggle>
-        </Setting>
 
         <UpdatesSection />
         {!window.drimvox && <AccountSection />}
@@ -125,19 +118,6 @@ export function SettingsSheet() {
             value={settings.currency}
             options={currencies.map((v) => ({ value: v, label: t(`settings.currency.${v}`) }))}
             onChange={(currency) => save({ currency })}
-          />
-        </Setting>
-        <Setting id="agent-budget-label" title={t("settings.agentBudgetLabel")} about={t("settings.agentBudgetHint")}>
-          <AmountField
-            label={t(perUsd === 1 ? "settings.agentBudget" : "settings.agentBudgetRub")}
-            sign={shownSign()}
-            value={budget}
-            onChange={setBudget}
-            onSave={() => {
-              const value = Number(budget.replace(",", ".")) / perUsd;
-              if (value >= 0.01) void save({ agentBudgetUsd: Number(value.toFixed(4)) });
-              else setBudget(shown(settings.agentBudgetUsd));
-            }}
           />
         </Setting>
         <Setting id="monthly-budget-label" title={t("settings.monthlyBudgetLabel")} about={t("settings.monthlyBudgetHint")}>

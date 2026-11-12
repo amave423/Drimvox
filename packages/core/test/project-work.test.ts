@@ -1,6 +1,7 @@
 import { slug } from "../src/work/project-git";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { storeOf } from "../src/agent/store";
+import { retryWait } from "../src/work/run";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -98,6 +99,22 @@ describe("work on a project", () => {
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Второе", model: s.ref("coder") });
     const paused = await until(s.project.id, (w) => w.status === "paused" && requestsOf("coder").length === 2);
     expect(paused.reason).toBe("budget");
+  });
+
+  // Seen live: a long answer of DeepSeek through RouterAI broke off twice in a row, and the run stopped mid-work.
+  it("goes on when a provider's answer breaks off mid-stream", async () => {
+    const busy = { brokenOff: true };
+    const s = await setup({ coder: [busy, busy, busy, { text: "Сделал." }] });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай", model: s.ref("coder") });
+    const done = await until(s.project.id, (w) => w.status !== "running" && requestsOf("coder").length >= 4);
+    expect(done.status).toBe("done");
+  });
+
+  it("tries a busy, unreachable or unreadable provider five times, a refusal twice", () => {
+    expect([1, 2, 3, 4, 5].map((n) => retryWait("bad_response", n))).toEqual([5_000, 15_000, 30_000, 60_000, null]);
+    expect(retryWait("overloaded", 4)).toBe(60_000);
+    expect([1, 2].map((n) => retryWait("provider_error", n))).toEqual([5_000, null]);
   });
 
   // The working model keeps failing: the strong one takes over, when the project has one.
