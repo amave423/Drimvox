@@ -37,12 +37,9 @@ import type { WebAccess } from "../internet/web";
 import type { McpHub } from "../mcp/hub";
 import type { Studio } from "../media/studio";
 import type { ProviderRepo } from "../providers/repo";
-import type { ProjectPlan } from "@drimvox/shared";
-import type { BacklogService } from "../backlog/service";
 import { askAboutPictures, resolveVision } from "../visual/look";
 import { toolbox, type ToolboxDeps } from "../tools";
-import { visualTools, type VisualKit } from "../visual/tools";
-import { WORK_STEPS, workRules } from "../work/prompt";
+import type { VisualKit } from "../visual/tools";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 
 /** The largest file of the folder shown from an answer. */
@@ -66,8 +63,6 @@ const PROGRESS_MS = 1000;
 
 /** What a project task's conversation needs beyond a chat with a folder (docs/specs/project-work.md). */
 export interface WorkDeps {
-  service: BacklogService;
-  plan(projectId: string): ProjectPlan | null;
   visualKit: VisualKit;
   visionModel(): { providerId: string; model: string } | null;
   /** The settings' switch: commands in a chat's folder run without asking. */
@@ -80,8 +75,6 @@ export interface WorkDeps {
   toolbox?: ToolboxDeps;
 }
 
-/** Looks at pages per answer of a task: the desktop and the phone, then again after a fix. */
-const WORK_LOOKS = { looks: 8, then: "You have looked enough: finish with what you have and say what is left." };
 /** One attached file at most; the window sends ten at most. */
 const MAX_ATTACHMENT = 20 * 1024 * 1024;
 
@@ -352,24 +345,6 @@ export function chatRoutes(
               onResult: () => {},
             })
           : {};
-        // A task of a project's list: its rules, more steps, a dev server in the background and a look at the pages.
-        const task = chat.itemId && chat.projectId && chat.folder && toolsOk ? chat : null;
-        if (task) work.service.working(chat.id);
-        const workTools =
-          task && task.folder
-            ? visualTools(
-                {
-                  kit: work.visualKit,
-                  taskId: chat.id,
-                  worktree: task.folder,
-                  vision: await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel, listModels),
-                  hooks: { onCall: (call) => void emit({ type: "tool", name: call.name, input: describeInput(call.input) }), onResult: () => {}, askApproval: async () => false },
-                  onSpend: () => {},
-                  event: () => {},
-                },
-                WORK_LOOKS,
-              )
-            : {};
         // Downloads, mail, SSH, audits, before and after: in a chat with a folder (a plain chat keeps only the web).
         const chatToolbox = async () => {
           const seeing = await resolveVision(work.visionModel(), providers, { providerId: conn.id, model: chat.model! }, findModel, listModels);
@@ -391,7 +366,7 @@ export function chatRoutes(
         await reply({
           chats,
           chatId: chat.id,
-          work: task || skills.length ? { system: [task ? workRules(work.plan(task.projectId!)) : "", skillsInstructions(skills)].filter(Boolean).join("\n"), steps: task ? WORK_STEPS : 0 } : undefined,
+          work: skills.length ? { system: skillsInstructions(skills), steps: 0 } : undefined,
           conn,
           model: chat.model!,
           content,
@@ -405,7 +380,6 @@ export function chatRoutes(
           extraTools: {
             ...mcpTools,
             ...(toolsOk && chat.folder && work.toolbox ? await chatToolbox() : {}),
-            ...workTools,
             ...(chat.folder ? skillTools(skills, chat.folder, skillHooks) : {}),
             ...(chat.folder && toolsOk
               ? folderTools(
@@ -433,12 +407,6 @@ export function chatRoutes(
           // A stopped answer sends no "done": its followers end here.
           for (const listener of following.listeners) listener(null);
         });
-        if (task) {
-          // A dev server the agent started does not hold the port once it answered (seen: "npm run dev" failed after).
-          work.visualKit.background.stopAll(chat.id);
-          const last = chats.get(chat.id)?.messages.at(-1);
-          if (last?.role === "assistant" && last.status === "done") work.service.answered(chat.id);
-        }
       });
     });
 }

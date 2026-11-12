@@ -1,39 +1,15 @@
-/* Projects, agent tasks and the proofreading review. */
-
 /* Status markers */
-.status-dot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-.status-dot.is-running { background: var(--ink); box-shadow: 0 0 0 3px var(--ink-soft); }
-.status-dot.is-waiting { background: var(--wait); box-shadow: 0 0 0 3px var(--wait-soft); }
-.status-dot.is-review, .status-dot.is-merged { background: var(--ok); }
-.status-dot.is-failed { background: var(--pencil); }
-.status-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12.5px; white-space: nowrap; }
-.status-chip.is-waiting { border-color: var(--wait); color: var(--wait); }
-.status-chip.is-failed { border-color: var(--pencil); color: var(--pencil); }
-.status-chip.is-review, .status-chip.is-merged { border-color: var(--ok); color: var(--ok); }
-.is-ink { color: var(--ink); }
 .is-pencil-text { color: var(--pencil); }
-.is-wait-text { color: var(--wait); }
 
 /* Sidebar */
 .side-group { display: grid; gap: 4px; min-height: 0; }
-.side-sublist { list-style: none; margin: 0 0 4px 10px; padding: 0 0 0 8px; border-left: 1px solid var(--line); display: grid; gap: 1px; }
-.side-task { display: flex !important; align-items: center; gap: 8px; font-size: 13.5px; min-width: 0; }
 .side-task .side-item-title { min-width: 0; }
-.side-sublist li { min-width: 0; }
 .side-form { display: grid; gap: 6px; margin: 4px 0; }
 
 /* Project */
-.project-path { overflow-wrap: anywhere; font-size: 13px; }
 .notice { border-left: 2px solid var(--wait); padding: 4px 0 4px 16px; margin-bottom: 8px; }
 .notice p { margin: 0 0 12px; max-width: 64ch; }
-.task-form { display: grid; gap: 10px; }
-.task-input { resize: vertical; min-height: 110px; line-height: 1.5; }
-.task-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.task-row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto 70px; gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); text-align: left; }
-.task-row:hover .task-row-title { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
-.task-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-row .mono { text-align: right; font-size: 12.5px; }
-.project-kind-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13.5px; }
 .project-kind-switch .segmented button { padding: 4px 12px; font-size: 13px; }
 /* Leaving Drimvox, set apart at the end of the project's tab. */
 .danger-zone { margin-top: 20px; padding: 12px 14px; border: 1px solid var(--pencil-soft); border-radius: 12px; display: grid; gap: 8px; justify-items: start; }
@@ -41,15 +17,10 @@
 .danger-zone .actions { flex-wrap: wrap; align-items: center; }
 
 /* Task */
-.task-head { display: grid; gap: 8px; margin-bottom: 14px; }
-.task-head h1 { overflow-wrap: anywhere; }
 .task-head .facts { align-items: center; font-size: 13px; }
-.task-notice { position: sticky; top: 0; z-index: 5; background: var(--sheet); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 .task-notice.is-asking { align-items: flex-start; }
 .task-notice.is-asking .approval { flex: 1 1 320px; min-width: 0; margin: 0; }
 .task-notice.is-asking .approval code { max-height: 180px; overflow: auto; }
-/* The agent's questions: answers to pick as buttons, the user's own in a field. */
-/* A question is no alarm: the calm ink of a choice, not the pencil red of a permission. */
 /* Seen live: four questions with long answers made the card taller than the window and wider than the feed. It scrolls
    inside, and every answer is a full-width row whose words wrap. */
 .approval.agent-question-card { border: 1.5px solid var(--ink); background: var(--sheet); max-height: min(70vh, 640px); overflow: auto; min-width: 0; }
@@ -60,33 +31,22 @@
 .agent-question-option { display: grid; gap: 2px; justify-content: stretch; justify-items: start; text-align: left; width: 100%; min-width: 0; padding: 8px 16px; border-radius: 12px; white-space: normal; overflow-wrap: anywhere; }
 .agent-question .field-input { width: 100%; min-width: 0; box-sizing: border-box; }
 .agent-question-option.is-picked { border-color: var(--ink); background: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--ink); }
-.task-notice p { margin: 0; flex: 1; min-width: 240px; }
 .task-notice.is-wait { border-color: var(--wait); }
-.task-notice.is-failed { border-color: var(--pencil); }
 .action-spinner { display: inline-block; flex: none; box-sizing: border-box; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink-soft); border-top-color: var(--ink); }
 @media (prefers-reduced-motion: no-preference) {
   .action-spinner { animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 }
 
-/* Feed: one line per action */
 /* One column no wider than the sheet: a long command must not stretch the feed (its line is cut with an ellipsis). */
 .feed { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .feed > li, .action, .action summary { min-width: 0; }
 .feed > li > p { margin: 4px 0; overflow-wrap: anywhere; }
-.feed-note > p { color: var(--fg); }
-.feed-bubble { justify-self: end; max-width: 100%; margin: 6px 0 !important; background: var(--paper); border: 1px solid var(--line); border-radius: 14px 14px 4px 14px; padding: 10px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.feed-user { display: grid; }
 .action summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; padding: 3px 4px 3px 0; font-size: 14px; color: var(--ink); }
 .action summary::-webkit-details-marker { display: none; }
 .action summary::before { content: "›"; flex: none; color: var(--muted); width: 8px; transition: transform 120ms; }
 .action[open] summary::before { transform: rotate(90deg); }
-.action-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .action-label.mono { font-size: 13px; }
-.action-ok, .action-bad { flex: none; font: 12px var(--font-mono); white-space: nowrap; }
-.action-ok { color: var(--ok); }
-.action-bad { color: var(--pencil); }
-.action-output { margin: 4px 0 8px 18px; padding: 10px 12px; max-height: 260px; overflow: auto; background: var(--paper); border-radius: 8px; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .approval { display: grid; gap: 6px; margin: 8px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 /* Only the question waiting for an answer, at the top of the task, is loud; the feed keeps a quiet record. */
 .approval.is-asking { border: 1.5px solid var(--pencil); background: var(--pencil-soft); }
@@ -96,46 +56,18 @@
 .worked .feed { margin-top: 10px; }
 
 /* Review: proofreading */
-.review-summary { font: 17px/1.55 var(--font-serif); margin: 0 0 12px; max-width: 64ch; white-space: pre-line; }
-.review-hint { font-size: 13px; margin: 6px 0; }
 .diff { display: grid; gap: 18px; margin: 10px 0 18px; }
-.diff-file { border-top: 1px solid var(--line); }
-.diff-head { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0 6px; font-size: 13px; color: var(--muted); }
 .diff-head .mono:first-child { overflow-wrap: anywhere; }
-.diff-count { white-space: nowrap; }
-.diff-binary { margin: 4px 0; }
-.diff-hunk + .diff-hunk { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .dl { display: grid; grid-template-columns: 40px 16px minmax(0, 1fr); font: 13px/1.8 var(--font-mono); border-radius: 3px; }
 .dl.is-commentable { cursor: pointer; }
 .dl.is-commentable:hover, .dl.is-commentable:focus-visible { background: var(--paper); outline: none; }
-.dl-no { color: var(--muted); text-align: right; padding-right: 10px; opacity: 0.7; user-select: none; }
-.dl-sign { color: var(--muted); user-select: none; }
-.dl-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
-.dl-add .dl-text { color: var(--ink); background: var(--ink-soft); border-radius: 3px; }
-.dl-add .dl-sign { color: var(--ink); }
-.dl-del .dl-text { color: var(--pencil); text-decoration: line-through; text-decoration-thickness: 1.5px; }
-.dl-del .dl-sign { color: var(--pencil); }
-.dl-comment { margin: 2px 0 6px 56px; padding-left: 10px; border-left: 2px solid var(--pencil); font: italic 500 15px/1.45 var(--font-serif); color: var(--pencil); }
-.dl-form { margin: 4px 0 10px 56px; display: grid; gap: 8px; max-width: 520px; }
-.review-bar { position: sticky; bottom: 0; display: grid; gap: 10px; padding: 14px 0 18px; background: var(--sheet); border-top: 1px solid var(--line); }
 .review-bar .error-note ul { margin: 6px 0 0; padding-left: 18px; }
-.result-note { margin: 10px 0 !important; font-size: 15px; }
-.margin-comment { display: grid; gap: 2px; margin: 8px 0 0 !important; }
-.margin-comment em { font: italic 500 14.5px var(--font-serif); color: var(--pencil); }
 .margin-comment .link { justify-self: start; font-size: 12px; }
 .note.is-pencil strong { color: var(--pencil); }
 
 /* Pipeline: stage switches, step strip, interview cards, the spec sheet */
-.stages { border: 0; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
-.stages legend { padding: 0; margin-bottom: 4px; color: var(--muted); font-size: 13px; }
-.stage-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .stage-switch.is-disabled { color: var(--muted); cursor: default; }
-
-.phase-steps { list-style: none; counter-reset: step; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 2px 0 0; padding: 0; font-size: 13px; color: var(--muted); }
-.phase-steps li { counter-increment: step; display: inline-flex; align-items: baseline; gap: 6px; }
-.phase-steps li::before { content: counter(step); font: italic 500 14px var(--font-serif); }
 .phase-steps li.is-done { color: var(--ok); }
-.phase-steps li.is-now { color: var(--ink); font-weight: 600; }
 
 .interview { margin: 8px 0 18px; padding-top: 4px; }
 .question { border: 0; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; }
@@ -144,31 +76,10 @@
 .option:hover { border-color: var(--muted); }
 .option.is-on { border-color: var(--ink); background: var(--ink-soft); }
 .option input { margin-top: 3px; }
-.option-text { display: grid; gap: 2px; min-width: 0; }
-.option-text small { color: var(--muted); font-size: 13px; }
 .option-text .field-input { margin-top: 6px; }
 .option-rec { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--wait-soft); color: var(--wait); white-space: nowrap; }
-
-.spec-review { margin: 8px 0 18px; padding-top: 4px; }
-.spec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.spec-doc { margin: 10px 0; padding: 18px 20px; border: 1px solid var(--line); border-left: 3px solid var(--ink); background: var(--sheet); }
 .spec-doc .md { font-size: 15px; }
-.spec-editor { resize: vertical; line-height: 1.55; font-size: 13px; }
-.spec-sub { margin: 16px 0 6px; font: 600 16px var(--font-serif); }
-.spec-hint { font-size: 13px; margin: 0 0 8px; }
-.check-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
-.check-list li { display: flex; gap: 10px; align-items: center; }
 .check-list .field-input { max-width: 460px; }
-.spec-revise { margin-top: 12px; }
-.spec-actions { margin-top: 14px; }
-
-.feed-step { margin: 10px 0 2px !important; font: italic 500 15px var(--font-serif); color: var(--muted); }
-.feed-escalation { color: var(--wait); }
-.feed-answers ul { margin: 4px 0 0; padding-left: 18px; }
-.feed-spec-body { margin: 4px 0 10px 18px; padding: 10px 14px; border-left: 2px solid var(--ink); }
-.feed-checks { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12.5px; }
-.checks-note { margin: 0 0 10px !important; }
-.stuck-report { width: 100%; margin: 4px 0 0; max-height: 220px; }
 
 /* Team: launch, plan, subtasks */
 .mode-switch { margin: 0; display: inline-flex; justify-self: start; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
@@ -176,82 +87,16 @@
 .mode-switch label.is-on { background: var(--ink-soft); color: var(--ink); }
 .mode-switch input { position: absolute; opacity: 0; pointer-events: none; }
 .mode-switch label:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 1px; }
-.team-models { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 18px; }
-.team-model { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
-.plan-cards { list-style: none; counter-reset: card; margin: 6px 0 4px; padding: 0; display: grid; gap: 8px; }
-.plan-card { counter-increment: card; position: relative; display: grid; gap: 6px; padding: 12px 14px 10px 40px; border: 1px solid var(--line); background: var(--sheet); }
-.plan-card::before { content: counter(card); position: absolute; left: 14px; top: 10px; font: italic 500 17px var(--font-serif); color: var(--ink); }
-.plan-card p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.plan-card-checks { font-size: 12.5px; }
-.plan-card-foot { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
-.subtasks { margin: 4px 0 18px; }
-.subtask-board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.subtask-card { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 14px; border: 1px solid var(--line); border-left: 3px solid var(--line); background: var(--sheet); text-align: left; }
-.subtask-card.is-running { border-left-color: var(--ink); }
-.subtask-card.is-waiting { border-left-color: var(--wait); }
-.subtask-card.is-failed, .subtask-card.is-stopped { border-left-color: var(--pencil); }
-.subtask-card.is-merged { border-left-color: var(--ok); }
-.subtask-card:hover .subtask-title { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
-.subtask-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subtask-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; }
-.goal-link { justify-self: start; font-size: 13px; }
-.answer-more { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; margin: 12px 0 18px; }
 
 /* Screenshots in the feed and visual checks in the spec. */
-.feed-shot { margin: 6px 0; display: grid; gap: 4px; }
-.feed-shot figcaption { font-size: 13px; overflow-wrap: anywhere; }
-.feed-shot img { display: block; max-width: min(100%, 520px); border: 1px solid var(--line); border-radius: 6px; }
-.visual-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 6px; }
-.visual-list li { display: grid; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .visual-list .link { justify-self: start; }
 
 /* Requirements in the spec and the acceptance agent's checklist in review. */
-.requirements { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
-.requirements li { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; overflow-wrap: anywhere; }
-.requirement-id { color: var(--ink); font-size: 13px; padding-top: 2px; }
-.requirement-how { grid-column: 2; font-size: 13px; }
-.decisions { margin: 6px 0 0; padding-left: 20px; color: var(--muted); }
 .acceptance { margin: 18px 0 8px; }
-.acceptance-meta { margin: 2px 0 8px; font-size: 13px; }
-.acceptance-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
-.acceptance-item { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--sheet); }
-.acceptance-item p { margin: 0; overflow-wrap: anywhere; }
-.acceptance-mark { font: 500 12.5px var(--font-ui); padding: 2px 8px; border-radius: 999px; justify-self: start; align-self: start; }
 .acceptance-item.is-done .acceptance-mark { color: var(--ok); background: var(--ok-soft); }
-.acceptance-item.is-partial .acceptance-mark { color: var(--wait); background: var(--wait-soft); }
-.acceptance-item.is-missing .acceptance-mark { color: var(--pencil); background: var(--pencil-soft); }
-.acceptance-problem { color: var(--pencil); margin-top: 4px !important; }
-.acceptance-body { min-width: 0; }
-
-/* The interview between rounds: what the agent understood and what it still does not know. */
-.interview-notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; margin: 10px 0 14px; padding: 12px 14px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); }
-.interview-notes p, .interview-notes ul { margin: 4px 0 0; }
-.interview-notes ul { padding-left: 18px; }
-.interview-hint { font-size: 13px; }
-.stages-mode { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 4px; }
-.stages-mode-hint { font-size: 13px; flex: 1 1 260px; }
-.stage-now { margin: 6px 0 0; font-size: 13.5px; }
 
 /* Design: samples of a direction, the brief, the review */
-.font-serif { font-family: var(--font-serif); }
-.font-sans { font-family: var(--font-ui); }
-.font-mono { font-family: var(--font-mono); }
-.font-hand { font-family: var(--font-hand); }
-.swatches { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; vertical-align: middle; }
-.swatch { width: 22px; height: 16px; }
-.look-sample { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 4px; }
-.look-fonts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; }
-.look-reference { display: grid; gap: 8px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }
-.look-reference-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .look-reference-row .field-input { flex: 1 1 220px; min-width: 0; }
-.design-brief, .design-review { display: grid; gap: 8px; }
-.design-palette { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
-.design-rules { margin: 0; padding-left: 20px; }
-.design-shots { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
-.design-shots img { display: block; max-width: 220px; max-height: 260px; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 6px; }
-.design-brief .swatches { justify-self: start; }
-.design-note .swatches { display: flex; width: max-content; margin-top: 6px; }
-.feed-reference { display: grid; gap: 4px; }
 
 /* Local models */
 .is-ok-text { color: var(--ok); }
@@ -305,7 +150,6 @@
 .local-search { display: flex; gap: 8px; margin: 8px 0 12px; }
 .local-search .field-input { flex: 1 1 auto; min-width: 0; }
 .local-repo { border-bottom: 1px solid var(--line); }
-.local-repo-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; width: 100%; padding: 8px 0; background: none; border: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
 .local-repo-head .mono { overflow-wrap: anywhere; min-width: 0; }
 .local-variants { padding: 0 0 10px 14px; }
 .local-unfiltered { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
@@ -319,36 +163,13 @@
 .local-repo.is-unsupported .local-repo-head { cursor: default; opacity: 0.6; }
 .local-why { flex-basis: 100%; font-size: 12.5px; color: var(--muted); }
 
-/* A project's start and its plan (docs/specs/project-work.md). */
-.project-models { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; margin: 12px 0 4px; }
-.project-model { display: grid; gap: 4px; align-content: start; justify-items: start; }
-.project-model-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 /* "+ Add" stands where a picker would, on its line (seen: it sat higher than the pickers beside it). */
 .project-model > .link { min-height: var(--control-h); display: inline-flex; align-items: center; }
-.project-strong-hint { margin: 0 0 8px; font-size: 13px; }
-.project-plan { display: grid; gap: 10px; margin: 8px 0 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
 .project-plan .sheet-h { margin: 0; }
-.plan-summary { margin: 0; line-height: 1.55; }
-.plan-steps { margin: 0; padding-left: 22px; display: grid; gap: 3px; }
-.plan-details { display: grid; gap: 16px; }
-.plan-details section { display: grid; gap: 6px; }
-.plan-details p { margin: 0; line-height: 1.55; }
-.plan-h { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.plan-pairs { margin: 0; display: grid; gap: 8px; }
-.plan-pairs dt { font-weight: 600; }
-.plan-pairs dd { margin: 2px 0 0; line-height: 1.5; color: var(--fg); }
-.plan-palette { display: flex; flex-wrap: wrap; gap: 6px 12px; }
-.plan-swatch { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
-.plan-swatch-color { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--line); }
-.plan-rules { margin: 0; padding-left: 20px; display: grid; gap: 3px; }
-.plan-limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 220px)); gap: 10px 16px; }
 .project-plan .actions { margin: 0; }
-.plan-revise { display: grid; gap: 8px; justify-items: start; padding-top: 10px; border-top: 1px solid var(--line); }
 .plan-revise .field { width: 100%; }
-.work-summary { display: grid; gap: 6px; margin: 8px 0 16px; }
 .work-summary .actions { margin: 4px 0 0; }
 .field-label { color: var(--muted); font-size: 14px; }
-.project-templates { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 
 /* Models found on Hugging Face: cards in a grid; an opened one takes the row for its files. */
 .hf-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; }
@@ -372,8 +193,5 @@
 
 /* How the agent works with git in a project, and its branch to accept (docs/specs/project-git.md). */
 .workshop-project .card { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sheet); }
-.workshop-project .card-h { margin: 0; font: 600 15px var(--font-serif); }
 .workshop-project .card .field { font-size: 13px; }
 .workshop-project .card .actions { flex-wrap: wrap; }
-.git-note, .git-branch p { margin: 0; font-size: 13px; }
-.project-kind-fixed { font-weight: 500; font-size: 13.5px; }

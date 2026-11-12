@@ -1,7 +1,4 @@
 import { AttachmentRepo } from "./chats/attachment-repo";
-import { BacklogService } from "./backlog/service";
-import { backlogRoutes } from "./routes/backlog";
-import { BacklogRepo } from "./backlog/repo";
 import { ProjectWorkRepo } from "./work/repo";
 import { ProjectWork } from "./work/service";
 import { workRoutes } from "./routes/work";
@@ -12,8 +9,7 @@ import { zValidator } from "@hono/zod-validator";
 import { settingsPatchSchema, speakSchema, speechText, type PresetId } from "@drimvox/shared";
 import { Hono } from "hono";
 import { join } from "node:path";
-import { ProjectRepo, TaskRepo } from "./agent/repo";
-import { AgentRunner } from "./agent/runner";
+import { ProjectRepo } from "./agent/repo";
 import { ChatApprovals } from "./chats/approvals";
 import { setStoreDir } from "./agent/store";
 import { ChatQuestions } from "./chats/questions";
@@ -49,7 +45,7 @@ import { forgetCliProxy } from "./local/cliproxy-leftovers";
 import { ProjectGit } from "./work/project-git";
 import { ProjectExtensions } from "./projects/extensions";
 import { projectExtensionRoutes } from "./routes/project-extensions";
-import { SshServers, sshNote } from "./tools/ssh";
+import { SshServers } from "./tools/ssh";
 import { setMailApi } from "./tools/email";
 import { sshRoutes } from "./routes/ssh";
 import { Chains } from "./providers/chains";
@@ -70,7 +66,6 @@ import { SEARCH_URLS, SearchStore, withSearchService, type SearchUrls } from "./
 import { githubRoutes } from "./routes/github";
 import { GitHub, type GithubOptions } from "./github/github";
 import { fetchVia, ProxyStore } from "./proxy";
-import { taskRoutes } from "./routes/tasks";
 import { setPriceCatalogUrl } from "./providers/native";
 import type { CliId } from "./cli/kinds";
 import { setCliCommands } from "./cli/resolve";
@@ -205,8 +200,6 @@ export function createCore(o: AppOptions) {
   const media = new MediaRepo(o.db, o.dataDir);
   const chats = new ChatRepo(o.db, media, new AttachmentRepo(o.db, o.dataDir));
   const projects = new ProjectRepo(o.db);
-  const tasks = new TaskRepo(o.db);
-  const backlog = new BacklogRepo(o.db);
   const workRepo = new ProjectWorkRepo(o.db);
   const idleTimeoutMs = o.idleTimeoutMs ?? 120_000;
   // Sites that draw with scripts (databases, shops) are read in the desktop's or the server's browser.
@@ -230,38 +223,14 @@ export function createCore(o: AppOptions) {
   };
   // Other computers over SSH, downloads, mail, audits, before and after (tools/index.ts).
   const sshServers = new SshServers(o.db, cipher);
-  const runner = new AgentRunner({
-    sshNote: () => sshNote(sshServers),
-    tasks,
-    backlog,
-    work: workRepo,
-    projects,
-    providers,
-    dataDir: o.dataDir,
-    budgetUsd: () => readSettings(o.db).agentBudgetUsd,
-    strongModel: () => readSettings(o.db).strongModel,
-    acceptanceModel: () => readSettings(o.db).acceptanceModel,
-    developer: () => readSettings(o.db).developer,
-    imageModel: () => readSettings(o.db).imageModel,
-    media,
-    web,
-    mcp,
-    visualKit,
-    visionModel: () => readSettings(o.db).visionModel,
-    skillsDir: join(o.dataDir, "skills"),
-    idleTimeoutMs,
-  });
-  const backlogService = new BacklogService(backlog, projects, chats);
   const projectGit = new ProjectGit(o.db, github, (id) => projects.get(id)?.name ?? null);
   setMailApi(o.mailApi);
   const tools = { dataDir: o.dataDir, ssh: sshServers, browser, webDir: o.webDir };
   const extensions = new ProjectExtensions(o.db);
   const projectWork = new ProjectWork({
     repo: workRepo,
-    runner,
     projects,
     chats,
-    backlog,
     approvals,
     questions,
     cliDir: join(o.dataDir, "cli-chats"),
@@ -276,13 +245,12 @@ export function createCore(o: AppOptions) {
       skillsDir: join(o.dataDir, "skills"),
       mcp,
       idleTimeoutMs,
-      plan: (projectId) => backlog.plan(projectId),
       month: () => monthUsage(o.db, chats),
       vision: (conn, model, chosen) => resolveVision(chosen ?? readSettings(o.db).visionModel, providers, { providerId: conn.id, model }, findModel, listModels),
       git: projectGit,
       extensions: (id) => extensions.get(id),
       toolbox: tools,
-      imageTools: (worktree, taskId, hooks, onSpend, budgetLeft) => imageToolsFor(readSettings(o.db).imageModel, providers, { worktree, taskId, media, hooks, budgetLeft, onSpend }),
+      imageTools: (worktree, chatId, hooks, onSpend, budgetLeft) => imageToolsFor(readSettings(o.db).imageModel, providers, { worktree, chatId, media, hooks, budgetLeft, onSpend }),
     },
   });
   const studio = new Studio({ chats, media, providers, pollMs: o.mediaPollMs ?? 10_000 });
@@ -365,8 +333,6 @@ export function createCore(o: AppOptions) {
     .route(
       "/chats",
       chatRoutes(chats, providers, studio, web, mcp, approvals, questions, idleTimeoutMs, join(o.dataDir, "cli-chats"), {
-        service: backlogService,
-        plan: (projectId) => backlog.plan(projectId),
         visualKit,
         visionModel: () => readSettings(o.db).visionModel,
         folderAutoApprove: () => readSettings(o.db).folderAutoApprove,
@@ -381,12 +347,10 @@ export function createCore(o: AppOptions) {
     .route("/media", mediaRoutes(media))
     .route("/skills", skillRoutes(join(o.dataDir, "skills"), o.skillSources ?? SKILL_SOURCES))
     .route("/usage", usageRoutes(chats, () => monthUsage(o.db, chats), async (since) => spendingByModel(o.db, providers, since)))
-    .route("/projects", projectRoutes(projects, tasks, providers, runner, (id) => !!workRepo.get(id)?.startedAt))
-    .route("/projects", backlogRoutes(projects, backlog, backlogService))
+    .route("/projects", projectRoutes(projects, (id) => !!workRepo.get(id)?.startedAt))
     .route("/chains", chainRoutes(chains, freeWatch))
     .route("/projects", workRoutes(projects, providers, projectWork, shots, workRepo, projectGit))
     .route("/projects", projectExtensionRoutes(projects, extensions, mcpRepo, join(o.dataDir, "skills")))
-    .route("/tasks", taskRoutes(tasks, runner, shots, backlogService))
     .route(
       "/processes",
       processRoutes(visualKit.background, {
@@ -397,10 +361,6 @@ export function createCore(o: AppOptions) {
         },
         project: (id) => projects.get(id),
         chat: (id) => chats.get(id),
-        task: (id) => {
-          const row = tasks.row(id);
-          return row ? { title: row.title } : null;
-        },
       }),
     )
     .route("/github", githubRoutes(github, projects))
@@ -427,7 +387,6 @@ export function createCore(o: AppOptions) {
       freeWatch.stop();
       studio.shutdown();
       await projectWork.shutdown();
-      await runner.shutdown();
       visualKit.background.shutdown();
       await mcp.shutdown();
       await agentBrowser.stop();

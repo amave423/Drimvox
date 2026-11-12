@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BASE, auth, createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
+import { answerApproval, projectRun, toolOutputs, waitApproval, waitWork } from "./project-run";
 import { HEADLESS_DEVTOOLS, HEADLESS_PLAYWRIGHT, TRUST_PLAYWRIGHT } from "../src/db";
 import { fillArgs, needsAsking } from "../src/mcp/hub";
 
@@ -91,39 +92,22 @@ describe("servers", () => {
 });
 
 describe("tools for agents", () => {
-  async function runTask(script: FakeTurn[]) {
-    fake = await startFakeProvider({ key: KEY, script, models: [{ id: "coder" }] });
-    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
-    const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
-    const stages = { interview: false, spec: false, approveSpec: false, testsFirst: false };
-    const task = await (await env.call("POST", `/api/projects/${project.id}/tasks`, { task: "Сложи", providerId: provider.id, model: "coder", stages })).json();
-    return task.id as string;
+  // A project's agent: the user's MCP tools are loaded first, as rare ones (deferred.ts).
+  async function runWork(script: FakeTurn[]) {
+    fake = await startFakeProvider({ key: KEY, script: [load, ...script, { text: "Готово." }], models: [{ id: "coder", supported_parameters: ["tools"] }] });
+    return projectRun(env, fake, repo, "Сложи");
   }
-  const waitTask = async (id: string, check: (t: any) => boolean) => {
-    for (let i = 0; i < 400; i++) {
-      const t = await (await env.call("GET", `/api/tasks/${id}`)).json();
-      if (check(t)) return t;
-      await new Promise((r) => setTimeout(r, 25));
-    }
-    throw new Error("task stuck");
-  };
+  const load = { toolCalls: [{ name: "find_tools", args: { names: ["mcp_demo_add"] } }] };
   const add = { toolCalls: [{ name: "mcp_demo_add", args: { a: 2, b: 3 } }] };
-  const finish = { toolCalls: [{ name: "finish", args: { summary: "Готово", commit_message: "Done" } }] };
 
   it("asks before the first call, remembers \"always\" and calls without asking afterwards", async () => {
     const serverId = await addServer();
-    const id = await runTask([add, add, finish]);
-    const waiting = await waitTask(id, (t) => t.pendingApproval);
-    expect(waiting.pendingApproval).toMatchObject({ reason: "mcp" });
-    expect(waiting.pendingApproval.command).toContain("demo");
-    expect(waiting.pendingApproval.command).toContain("add");
-    await env.call("POST", `/api/tasks/${id}/approvals/${waiting.pendingApproval.id}`, { allow: true, always: true });
-    await waitTask(id, (t) => t.status === "done_empty");
-
-    const results = (await (await env.call("GET", `/api/tasks/${id}/events`)).json()).filter((e: any) => e.kind === "tool_result");
-    expect(results.map((e: any) => e.data.output)).toEqual(["5", "5", "Finished."]);
-    const approvals = (await (await env.call("GET", `/api/tasks/${id}/events`)).json()).filter((e: any) => e.kind === "approval");
-    expect(approvals).toHaveLength(2);
+    const run = await runWork([add, add]);
+    const asked = await waitApproval(env, run.chatId);
+    expect(asked.tool).toContain("add");
+    await answerApproval(env, run.chatId, asked.id, true, true);
+    await waitWork(env, run.projectId);
+    expect(toolOutputs(fake!).slice(1)).toEqual(["5", "5"]);
     expect((await (await env.call("GET", "/api/mcp")).json())[0].allowed).toEqual(["add"]);
 
     expect((await env.call("DELETE", `/api/mcp/${serverId}/allowed/add`)).status).toBe(204);
@@ -132,22 +116,21 @@ describe("tools for agents", () => {
 
   it("tells the agent when the user says no", async () => {
     await addServer();
-    const id = await runTask([add, finish]);
-    const waiting = await waitTask(id, (t) => t.pendingApproval);
-    await env.call("POST", `/api/tasks/${id}/approvals/${waiting.pendingApproval.id}`, { allow: false });
-    await waitTask(id, (t) => t.status === "done_empty");
-    const result = (await (await env.call("GET", `/api/tasks/${id}/events`)).json()).find((e: any) => e.kind === "tool_result");
-    expect(result.data).toMatchObject({ ok: false });
-    expect(result.data.output).toMatch(/did not allow/);
+    const run = await runWork([add]);
+    const asked = await waitApproval(env, run.chatId);
+    await answerApproval(env, run.chatId, asked.id, false);
+    await waitWork(env, run.projectId);
+    expect(toolOutputs(fake!)[1]).toMatch(/did not allow/);
   });
 
   it("gives a switched-off server's tools to nobody", async () => {
     const serverId = await addServer();
     await env.call("PATCH", `/api/mcp/${serverId}`, { enabled: false });
-    await runTask([finish]);
-    for (let i = 0; i < 100 && !fake!.requests.some((r) => r.path === "/v1/chat/completions"); i++) await new Promise((r) => setTimeout(r, 20));
-    const tools = fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body.tools.map((t: any) => t.function.name);
-    expect(tools.some((n: string) => n.startsWith("mcp_"))).toBe(false);
+    fake = await startFakeProvider({ key: KEY, script: [{ text: "Готово." }], models: [{ id: "coder", supported_parameters: ["tools"] }] });
+    const run = await projectRun(env, fake, repo, "Сложи");
+    await waitWork(env, run.projectId);
+    const body = fake.requests.find((r) => r.path === "/v1/chat/completions")!.body;
+    expect(JSON.stringify(body.tools)).not.toContain("mcp_");
   });
 });
 

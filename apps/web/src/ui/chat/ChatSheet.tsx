@@ -37,7 +37,6 @@ import { readThinking, ThinkingSwitch } from "./ThinkingSwitch";
 import { ChatMargin } from "./ChatMargin";
 import { FileChips, FileViewer } from "./FileChips";
 import { ProjectComposer } from "../projects/ProjectComposer";
-import { WorkReview } from "../projects/WorkReview";
 import { MAX_BYTES, MAX_FILES, prepareFile, SentFiles, toBase64, type PendingFile } from "./Attachments";
 import { activityLine } from "./activityLine";
 import { useFollow } from "./useFollow";
@@ -573,7 +572,6 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
           {folderError && (
             <p className="error-note">{t(folderError === "no_tools" ? "folder.noTools" : folderError === "not_found" ? "folder.notFound" : "folder.failed")}</p>
           )}
-          {chat?.projectId && chat.itemId && <WorkReview projectId={chat.projectId} itemId={chat.itemId} busy={!!draft} answers={answers.length} />}
           {/* The agent's newest question over the box until the user writes after it; the user answers in the conversation. */}
           {workshop && work && work.questions.length > 0 && work.questions.at(-1)!.at > lastUserAt && (
             <section className="work-questions-note">

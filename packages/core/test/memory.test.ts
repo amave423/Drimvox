@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
+import { projectRun, waitWork } from "./project-run";
 import { memoryLimit } from "../src/agent/memory";
 
 vi.setConfig({ testTimeout: 60_000 });
@@ -19,7 +20,6 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  slowSummary = 0;
   await env.closeAsync();
   await fake?.close();
   fake = undefined;
@@ -28,79 +28,25 @@ afterEach(async () => {
 
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
 const isSummarizer = (body: any) => JSON.stringify(body?.messages?.[0] ?? "").includes("working memory");
-const SUMMARY = "SUMMARY: wrote notes.md, read big.txt over and over; next: finish.";
-/** How long the summarizer takes to answer, in milliseconds. */
-let slowSummary = 0;
 
+/** A project's agent writing notes; it answers in text when its queue is over. */
 async function start(coder: FakeTurn[]) {
   const queue = [...coder];
   fake = await startFakeProvider({
     key: KEY,
-    // A window of 64 thousand tokens: the summary comes at 80 % of it (about 179 thousand characters).
-    models: [{ id: "coder", context_length: 64_000 }],
-    respond: (body) => (isSummarizer(body) ? { text: SUMMARY, delayMs: slowSummary } : (queue.shift() ?? call("finish", { summary: "Готово", commit_message: "Notes" }))),
+    // A window of 32 thousand tokens: the summary comes at 80 % of it (about 90 thousand characters), below what a
+    // project's run keeps whole of the newest outputs (prune.ts), so the reads overflow it all the same.
+    models: [{ id: "coder", context_length: 32_000, supported_parameters: ["tools"] }],
+    respond: (body) => (isSummarizer(body) ? { text: "SUMMARY" } : (queue.shift() ?? { text: "Готово." })),
   });
-  const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
-  const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
-  const res = await env.call("POST", `/api/projects/${project.id}/tasks`, {
-    task: "Запиши заметки",
-    providerId: provider.id,
-    model: "coder",
-    stages: { interview: false, spec: false, approveSpec: false, testsFirst: false },
-  });
-  return (await res.json()).id as string;
+  return (await projectRun(env, fake, repo, "Запиши заметки")).projectId;
 }
 
-async function settle(id: string) {
-  for (let i = 0; i < 1200; i++) {
-    const task = await (await env.call("GET", `/api/tasks/${id}`)).json();
-    if (!["running", "queued"].includes(task.status)) return task;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw new Error("stuck");
-}
+const settle = (projectId: string) => waitWork(env, projectId);
 
 const coderRequests = () => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && !isSummarizer(r.body)).map((r) => r.body.messages as any[]);
 
-// Seen live: cutting old reads piece by piece made the agent forget the file it edited and read it 156 times.
 describe("the agent's memory", () => {
-  it("replaces the older work with one summary near the limit, with the files it changed, and keeps the start the same", async () => {
-    const reads = Array.from({ length: 12 }, () => call("read_file", { path: "big.txt" }));
-    const id = await start([call("write_file", { path: "notes.md", content: "# Заметки\nпервая\n" }), ...reads]);
-    const task = await settle(id);
-    expect(task.status).toBe("review");
-
-    // One summary, not one a step.
-    expect(fake!.requests.filter((r) => r.path === "/v1/chat/completions" && isSummarizer(r.body))).toHaveLength(1);
-    const sent = coderRequests();
-    const after = sent.filter((m) => JSON.stringify(m).includes(SUMMARY));
-    expect(after.length).toBeGreaterThan(1);
-    const last = JSON.stringify(sent.at(-1));
-    expect(last.length).toBeLessThan(220_000);
-    expect(last).toContain("=== notes.md ===");
-    expect(last).toContain("# Заметки");
-    // The task, then the summary: the same at the start of every request after it, so the provider's cache holds.
-    const head = (m: any[]) => JSON.stringify(m.slice(0, 3));
-    expect(new Set(after.map(head)).size).toBe(1);
-    expect(JSON.stringify(after[0]![1])).toContain("Запиши заметки");
-    expect(JSON.stringify(after[0]![2])).toContain(SUMMARY);
-  });
-
-  // As OpenCode does: the summary is written in the background before the limit, so the agent does not stand and wait.
-  it("starts the summary before the limit and goes on working while it is written", async () => {
-    slowSummary = 3000;
-    const reads = Array.from({ length: 12 }, () => call("read_file", { path: "big.txt" }));
-    const id = await start([call("write_file", { path: "notes.md", content: "# Заметки\n" }), ...reads]);
-    await settle(id);
-    const all = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
-    const asked = all.findIndex((r) => isSummarizer(r.body));
-    expect(asked).toBeGreaterThan(0);
-    // Steps went on after the summary was asked for and before it came.
-    expect(all.slice(asked + 1).some((r) => !isSummarizer(r.body) && !JSON.stringify(r.body.messages).includes(SUMMARY))).toBe(true);
-    expect(coderRequests().some((m) => JSON.stringify(m).includes(SUMMARY))).toBe(true);
-    expect(all.filter((r) => isSummarizer(r.body))).toHaveLength(1);
-  });
-
   // Seen live: the time to the minute in the system prompt changed the start of every request each minute, so the
   // provider's cache never held over a long task (16.7M input tokens at full price for one small site).
   it("keeps the system prompt the same from step to step: the date, not the time", async () => {

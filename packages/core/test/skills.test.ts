@@ -6,6 +6,7 @@ import { copyTree, removeTree } from "../src/fsx";
 import { parseSkill } from "../src/skills/skills";
 import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
+import { projectRun, toolOutputs, waitWork } from "./project-run";
 import { git, makeRepo } from "./git-repo";
 
 const KEY = "good-key";
@@ -93,19 +94,12 @@ describe("skills in Drimvox", () => {
 });
 
 describe("skills for agents", () => {
+  /** A project's agent with a shared skill and the project's own (house-style). */
   async function run(script: FakeTurn[]) {
     await env.call("POST", "/api/skills/import", { path: makeSharedSkill() });
-    fake = await startFakeProvider({ key: KEY, script, models: [{ id: "coder" }] });
-    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
-    const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
-    const stages = { interview: false, spec: false, approveSpec: false, testsFirst: false };
-    const task = await (await env.call("POST", `/api/projects/${project.id}/tasks`, { task: "Сделай отчёт", providerId: provider.id, model: "coder", stages })).json();
-    for (let i = 0; i < 300; i++) {
-      const t = await (await env.call("GET", `/api/tasks/${task.id}`)).json();
-      if (t.status !== "running") return task.id as string;
-      await new Promise((r) => setTimeout(r, 25));
-    }
-    throw new Error("task stuck");
+    fake = await startFakeProvider({ key: KEY, script: [...script, { text: "Готово." }], models: [{ id: "coder", supported_parameters: ["tools"] }] });
+    const { projectId } = await projectRun(env, fake, repo, "Сделай отчёт");
+    await waitWork(env, projectId);
   }
 
   function makeSharedSkill(): string {
@@ -116,11 +110,10 @@ describe("skills for agents", () => {
   }
 
   it("sees the list, opens a skill and reads its file", async () => {
-    const id = await run([
+    await run([
       { toolCalls: [{ name: "use_skill", args: { name: "reports" } }] },
       { toolCalls: [{ name: "read_skill_file", args: { name: "reports", path: "template.md" } }] },
       { toolCalls: [{ name: "use_skill", args: { name: "house-style" } }] },
-      { toolCalls: [{ name: "finish", args: { summary: "Готово", commit_message: "Done" } }] },
     ]);
     const first = fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body;
     const system = first.messages[0].content as string;
@@ -128,11 +121,11 @@ describe("skills for agents", () => {
     expect(system).toContain("house-style: Как у нас пишут CSS");
     expect(first.tools.map((t: any) => t.function.name)).toEqual(expect.arrayContaining(["use_skill", "read_skill_file"]));
 
-    const results = (await (await env.call("GET", `/api/tasks/${id}/events`)).json()).filter((e: any) => e.kind === "tool_result");
-    expect(results[0].data.output).toContain("Пиши вывод первой строкой");
-    expect(results[0].data.output).toContain("template.md");
-    expect(results[1].data.output).toContain("# Вывод");
-    expect(results[2].data.output).toContain("Только токены из tokens.css");
+    const outputs = toolOutputs(fake!);
+    expect(outputs[0]).toContain("Пиши вывод первой строкой");
+    expect(outputs[0]).toContain("template.md");
+    expect(outputs[1]).toContain("# Вывод");
+    expect(outputs[2]).toContain("Только токены из tokens.css");
     expect(git(repo, "status", "--porcelain")).toBe("");
   });
 });

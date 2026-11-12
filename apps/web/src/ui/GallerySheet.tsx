@@ -69,11 +69,6 @@ export function GallerySheet() {
                     {t("gallery.openChat")}
                   </button>
                 )}
-                {item.taskId && (
-                  <button className="link" onClick={() => navigate({ kind: "task", taskId: item.taskId! })}>
-                    {t("gallery.openTask")}
-                  </button>
-                )}
                 {removing === item.id ? (
                   // Delete it? A check mark and a cross, as for chats (asked for: not "really delete" in words).
                   <span className="gallery-confirm">

@@ -9,7 +9,7 @@ interface DrimvoxBridge {
   pickKey?(): Promise<string | null>;
   savePdf?(name: string): Promise<string | null>;
   /** Drimvox's own notification; shown only while the window is not in front. A click opens the task or the project. */
-  notify(notice: NoticeRequest & { taskId?: string; projectId?: string; chatId?: string }): void;
+  notify(notice: NoticeRequest & { projectId?: string; chatId?: string }): void;
   /** A notification right now, even with the window in front: to check that they reach the desktop and sound. */
   testNotify(notice: NoticeRequest): void;
   /** Desktop: the agent's real browser tab is put over this box of the window; null takes it out of sight. */
@@ -28,7 +28,6 @@ interface DrimvoxBridge {
   /** Opens Drimvox's shared skills folder in Explorer. */
   openSkillsFolder(): void;
   /** Called when the user clicks a notification; returns a function that stops listening. */
-  onOpenTask(listener: (taskId: string) => void): () => void;
   onOpenProject?(listener: (projectId: string) => void): () => void;
   onOpenChat?(listener: (chatId: string) => void): () => void;
 }

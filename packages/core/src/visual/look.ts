@@ -13,9 +13,6 @@ import type { Connection } from "../providers/repo";
 /** A picture of the page, or a picture with the errors its console showed while it loaded. */
 export type Screenshotter = (url: string, size: { width: number; height: number }, actions?: PageAction[]) => Promise<Buffer | { png: Buffer; console: string[] }>;
 
-/** The picture of a screenshot, with or without the console's errors. */
-export const pngOf = (taken: Buffer | { png: Buffer }): Buffer => (Buffer.isBuffer(taken) ? taken : taken.png);
-
 export interface Vision {
   conn: Connection;
   model: string;

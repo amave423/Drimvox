@@ -1,3 +1,4 @@
+import { shellNote } from "../agent/commands";
 import type { AttachmentView, StreamEvent } from "@drimvox/shared";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
@@ -112,7 +113,7 @@ export function describeCall(input: unknown): string {
 
 /** What the model is told when the chat has a folder. */
 export function folderHint(folder: string, platform = process.platform): string {
-  const shell = platform === "win32" ? "Windows PowerShell 5.1 (no && or ||: separate commands with ;)" : "sh";
+  const shell = shellNote(platform);
   return [
     `The user connected a folder to this chat: ${folder}. You work right in it: what you write changes the user's files at once.`,
     `Commands run with ${shell} in that folder. Read files with read_file and search, not with commands; change them with`,

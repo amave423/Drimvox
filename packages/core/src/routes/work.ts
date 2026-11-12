@@ -3,7 +3,6 @@ import { projectGitRulesSchema, projectWorkChatSchema, projectWorkMessageSchema,
 import { Hono } from "hono";
 import { readFile } from "node:fs/promises";
 import type { ProjectRepo } from "../agent/repo";
-import { TaskBusy } from "../agent/runner";
 import type { ProviderRepo } from "../providers/repo";
 import type { Shots } from "../visual/look";
 import { folderChanges } from "../work/changes";
@@ -18,7 +17,6 @@ const notFound = { error: { code: "not_found" } } as const;
 export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work: ProjectWork, shots: Shots, repo: ProjectWorkRepo, git: ProjectGit) {
   const refused = (err: unknown) => {
     if (err instanceof WorkRefused) return { error: { code: err.code } };
-    if (err instanceof TaskBusy) return { error: { code: "busy" as const } };
     throw err;
   };
   return new Hono()

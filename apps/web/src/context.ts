@@ -1,4 +1,4 @@
-import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary, ProjectWorkView } from "@drimvox/shared";
+import type { ChatView, ProjectView, ProviderView, Settings, SettingsPatch, UsageSummary, ProjectWorkView } from "@drimvox/shared";
 import { createContext, useContext } from "react";
 import type { Api } from "./api";
 import type { MessageKey } from "./i18n";
@@ -30,8 +30,7 @@ export type View =
   | { kind: "chat"; chatId: string | null; key: string; send?: string }
   | { kind: "project"; projectId: string }
   /** The projects' mode with no project open yet. */
-  | { kind: "projects" }
-  | { kind: "task"; taskId: string };
+  | { kind: "projects" };
 
 export interface AppContextValue {
   api: Api;
@@ -56,8 +55,6 @@ export interface AppContextValue {
   reloadToday(): Promise<void>;
   projects: ProjectView[];
   reloadProjects(): Promise<void>;
-  tasks: TaskView[];
-  reloadTasks(): Promise<void>;
   /** Every project's work, kept fresh: the projects' list shows how each goes. */
   works: ProjectWorkView[];
   reloadWorks(): void;
@@ -80,7 +77,7 @@ export const inParams = (view: View) => (PARAM_KINDS as readonly string[]).inclu
  */
 export function modeOf(view: View, chats: ChatView[] = []): Mode | null {
   if (inParams(view)) return null;
-  const projects = view.kind === "project" || view.kind === "projects" || view.kind === "task" || (view.kind === "chat" && !!chats.find((c) => c.id === view.chatId)?.projectId);
+  const projects = view.kind === "project" || view.kind === "projects" || (view.kind === "chat" && !!chats.find((c) => c.id === view.chatId)?.projectId);
   return projects ? "projects" : "chat";
 }
 

@@ -1,11 +1,10 @@
 import { z } from "zod";
 
-/** Whose a background process is: a project's agent, a project's started result, a chat with a folder, a task. */
+/** Whose a background process is: a project's agent, a project's started result, a chat with a folder. */
 export type ProcessOwner =
   | { kind: "project"; projectId: string; name: string }
   | { kind: "site"; projectId: string; name: string }
   | { kind: "chat"; chatId: string; name: string }
-  | { kind: "task"; taskId: string; name: string }
   | { kind: "other"; name: string };
 
 /** A command running in the background (asked for: to see what runs and stop what is not needed). */

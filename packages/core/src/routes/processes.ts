@@ -8,7 +8,6 @@ export interface ProcessNames {
   projectOfChat(chatId: string): { id: string; name: string } | null;
   project(projectId: string): { name: string } | null;
   chat(chatId: string): { title: string | null } | null;
-  task(taskId: string): { title: string } | null;
 }
 
 /**
@@ -25,8 +24,6 @@ export function processRoutes(background: Background, names: ProcessNames) {
     if (project) return { kind: "project", projectId: project.id, name: project.name };
     const chat = names.chat(key);
     if (chat) return { kind: "chat", chatId: key, name: chat.title ?? "" };
-    const task = names.task(key);
-    if (task) return { kind: "task", taskId: key, name: task.title };
     return { kind: "other", name: key };
   };
   return new Hono()

@@ -1,4 +1,4 @@
-import type { ActivityEntry, MonthUsage, ProjectPlan, ProviderError, StreamEvent } from "@drimvox/shared";
+import type { ActivityEntry, MonthUsage, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { McpAsk, McpHooks } from "../mcp/hub";
 import { compactHistory } from "./compact";
 import { tool, type ModelMessage, type ToolSet } from "ai";
@@ -68,7 +68,6 @@ export interface RunDeps {
     service: { providerId: string; model: string } | null;
   };
   idleTimeoutMs: number;
-  plan(projectId: string): ProjectPlan | null;
   /** This month's spending against the app's budget. */
   month(): MonthUsage;
   /** The model that sees pictures for this one: the project's own choice, else the settings', else the model itself. */
@@ -270,7 +269,7 @@ export class WorkRun {
       // The project's state for whoever picks it up next, in Drimvox or another program (AGENTS.md, notes.ts).
       try {
         const row = this.row();
-        const goal = this.d.plan(this.projectId)?.context ?? this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? "";
+        const goal = this.d.chats.history(this.chatId).find((m) => m.role === "user")?.content ?? "";
         const branch = this.d.git ? ((await this.d.git.state(this.projectId, this.folder).catch(() => null))?.branch ?? null) : null;
         writeState(this.folder, { goal, checklist: [], start: row.site, branch, report: row.report, at: Date.now() });
       } catch {
@@ -333,7 +332,6 @@ export class WorkRun {
     };
 
     const price = await findModel(conn, model);
-    const plan = this.d.plan(this.projectId);
     // The project's own skills, the downloaded ones it switched on, its model for screenshots (asked for: per project).
     const chosen = this.d.extensions?.(this.projectId) ?? { skills: null, mcp: null, vision: null, service: null };
     const vision = await this.d.vision(conn, model, chosen.vision);
@@ -473,7 +471,7 @@ export class WorkRun {
       // Short as OpenCode's (agent-prompt.ts): the folder, the tone, how to do a task and stop; no rules of design.
       system: [
         this.startedAt,
-        agentPrompt(this.folder, process.platform, !!gitLine?.startsWith("- Never commit")),
+        agentPrompt(this.folder, process.platform, gitLine),
         LANGUAGE_HINT,
         HONEST_HINT,
         // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).

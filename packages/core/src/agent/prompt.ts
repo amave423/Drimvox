@@ -1,3 +1,4 @@
+import { shellNote } from "./commands";
 import { WEB_HINT } from "../internet/tools";
 import { todayLine } from "../now";
 import { ASSETS_HINT, DESIGN_HINT } from "./design";
@@ -41,9 +42,7 @@ export const STUCK_HINT =
 
 /** System prompt of the Solo agent. English for the model; it answers the user in their language. */
 export function systemPrompt(root: string, platform = process.platform): string {
-  // Models default to bash habits; Windows PowerShell 5.1 cannot even parse `&&`.
-  const shell =
-    platform === "win32" ? "Windows PowerShell 5.1 (no && or ||: separate commands with ; or use if ($?) { ... })" : "sh on a Unix-like system";
+  const shell = shellNote(platform);
   return [
     "You are a careful software engineer working inside Drimvox, a desktop app for coding with AI agents.",
     `You work in a private copy of the user's project at: ${root}`,
@@ -73,22 +72,4 @@ export function systemPrompt(root: string, platform = process.platform): string 
     "- commit_message: a short English commit message in the imperative mood, under 72 characters.",
     "If the task cannot be done, call finish and explain why in the summary.",
   ].join("\n");
-}
-
-/** Message that sends the user's review back to the agent. */
-export function feedbackMessage(
-  note: string | undefined,
-  comments: { path: string; line: number; side?: "old" | "new"; text: string }[],
-): string {
-  const parts = ["The user reviewed your changes and asks for more work."];
-  if (comments.length) {
-    parts.push("", "Comments on lines (path:line — comment):");
-    for (const c of comments) {
-      const where = c.side === "old" ? `${c.path}:${c.line} (a line you removed; number in the original file)` : `${c.path}:${c.line}`;
-      parts.push(`- ${where} — ${c.text}`);
-    }
-  }
-  if (note) parts.push("", `General comment: ${note}`);
-  parts.push("", "Address every comment, then call finish again.");
-  return parts.join("\n");
 }

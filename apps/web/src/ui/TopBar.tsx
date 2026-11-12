@@ -8,7 +8,7 @@ import { noticeLookNow } from "./NoticeSoundSetting";
 import { ProcessesButton } from "./ProcessesButton";
 
 export function TopBar() {
-  const { t, view, mode, navigate, chats, projects, tasks } = useApp();
+  const { t, view, mode, navigate, chats, projects } = useApp();
 
   // Every screen says where the user is (seen: the start page, the local models, the gallery and projects said nothing).
   let crumb = "";
@@ -16,7 +16,6 @@ export function TopBar() {
   if (inParams(view)) crumb = t("side.params");
   if (view.kind === "projects") crumb = t("side.projects");
   if (view.kind === "project") crumb = projects.find((p) => p.id === view.projectId)?.name ?? "";
-  if (view.kind === "task") crumb = tasks.find((x) => x.id === view.taskId)?.title ?? "";
   if (view.kind === "chat") crumb = chats.find((c) => c.id === view.chatId)?.title ?? t("chat.untitled");
 
   return (

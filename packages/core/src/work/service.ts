@@ -1,8 +1,5 @@
-import type { ActivityEntry, ModelRef, ProjectModels, ProjectWorkView, TaskView, ThinkingLevel } from "@drimvox/shared";
+import type { ActivityEntry, ModelRef, ProjectModels, ProjectWorkView, ThinkingLevel } from "@drimvox/shared";
 import type { ProjectRepo } from "../agent/repo";
-import type { AgentRunner } from "../agent/runner";
-import { isRepoRoot } from "../agent/git";
-import type { BacklogRepo } from "../backlog/repo";
 import type { ChatApprovals } from "../chats/approvals";
 import type { ChatQuestions } from "../chats/questions";
 import { reply } from "../chats/reply";
@@ -20,10 +17,6 @@ export class WorkRefused extends Error {
 }
 
 const siteKey = (projectId: string) => `site:${projectId}`;
-
-const INTERVIEW = { interview: true, spec: false, approveSpec: false, testsFirst: false };
-/** A small change in an existing project: straight to the plan (asked for: a big interview for a small fix). */
-const QUICK = { interview: false, spec: false, approveSpec: false, testsFirst: false };
 
 /**
  * A project's work (docs/specs/project-work.md): the interview and the plan are a task of the project; "Go" starts one
@@ -43,10 +36,8 @@ export class ProjectWork {
   constructor(
     private readonly o: {
       repo: ProjectWorkRepo;
-      runner: AgentRunner;
       projects: ProjectRepo;
       chats: ChatRepo;
-      backlog: BacklogRepo;
       approvals: ChatApprovals;
       questions: ChatQuestions;
       run: Omit<RunDeps, "ended">;
@@ -66,8 +57,6 @@ export class ProjectWork {
       reason: row?.reason ?? null,
       detail: row?.detail ?? null,
       models: row?.models ?? null,
-      planTaskId: row?.planTaskId ?? null,
-      plan: this.o.backlog.plan(projectId),
       chatId,
       checklist: row?.checklist ?? [],
       questions: row?.questions ?? [],
@@ -266,7 +255,7 @@ export class ProjectWork {
       webAccess: this.o.run.web,
       folder: this.o.projects.get(run.projectId)?.path ?? null,
       // The CLI works in the project's folder with the project's rules, as in a terminal.
-      work: { system: projectRules(this.o.backlog.plan(run.projectId), false), steps: 0 },
+      work: { system: projectRules(false), steps: 0 },
       cliDir: this.o.cliDir,
       activity: () => activity,
       emit: async (e) => {

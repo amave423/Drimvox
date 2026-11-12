@@ -4,13 +4,13 @@ import { useApp } from "../../context";
 
 /** Leaving Drimvox from the sidebar's "⋯", confirmed under the project (asked for: in one place only); the folder stays. */
 export function RemoveProject({ project, onDone, asked = false }: { project: ProjectView; onDone?: () => void; asked?: boolean }) {
-  const { api, t, navigate, reloadProjects, reloadTasks } = useApp();
+  const { api, t, navigate, reloadProjects } = useApp();
   const [confirm, setConfirm] = useState(asked);
   const [busy, setBusy] = useState(false);
   async function remove() {
     setBusy(true);
     await api.projects[":id"].$delete({ param: { id: project.id } }).catch(() => null);
-    await Promise.all([reloadProjects(), reloadTasks()]);
+    await reloadProjects();
     setBusy(false);
     onDone?.();
     navigate({ kind: "projects" });

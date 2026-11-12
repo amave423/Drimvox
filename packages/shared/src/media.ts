@@ -171,7 +171,6 @@ export interface MediaItem {
   /** USD from the provider's answer; null when it did not say. */
   costUsd: number | null;
   chatId: string | null;
-  taskId: string | null;
   /** For an agent's picture: where it lies in the project. */
   path: string | null;
   createdAt: number;

@@ -16,7 +16,8 @@ export interface ImageToolDeps {
   /** With prices loaded. */
   model: MediaModel;
   worktree: string;
-  taskId: string;
+  /** The conversation the picture was made in. */
+  chatId: string;
   media: MediaRepo;
   hooks: Omit<ToolHooks, "onFinish">;
   /** Money the task may still spend. */
@@ -76,7 +77,7 @@ export function imageTools(d: ImageToolDeps): ToolSet {
           const cost = picture.costUsd ?? estimate ?? 0;
           d.onSpend(cost);
           const saved = relative(d.worktree, target).split("\\").join("/");
-          d.media.add({ kind: "image", ...picture, costUsd: cost, prompt, providerId: d.conn.id, model: d.model.id, taskId: d.taskId, path: saved });
+          d.media.add({ kind: "image", ...picture, costUsd: cost, prompt, providerId: d.conn.id, model: d.model.id, chatId: d.chatId, path: saved });
           return done(true, `Saved ${saved} (${picture.mime}, ${picture.bytes.length} bytes, $${cost.toFixed(4)}).`);
         } catch (err) {
           const e = describeError(err);

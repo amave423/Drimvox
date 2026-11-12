@@ -1,4 +1,4 @@
-import { startTask, addProject } from "./start-task";
+import { addProject } from "./add-project";
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -61,7 +61,7 @@ async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
   // The coder sees pictures itself, so it also checks its own screenshots.
   const coder: FakeTurn[] = [
     { toolCalls: [{ name: "look_at_page", args: { url, question: "Виден заголовок «Привет, Drimvox»?", ...(steps ? { steps } : {}) } }] },
-    { toolCalls: [{ name: "finish", args: { summary: "Проверил страницу.", commit_message: "Check" } }] },
+    { text: "Проверил страницу." },
   ];
   fake = await startFakeProvider({
     key: KEY,
@@ -85,20 +85,21 @@ async function lookAt(html?: string, steps?: unknown[]): Promise<Buffer> {
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
 
   await addProject(page);
-  await startTask(page, { task: "Проверь, как выглядит страница", model: "coder" });
-
+  // The project's conversation: the agent looks at the page in its answer.
+  await page.locator(".composer").getByRole("button", { name: "Выбери модель" }).click();
+  const tabs = page.getByRole("navigation", { name: "Провайдеры" });
+  if (await tabs.count()) await tabs.getByRole("button", { name: new URL(fake.baseUrl).host }).click();
+  await page.getByRole("option", { name: /Coder/ }).click();
+  await page.getByPlaceholder("Вопрос или задача по проекту").fill("Проверь, как выглядит страница");
+  await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
   await expect(page.getByText("Проверил страницу.")).toBeVisible({ timeout: 30_000 });
-  await page.getByText("Как агент работал").click();
-  const shot = page.getByRole("img", { name: `Скриншот ${url}` });
-  await expect(shot).toBeVisible();
-  expect(await shot.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(600);
 
   const sent = fake.requests.find((r) => JSON.stringify(r.body?.messages ?? "").includes("data:image/png;base64,"))!;
   const dataUrl = JSON.stringify(sent.body.messages).match(/data:image\/png;base64,([A-Za-z0-9+/=]+)/)![1]!;
   return Buffer.from(dataUrl, "base64");
 }
 
-test("an agent looks at its page: a real screenshot goes to the model and into the feed", async () => {
+test("an agent looks at its page: a real screenshot of the whole page goes to the model", async () => {
   const png = await lookAt();
   // The model got a real PNG of the page, not an empty picture.
   expect(png.subarray(1, 4).toString()).toBe("PNG");

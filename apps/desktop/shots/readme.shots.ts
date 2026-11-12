@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "../../../packages/core/test/fake-provider";
 import { newChat, openSection, paramsButton } from "../e2e/sections";
-import { addProject } from "../e2e/start-task";
+import { addProject } from "../e2e/add-project";
 import { readFileSync } from "node:fs";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));

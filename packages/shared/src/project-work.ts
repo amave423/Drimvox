@@ -1,6 +1,5 @@
 import { z } from "zod";
-import type { ProjectPlan } from "./backlog";
-import { modelRefSchema } from "./tasks";
+import { modelRefSchema } from "./projects";
 import { thinkingLevels } from "./chats";
 
 /**
@@ -59,9 +58,6 @@ export interface ProjectWorkView {
   /** Details of an error that stopped the run. */
   detail: string | null;
   models: ProjectModels | null;
-  /** The interview and the plan: a task of the project. */
-  planTaskId: string | null;
-  plan: ProjectPlan | null;
   /** The project's one long conversation. */
   chatId: string | null;
   checklist: ChecklistItem[];

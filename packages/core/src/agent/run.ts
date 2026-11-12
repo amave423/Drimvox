@@ -10,7 +10,7 @@ import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
 import { codeTool } from "./code-mode";
-import { cutPoint, memoryLimit, remember, sizeOf, TRIM_SHARE, withMemory, type Memory, type Remembered } from "./memory";
+import { memoryLimit, sizeOf, TRIM_SHARE } from "./memory";
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
@@ -22,12 +22,6 @@ import { thinkingOptions } from "../chats/thinking";
 import { Workspace } from "./workspace";
 
 export const MAX_STEPS = 60;
-
-/** A summary of the older work written in the background, and what came of it (undefined while it is written). */
-type Summary = { result: Promise<Remembered | null>; done: Remembered | null | undefined };
-
-/** The share of the memory's limit at which its summary starts in the background. */
-const EARLY_SUMMARY = 0.85;
 
 /** Rounds a pass may go on for after the provider cut an answer by its output limit. */
 const MAX_CUTS = 3;
@@ -60,9 +54,6 @@ export interface RunInput {
   stopWhen?: () => boolean;
   /** Asked before every step: a reminder that goes with that request only, such as ticking off the checklist. */
   remind?: () => string | null;
-  /** What the agent remembers of its older work; with onMemory, a new summary replaces the older part when it grows. */
-  memory?: Memory | null;
-  onMemory?(memory: Memory, usage: { inputTokens: number; outputTokens: number; costUsd: number }): void;
   /** Old tool outputs leave the conversation as OpenCode prunes them (prune.ts): a project's run. */
   prune?: boolean;
   /** More tools kept out of every step until the model loads them, such as the user's MCP servers' (deferred.ts). */
@@ -107,7 +98,6 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let lastText = "";
   let spent = i.spentUsd;
   let steps = 0;
-  let memory = i.memory ?? null;
   /** The provider served part of a request from its cache: the history is then kept as it is (see prepareStep). */
   let cacheSeen = false;
 
@@ -155,15 +145,6 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   // The rare tools wait until the model loads them (deferred.ts); a step with one tool to call keeps just that one.
   const deferral = i.only ? null : deferTools(tools, i.rare);
 
-  // A summary of the older work being written in the background, and what came of it (undefined while it is written).
-  let writing = null as Summary | null;
-  const adopt = (r: Remembered) => {
-    const cost = r.costUsd;
-    spent += cost;
-    memory = r.memory;
-    i.onMemory!(memory, { inputTokens: r.inputTokens, outputTokens: r.outputTokens, costUsd: cost });
-  };
-
   // The project's notes (AGENTS.md) start every request, read once a pass (measured: the agent's update of its notes
   // changed the start of the next request, and the whole conversation went at full price, 50 times the cached one); the
   // update shows from the next pass.
@@ -205,47 +186,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
               : i.thinkingLevel
                 ? thinkingOptions(i.conn.preset, i.thinkingLevel)
                 : undefined,
-        // Near the model's context, the older work becomes one summary; see memory.ts.
         prepareStep: async ({ messages, stepNumber }) => {
-          // A summary written in the background meanwhile takes over the older work now.
-          if (writing?.done !== undefined) {
-            if (writing.done) adopt(writing.done);
-            writing = null;
-          }
-          // A step gets the messages the last one sent: once the summary is in them, they are not cut again by the old
-          // count (seen in chats: the summary and the newest messages fell off at the next step).
-          const view: Memory | null =
-            memory && messages[1]?.role === "user" && messages[1].content === memory.summary ? { upTo: 2, summary: memory.summary } : memory;
-          let sent = withMemory(messages, view);
-          const limit = memoryLimit(i.price);
-          const size = sizeOf(sent);
-          // Before the limit the summary starts in the background and the agent goes on (as OpenCode does); only at the
-          // limit does it wait for it.
-          if (i.onMemory && !writing && size > limit * EARLY_SUMMARY) {
-            const upTo = cutPoint(messages, view, limit);
-            if (upTo !== null) {
-              const job: Summary = { result: Promise.resolve(null), done: undefined };
-              job.result = remember(i.conn, i.model, i.worktree, messages, view, upTo, i.signal, undefined, i.service).then(
-                (r) => (job.done = r),
-                // Without a summary the whole conversation goes; a later step tries again.
-                () => (job.done = null),
-              );
-              writing = job;
-            }
-          }
-          if (writing && size > limit) {
-            running++;
-            clearTimeout(timer);
-            try {
-              const r = await writing.result;
-              if (r) adopt(r);
-              writing = null;
-              sent = withMemory(messages, memory);
-            } finally {
-              running--;
-              resetClock();
-            }
-          }
+          let sent = messages;
           // Old thinking too, except Anthropic's: it is signed and refused once changed.
           // Only where the provider caches nothing, or near the model's window (measured on DeepSeek: a cached token costs a
           // fiftieth of a new one, and each move of the line sent the whole conversation at full price again).

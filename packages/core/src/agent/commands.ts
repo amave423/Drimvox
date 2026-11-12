@@ -122,6 +122,12 @@ function absolutePaths(command: string): string[] {
     // Only a folder that really sits at the root counts.
     // A regular expression such as /\\/g in code is not a folder either: only a plain name at the root counts.
     const top = path.split("/")[1];
+    // Git Bash names a drive /c/…: the same folder as C:\….
+    const drive = process.platform === "win32" ? /^\/([a-zA-Z])(?=\/|$)/.exec(path) : null;
+    if (drive) {
+      found.push(`${drive[1]!.toUpperCase()}:/${path.slice(3)}`);
+      continue;
+    }
     if (process.platform === "win32" && path.startsWith("/") && top && (!/^[\w .-]+$/.test(top) || !existsSync(resolve("/", top)))) continue;
     found.push(path.startsWith("~") ? path.replace(/^~/, process.env.USERPROFILE ?? process.env.HOME ?? "/") : path);
   }
@@ -175,12 +181,40 @@ const FULL_LIMIT = 5_000_000;
  */
 export const NO_PROMPTS = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never", GIT_ASKPASS: "", SSH_ASKPASS: "" };
 
-/** Starts a command in the user's shell: PowerShell on Windows, sh elsewhere (in its own process group). */
+let bashFound: string | null | undefined;
+
+/**
+ * Git for Windows' bash, when Git is installed: the agent's commands run in it on Windows, as in Claude Code. Models write
+ * bash whatever they are told (seen live: `npm install | tail -5` in PowerShell hid npm's output, and the agent dropped the
+ * SQLite it was asked for, thinking it would not install, though it did). DRIMVOX_SHELL=powershell keeps PowerShell.
+ */
+export function gitBash(): string | null {
+  if (process.platform !== "win32" || process.env.DRIMVOX_SHELL === "powershell") return null;
+  if (bashFound !== undefined) return bashFound;
+  const roots = [process.env.ProgramW6432, process.env.ProgramFiles, process.env["ProgramFiles(x86)"], process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "Programs")];
+  const candidates = roots.filter((r): r is string => !!r).map((r) => join(r, "Git", "bin", "bash.exe"));
+  // Git elsewhere: its bash sits two folders up from git.exe (…\Git\cmd\git.exe → …\Git\bin\bash.exe).
+  for (const dir of (process.env.PATH ?? "").split(";")) if (/[\\/]git[\\/](cmd|bin|mingw64[\\/]bin)[\\/]?$/i.test(dir)) candidates.push(join(dir, /mingw64/i.test(dir) ? "../.." : "..", "bin", "bash.exe"));
+  bashFound = candidates.map((c) => resolve(c)).find((c) => existsSync(c)) ?? null;
+  return bashFound;
+}
+
+/** The shell the agent's commands run in, as its instructions say it. */
+export function shellNote(platform: NodeJS.Platform = process.platform): string {
+  if (platform !== "win32") return "sh";
+  if (platform === process.platform && gitBash())
+    return "bash (Git for Windows): Unix commands, pipes and && work; write paths as C:/Users/... For Windows-only things run powershell -NoProfile -Command \"...\"";
+  return "Windows PowerShell 5.1 (no && or ||: separate commands with ; or use if ($?) { ... })";
+}
+
+/** Starts a command in the user's shell: bash or PowerShell on Windows, sh elsewhere (in its own process group). */
 export function spawnShell(command: string, cwd: string, env?: Record<string, string>): ChildProcessWithoutNullStreams {
   const withEnv = { env: { ...process.env, ...NO_PROMPTS, ...env } };
-  return process.platform === "win32"
-    ? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], { cwd, windowsHide: true, ...withEnv })
-    : spawn("/bin/sh", ["-c", command], { cwd, detached: true, ...withEnv });
+  if (process.platform !== "win32") return spawn("/bin/sh", ["-c", command], { cwd, detached: true, ...withEnv });
+  const bash = gitBash();
+  return bash
+    ? spawn(bash, ["-c", command], { cwd, windowsHide: true, ...withEnv })
+    : spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], { cwd, windowsHide: true, ...withEnv });
 }
 
 /** Stops a command and everything it started, such as a dev server's workers. */

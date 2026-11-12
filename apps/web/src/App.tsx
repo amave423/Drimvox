@@ -1,10 +1,9 @@
-import type { MonthUsage, ChatView, ProjectView, ProjectWorkView, ProviderView, Settings, SettingsPatch, TaskView, UsageSummary } from "@drimvox/shared";
+import type { MonthUsage, ChatView, ProjectView, ProjectWorkView, ProviderView, Settings, SettingsPatch, UsageSummary } from "@drimvox/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ok, type Api } from "./api";
 import { AppContext, inParams, modeOf, type AppContextValue, type CoreStatus, type Mode, type View } from "./context";
 import { translate } from "./i18n";
 import { formatUsd, setDisplayCurrency, startOfToday } from "./lib/format";
-import { noticesFor } from "./lib/notices";
 import { workNotices } from "./lib/workNotices";
 import { applyTheme, resolveTheme } from "./theme";
 import { playSound } from "./lib/sounds";
@@ -13,7 +12,6 @@ import { HomeSheet } from "./ui/HomeSheet";
 import { ProjectsStart, Workshop } from "./ui/projects/Workshop";
 import { ProvidersSheet } from "./ui/providers/ProvidersSheet";
 import { LocalModelsSheet } from "./ui/local/LocalModelsSheet";
-import { TaskSheet } from "./ui/tasks/TaskSheet";
 import { GallerySheet } from "./ui/GallerySheet";
 import { GuideSheet } from "./ui/GuideSheet";
 import { SettingsSheet } from "./ui/SettingsSheet";
@@ -45,7 +43,6 @@ export function App({ api, token, initialSettings, status }: Props) {
   const [today, setToday] = useState<UsageSummary | null>(null);
   const [month, setMonth] = useState<MonthUsage | null>(null);
   const [projects, setProjects] = useState<ProjectView[]>([]);
-  const [tasks, setTasks] = useState<TaskView[]>([]);
   const [usdRub, setUsdRub] = useState(0);
   const systemDark = useSystemDark();
   const side = usePaneWidth(SIDE_PANE);
@@ -111,13 +108,6 @@ export function App({ api, token, initialSettings, status }: Props) {
   const reloadProjects = useCallback(async () => {
     setProjects(await api.projects.$get().then((r) => ok<ProjectView[]>(r)).catch(() => []));
   }, [api]);
-  const tasksLoaded = useRef(false);
-  const reloadTasks = useCallback(async () => {
-    const next = await api.tasks.$get().then((r) => ok<TaskView[]>(r)).catch(() => null);
-    if (!next) return;
-    tasksLoaded.current = true;
-    setTasks(next);
-  }, [api]);
 
   // How Drimvox's own notifications look and sound now: the window's theme, the colours of the mode the user is in
   // (asked for: they were always the projects' green, in a chat too), the settings' sound. Kept in a ref: the effects
@@ -145,21 +135,6 @@ export function App({ api, token, initialSettings, status }: Props) {
     };
   };
 
-  // A task that now needs the user becomes a notification (shown only while the window is elsewhere).
-  const seenTasks = useRef<TaskView[] | null>(null);
-  useEffect(() => {
-    if (!tasksLoaded.current) return;
-    const notices = noticesFor(seenTasks.current, tasks);
-    seenTasks.current = tasks;
-    if (!settings.notifications) return;
-    for (const n of notices) {
-      const title = translate(settings.locale, `notice.${n.kind}`);
-      if (window.drimvox?.notify) window.drimvox.notify({ ...noticeLook.current, title, body: n.title, taskId: n.taskId });
-      // In a browser: the browser's own notifications, once allowed, while the tab is in the background.
-      else browserNotice(title, n.title, n.taskId, () => setView({ kind: "task", taskId: n.taskId }));
-    }
-  }, [tasks]);
-  useEffect(() => window.drimvox?.onOpenTask?.((taskId) => setView({ kind: "task", taskId })), []);
   useEffect(() => window.drimvox?.onOpenProject?.((projectId) => setView({ kind: "project", projectId })), []);
   useEffect(() => window.drimvox?.onOpenChat?.((chatId) => setView({ kind: "chat", chatId, key: chatId })), []);
 
@@ -196,8 +171,7 @@ export function App({ api, token, initialSettings, status }: Props) {
     void reloadChats();
     void reloadToday();
     void reloadProjects();
-    void reloadTasks();
-  }, [reloadProviders, reloadChats, reloadToday, reloadProjects, reloadTasks]);
+  }, [reloadProviders, reloadChats, reloadToday, reloadProjects]);
 
   // A chat whose model answers shows a spinner in the list, then a dot when the answer is ready: kept fresh meanwhile.
   const answering = chats.some((c) => c.answering);
@@ -206,17 +180,6 @@ export function App({ api, token, initialSettings, status }: Props) {
     const timer = setInterval(() => void reloadChats(), 1500);
     return () => clearInterval(timer);
   }, [answering, reloadChats]);
-
-  // Keep the sidebar's task statuses fresh while an agent is busy.
-  const busy = tasks.some((t) => t.status === "running" || t.status === "waiting");
-  useEffect(() => {
-    if (!busy) return;
-    const timer = setInterval(() => {
-      void reloadTasks();
-      void reloadToday();
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [busy, reloadTasks, reloadToday]);
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -238,8 +201,6 @@ export function App({ api, token, initialSettings, status }: Props) {
       reloadToday,
       projects,
       reloadProjects,
-      tasks,
-      reloadTasks,
       works,
       reloadWorks,
       mode,
@@ -261,8 +222,6 @@ export function App({ api, token, initialSettings, status }: Props) {
       reloadToday,
       projects,
       reloadProjects,
-      tasks,
-      reloadTasks,
       works,
       reloadWorks,
       mode,
@@ -295,7 +254,6 @@ export function App({ api, token, initialSettings, status }: Props) {
           {view.kind === "chat" && <ChatSheet key={view.key} chatId={view.chatId} viewKey={view.key} autoSend={view.send} />}
           {view.kind === "project" && <Workshop key={view.projectId} projectId={view.projectId} />}
           {view.kind === "projects" && <ProjectsStart />}
-          {view.kind === "task" && <TaskSheet key={view.taskId} taskId={view.taskId} />}
         </main>
         <footer className="bottombar">
           {today && <span>{value.t("bottom.today", { cost: formatUsd(today.costUsd) })}</span>}

@@ -1,9 +1,5 @@
-import type { ProjectPlan } from "@drimvox/shared";
-import { ASSETS_HINT, DESIGN_HINT, designInstructions } from "../agent/design";
+import { ASSETS_HINT, DESIGN_HINT } from "../agent/design";
 import { BATCH_HINT, SECRETS_HINT, STUCK_HINT } from "../agent/prompt";
-
-/** Steps one answer on a task may take: enough for a task of the list; past it, "go on" continues. */
-export const WORK_STEPS = 200;
 
 /**
  * How the last word of a piece of work is written (asked for: not a long story that everything is perfect, and ideas of
@@ -17,46 +13,10 @@ export const REPORT_STYLE =
   "improvements you could make next, as a short list, for the user to choose from.";
 
 /**
- * What the agent is told in a task's conversation, besides the chat's own folder text (docs/specs/project-work.md).
- * Seen in the live run: files and page addresses in transliterated Russian, a project that did not start after it was
- * accepted (no dependencies installed), half a task done.
- */
-export function workRules(plan: ProjectPlan | null): string {
-  return [
-    "You are doing one task of the user's project list, right in the project's folder, as a careful senior engineer would.",
-    "Work in a loop: read what you need, change it, run it, look at it, check it. Use read_file and search to read code;",
-    "edit_file for changes, write_file for new files. Keep files under ~400 lines: split by responsibility.",
-    BATCH_HINT,
-    STUCK_HINT,
-    SECRETS_HINT,
-    ASSETS_HINT,
-    DESIGN_HINT,
-    // Seen live: a file written, then patched sixteen times in a row before it was run once.
-    "Write a new file whole and right in one write_file, then run or check it before changing it; do not build a file",
-    "out of many small edits. Batch related changes to one file into one edit where you can.",
-    "Rules:",
-    "- Names in code are English: files, folders, page addresses, variables, functions (calculator, /cart). Never transliterate",
-    "  another language into Latin letters. Text the visitor reads stays in the user's language.",
-    "- The project must start for the user with one command. Install the dependencies yourself (npm install, pip install …),",
-    "  make sure the usual command (npm run dev, or what the project uses) starts without errors: run it in the background",
-    "  with start_background, read its output, stop it when done. Say in the end how to run it.",
-    "- Do the whole task: before you stop, go through every \"done when\" point and check it for real (run, open, look).",
-    "- When there is an interface, start it and use look_at_page on a desktop width and a phone width (390).",
-    "- Run the project's build and tests when it has them; fix what fails.",
-    "- Never commit or push: the user accepts the task, and Drimvox commits it.",
-    "- Keep the project's notes current with update_notes: commands, decisions, what is done.",
-    "End with a short report in the user's language: each \"done when\" point and how it is met, and how to run the project.",
-    ...(plan?.checks.length ? [`The project's checks: ${plan.checks.join("; ")}`] : []),
-    ...(plan?.pages.length ? [`Pages: ${plan.pages.map((p) => `${p.url}${p.command ? ` (served by: ${p.command})` : ""}`).join("; ")}`] : []),
-    ...(plan?.design ? [designInstructions(plan.design)] : []),
-  ].join("\n");
-}
-
-/**
  * What the agent is told in a project's run (docs/specs/project-work.md): one long loop, alone, from the plan to a
  * working result, with its own checklist and its own checks.
  */
-export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "- Never commit or push: git stays the user's."): string {
+export function projectRules(canLook: boolean, git = "- Never commit or push: git stays the user's."): string {
   return [
     "You build the user's project alone, from the plan to a working result, right in the project's folder, as a careful",
     "senior engineer would. Nobody accepts steps one by one: the user watches and may write to you at any time.",
@@ -76,21 +36,14 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "
     "and why (\"Checking how the order form saves data\"), and after you learn something, one sentence on what you found",
     "and what follows. Never do more than a few actions in a row without a word; keep these lines short, not a report.",
     // Seen live: after "Go" the agent wrote in English until the user asked in Russian.
-    "Write to the user in the language the user writes in (the plan's language): your messages, the checklist, questions",
+    "Write to the user in the language the user writes in: your messages, the checklist, questions",
     "and the report.",
-    // Seen live: a cheap model wrote "Now let me create…" to a Russian user all the same; the language named outright helps.
-    ...(plan?.context && /[а-яё]/i.test(plan.context) ? ["The user writes in Russian: everything you write to the user is in Russian."] : []),
     "Rules:",
     "- Names in code are English: files, folders, page addresses, variables (calculator, /cart). Never transliterate another",
     "  language into Latin letters. Text people read stays in the user's language.",
     "- The project must start for the user with one command. Install the dependencies yourself, make sure the usual command",
     "  (npm run dev, or what the project uses) starts without errors: run it with start_background, read its output.",
-    // Asked for: tests first on a big new project with real logic, none written for a simple page (they cost time and money).
-    plan?.testing === "first"
-      ? "- Test first: for each piece of logic (API, data, rules, calculations) write a test that fails, then the code that\n  makes it pass; run the tests after each step and keep them green. Check your work for real: run the build;"
-      : plan?.testing === "light"
-        ? "- No test suite for this project: check your work for real by running the build;"
-        : "- Check your work for real: write and run tests for the logic; run the build;",
+    "- Check your work for real: write and run tests for the logic; run the build;",
     canLook
       ? "  start the interface and look at its pages with look_at_page on a desktop width and a phone width (390); go through the\n  main scenarios as a person would (add to cart, order, sign in): open the page with browser_open, act with browser_click\n  and browser_type, and look at the state it reached with browser_look. Never install Playwright or another browser into\n  the project and never write screenshot scripts: these tools do it."
       : "  start the interface and request its pages to make sure they answer.",
@@ -105,70 +58,5 @@ export function projectRules(plan: ProjectPlan | null, canLook: boolean, git = "
     "address) when the result is something to open, a site or a server: Drimvox starts it for the user. Stop your own",
     "background processes first. The report is the end: nothing after it.",
     `The report: ${REPORT_STYLE}`,
-    ...(plan?.context ? [`The plan: ${plan.context}`] : []),
-    ...(plan?.checks.length ? [`The project's checks: ${plan.checks.join("; ")}`] : []),
-    ...(plan?.pages.length ? [`Pages: ${plan.pages.map((p) => `${p.url}${p.command ? ` (served by: ${p.command})` : ""}`).join("; ")}`] : []),
-    ...(plan?.design ? [designInstructions(plan.design)] : []),
   ].join("\n");
-}
-
-/**
- * What the agent is told in a ready project (asked for: like the chat with a folder, which the user liked, with a plan to
- * follow): it answers each message as it comes, keeps a checklist for a task, and ends its turn with a reply.
- */
-export function existingRules(canLook: boolean, git = "- Never commit or push: git stays the user's."): string {
-  return [
-    "You work in the user's existing project, right in its folder, as a careful senior engineer would. The user talks to",
-    "you as in a chat: each message is a question or a task in this project. Read the code you need before you change it;",
-    "follow the project's own conventions, structure and tools. edit_file for changes, write_file for new files.",
-    BATCH_HINT,
-    STUCK_HINT,
-    SECRETS_HINT,
-    ASSETS_HINT,
-    DESIGN_HINT,
-    "For a question, look at the code and answer it; change nothing unless asked.",
-    "For a task: first write a short checklist of the steps with update_checklist (3-8 items, in the user's language); the",
-    "user sees it as your plan beside the conversation. Keep it current: mark items done as you go, add found work. Then do",
-    "the task and check it for real: run the project's tests and build when it has them (write new tests only when the",
-    "user asks: covering an old project with tests costs much time and money)",
-    canLook
-      ? "  and look at changed pages with look_at_page (desktop and phone width 390), or go through them with browser_open,\n  browser_click and browser_type."
-      : "  and request changed pages to make sure they answer.",
-    "Think aloud as you go: one short sentence before each group of actions on what you do and why, one after you learn",
-    "something. If you cannot decide something well yourself, ask_user with your assumption and go on: never wait.",
-    "Write to the user in the language the user writes in.",
-    "Rules:",
-    // Seen live: a question about a crooked 3D scene was answered by reading 12 files in the main conversation, and no
-    // sub-agent was ever called.
-    "- A question about how a part of the project works, or a bug whose cause you do not know yet: first hand the",
-    "  research to a sub-agent with delegate (it reads in its own context and gives back a short report, several can run",
-    "  in one step); read yourself only the files you are going to change.",
-    "- Change only what the task needs; no unrelated refactoring, no new dependencies without a reason.",
-    git,
-    "- Keep the project's notes current with update_notes when you learn how the project works.",
-    // Seen live: a currency converter was ready in 12 minutes, then polished for 15 more (78 edits, 15 looks).
-    "- Do the task, then stop: no endless polishing. Look at each changed page once on each width, again only after a real",
-    "  fix; a look that finds only matters of taste is not a reason for another round. Never grade your own result (\"8/10\")",
-    "  and polish toward a higher mark, even where a skill says to critique your work: once it does what was asked and nothing",
-    "  is broken, stop and say what you made; the user asks for more if they want it. Do not read a file again that you",
-    "  just read or wrote. A server you started stays running between the user's messages: open its address again first.",
-    "End your turn with a reply, or the answer to a question. finish_work is not needed; call it only when the user asked",
-    "to make something to open (a site or a server) and it is ready, with start.",
-    `The reply after a change: ${REPORT_STYLE}`,
-  ].join("\n");
-}
-
-/** The first message of a project's run: the plan the user said "Go" to. */
-export function planMessage(plan: ProjectPlan): string {
-  return ["Начинай работу по плану:", "", plan.context, "", ...(plan.steps ?? []).map((s, n) => `${n + 1}. ${s}`)].join("\n");
-}
-
-/** Said when the model stops without finish_work (docs/specs/project-work.md: "stuck"). */
-export function nudgeMessage(open: string[]): string {
-  return open.length
-    ? [
-        `You stopped, but the work is not finished. Open checklist items: ${open.join("; ")}.`,
-        "Go on working. If something blocks you, ask_user with your assumption and go on. When everything is done and checked, call finish_work.",
-      ].join("\n")
-    : "Every checklist item is done. If you have not checked the result for real, do it now, then call finish_work with the report. If the user asked for more, add it to the checklist and do it.";
 }

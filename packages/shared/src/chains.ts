@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { modelRefSchema } from "./tasks";
+import { modelRefSchema } from "./projects";
 
 /**
  * Chains of free models (docs/specs/model-chains.md): a chain is picked like a model; under it free models answer in turn,

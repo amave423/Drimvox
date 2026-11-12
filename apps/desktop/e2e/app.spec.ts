@@ -123,7 +123,6 @@ test("the page has no access to Node", async () => {
       "notify",
       "onOpenChat",
       "onOpenProject",
-      "onOpenTask",
       "onUpdate",
       "openSkillsFolder",
       "pickFolder",

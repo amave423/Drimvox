@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { workNotices } from "./workNotices";
 
 const work = (projectId: string, status: ProjectWorkView["status"], waitingApproval = false, reason: ProjectWorkView["reason"] = null) =>
-  ({ projectId, status, waitingApproval, reason, planTaskId: `plan-${projectId}` }) as ProjectWorkView;
+  ({ projectId, status, waitingApproval, reason }) as ProjectWorkView;
 
 describe("workNotices", () => {
   // Seen live: a project waited half an hour on a permission nobody saw.

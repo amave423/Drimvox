@@ -2,6 +2,7 @@ import { defaultGitRules, projectGitRulesSchema, type ProjectGitRules, type Proj
 import { addWork, currentBranch, runGit } from "../agent/git";
 import type { Database } from "../db";
 import type { GitHub } from "../github/github";
+import { commitRules } from "./agent-prompt";
 
 /** Files that never go into the agent's commits: keys and passwords stay out of git (and so out of GitHub). */
 const SECRETS = [".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*", "id_ed25519*", "*.keystore"];
@@ -198,28 +199,24 @@ export class ProjectGit {
   /** What the agent is told about committing, by the rules; the project's recent messages when it writes like them. */
   async instructions(projectId: string, folder: string): Promise<string> {
     const rules = this.rules(projectId);
-    if (rules.commit === "never") return "- Never commit or push: git stays the user's.";
+    if (rules.commit === "never") return "- Never commit or push: git stays the user's (the project's rules say so).";
     const when = {
-      "per-item": "after each checklist item you finish, call commit_changes with a message for that step",
-      end: "when the whole task is done, call commit_changes once with a message for it",
-      logical: "call commit_changes at logical points, each commit one meaningful change",
+      "per-item": "after each piece of the work you finish and check",
+      end: "once, when the whole task is done and checked",
+      logical: "at logical points, each commit one meaningful change",
       never: "",
     }[rules.commit];
     let style = {
       history: "",
-      en: "Commit messages: one short line in English, imperative (Fix cart total after removing an item).",
-      ru: "Commit messages: one short line in Russian (Исправлен пересчёт суммы в корзине).",
-      conventional: "Commit messages: Conventional Commits, one line (fix(cart): recalc total on remove).",
+      en: "with one short line in English, imperative (Fix cart total after removing an item)",
+      ru: "with one short line in Russian (Исправлен пересчёт суммы в корзине)",
+      conventional: "with a Conventional Commits line (fix(cart): recalc total on remove)",
     }[rules.messages];
     if (rules.messages === "history") {
       const log = (await runGit(folder, ["log", "-8", "--format=%s"], true)).stdout.trim();
-      style = log ? `Commit messages: write them like this project's recent ones:\n${log}` : "Commit messages: one short line in English, imperative.";
+      style = log ? `with messages written like this project's recent ones (${log.split("\n").join(" | ")})` : "with one short line in English, imperative";
     }
-    return [
-      `- Git: ${when}. Drimvox makes the commit in the user's name (secrets and dependency folders are left out) and sends`,
-      "  it to GitHub itself. Never run git commit, push, checkout, switch or reset yourself.",
-      `- ${style}`,
-    ].join("\n");
+    return commitRules(when, style);
   }
 }
 

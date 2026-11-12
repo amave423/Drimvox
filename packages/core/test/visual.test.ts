@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
+import { waitWork } from "./project-run";
 
 const KEY = "good-key";
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
@@ -35,72 +36,61 @@ afterEach(async () => {
   rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
-/** The coder follows its script; the vision model "eyes" answers from its own list. */
-async function start(coder: FakeTurn[], eyes: string[], o: { spec?: boolean; visionSetting?: boolean; acceptor?: FakeTurn[] } = {}) {
+/** A project's agent follows its script; the vision model "eyes" answers from its own list. Returns the project's id. */
+async function start(coder: FakeTurn[], eyes: string[], o: { visionSetting?: boolean } = {}) {
   const coderQueue = [...coder];
   const eyesQueue = [...eyes];
-  const acceptorQueue = [...(o.acceptor ?? [])];
-  const isAcceptor = (body: any) => /acceptance agent/i.test(JSON.stringify(body.messages?.[0]?.content ?? ""));
   fake = await startFakeProvider({
     key: KEY,
     models: [
-      { id: "coder", architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
+      { id: "coder", supported_parameters: ["tools"], architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
       // Without the setting no model of the provider sees: Drimvox would otherwise find this one by itself.
       { id: "eyes", architecture: { input_modalities: o.visionSetting === false ? ["text"] : ["text", "image"], output_modalities: ["text"] } },
     ],
-    respond: (body) =>
-      body.model === "eyes"
-        ? { text: eyesQueue.shift() ?? "PASS" }
-        : ((isAcceptor(body) ? acceptorQueue.shift() : coderQueue.shift()) ?? { text: "Done." }),
+    respond: (body) => (body.model === "eyes" ? { text: eyesQueue.shift() ?? "PASS" } : (coderQueue.shift() ?? { text: "Готово." })),
   });
   const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
   if (o.visionSetting !== false) await env.call("PATCH", "/api/settings", { visionModel: { providerId: provider.id, model: "eyes" } });
-  const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
-  const stages = { interview: false, spec: !!o.spec, approveSpec: false, testsFirst: false };
-  const task = await (await env.call("POST", `/api/projects/${project.id}/tasks`, { task: "Сделай страницу", providerId: provider.id, model: "coder", stages })).json();
-  return task.id as string;
+  const project = await (await env.call("POST", "/api/projects", { path: repo, kind: "existing" })).json();
+  await env.call("POST", `/api/projects/${project.id}/work/chat`, { content: "Сделай страницу", model: { providerId: provider.id, model: "coder" } });
+  return project.id as string;
 }
 
-const waitTask = async (id: string, check: (t: any) => boolean) => {
-  for (let i = 0; i < 600; i++) {
-    const t = await (await env.call("GET", `/api/tasks/${id}`)).json();
-    if (check(t)) return t;
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  throw new Error("task stuck");
-};
-const events = async (id: string) => (await (await env.call("GET", `/api/tasks/${id}/events`)).json()) as any[];
+const settle = (projectId: string) => waitWork(env, projectId);
+/** What each call of a tool gave back, as the agent got it in its last request. */
+function results(name: string): string[] {
+  const messages = fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === "coder").at(-1)!.body.messages as any[];
+  const named = new Map<string, string>(messages.flatMap((m) => (m.tool_calls ?? []).map((c: any) => [c.id, c.function.name] as [string, string])));
+  return messages.filter((m) => m.role === "tool" && named.get(m.tool_call_id) === name).map((m) => String(m.content));
+}
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
-const finish = call("finish", { summary: "Готово", commit_message: "Page" });
 const visionRequests = () => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === "eyes");
 
 describe("look_at_page", () => {
   it("photographs a local page and returns what the vision model sees", async () => {
-    const id = await start([call("look_at_page", { url: "http://localhost:5173/", question: "Виден заголовок Привет?" }), finish], ["Да, заголовок «Привет» по центру."]);
-    await waitTask(id, (t) => t.status === "done_empty");
+    const id = await start([call("look_at_page", { url: "http://localhost:5173/", question: "Виден заголовок Привет?" })], ["Да, заголовок «Привет» по центру."]);
+    const work = await settle(id);
     expect(shots).toEqual(["http://localhost:5173/"]);
 
     const asked = JSON.stringify(visionRequests()[0]!.body.messages);
     expect(asked).toContain("Виден заголовок Привет?");
     expect(asked).toContain("data:image/png;base64,");
 
-    const result = (await events(id)).find((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
-    expect(result.data, JSON.stringify(result.data)).toMatchObject({ ok: true });
-    expect(result.data.output).toContain("заголовок «Привет» по центру");
-    const shot = (await events(id)).find((e) => e.kind === "screenshot");
-    expect(shot.data).toMatchObject({ url: "http://localhost:5173/" });
-    const file = await env.call("GET", `/api/tasks/${id}/screenshots/${shot.data.id}`);
+    expect(results("look_at_page")[0]).toContain("заголовок «Привет» по центру");
+    const shot = work.shots[0];
+    expect(shot).toMatchObject({ url: "http://localhost:5173/" });
+    const file = await env.call("GET", `/api/projects/${id}/work/shots/${shot.id}`);
     expect(file.headers.get("content-type")).toBe("image/png");
   });
 
   // Seen live: an agent wrote three diagnostic pages to learn why its page stayed empty; a failed script does not show.
   it("hands the page's console errors to the agent with what the vision model sees", async () => {
     env.setScreenshot(async () => ({ png: PNG, console: ["Uncaught SyntaxError: Unexpected token '}' (ui.js:120)"] }));
-    const id = await start([call("look_at_page", { url: "http://localhost:5173/", question: "Видно небо?" }), finish], ["Страница пустая."]);
-    await waitTask(id, (t) => t.status === "done_empty");
-    const result = (await events(id)).find((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
-    expect(result.data.output).toContain("Страница пустая.");
-    expect(result.data.output).toContain("Errors in the page's console:\n- Uncaught SyntaxError: Unexpected token '}' (ui.js:120)");
+    const id = await start([call("look_at_page", { url: "http://localhost:5173/", question: "Видно небо?" })], ["Страница пустая."]);
+    await settle(id);
+    const [output] = results("look_at_page");
+    expect(output).toContain("Страница пустая.");
+    expect(output).toContain("Errors in the page's console:\n- Uncaught SyntaxError: Unexpected token '}' (ui.js:120)");
   });
 
   // docs/specs/project-work.md: the agent goes through a scenario as a person would, then looks at the result.
@@ -114,26 +104,23 @@ describe("look_at_page", () => {
       [
         call("look_at_page", { url: "http://localhost:5173/", question: "В корзине 1 товар?", steps: scenario }),
         call("look_at_page", { url: "http://localhost:5173/", question: "?", steps: [{ action: "click", target: "Нет такой" }] }),
-        finish,
       ],
       ["Да, в корзине одна доска."],
     );
-    await waitTask(id, (t) => t.status === "done_empty");
+    await settle(id);
     expect(steps[0]).toEqual(scenario);
-    const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
-    expect(results.map((r) => r.data.ok)).toEqual([true, false]);
-    expect(results[1].data.output).toMatch(/not found on the page: Нет такой/);
+    const outputs = results("look_at_page");
+    expect(outputs[0]).toContain("одна доска");
+    expect(outputs[1]).toMatch(/not found on the page: Нет такой/);
   });
 
   // Seen live: an agent told to care about the look kept photographing its page, a dozen times and $0.80 later.
-  it("lets an agent look a few times per turn, then tells it to finish", async () => {
+  it("lets an agent look a few times per answer, then tells it to go on with the work", async () => {
     const look = call("look_at_page", { url: "http://localhost:5173/", question: "Как выглядит?" });
-    const id = await start([look, look, look, look, look, finish], []);
-    await waitTask(id, (t) => t.status === "done_empty");
-    expect(shots).toHaveLength(4);
-    const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
-    expect(results.map((r) => r.data.ok)).toEqual([true, true, true, true, false]);
-    expect(results.at(-1).data.output).toMatch(/design review/);
+    const id = await start(Array.from({ length: 9 }, () => look), []);
+    await settle(id);
+    expect(shots).toHaveLength(8);
+    expect(results("look_at_page").at(-1)).toMatch(/looked at pages enough in this answer/);
   });
 
   // Seen live: a requirement asked for the phone layout and the acceptance agent had no way to look at it.
@@ -141,64 +128,45 @@ describe("look_at_page", () => {
     const id = await start([
       call("look_at_page", { url: "http://localhost:5173/", question: "Как на телефоне?", width: 390 }),
       call("look_at_page", { url: "http://localhost:5173/", question: "А на компьютере?" }),
-      finish,
     ], []);
-    await waitTask(id, (t) => t.status === "done_empty");
+    await settle(id);
     expect(widths).toEqual([390, 1280]);
   });
 
   // Seen live: a weather site was checked with 8 openings, 13 looks and 29 scripts in the page, a model request each.
   it("checks a page in one call: a desktop and a phone screenshot in one question, and the console's errors", async () => {
     env.setScreenshot(async (_url, size) => (widths.push(size.width), { png: PNG, console: ["Uncaught TypeError: x is undefined (app.js:3)"] }));
-    const id = await start([call("check_page", { url: "http://localhost:5173/", focus: "Метеограмма" }), finish], ["Компьютер: всё на месте. Телефон: таблица вылезает за край."]);
-    await waitTask(id, (t) => t.status === "done_empty");
+    const id = await start([call("check_page", { url: "http://localhost:5173/", focus: "Метеограмма" })], ["Компьютер: всё на месте. Телефон: таблица вылезает за край."]);
+    await settle(id);
     expect(widths).toEqual([1280, 390]);
     expect(visionRequests()).toHaveLength(1);
     const asked = JSON.stringify(visionRequests()[0]!.body.messages);
     expect(asked.match(/data:image\/png;base64,/g)).toHaveLength(2);
     expect(asked).toContain("Метеограмма");
-    const result = (await events(id)).find((e) => e.kind === "tool_result" && e.data.name === "check_page");
-    expect(result.data.output).toContain("таблица вылезает за край");
-    expect(result.data.output).toContain("- Uncaught TypeError: x is undefined (app.js:3)");
+    const [output] = results("check_page");
+    expect(output).toContain("таблица вылезает за край");
+    expect(output).toContain("- Uncaught TypeError: x is undefined (app.js:3)");
   });
 
   // Seen live: told to check twice at most, the agent checked five times, tweaking details between.
   it("lets an agent check a page twice per answer, then tells it to stop", async () => {
     const check = call("check_page", { url: "http://localhost:5173/" });
-    const id = await start([check, check, check, finish], ["Всё на месте.", "Всё на месте."]);
-    await waitTask(id, (t) => t.status === "done_empty");
-    const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "check_page");
-    expect(results.map((r) => r.data.ok)).toEqual([true, true, false]);
-    expect(results.at(-1).data.output).toMatch(/give the user your short reply/);
-  });
-
-  // Seen live: checking fourteen requirements, the acceptance agent ran out of the coder's four looks.
-  it("lets the acceptance agent look more than the coder", async () => {
-    const look = call("look_at_page", { url: "http://localhost:5173/", question: "Что видно?" });
-    const report = call("report_acceptance", { results: [{ id: "R1", status: "done", evidence: "видно", problem: "" }], summary: "Принято" });
-    const spec = call("propose_spec", {
-      spec: "# Страница",
-      checks: [],
-      plan: ["Страница"],
-      requirements: [{ id: "R1", text: "Есть заголовок", verify: "review", how: "главная" }],
-    });
-    const id = await start([spec, finish], [], { spec: true, acceptor: [look, look, look, look, look, look, report] });
-    await waitTask(id, (t) => !["running", "queued"].includes(t.status));
-    const results = (await events(id)).filter((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
-    expect(results.map((r) => r.data.ok)).toEqual([true, true, true, true, true, true]);
+    const id = await start([check, check, check], ["Всё на месте.", "Всё на месте."]);
+    await settle(id);
+    const outputs = results("check_page");
+    expect(outputs.slice(0, 2)).toEqual([expect.stringContaining("Всё на месте."), expect.stringContaining("Всё на месте.")]);
+    expect(outputs.at(-1)).toMatch(/give the user your short reply/);
   });
 
   it("opens only this computer and the public internet", async () => {
-    const id = await start([call("look_at_page", { url: "http://192.168.1.10/admin", question: "?" }), finish], []);
-    await waitTask(id, (t) => t.status === "done_empty");
+    const id = await start([call("look_at_page", { url: "http://192.168.1.10/admin", question: "?" })], []);
+    await settle(id);
     expect(shots).toEqual([]);
-    const result = (await events(id)).find((e) => e.kind === "tool_result" && e.data.name === "look_at_page");
-    expect(result.data.ok).toBe(false);
+    expect(results("look_at_page")[0]).toMatch(/Error|not allowed|only/i);
   });
 
   it("has no look_at_page without a model that sees pictures", async () => {
-    await start([finish], [], { visionSetting: false });
-    for (let i = 0; i < 100 && !fake!.requests.some((r) => r.path === "/v1/chat/completions"); i++) await new Promise((r) => setTimeout(r, 20));
+    await settle(await start([], [], { visionSetting: false }));
     const tools = fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body.tools.map((t: any) => t.function.name);
     expect(tools).not.toContain("look_at_page");
     expect(tools).toContain("start_background");
@@ -206,14 +174,19 @@ describe("look_at_page", () => {
 });
 
 describe("background processes", () => {
-  it("starts a server, shows its output and stops it when the task ends", async () => {
+  // In a ready project the agent's server stays between messages (seen live: it started the same server three times
+  // over); the window lists it with its project and stops it.
+  it("starts a server, shows its output and keeps it for the next message, until the user stops it", async () => {
     const server = `node -e "console.log('ready on 4321'); setInterval(() => {}, 1000)"`;
-    const id = await start([call("start_background", { command: server }), call("read_background", { id: 1 }), finish], []);
-    await waitTask(id, (t) => t.status === "done_empty");
-    const results = (await events(id)).filter((e) => e.kind === "tool_result");
-    expect(results[0].data.output).toMatch(/Started process 1/);
-    expect(results[1].data.output).toContain("ready on 4321");
-    const pid = Number(results[0].data.output.match(/pid (\d+)/)![1]);
+    const id = await start([call("start_background", { command: server }), call("read_background", { id: 1 })], []);
+    await settle(id);
+    const [started] = results("start_background");
+    expect(started).toMatch(/Started process 1/);
+    expect(results("read_background")[0]).toContain("ready on 4321");
+    const pid = Number(started!.match(/pid (\d+)/)![1]);
+    const [listed] = await (await env.call("GET", "/api/processes")).json();
+    expect(listed.owner).toMatchObject({ kind: "project", projectId: id });
+    expect((await env.call("POST", "/api/processes/stop", { key: listed.key, id: listed.id })).status).toBe(200);
     let alive = true;
     for (let i = 0; i < 100 && alive; i++) {
       try {
@@ -224,46 +197,5 @@ describe("background processes", () => {
       }
     }
     expect(alive).toBe(false);
-  });
-});
-
-describe("visual checks from the spec", () => {
-  const spec = (visual: unknown[]) =>
-    call("propose_spec", { spec: "# Страница", checks: [], plan: ["Сверстать"], visual_checks: visual });
-  const page = { url: "http://localhost:5173/", expect: "Крупный заголовок «Привет»" };
-
-  // Seen live: one page passed and failed by turns on a language switch the screenshot did not show.
-  it("asks the model to judge the substance, not what a still screenshot cannot show", async () => {
-    const id = await start([call("propose_spec", { spec: "# Страница", checks: [], plan: ["Страница"], visual_checks: [{ url: "http://localhost:5173/", expect: "Заголовок Привет" }] }), finish], ["PASS: заголовок есть"], { spec: true });
-    await waitTask(id, (t) => !["running", "queued"].includes(t.status));
-    const asked = JSON.stringify(visionRequests()[0]!.body.messages);
-    expect(asked).toMatch(/substance/);
-    expect(asked).toMatch(/cannot show/);
-  });
-
-  it("checks the page after the code and sends a failure back once", async () => {
-    const id = await start([spec([page]), call("write_file", { path: "index.html", content: "<h1>Привет</h1>" }), finish, finish], [
-      "FAIL: заголовка не видно, белая страница.",
-      "PASS: заголовок «Привет» крупный.",
-    ], { spec: true });
-    const done = await waitTask(id, (t) => t.status === "review");
-    expect(done.visualChecks).toEqual([page]);
-    const visual = (await events(id)).filter((e) => e.kind === "check" && e.data.phase === "visual").map((e) => e.data.ok);
-    expect(visual).toEqual([false, true]);
-    const coderMessages = JSON.stringify(fake!.requests.filter((r) => r.body?.model === "coder").at(-1)!.body.messages);
-    expect(coderMessages).toContain("заголовка не видно");
-  });
-
-  it("waits for the user after two failed looks", async () => {
-    const id = await start([spec([page]), finish, finish, finish], ["FAIL: пусто.", "FAIL: всё ещё пусто."], { spec: true });
-    const waiting = await waitTask(id, (t) => t.status === "waiting");
-    expect(waiting.statusReason).toBe("visual_failed");
-  });
-
-  it("skips visual checks it cannot do and says so", async () => {
-    const id = await start([spec([page]), finish], [], { spec: true, visionSetting: false });
-    await waitTask(id, (t) => t.status === "done_empty" || t.status === "review");
-    const notes = (await events(id)).filter((e) => e.kind === "text").map((e) => e.data.text);
-    expect(notes.join(" ")).toMatch(/visual checks/i);
   });
 });

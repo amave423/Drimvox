@@ -1,18 +1,16 @@
 import { zValidator } from "@hono/zod-validator";
 import { findSkills, projectSkillRoots, toSkillView } from "../skills/skills";
-import { projectCreateSchema, projectMoveSchema, projectPeekSchema, projectRenameSchema, taskCreateSchema, type ProjectView } from "@drimvox/shared";
+import { projectCreateSchema, projectMoveSchema, projectPeekSchema, projectRenameSchema, type ProjectView } from "@drimvox/shared";
 import { Hono } from "hono";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import { GitError, initWithCommit, isRepoRoot, removeWorktree } from "../agent/git";
+import { GitError, initWithCommit, isRepoRoot } from "../agent/git";
 import { findMovedFolder } from "../agent/relocate";
-import type { ProjectRepo, TaskRepo } from "../agent/repo";
-import type { AgentRunner } from "../agent/runner";
-import type { ProviderRepo } from "../providers/repo";
+import type { ProjectRepo } from "../agent/repo";
 
 const notFound = { error: { code: "not_found" } } as const;
 
-export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers: ProviderRepo, runner: AgentRunner, kindLocked: (projectId: string) => boolean = () => false) {
+export function projectRoutes(projects: ProjectRepo, kindLocked: (projectId: string) => boolean = () => false) {
   const withGit = async (p: Omit<ProjectView, "gitState">): Promise<ProjectView> => {
     if (!existsSync(p.path)) {
       // Renamed or moved beside where it was: found by its conversations' marks in git, and followed.
@@ -86,11 +84,6 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
     .delete("/:id", async (c) => {
       const project = projects.get(c.req.param("id"));
       if (!project) return c.json(notFound, 404);
-      const own = tasks.list(project.id);
-      if (own.some((t) => runner.isRunning(t.id))) return c.json({ error: { code: "busy" } }, 409);
-      for (const t of own) {
-        if (t.status !== "accepted" && t.status !== "discarded") await removeWorktree(project.path, t.worktree, t.branch).catch(() => {});
-      }
       projects.remove(project.id);
       return c.body(null, 204);
     })
@@ -98,24 +91,5 @@ export function projectRoutes(projects: ProjectRepo, tasks: TaskRepo, providers:
       const project = projects.get(c.req.param("id"));
       if (!project) return c.json(notFound, 404);
       return c.json(findSkills(projectSkillRoots(project.path)).map((s) => toSkillView(s, project.path)), 200);
-    })
-    .get("/:id/tasks", (c) => {
-      const project = projects.get(c.req.param("id"));
-      if (!project) return c.json(notFound, 404);
-      return c.json(tasks.list(project.id).map((t) => runner.view(t.id)!), 200);
-    })
-    .post("/:id/tasks", zValidator("json", taskCreateSchema), async (c) => {
-      const project = projects.get(c.req.param("id"));
-      if (!project) return c.json(notFound, 404);
-      const input = c.req.valid("json");
-      if (!providers.get(input.providerId) || (input.team && !providers.get(input.team.providerId))) {
-        return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
-      }
-      if (!(await isRepoRoot(project.path))) return c.json({ error: { code: "not_repo" } }, 409);
-      try {
-        return c.json(await runner.start(project.id, input), 201);
-      } catch (err) {
-        return c.json(gitFailure(err), 409);
-      }
     });
 }

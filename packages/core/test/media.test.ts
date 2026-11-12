@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTestEnv, readEvents, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeReply, type FakeTurn } from "./fake-provider";
 import { makeRepo } from "./git-repo";
+import { answerApproval, waitApproval, waitWork } from "./project-run";
 
 const KEY = "good-key";
 const PNG = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
@@ -254,70 +255,39 @@ describe("pictures made by an agent", () => {
   });
   afterEach(() => rmSync(repo, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
-  async function runTask(script: FakeTurn[], model = "img/cheap") {
-    const id = await start({ script });
-    await env.call("PATCH", "/api/settings", { imageModel: { providerId: id, model } });
-    const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
-    const stages = { interview: false, spec: false, approveSpec: false, testsFirst: false };
-    const task = await (await env.call("POST", `/api/projects/${project.id}/tasks`, { task: "Сделай логотип", providerId: id, model: "coder", stages })).json();
-    return task.id as string;
+  /** A project's agent drawing with the settings' picture model; the picture goes right into the project's folder. */
+  async function runWork(script: FakeTurn[], model: string | null = "img/cheap") {
+    const id = await start({ script: [...script, { text: "Логотип готов." }] });
+    if (model) await env.call("PATCH", "/api/settings", { imageModel: { providerId: id, model } });
+    const project = await (await env.call("POST", "/api/projects", { path: repo, kind: "existing" })).json();
+    const res = await env.call("POST", `/api/projects/${project.id}/work/chat`, { content: "Нарисуй логотип", model: { providerId: id, model: "coder" } });
+    return { projectId: project.id as string, chatId: (await res.json()).chatId as string };
   }
-  const waitTask = async (id: string, check: (t: any) => boolean) => {
-    for (let i = 0; i < 400; i++) {
-      const t = await (await env.call("GET", `/api/tasks/${id}`)).json();
-      if (check(t)) return t;
-      await new Promise((r) => setTimeout(r, 25));
-    }
-    throw new Error("task stuck");
-  };
   const draw = { toolCalls: [{ name: "generate_image", args: { prompt: "Логотип: лиса", path: "assets/logo.png", aspect_ratio: "1:1" } }] };
-  const finish = { toolCalls: [{ name: "finish", args: { summary: "Логотип готов", commit_message: "Add logo" } }] };
 
-  it("draws a cheap picture into the copy, charges the task and shows it in review", async () => {
-    const id = await runTask([draw, finish]);
-    const task = await waitTask(id, (t) => t.status === "review");
-    expect(task.costUsd).toBeGreaterThanOrEqual(0.039);
-
-    const diff = await (await env.call("GET", `/api/tasks/${id}/diff`)).json();
-    expect(diff.find((f: any) => f.path === "assets/logo.png")).toMatchObject({ binary: true });
-    const file = await env.call("GET", `/api/tasks/${id}/file?path=assets/logo.png`);
-    expect(Buffer.from(await file.arrayBuffer())).toEqual(PNG);
-
+  // Asked whether the project's agent has every tool: it had no picture tool; now it draws right into the project folder.
+  it("draws a picture in a project's run, straight into the project's folder, and keeps it in the gallery", async () => {
+    const run = await runWork([draw]);
+    const done = await waitWork(env, run.projectId);
+    expect(done.status).toBe("done");
+    expect(readFileSync(join(repo, "assets/logo.png"))).toEqual(PNG);
     const gallery = await (await env.call("GET", "/api/media")).json();
-    expect(gallery[0]).toMatchObject({ kind: "image", taskId: id, path: "assets/logo.png", prompt: "Логотип: лиса" });
-    expect(existsSync(join(repo, "assets/logo.png"))).toBe(false);
+    expect(gallery[0]).toMatchObject({ kind: "image", path: "assets/logo.png", prompt: "Логотип: лиса" });
   });
 
   it("asks before a dear picture and draws nothing when refused", async () => {
-    const id = await runTask([draw, finish], "img/dear");
-    const waiting = await waitTask(id, (t) => t.pendingApproval);
-    expect(waiting.pendingApproval).toMatchObject({ reason: "media_cost" });
-    expect(waiting.pendingApproval.command).toContain("$0.25");
-    await env.call("POST", `/api/tasks/${id}/approvals/${waiting.pendingApproval.id}`, { allow: false });
-    await waitTask(id, (t) => t.status === "done_empty");
+    const run = await runWork([draw], "img/dear");
+    const asked = await waitApproval(env, run.chatId);
+    expect(asked.tool).toContain("$0.25");
+    await answerApproval(env, run.chatId, asked.id, false);
+    await waitWork(env, run.projectId);
     expect(fake!.requests.some((r) => r.path === "/v1/images")).toBe(false);
-  });
-
-  // Asked whether the project's agent has every tool: it had no picture tool; now it draws right into the project folder.
-  it("draws a picture in a project's run, straight into the project's folder", async () => {
-    const id = await start({ script: [draw, { text: "Логотип готов." }] });
-    await env.call("PATCH", "/api/settings", { imageModel: { providerId: id, model: "img/cheap" } });
-    const project = await (await env.call("POST", "/api/projects", { path: repo, kind: "existing" })).json();
-    await env.call("POST", `/api/projects/${project.id}/work/chat`, { content: "Нарисуй логотип", model: { providerId: id, model: "coder" } });
-    for (let i = 0; i < 400; i++) {
-      const w = await (await env.call("GET", `/api/projects/${project.id}/work`)).json();
-      if (w.status === "done") break;
-      await new Promise((r) => setTimeout(r, 25));
-    }
-    expect(readFileSync(join(repo, "assets/logo.png"))).toEqual(PNG);
+    expect(existsSync(join(repo, "assets/logo.png"))).toBe(false);
   });
 
   it("has no picture tool without a model for it in the settings", async () => {
-    const id = await start({ script: [finish] });
-    const project = await (await env.call("POST", "/api/projects", { path: repo })).json();
-    const stages = { interview: false, spec: false, approveSpec: false, testsFirst: false };
-    await env.call("POST", `/api/projects/${project.id}/tasks`, { task: "x", providerId: id, model: "coder", stages });
-    for (let i = 0; i < 100 && !fake!.requests.some((r) => r.path === "/v1/chat/completions"); i++) await new Promise((r) => setTimeout(r, 20));
+    const run = await runWork([], null);
+    await waitWork(env, run.projectId);
     const tools = fake!.requests.find((r) => r.path === "/v1/chat/completions")!.body.tools.map((t: any) => t.function.name);
     expect(tools).not.toContain("generate_image");
   });

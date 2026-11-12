@@ -15,7 +15,6 @@ interface MediaRow {
   cost_usd: number | null;
   chat_id: string | null;
   message_id: string | null;
-  task_id: string | null;
   path: string | null;
   created_at: number;
 }
@@ -41,7 +40,6 @@ export interface NewMedia {
   costUsd: number | null;
   chatId?: string;
   messageId?: string;
-  taskId?: string;
   path?: string;
 }
 
@@ -72,7 +70,6 @@ export class MediaRepo {
       cost_usd: m.costUsd,
       chat_id: m.chatId ?? null,
       message_id: m.messageId ?? null,
-      task_id: m.taskId ?? null,
       path: m.path ?? null,
       created_at: Date.now(),
     };
@@ -127,7 +124,6 @@ function toItem(r: MediaRow): MediaItem {
     model: r.model,
     costUsd: r.cost_usd,
     chatId: r.chat_id,
-    taskId: r.task_id,
     path: r.path,
     createdAt: r.created_at,
   };

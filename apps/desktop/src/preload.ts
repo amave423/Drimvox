@@ -24,11 +24,6 @@ contextBridge.exposeInMainWorld("drimvox", {
   },
   installUpdate: () => ipcRenderer.send("drimvox:update-install"),
   checkUpdates: () => ipcRenderer.send("drimvox:update-check"),
-  onOpenTask: (listener: (taskId: string) => void) => {
-    const handler = (_event: unknown, taskId: unknown) => typeof taskId === "string" && listener(taskId);
-    ipcRenderer.on("drimvox:open-task", handler);
-    return () => void ipcRenderer.removeListener("drimvox:open-task", handler);
-  },
   onOpenChat: (listener: (chatId: string) => void) => {
     const handler = (_event: unknown, chatId: unknown) => typeof chatId === "string" && listener(chatId);
     ipcRenderer.on("drimvox:open-chat", handler);

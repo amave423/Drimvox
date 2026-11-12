@@ -27,10 +27,6 @@ describe("translate", () => {
     expect(translate("ru", "task.reason.no_such_reason" as never, { n: 1 })).toBe("task.reason.no_such_reason");
   });
 
-  it("has a text for the reviewer giving no verdict", () => {
-    expect(dictionaries.ru["task.reason.acceptance_error" as keyof typeof dictionaries.ru]).toBeTruthy();
-  });
-
   it("fills placeholders", () => {
     expect(translate("en", "local.get", { size: "3 GB" })).toBe("Download · 3 GB");
   });

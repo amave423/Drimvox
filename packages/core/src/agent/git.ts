@@ -71,18 +71,6 @@ export async function isRepoRoot(dir: string): Promise<boolean> {
   return inside?.trim() === "true" && prefix.trim() === "";
 }
 
-/** Throws away uncommitted changes and new files (ignored ones stay), back to the last commit. */
-export async function discardChanges(dir: string): Promise<void> {
-  await runGit(dir, ["reset", "--hard", "-q"]);
-  // Installed dependencies are not committed (see commitAll), so they would go too: the app could not start again.
-  await runGit(dir, ["clean", "-fdq", ...NEVER_ADDED.flatMap((name) => ["-e", `${name}/`])]);
-}
-
-export async function ensureIdentity(dir: string): Promise<void> {
-  const res = await runGit(dir, ["var", "GIT_AUTHOR_IDENT"], true);
-  if (res.code !== 0) throw new GitError("no_identity", "git user.name and user.email are not set");
-}
-
 /**
  * Starts git in a plain folder with one commit of what is there, dependency folders left out. Without a name and email
  * in git, this repository alone gets the computer's user name: the user need not know about git to start.
@@ -106,16 +94,6 @@ export async function headCommit(repo: string): Promise<string> {
 export async function currentBranch(repo: string): Promise<string | null> {
   const res = await runGit(repo, ["symbolic-ref", "--short", "-q", "HEAD"], true);
   return res.code === 0 ? res.stdout.trim() : null;
-}
-
-export async function addWorktree(repo: string, path: string, branch: string, base: string): Promise<void> {
-  await runGit(repo, ["worktree", "add", "-q", "-b", branch, path, base]);
-}
-
-export async function removeWorktree(repo: string, path: string, branch: string): Promise<void> {
-  await runGit(repo, ["worktree", "remove", "--force", path], true);
-  await runGit(repo, ["worktree", "prune"], true);
-  await runGit(repo, ["branch", "-D", branch], true);
 }
 
 /** Records everything in the copy as a commit on the task branch. Returns false when nothing changed. */
@@ -165,69 +143,7 @@ export async function commitAll(worktree: string, message: string): Promise<bool
   return true;
 }
 
-export async function diffText(repo: string, base: string, head: string): Promise<string> {
-  return (await runGit(repo, ["diff", "--no-color", "--no-ext-diff", "--find-renames", base, head])).stdout;
-}
-
-export async function changedFiles(repo: string, base: string, head: string): Promise<string[]> {
-  return lines(await out(repo, ["diff", "--name-only", "--find-renames", base, head]));
-}
-
-/** Files with uncommitted or staged edits in the user's working folder. */
-export async function dirtyFiles(repo: string): Promise<string[]> {
-  // Not trimmed: each entry starts with a two-letter status that may begin with a space.
-  const status = (await runGit(repo, ["status", "--porcelain", "-z", "--untracked-files=all"])).stdout;
-  return status
-    .split("\0")
-    .filter(Boolean)
-    .map((entry) => entry.slice(3));
-}
-
-/** Files that would conflict if `branch` were merged into HEAD, without touching the working folder. */
-export async function conflictingFiles(repo: string, branch: string): Promise<string[]> {
-  const res = await runGit(repo, ["merge-tree", "--write-tree", "--name-only", "HEAD", branch], true);
-  if (res.code === 0) return [];
-  if (res.code !== 1) throw new GitError("failed", `git merge-tree: ${res.stderr.trim()}`);
-  const [, ...rest] = res.stdout.split("\n");
-  const files: string[] = [];
-  for (const line of rest) {
-    if (!line.trim()) break;
-    files.push(line.trim());
-  }
-  return [...new Set(files)];
-}
-
-/** Brings the branch onto the current branch as one commit authored by the user. */
-export async function squashInto(repo: string, branch: string, message: string): Promise<string | null> {
-  await runGit(repo, ["merge", "--squash", "-q", branch]);
-  const staged = await runGit(repo, ["diff", "--cached", "--quiet"], true);
-  if (staged.code === 0) return null;
-  await runGit(repo, ["commit", "-q", "-m", message]);
-  return headCommit(repo);
-}
-
 function lines(text: string): string[] {
   return text.split("\n").map((l) => l.trim()).filter(Boolean);
 }
 
-
-/**
- * Merges a subtask branch into a goal's copy. Returns null on success, or the conflicting files after
- * aborting the merge, so the goal's branch stays exactly as it was.
- */
-export async function mergeBranch(worktree: string, branch: string, message: string): Promise<string[] | null> {
-  const res = await runGit(worktree, [...drimvoxIdentity, "merge", "--no-ff", "--no-edit", "-m", message, branch], true);
-  if (res.code === 0) return null;
-  const conflicts = lines((await runGit(worktree, ["diff", "--name-only", "--diff-filter=U"], true)).stdout);
-  await runGit(worktree, ["merge", "--abort"], true);
-  return conflicts.length ? conflicts : ["(merge failed)"];
-}
-
-/** A file's bytes at a commit or branch; null when it is not there. */
-export function showFile(repo: string, ref: string, path: string): Promise<Buffer | null> {
-  return new Promise((resolve) => {
-    execFile("git", ["show", `${ref}:${path}`], { cwd: repo, encoding: "buffer", maxBuffer: 256 * 1024 * 1024, windowsHide: true }, (err, stdout) =>
-      resolve(err ? null : stdout),
-    );
-  });
-}

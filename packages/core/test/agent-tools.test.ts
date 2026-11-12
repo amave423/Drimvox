@@ -2,11 +2,11 @@ import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from "n
 import { storeOf } from "../src/agent/store";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { classifyCommand, runCommand } from "../src/agent/commands";
+import { classifyCommand, gitBash, runCommand, shellNote } from "../src/agent/commands";
 import { parseDiff } from "../src/agent/diff";
-import { BATCH_HINT, STUCK_HINT, feedbackMessage, systemPrompt } from "../src/agent/prompt";
+import { BATCH_HINT, STUCK_HINT, systemPrompt } from "../src/agent/prompt";
 import { ASSETS_HINT, DESIGN_HINT } from "../src/agent/design";
-import { existingRules, projectRules } from "../src/work/prompt";
+import { projectRules } from "../src/work/prompt";
 import { folderHint } from "../src/chats/folder";
 import { Workspace } from "../src/agent/workspace";
 import { makeRepo } from "./git-repo";
@@ -230,6 +230,23 @@ describe("runCommand", () => {
     expect(Date.now() - started).toBeLessThan(10_000);
   }, 20_000);
 
+  // Seen live: `npm install | tail -5` in PowerShell hid npm's output, and the agent dropped the SQLite it was asked for.
+  it.runIf(process.platform === "win32" && !!gitBash())("runs commands in Git Bash on Windows: pipes, && and Unix tools work", async () => {
+    const result = await runCommand(`node -e "console.log(1); console.log(2)" | tail -1 && echo "ok" | grep ok`, root, 30_000);
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toBe("2\nok");
+    expect(shellNote("win32")).toMatch(/^bash \(Git for Windows\)/);
+  });
+
+  it.runIf(process.platform === "win32")("asks before a Git Bash path outside the folder, as before a C:\\ one", () => {
+    expect(classifyCommand("rm -rf /c/Windows/Temp/x", root)).toEqual({ action: "ask", reason: "outside" });
+    expect(classifyCommand("ls /c/Windows", root)).toEqual({ action: "ask", reason: "outside" });
+  });
+
+  describe("without Git, in PowerShell", () => {
+    beforeEach(() => void (process.env.DRIMVOX_SHELL = "powershell"));
+    afterEach(() => void delete process.env.DRIMVOX_SHELL);
+
   it.runIf(process.platform === "win32")("prints PowerShell errors as plain text", async () => {
     const result = await runCommand("Get-Item does-not-exist.txt", root, 30_000);
     expect(result.exitCode).toBe(1);
@@ -244,6 +261,11 @@ describe("runCommand", () => {
     expect(result.output).not.toContain("CLIXML");
     expect(result.output).toContain("&&");
     expect(result.output).toMatch(/PowerShell 5\.1/);
+  });
+
+    it("tells the model it is Windows PowerShell 5.1, without && or ||", () => {
+      expect(systemPrompt("C:\\repo", "win32")).toContain("Windows PowerShell 5.1 (no && or ||");
+    });
   });
 
   it("keeps only the end of long output", async () => {
@@ -269,18 +291,6 @@ describe("runCommand", () => {
     // A short output is shown whole, with no file.
     expect(await call("run_command", { command: `node -e "console.log('short')"`, timeout_seconds: 60 })).not.toContain("saved whole");
   }, 30_000);
-});
-
-describe("feedbackMessage", () => {
-  it("tells the model which comments are on removed lines", () => {
-    const text = feedbackMessage("Почти", [
-      { path: "a.ts", line: 2, side: "new", text: "переименуй" },
-      { path: "a.ts", line: 2, side: "old", text: "зачем удалил?" },
-    ]);
-    expect(text).toContain("- a.ts:2 — переименуй");
-    expect(text).toContain("- a.ts:2 (a line you removed; number in the original file) — зачем удалил?");
-    expect(text).toContain("General comment: Почти");
-  });
 });
 
 describe("parseDiff", () => {
@@ -330,14 +340,14 @@ describe("parseDiff", () => {
 });
 
 describe("systemPrompt", () => {
-  it("warns about Windows PowerShell 5.1 and its missing &&", () => {
-    expect(systemPrompt("C:\repo", "win32")).toContain("Windows PowerShell 5.1 (no && or ||");
-    expect(systemPrompt("/repo", "linux")).toContain("sh on a Unix-like system");
+  it("names the shell the commands run in", () => {
+    expect(systemPrompt("C:\\repo", "win32")).toContain(shellNote("win32"));
+    expect(systemPrompt("/repo", "linux")).toContain("Commands run with sh");
   });
 
   // Codex's and Claude Code's prompts ask for independent calls in one step; every step sends the whole conversation again.
   it("asks every agent to make independent calls in one step", () => {
-    for (const prompt of [systemPrompt("/repo", "linux"), projectRules(null, true), existingRules(true), folderHint("/repo", "linux")]) {
+    for (const prompt of [systemPrompt("/repo", "linux"), projectRules(true), folderHint("/repo", "linux")]) {
       expect(prompt).toContain(BATCH_HINT);
       expect(prompt).toContain(STUCK_HINT);
       // Asked for: icons from libraries and real pictures, not emoji (seen: flags and weather as emoji in every converter).

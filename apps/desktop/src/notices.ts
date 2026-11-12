@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 /** What a notification opens when clicked. */
 export interface NoticeTarget {
-  taskId?: string;
   projectId?: string;
   chatId?: string;
 }

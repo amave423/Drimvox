@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 // @ts-expect-error A plain module shared with the core's tests.
 import { startFakeGithub } from "../../../packages/core/test/fake-github.mjs";
 import { paramsButton } from "./sections";
-import { addProject } from "./start-task";
+import { addProject } from "./add-project";
 
 const mainJs = fileURLToPath(new URL("../dist/main.cjs", import.meta.url));
 

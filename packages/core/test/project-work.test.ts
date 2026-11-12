@@ -8,7 +8,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv, type TestEnv } from "./env";
 import { startFakeProvider, type FakeProvider, type FakeTurn } from "./fake-provider";
 import { git, makeRepo } from "./git-repo";
-import { setRetryDelays } from "../src/agent/pass";
 
 // docs/specs/project-work.md: one conversation per project, as a chat with a folder; a plan first, as Claude Code makes it.
 vi.setConfig({ testTimeout: 30_000 });
@@ -31,12 +30,6 @@ afterEach(async () => {
 });
 
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
-const PLAN = {
-  summary: "Сайт клиники: онлайн-запись к врачу и прайс-лист.",
-  steps: ["Каталог", "Калькулятор", "Проверить страницы"],
-  checks: ["Каталог открывается", "npm test"],
-  pages: [{ url: "http://localhost:5173/", command: "npm run dev" }],
-};
 const PRICED = [{ id: "coder", supported_parameters: ["tools"], pricing: { prompt: "0.000001", completion: "0.000002" } }];
 
 /** A fake provider answering each model from its own queue: who wrote what shows in the requests. */
@@ -340,7 +333,6 @@ describe("a ready project", () => {
     const res = await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Почини сумму", model: s.ref("coder") });
     expect(res.status).toBe(200);
     let work = await until(s.project.id, (w) => w.status === "done");
-    expect(work.plan).toBeNull();
     // No reminders to finish: it answered and stopped, as in a chat.
     expect(requestsOf("coder")).toHaveLength(1);
     expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("Drimvox's coding agent");
@@ -579,7 +571,6 @@ describe("a project's git rules", () => {
     return until(s.project.id, (w) => w.status === "done" && requestsOf("coder").length >= turns);
   };
 
-  // Asked for: no commits by hand and no agent's rituals; Drimvox commits the answer's changes at its end.
   // Asked for: the agent commits itself with messages of its own, as in OpenCode; Drimvox's commits were named by the
   // user's messages. Drimvox makes none of its own.
   it("leaves the commits to the agent, with its own messages, in the project's branch", async () => {
@@ -645,6 +636,16 @@ describe("a project's git rules", () => {
     expect((await env.call("POST", `/api/chats/${work.chatId}/messages/${answer.id}/undo`)).status).toBe(200);
     expect(readFileSync(join(folder, "index.html"), "utf8")).toBe("<h1>Клиника</h1>\n");
     expect(existsSync(join(folder, "new.js"))).toBe(false);
+  });
+
+  // The project's git card says when to commit and how the messages read: the agent, who commits now, is told so.
+  it("tells the agent the project's rules for its commits: when, and in which language", async () => {
+    const s = await ready([{ text: "Готово." }], { commit: "end", messages: "ru" });
+    await ask(s, "Сделай a", 1);
+    const system = JSON.stringify(requestsOf("coder")[0]!.body.messages[0]);
+    expect(system).toContain("Commit your work with git yourself, once, when the whole task is done and checked");
+    expect(system).toContain("in Russian");
+    expect(system).toContain("Never delete a repository");
   });
 
   it("commits nothing when the rules say so, and the agent is told git is the user's", async () => {

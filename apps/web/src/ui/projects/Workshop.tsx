@@ -3,7 +3,6 @@ import type { ProjectView, ProjectWorkView } from "@drimvox/shared";
 import { useEffect, useState } from "react";
 import { useApp } from "../../context";
 import { ChatSheet } from "../chat/ChatSheet";
-import { TaskSheet } from "../tasks/TaskSheet";
 import { useAddProject } from "./AddProject";
 import { PaneSplit, usePaneWidth } from "../PaneSplit";
 import { useProjectWork } from "./useProjectWork";

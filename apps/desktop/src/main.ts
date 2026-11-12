@@ -430,14 +430,13 @@ function registerIpc() {
     void shell.openPath(dir);
   });
 
-  // Drimvox's own notifications (notices.ts): a click brings the window forward on the task or the project.
+  // Drimvox's own notifications (notices.ts): a click brings the window forward on the project or the chat.
   setupNotices((target) => {
     if (!win) return;
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
-    if (target.taskId) win.webContents.send("drimvox:open-task", target.taskId);
-    else if (target.projectId) win.webContents.send("drimvox:open-project", target.projectId);
+    if (target.projectId) win.webContents.send("drimvox:open-project", target.projectId);
     else if (target.chatId) win.webContents.send("drimvox:open-chat", target.chatId);
   });
 
@@ -460,9 +459,9 @@ function registerIpc() {
     if (!fromOurPage(event.senderFrame?.url)) return;
     const request = noticeRequest(notice);
     if (!request) return;
-    const { taskId, projectId, chatId } = (notice ?? {}) as { taskId?: unknown; projectId?: unknown; chatId?: unknown };
+    const { projectId, chatId } = (notice ?? {}) as { projectId?: unknown; chatId?: unknown };
     const id = (v: unknown) => (typeof v === "string" && v ? v : undefined);
-    const target = { taskId: id(taskId), projectId: id(projectId), chatId: id(chatId) };
+    const target = { projectId: id(projectId), chatId: id(chatId) };
     // Tests cannot take the focus away from the window; they say it is elsewhere.
     const away = process.env.DRIMVOX_TEST_UNFOCUSED === "1" || !win?.isFocused();
     if (!away) return;
@@ -470,11 +469,10 @@ function registerIpc() {
       // Tests read and click notifications here instead of on the desktop.
       const shown = ((globalThis as { drimvoxNotices?: unknown[] }).drimvoxNotices ??= []);
       const click = () => {
-        if (target.taskId) win?.webContents.send("drimvox:open-task", target.taskId);
-        else if (target.projectId) win?.webContents.send("drimvox:open-project", target.projectId);
+        if (target.projectId) win?.webContents.send("drimvox:open-project", target.projectId);
         else if (target.chatId) win?.webContents.send("drimvox:open-chat", target.chatId);
       };
-      shown.push({ title: request.title, body: request.body, taskId: target.taskId ?? "", projectId: target.projectId ?? "", chatId: target.chatId ?? "", click });
+      shown.push({ title: request.title, body: request.body, projectId: target.projectId ?? "", chatId: target.chatId ?? "", click });
       return;
     }
     void showNotice(origin, request, target);

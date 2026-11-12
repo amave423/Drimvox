@@ -5,16 +5,12 @@ import type { MessageKey } from "../i18n";
 import { showStart } from "./SideChats";
 import { RemoveProject } from "./projects/RemoveProject";
 import { AddProject } from "./projects/AddProject";
-import { StatusDot } from "./tasks/StatusDot";
-
-const FINISHED = new Set(["accepted", "discarded"]);
 
 /**
- * The projects' mode's sidebar: every project with how its work goes, the open project's checklist under it, and its
- * separate tasks and their conversations.
+ * The projects' mode's sidebar: every project with how its work goes.
  */
 export function SideProjects() {
-  const { api, t, view, navigate, projects, tasks, chats, works, reloadProjects } = useApp();
+  const { api, t, view, navigate, projects, chats, works, reloadProjects } = useApp();
   // A project is called by its folder until the user names it (asked for: renaming like chats).
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -43,7 +39,6 @@ export function SideProjects() {
   }
   const currentChat = view.kind === "chat" ? view.chatId : undefined;
   const currentProject = view.kind === "project" ? view.projectId : undefined;
-  const currentTask = view.kind === "task" ? view.taskId : undefined;
 
   return (
     <section className="side-group side-projects">
@@ -57,9 +52,6 @@ export function SideProjects() {
         <ul className="side-list">
           {projects.map((project) => {
             const work = works.find((w) => w.projectId === project.id) ?? null;
-            const open = tasks.filter((task) => task.projectId === project.id && !FINISHED.has(task.status) && task.id !== work?.planTaskId).slice(0, 6);
-            // A separate task's conversations; the project's own work is its workshop.
-            const talks = chats.filter((c) => c.projectId === project.id && c.itemId).slice(0, 6);
             const here = project.id === currentProject;
             return (
               <li key={project.id}>
@@ -130,33 +122,6 @@ export function SideProjects() {
                   </div>
                 )}
                 {removing === project.id && <RemoveProject project={project} asked onDone={() => setRemoving(null)} />}
-                {(open.length > 0 || talks.length > 0) && (
-                  <ul className="side-sublist">
-                    {talks.map((chat) => (
-                      <li key={chat.id}>
-                        <button
-                          className={`side-item side-task${chat.id === currentChat ? " is-on" : ""}`}
-                          onClick={() => navigate({ kind: "chat", chatId: chat.id, key: chat.id })}
-                          aria-current={chat.id === currentChat ? "page" : undefined}
-                        >
-                          <span className="side-item-title">{chat.title ?? t("chat.untitled")}</span>
-                        </button>
-                      </li>
-                    ))}
-                    {open.map((task) => (
-                      <li key={task.id}>
-                        <button
-                          className={`side-item side-task${task.id === currentTask ? " is-on" : ""}`}
-                          onClick={() => navigate({ kind: "task", taskId: task.id })}
-                          aria-current={task.id === currentTask ? "page" : undefined}
-                        >
-                          <StatusDot status={task.status} />
-                          <span className="side-item-title">{task.title}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </li>
             );
           })}

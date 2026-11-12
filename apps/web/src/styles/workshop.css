@@ -134,7 +134,9 @@
 
 /* The run's conversation as a timeline (variant C): each message at its time, on one line down the side. */
 .workshop-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.workshop-chat-body { flex: 1; display: flex; flex-direction: column; padding: 16px 22px 0; max-width: 1000px; width: 100%; }
+/* Seen on a full-screen window: the conversation took a narrow strip on the left. It grows with the window, centred, up to
+   a width where lines are still read easily. */
+.workshop-chat-body { flex: 1; display: flex; flex-direction: column; padding: 16px 28px 0; max-width: 1360px; width: 100%; margin: 0 auto; box-sizing: border-box; }
 .timeline { gap: 0; }
 .tl-item { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0 14px; position: relative; padding-bottom: 16px; }
 .tl-item::before { content: ""; position: absolute; left: 54px; top: 6px; bottom: -6px; width: 2px; background: var(--line); }

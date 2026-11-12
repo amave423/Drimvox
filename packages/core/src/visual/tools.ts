@@ -1,4 +1,4 @@
-import type { PageAction, TaskEvent, VisualCheck } from "@drimvox/shared";
+import type { PageAction } from "@drimvox/shared";
 import { pageStepsInput } from "./steps";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
@@ -23,7 +23,8 @@ export interface VisualDeps {
   vision: Vision | null;
   hooks: Omit<ToolHooks, "onFinish">;
   onSpend(usd: number): void;
-  event(kind: TaskEvent["kind"], data: unknown): void;
+  /** A screenshot taken: its id among the shots, and the page. */
+  event(kind: "screenshot", data: { id: string; url: string }): void;
 }
 
 const SIZE = { width: 1280, height: 800 };
@@ -41,10 +42,6 @@ export interface LookLimit {
   /** What the agent is told when it is out of looks. */
   then: string;
 }
-
-export const VISUAL_HINT =
-  "To see an interface you built, start it with start_background (for example npm run dev), read its output with " +
-  "read_background to learn the address, then call look_at_page with the address and a question about what should be visible.";
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve) => {
@@ -184,55 +181,4 @@ ${d.kit.background.read(d.taskId, already.id)}`;
       }),
   });
   return tools;
-}
-
-export interface VisualResult {
-  check: VisualCheck;
-  ok: boolean;
-  answer: string;
-}
-
-/** Drimvox's own look at the pages from the spec: start the app if asked, wait for the address, judge the screenshot. */
-export async function runVisualChecks(d: VisualDeps, checks: VisualCheck[], signal?: AbortSignal): Promise<VisualResult[]> {
-  const results: VisualResult[] = [];
-  const started: number[] = [];
-  try {
-    for (const check of checks) {
-      if (check.start) started.push(d.kit.background.start(d.taskId, check.start, d.worktree).id);
-      let answer: string;
-      let ok = false;
-      if (!mayLookAt(check.url)) answer = "Only this computer (localhost) and public addresses can be opened.";
-      // A server Drimvox just started needs time to come up; one that already runs is photographed at once.
-      else if (check.start && !(await reachable(check.url, signal))) answer = `${check.url} did not answer within a minute.`;
-      else {
-        // Seen live: one page passed and failed by turns over a language switch the screenshot did not show.
-        const question = [
-          `Does the page meet this, in substance: "${check.expect}"?`,
-          "FAIL only when something important is missing or broken: an error, an empty or half-drawn page, a missing part.",
-          "Wording that differs a little, and what a still screenshot cannot show (motion, sound, hover, what opens on a click),",
-          "are no reasons to fail. Start the answer with PASS or FAIL, then say what you see.",
-        ].join(" ");
-        answer = (await look(d, check.url, question, signal)).answer;
-        ok = /^\W*PASS\b/i.test(answer);
-      }
-      d.event("check", { phase: "visual", command: `${check.url} — ${check.expect}`, exitCode: ok ? 0 : 1, ok, output: answer });
-      results.push({ check, ok, answer });
-    }
-  } finally {
-    for (const id of started) d.kit.background.stop(d.taskId, id);
-  }
-  return results;
-}
-
-/** A freshly started dev server takes a while; any answer from the address counts. */
-export async function reachable(url: string, signal?: AbortSignal): Promise<boolean> {
-  for (let i = 0; i < 60 && !signal?.aborted; i++) {
-    try {
-      await fetch(url, { signal: AbortSignal.timeout(3000) });
-      return true;
-    } catch {
-      await sleep(1000, signal);
-    }
-  }
-  return false;
 }
