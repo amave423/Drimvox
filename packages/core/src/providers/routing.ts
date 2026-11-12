@@ -63,6 +63,17 @@ function cheapest(baseUrl: string, model: string, fetchFn: typeof fetch): Promis
   return tag;
 }
 
+/** Models whose cheapest provider failed lately, by `baseUrl|model`: until when their requests go where the router sends them. */
+const avoided = new Map<string, number>();
+
+/**
+ * The cheapest provider of a model stopped answering or broke off: the next requests go unpinned for a while, the router
+ * picks one that works (seen live: four tries in a row waited two minutes each for one provider of DeepSeek 1017).
+ */
+export function unpinCheapest(baseUrl: string, model: string, ms = 15 * 60_000): void {
+  avoided.set(`${baseUrl}|${model}`, Date.now() + ms);
+}
+
 /** Requests to the chat API go to the model's cheapest provider; a request that names its own provider is left as it is. */
 export function withCheapestProvider(baseUrl: string, fetchFn: typeof fetch): typeof fetch {
   return async (input, init) => {
@@ -74,6 +85,7 @@ export function withCheapestProvider(baseUrl: string, fetchFn: typeof fetch): ty
       return fetchFn(input, init);
     }
     if (typeof body.model !== "string" || body.provider || body.model.includes("@")) return fetchFn(input, init);
+    if ((avoided.get(`${baseUrl}|${body.model}`) ?? 0) > Date.now()) return fetchFn(input, init);
     const tag = await cheapest(baseUrl, body.model, fetchFn);
     if (!tag) return fetchFn(input, init);
     return fetchFn(input, { ...init, body: JSON.stringify({ ...body, provider: { order: [tag] } }) });

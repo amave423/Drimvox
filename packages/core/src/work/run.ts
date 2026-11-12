@@ -15,6 +15,7 @@ import { webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { todayLine } from "../now";
 import { findModel } from "../providers/catalog";
+import { unpinCheapest } from "../providers/routing";
 import type { Connection, ProviderRepo } from "../providers/repo";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 import { askAboutPictures, type Vision } from "../visual/look";
@@ -249,6 +250,8 @@ export class WorkRun {
         if (signal.aborted || outcome.kind === "stopped") return stopWith("stopped", "user");
         if (outcome.kind === "error") {
           const wait = retryWait(outcome.error.code, ++errors);
+          // Not the same provider again: the router picks another for a while (routing.ts).
+          if (TRANSIENT.has(outcome.error.code)) unpinCheapest(conn.baseUrl, ref.model);
           if (wait !== null) {
             await sleep(wait, signal);
             continue;

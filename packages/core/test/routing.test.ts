@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cheapestEndpoint, withCheapestProvider } from "../src/providers/routing";
+import { cheapestEndpoint, unpinCheapest, withCheapestProvider } from "../src/providers/routing";
 
 const endpoint = (tag: string, prompt: number, cache: number | null, completion: number, extra: Record<string, unknown> = {}) => ({
   tag,
@@ -41,5 +41,23 @@ describe("the cheapest provider of a model", () => {
     expect(sent[0]!.body).toMatchObject({ model: "deepseek/flash", provider: { order: ["morph"] } });
     expect((sent[0]!.body as { provider: { allow_fallbacks?: boolean } }).provider.allow_fallbacks).toBeUndefined();
     expect(sent[1]!.body).not.toHaveProperty("provider");
+  });
+
+  // Seen live: four tries in a row waited two minutes each for one provider of DeepSeek 1017.
+  it("leaves the choice to the router for a while once the cheapest one failed", async () => {
+    const sent: unknown[] = [];
+    const fake: typeof fetch = async (input, init) => {
+      if (String(input).includes("/endpoints")) return new Response(JSON.stringify({ data: { endpoints: [endpoint("morph", 2.6, 0.47, 47.3)] } }));
+      sent.push(JSON.parse(String(init?.body)));
+      return new Response("{}");
+    };
+    const routed = withCheapestProvider("https://stuck.test/api/v1", fake);
+    const ask = () => routed("https://stuck.test/api/v1/chat/completions", { method: "POST", body: JSON.stringify({ model: "deepseek/flash", messages: [] }) });
+    await ask();
+    unpinCheapest("https://stuck.test/api/v1", "deepseek/flash");
+    await ask();
+    unpinCheapest("https://stuck.test/api/v1", "deepseek/flash", -1);
+    await ask();
+    expect(sent.map((b) => (b as { provider?: unknown }).provider ?? null)).toEqual([{ order: ["morph"] }, null, { order: ["morph"] }]);
   });
 });
