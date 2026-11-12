@@ -138,8 +138,9 @@ function absolutePaths(command: string): string[] {
   }
   for (const m of command.matchAll(/(?:^|[\s"'=(])((?:~|\/)[^\s"'`;|&)]*)/g)) {
     const path = m[1]!;
-    // Command switches like /s or /T are not paths; a lone "/" or "/etc/..." is.
-    if (/^\/[a-zA-Z?]{1,2}$/.test(path)) continue;
+    // Command switches like /s or /T are not paths, nor //F as Git Bash writes them (seen: `taskkill //F //IM app.exe`
+    // asked for permission); a lone "/" or "/etc/..." is. /dev/null is nobody's file.
+    if (/^\/{1,2}[a-zA-Z?]{1,2}$/.test(path) || path === "/dev/null") continue;
     // On Windows "/x" means the root of the drive, where code rarely points; '/api/boards' in a script is a URL path.
     // Only a folder that really sits at the root counts.
     // A regular expression such as /\\/g in code is not a folder either: only a plain name at the root counts.
