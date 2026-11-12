@@ -208,13 +208,16 @@ export class ProjectGit {
     }[rules.commit];
     let style = {
       history: "",
-      en: "with one short line in English, imperative (Fix cart total after removing an item)",
+      en: "with one short line in English, imperative, under 72 characters (Fix cart total after removing an item)",
       ru: "with one short line in Russian (Исправлен пересчёт суммы в корзине)",
       conventional: "with a Conventional Commits line (fix(cart): recalc total on remove)",
     }[rules.messages];
     if (rules.messages === "history") {
       const log = (await runGit(folder, ["log", "-8", "--format=%s"], true)).stdout.trim();
-      style = log ? `with messages written like this project's recent ones (${log.split("\n").join(" | ")})` : "with one short line in English, imperative";
+      // One short line all the same: a history of long messages is no pattern to follow (seen: chat messages as commits).
+      style = log
+        ? `with one short line (under 72 characters) in the language and form of this project's recent messages (${log.split("\n").join(" | ")})`
+        : "with one short line in English, imperative, under 72 characters";
     }
     return commitRules(when, style);
   }

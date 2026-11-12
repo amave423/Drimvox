@@ -163,11 +163,11 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
     run_command,
     update_notes: wrap(
       "update_notes",
-      "Rewrite your section of the project's AGENTS.md: what any agent working here next must know (the goal, decisions, how to build, test and run, what is done and what is next, pitfalls). Short and current, not a diary; it starts every request. Leave out what the files show by themselves (the folders, the code, the dependencies): only what is not visible there.",
+      "Rewrite your notes on this project, kept by Drimvox outside it: what any agent working here next must know. First what the user wants and what they said not to do, in their own words (\"no web version: the VPS is only a server for the desktop app\"); then the decisions, how to build, test, run and deploy, what is done and what is next, pitfalls. Short and current, not a diary; it starts every request. Leave out what the files show by themselves (the folders, the code, the dependencies).",
       z.object({ notes: z.string().min(1) }),
       async ({ notes }) => {
         writeNotes(ws.root, notes);
-        return ok("Notes saved in AGENTS.md.");
+        return ok("Notes saved.");
       },
     ),
     finish: wrap(

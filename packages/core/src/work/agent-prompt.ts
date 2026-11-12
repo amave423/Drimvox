@@ -1,7 +1,7 @@
 import { shellNote } from "../agent/commands";
 
 /** What the agent is told about git when the project leaves the commits to it (the project's own rules say when and how). */
-export function commitRules(when = "as you go: when a piece of it is done and checked", style = 'with a short message in English saying what changed ("Add voice channel join"), in the style of the project\'s history'): string {
+export function commitRules(when = "as you go: when a piece of it is done and checked", style = 'with one short line in English, imperative, under 72 characters, saying what changed ("Add voice channel join")'): string {
   return [
     `- Commit your work with git yourself, ${when}: \`git add\` the files that belong to it by name and \`git commit -m\` ${style};`,
     "  each commit says what that commit changed, never the message of another one. Keep dependencies, builds, installers,",
@@ -64,6 +64,7 @@ export function agentPrompt(folder: string, platform = process.platform, git = c
     "# Rules",
     git,
     "- Never write a password, key or token into a file, the project's notes or a commit, even one the user gave you.",
-    "- Keep the project's notes (update_notes) for what the next conversation must know: commands, decisions.",
+    "- Keep the project's notes (update_notes) for what the next conversation must know: what the user asked for and what they",
+    "  said not to do, decisions, commands. Before you build or deploy anything, check it against them.",
   ].join("\n");
 }
