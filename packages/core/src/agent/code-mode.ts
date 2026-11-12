@@ -94,8 +94,17 @@ export function codeTool(tools: () => ToolSet, skip: string[]): Tool {
               worker.postMessage({ id: m.id, ok: false, value: `No tool "${name}". Tools: ${[...allowed].join(", ")}` });
               return;
             }
+            // The arguments are checked as for a direct call (seen live: ssh_upload called with other names than its own got
+            // undefined paths and answered "paths[1]", and the agent gave up uploading).
+            const schema = t.inputSchema as { safeParse?: (v: unknown) => { success: boolean; data?: unknown; error?: { issues: { path: PropertyKey[]; message: string }[] } } };
+            const parsed = schema.safeParse?.(m.args ?? {});
+            if (parsed && !parsed.success) {
+              const wrong = parsed.error!.issues.map((i) => `${i.path.map(String).join(".") || "(arguments)"}: ${i.message}`).join("; ");
+              worker.postMessage({ id: m.id, ok: false, value: `Wrong arguments for ${name}: ${wrong}` });
+              return;
+            }
             try {
-              const value = await t.execute(m.args as never, { toolCallId: `${o.toolCallId ?? "execute"}-${++calls}`, messages: [], abortSignal: o.abortSignal } as never);
+              const value = await t.execute((parsed ? parsed.data : m.args) as never, { toolCallId: `${o.toolCallId ?? "execute"}-${++calls}`, messages: [], abortSignal: o.abortSignal } as never);
               worker.postMessage({ id: m.id, ok: true, value: textOf(value) });
             } catch (err: unknown) {
               worker.postMessage({ id: m.id, ok: false, value: err instanceof Error ? err.message : String(err) });

@@ -31,6 +31,14 @@ describe("the execute tool", () => {
     expect(out).toContain("text of b.txt");
   });
 
+  // Seen live: ssh_upload called from code with other names than its own got undefined paths and answered "paths[1]".
+  it("checks a call's arguments as a direct call does, and says which are wrong", async () => {
+    const before = calls.length;
+    const out = await run(`return await tools.read_file({ file: "a.txt" })`);
+    expect(out).toContain("Wrong arguments for read_file: path:");
+    expect(calls.length).toBe(before);
+  });
+
   it("keeps the stop tools and unknown names out, and says what went wrong", async () => {
     expect(await run(`return await tools.finish({})`)).toContain('No tool "finish"');
     expect(await run(`throw new Error("boom")`)).toContain("boom");

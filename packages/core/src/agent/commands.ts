@@ -232,11 +232,17 @@ export function shellNote(platform: NodeJS.Platform = process.platform): string 
 /** Starts a command in the user's shell: bash or PowerShell on Windows, sh elsewhere (in its own process group). */
 export function spawnShell(command: string, cwd: string, env?: Record<string, string>): ChildProcessWithoutNullStreams {
   const withEnv = { env: { ...process.env, ...NO_PROMPTS, ...env } };
-  if (process.platform !== "win32") return spawn("/bin/sh", ["-c", command], { cwd, detached: true, ...withEnv });
-  const bash = gitBash();
-  return bash
-    ? spawn(bash, ["-c", command], { cwd, windowsHide: true, ...withEnv })
-    : spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], { cwd, windowsHide: true, ...withEnv });
+  const bash = process.platform === "win32" ? gitBash() : null;
+  const child =
+    process.platform !== "win32"
+      ? spawn("/bin/sh", ["-c", command], { cwd, detached: true, ...withEnv })
+      : bash
+        ? spawn(bash, ["-c", command], { cwd, windowsHide: true, ...withEnv })
+        : spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], { cwd, windowsHide: true, ...withEnv });
+  // Nobody types into it: a program that asks (npx's "Ok to proceed?", a prompt for a password) reads the end at once
+  // instead of waiting to its timeout (seen live: the agent noted "run_command often hangs" and turned to start_background).
+  child.stdin.end();
+  return child;
 }
 
 /** Stops a command and everything it started, such as a dev server's workers. */

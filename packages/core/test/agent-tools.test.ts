@@ -270,6 +270,13 @@ describe("runCommand", () => {
     });
   });
 
+  // Seen live: the agent noted "run_command often hangs": a program waiting for input waited to its timeout.
+  it("gives a command no input, so a program that asks ends instead of waiting", async () => {
+    const result = await runCommand(`node -e "process.stdin.resume(); process.stdin.on('end', () => console.log('no input'))"`, root, 20_000);
+    expect(result.timedOut).toBe(false);
+    expect(result.output).toBe("no input");
+  });
+
   it("keeps only the end of long output", async () => {
     const result = await runCommand(`node -e "console.log('x'.repeat(50000) + 'END')"`, root, 30_000);
     expect(result.output.length).toBeLessThan(13_000);
