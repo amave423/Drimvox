@@ -96,8 +96,10 @@ export function classifyCommand(command: string, root: string): CommandVerdict {
   for (const path of absolutePaths(command)) {
     if (!movesFiles && PROGRAM.test(path)) continue;
     if (inToolCache(path)) continue;
-    // Bare slashes in code (a string, a division, a // comment) are not the drive's root on Windows, unless something is deleted.
-    if (process.platform === "win32" && /^\/+$/.test(path) && !movesFiles) continue;
+    // Bare slashes in code (a string, a division, a // comment, a regular expression in `node -e`) are not the drive's root
+    // on Windows, unless the root itself is what is moved or deleted (seen live: `cp a /tmp/b && node -e "s.replace(/x/, …)"`
+    // asked for permission).
+    if (process.platform === "win32" && /^\/+$/.test(path) && !MOVES_ROOT.test(command)) continue;
     const rel = relative(home, realName(path));
     if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { action: "ask", reason: "outside" };
   }
@@ -123,7 +125,9 @@ function realName(path: string): string {
 }
 
 const PROGRAM = /\.(exe|com|cmd|bat)$/i;
-const MOVES_FILES = /(^|[\s;&|(])(remove-item|rm|rmdir|rd|del|erase|move-item|mv|move|copy-item|cp|copy|rename-item|ren)(?=[\s;]|$)/i;
+/** The root itself given to a command that moves or deletes: `rm -rf /`, `del /`. */
+const MOVES_ROOT = /(^|[\s;&|(])(remove-item|rm|rmdir|rd|del|erase|move-item|mv|move|copy-item|cp|copy)(\s+-{1,2}[\w-]+)*\s+["']?\/+["']?(?=[\s;&|)]|$)/i;
+const MOVES_FILES =/(^|[\s;&|(])(remove-item|rm|rmdir|rd|del|erase|move-item|mv|move|copy-item|cp|copy|rename-item|ren)(?=[\s;]|$)/i;
 
 /** Windows drive paths, UNC paths, home paths and bare unix roots mentioned in a command. */
 function absolutePaths(command: string): string[] {

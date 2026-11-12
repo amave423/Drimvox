@@ -114,7 +114,7 @@ describe("workspace", () => {
 
 describe("classifyCommand", () => {
   // Seen live: `cd server && npm test && cd ../app` asked for permission, though ../app is the project's own.
-  const allowed = ["npm test", "npm install", "node build.js", "git status", "git commit -m wip", "pytest -q", "dir src", "rm -rf dist", "cd server && npm test && cd ../app && npm test"];
+  const allowed = ["npm test", "npm install", "node build.js", "git status", "git commit -m wip", "pytest -q", "dir src", "rm -rf dist", "cd server && npm test && cd ../app && npm test", `cp src/app.js /tmp/app.bak && node -e "s.replace(/  app\\.addHook\\(/, '')"`];
   const asked: [string, string][] = [
     ["git push origin main", "push"],
     ["npm install -g typescript", "global"],
