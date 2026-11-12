@@ -67,11 +67,29 @@ const rules: [RegExp, Extract<CommandVerdict, { action: "ask" }>["reason"]][] = 
  * Decides whether the agent may run a command on its own or must ask first.
  * A guard against obvious harm, not a sandbox: the command still runs with the user's rights.
  */
+/**
+ * A relative `cd` that ends outside the folder, the `cd`s followed in order (seen live: `cd server && npm test && cd ../app`
+ * asked for permission, though ../app is the project's own).
+ */
+function leavesFolder(command: string, root: string): boolean {
+  const top = resolve(root);
+  let at = top;
+  for (const m of command.matchAll(/(?:^|[\s;&|(])(?:cd|chdir|set-location|pushd|sl)\s+(?:"([^"]+)"|'([^']+)'|([^\s;&|)]+))/gi)) {
+    const to = (m[1] ?? m[2] ?? m[3])!;
+    // Absolute paths are judged with the other paths of the command, below.
+    if (isAbsolute(to) || /^[a-zA-Z]:/.test(to) || to.startsWith("/") || to.startsWith("~")) continue;
+    at = resolve(at, to);
+    const rel = relative(top, at);
+    if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return true;
+  }
+  return false;
+}
+
 export function classifyCommand(command: string, root: string): CommandVerdict {
   if (DESTROYS.some((p) => p.test(command))) return { action: "deny", reason: "destroy" };
   for (const [pattern, reason] of rules) if (pattern.test(command)) return { action: "ask", reason };
   if (opensBrowser(command)) return { action: "ask", reason: "browser" };
-  if (/(^|[\s;&|(])(cd|chdir|set-location|pushd|sl)\s+["']?\.\.(?=[\\/\s"']|$)/i.test(command)) return { action: "ask", reason: "outside" };
+  if (leavesFolder(command, root)) return { action: "ask", reason: "outside" };
   const home = realName(root);
   // Running an installed program (a browser for a headless look, say) touches nothing outside; moving or deleting it does.
   const movesFiles = MOVES_FILES.test(command);
