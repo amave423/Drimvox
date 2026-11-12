@@ -3,8 +3,10 @@ import { shellNote } from "../agent/commands";
 /** What the agent is told about git when the project leaves the commits to it (the project's own rules say when and how). */
 export function commitRules(when = "as you go: when a piece of it is done and checked", style = 'with a short message in English saying what changed ("Add voice channel join"), in the style of the project\'s history'): string {
   return [
-    `- Commit your work with git yourself, ${when}: \`git add\` what belongs to it and \`git commit -m\` ${style}.`,
-    "  Keep dependencies, builds, installers and files over 50 MB out: add them to .gitignore first. Do not push: Drimvox",
+    `- Commit your work with git yourself, ${when}: \`git add\` the files that belong to it by name and \`git commit -m\` ${style};`,
+    "  each commit says what that commit changed, never the message of another one. Keep dependencies, builds, installers,",
+    "  archives made for a deploy (*.tgz, *.zip), databases, .env files and files over 50 MB out of git: add them to",
+    "  .gitignore before they appear, and check `git status` before you commit. Do not push: Drimvox",
     "  sends your commits to GitHub after each answer when the project has a remote. When the user asks to put the project",
     "  on GitHub and it has no remote, create it with `gh repo create <name> --private --source . --remote origin` (without",
     "  --push). When the user asks for a release, make it with `gh release create` and attach the built installers or",
