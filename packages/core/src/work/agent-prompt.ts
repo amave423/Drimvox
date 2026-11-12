@@ -46,6 +46,14 @@ export function agentPrompt(folder: string, platform = process.platform, git = c
     "- Verify once: run the build, the tests or the linter when the project has them; for a page, call check_page once (it",
     "  looks at a desktop and a phone and gives the console's errors). Fix what is broken, then check_page once more at most.",
     "  Use the browser tool only for what a still picture cannot show: clicks, forms, a scenario.",
+    // Seen live: a Discord copy whose tests were green — fake microphones, bytes received — and whose user found
+    // crackling sound, silence after switching to a text channel, no noise suppression and screens unlike the mockup.
+    "- Check what the user will meet, not only that the code runs. A design or mockup in the project (a picture, an HTML",
+    "  page) is the reference: look at it and at your screen at the same width (check_page on both; page_match_design for",
+    "  a picture) and fix what differs. Sound and video: send a known tone through the real path and check what arrives",
+    "  (its level, no clicks or gaps), not only that bytes flow. A flow: go through it as a person would (switching",
+    "  screens keeps what must stay, such as a call while reading another channel).",
+    "- When the user reports bugs, reproduce each one first, fix it, check that same case again, and answer about each.",
     "- Then stop. Do not polish: no checking again what did not change, no reloading a page again and again to tweak",
     "  details, no rewriting what works. The user asks for more if they want it.",
     "- Tests: an app with real logic (a server, data, accounts, real-time messages, calculations) gets tests that check what",
