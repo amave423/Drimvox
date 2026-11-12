@@ -114,7 +114,9 @@ export class AgentView {
 
   /** The panel's page box moved, changed its size, opened or closed. */
   setPlace(place: Place): void {
-    this.place = place;
+    // A box too small to read a page in (a panel folded to nothing) is out of sight: the tab stays at a desktop's size, so
+    // what the agent measures there is a real page (seen live: "the browser gives a window of zero size").
+    this.place = place && place.width >= 200 && place.height >= 150 ? place : null;
     this.layout();
   }
 
