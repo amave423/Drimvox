@@ -108,6 +108,7 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
         };
       }
       const verdict = classifyCommand(command, ws.root);
+      if (verdict.action === "deny") throw new Error("Not allowed: this command deletes a repository or rewrites what was pushed. Never do that.");
       if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal, purpose))) {
         return { ok: false, output: "The user denied this command. Do not retry it; find another way or explain in finish." };
       }

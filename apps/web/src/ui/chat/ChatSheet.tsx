@@ -524,6 +524,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
                       // Seen after coming back to the chat: the requests this answer waits on, to answer here.
                       approvals={m.status === "streaming" && !draft ? chat?.approvals.map((a) => ({ ...a, state: "open" as const })) : undefined}
                       onApprove={approve}
+                      agent={workshop}
                     />
                   ),
                   // On the timeline a finished answer is a filled point; one still being written, an open one.

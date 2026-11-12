@@ -580,11 +580,18 @@ describe("a project's git rules", () => {
   };
 
   // Asked for: no commits by hand and no agent's rituals; Drimvox commits the answer's changes at its end.
-  it("commits the answer's changes in the project's branch in one commit, leaves secrets out", async () => {
-    const s = await ready([call("write_file", { path: "cart.js", content: "total()\n" }), call("write_file", { path: ".env", content: "KEY=secret\n" }), { text: "Готово." }]);
-    await ask(s, "Почини корзину", 3);
+  // Asked for: the agent commits itself with messages of its own, as in OpenCode; Drimvox's commits were named by the
+  // user's messages. Drimvox makes none of its own.
+  it("leaves the commits to the agent, with its own messages, in the project's branch", async () => {
+    const s = await ready([
+      call("write_file", { path: "cart.js", content: "total()\n" }),
+      call("write_file", { path: ".env", content: "KEY=secret\n" }),
+      call("run_command", { command: 'git add cart.js; git -c user.name=t -c user.email=t@t commit -q -m "Fix cart total"' }),
+      { text: "Готово." },
+    ]);
+    await ask(s, "Почини корзину", 4);
     expect(git(folder, "branch", "--show-current")).toBe("main");
-    expect(git(folder, "log", "--format=%s", "-1")).toBe("Почини корзину");
+    expect(git(folder, "log", "--format=%s", "-1")).toBe("Fix cart total");
     // Only the work: the project's state is kept in Drimvox's data, not in the project (asked for).
     expect(git(folder, "show", "--name-only", "--format=", "HEAD").split("\n").sort()).toEqual(["cart.js"]);
     expect(existsSync(join(folder, "AGENTS.md"))).toBe(false);
@@ -610,7 +617,11 @@ describe("a project's git rules", () => {
 
   // Seen live: a project left on "drimvox/task-1106-2048 → master" from before, which said nothing to its user.
   it("brings an agent's branch left from before back into the branch it came from, and works there", async () => {
-    const s = await ready([call("write_file", { path: "b.txt", content: "b\n" }), { text: "Готово." }]);
+    const s = await ready([
+      call("write_file", { path: "b.txt", content: "b\n" }),
+      call("run_command", { command: 'git add b.txt; git -c user.name=t -c user.email=t@t commit -q -m "Add b"' }),
+      { text: "Готово." },
+    ]);
     git(folder, "switch", "-q", "-c", "drimvox/task-1106-2048");
     writeFileSync(join(folder, "a.txt"), "a\n");
     git(folder, "add", "a.txt");
@@ -618,7 +629,7 @@ describe("a project's git rules", () => {
     env.db.sql
       .prepare("insert into settings (key, value) values (?, ?)")
       .run(`git.branch:${s.project.id}`, JSON.stringify({ branch: "drimvox/task-1106-2048", base: "main", pullRequest: null }));
-    await ask(s, "Сделай b", 2);
+    await ask(s, "Сделай b", 3);
     expect(git(folder, "branch", "--show-current")).toBe("main");
     expect(git(folder, "ls-files")).toContain("a.txt");
     expect(git(folder, "ls-files")).toContain("b.txt");

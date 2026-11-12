@@ -276,7 +276,8 @@ export class WorkRun {
       } catch {
         // A folder that cannot be written: the state is only in Drimvox.
       }
-      // What the agent left uncommitted goes in one commit; then its branch to GitHub, as the rules say.
+      // The agent commits itself, with messages of its own (asked for: as OpenCode; Drimvox's commits were named by the
+      // user's messages). Its commits go to GitHub, as the rules say.
       if (this.d.git) {
         const asked =
           this.d.chats
@@ -284,7 +285,6 @@ export class WorkRun {
             .filter((m) => m.role === "user")
             .at(-1)
             ?.content.split("\n")[0] ?? "";
-        await this.d.git.commit(this.projectId, this.folder, asked).catch(() => false);
         await this.d.git.finish(this.projectId, this.folder, asked).catch(() => {});
       }
       this.d.carry?.set(this.projectId, { chatId: this.chatId, turns: this.d.chats.history(this.chatId).length, messages });

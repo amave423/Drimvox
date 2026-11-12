@@ -269,12 +269,13 @@ export class GitHub {
   /** Pushes one ref to `origin` with the token, as pushTo does for the branch. */
   private async pushRef(dir: string, account: Account, refspec: string): Promise<void> {
     const remote = (await this.project(dir)).remote ?? "";
-    const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0" };
+    // No Git Credential Manager window asking for a code: the token goes as a header (seen: asked again and again).
+    const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
     if (/^https:\/\//i.test(remote)) {
       const basic = Buffer.from(`x-access-token:${account.token}`).toString("base64");
       Object.assign(env, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: `http.${new URL(remote).origin}/.extraheader`, GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}` });
     }
-    const result = await runGit(dir, ["push", "--force", "origin", refspec], true, env);
+    const result = await runGit(dir, ["-c", "credential.helper=", "push", "--force", "origin", refspec], true, env);
     if (result.code !== 0) throw new GithubFailure("push_failed", hide(result.stderr.trim() || result.stdout.trim(), account.token));
   }
 
@@ -282,13 +283,14 @@ export class GitHub {
     const branch = (await currentBranch(dir)) ?? "HEAD";
     const remote = (await this.project(dir)).remote ?? "";
     // The token goes as a header for the remote's host, through the environment: never in the arguments or the config.
-    const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0" };
+    // No Git Credential Manager window asking for a code: the token goes as a header (seen: asked again and again).
+    const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
     if (/^https:\/\//i.test(remote)) {
       const basic = Buffer.from(`x-access-token:${account.token}`).toString("base64");
       Object.assign(env, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: `http.${new URL(remote).origin}/.extraheader`, GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}` });
     }
     try {
-      const result = await runGit(dir, ["push", ...(first ? ["-u"] : []), "origin", branch], true, env);
+      const result = await runGit(dir, ["-c", "credential.helper=", "push", ...(first ? ["-u"] : []), "origin", branch], true, env);
       if (result.code !== 0) throw new GithubFailure("push_failed", hide(result.stderr.trim() || result.stdout.trim(), account.token));
     } catch (err) {
       if (err instanceof GitError) throw new GithubFailure("push_failed", err.message);

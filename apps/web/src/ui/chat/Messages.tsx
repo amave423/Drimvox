@@ -156,6 +156,8 @@ interface AssistantProps {
   onUndo?(): void;
   /** The files of the folder the answer wrote, changed or read. */
   files?: ReactNode;
+  /** A project's agent answers: "the agent is working", not "the model is answering" (asked for). */
+  agent?: boolean;
 }
 
 /** One thing the model did, as the answer shows it. */
@@ -240,6 +242,7 @@ export function AssistantMessage({
   onApprove,
   onUndo,
   files,
+  agent,
 }: AssistantProps) {
   const { t, settings } = useApp();
   const tokens = (n: number) => formatTokens(n, settings.locale);
@@ -283,7 +286,7 @@ export function AssistantMessage({
         <p className="msg-making">
           <span className="action-spinner" aria-hidden />
           {rendering
-            ? t(kind === "video" ? "media.videoWaiting" : kind === "image" ? "media.drawing" : "chat.answering")
+            ? t(kind === "video" ? "media.videoWaiting" : kind === "image" ? "media.drawing" : agent ? "chat.agentWorking" : "chat.answering")
             : t(making === "video" ? "media.videoSending" : "media.drawing")}
         </p>
       )}

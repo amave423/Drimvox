@@ -350,6 +350,7 @@ export const ru = {
   "chat.openKeys": "Открыть «Ключи и модели»",
   "chat.placeholder": "Сообщение (Shift+Enter — новая строка)",
   "chat.send": "Отправить",
+  "chat.agentWorking": "Агент думает…",
   "chat.answering": "Модель отвечает…",
   "chat.stop": "Стоп",
   "chat.reasoning": "Размышления модели",
@@ -978,7 +979,7 @@ export const ru = {
   "diagram.savePng": "Скачать PNG",
 
   "notice.work.approval": "Агент ждёт разрешения на команду",
-  "notice.work.done": "Проект готов",
+  "notice.work.done": "Агент ответил",
   "notice.work.paused": "Работа над проектом остановилась",
   "notice.review": "Готово, можно смотреть правки",
   "notice.answered": "Агент ответил на вопрос",

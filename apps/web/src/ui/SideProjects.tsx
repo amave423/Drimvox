@@ -90,7 +90,7 @@ export function SideProjects() {
                       aria-current={here ? "page" : undefined}
                     >
                       <span className="side-item-title">{project.name}</span>
-                      <WorkLine work={work} />
+                      <WorkLine work={work} unread={!here && !!chats.find((c) => c.id === work?.chatId)?.unread} />
                     </button>
                     <span className={`side-chat-actions${menu === project.id ? " is-open" : ""}`}>
                       <button
@@ -166,12 +166,16 @@ export function SideProjects() {
   );
 }
 
-/** How a project's work goes, under its name: working, waiting, done (asked for: no checklist any more). */
-function WorkLine({ work }: { work: ProjectWorkView | null }) {
+/**
+ * How a project's work goes, under its name: working or waiting. An answer not read yet is a dot, as a chat's (asked
+ * for: a project answers as a chat does, it is not "done").
+ */
+function WorkLine({ work, unread }: { work: ProjectWorkView | null; unread: boolean }) {
   const { t } = useApp();
   if (!work || work.status === "idle") return null;
+  if (work.status === "done") return unread ? <span className="side-chat-dot side-chat-state" role="img" aria-label={t("side.unread")} /> : null;
   // Waiting on the user's answer or permission counts as waiting, not as running.
-  const tone = work.status === "running" ? (work.waitingApproval ? "wait" : "run") : work.status === "done" ? "ok" : "wait";
+  const tone = work.status === "running" ? (work.waitingApproval ? "wait" : "run") : "wait";
   return (
     <>
       {/* The project's state, the only place it is shown (asked for); why it waits, on hover. */}

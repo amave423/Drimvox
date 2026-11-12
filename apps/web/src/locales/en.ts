@@ -350,6 +350,7 @@ export const en: Record<keyof typeof ru, string> = {
   "chat.openKeys": "Open Keys and models",
   "chat.placeholder": "Message (Shift+Enter for a new line)",
   "chat.send": "Send",
+  "chat.agentWorking": "The agent is thinking…",
   "chat.answering": "The model is answering…",
   "chat.stop": "Stop",
   "chat.reasoning": "Model reasoning",
@@ -978,7 +979,7 @@ export const en: Record<keyof typeof ru, string> = {
   "diagram.savePng": "Save PNG",
 
   "notice.work.approval": "The agent waits for permission on a command",
-  "notice.work.done": "The project is done",
+  "notice.work.done": "The agent answered",
   "notice.work.paused": "The work on the project stopped",
   "notice.review": "Done, the changes are ready",
   "notice.answered": "The agent answered the question",

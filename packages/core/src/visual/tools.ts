@@ -85,12 +85,15 @@ export function visualTools(d: VisualDeps, limit: LookLimit = { looks: MAX_LOOKS
   const tools: ToolSet = {
     start_background: tool({
       description:
-        "Start a long-running command in the project folder, such as a dev server. Returns its number and first output. What you " +
+        "Start a command that keeps running in the project folder: a dev server, a watcher. Not for builds, tests, installs " +
+        "or quick commands: run those with run_command (it waits up to 600 seconds and gives the output at once). " +
+        "Returns its number and first output. What you " +
         "started stays running between the user's messages; the same command already running is not started again.",
       inputSchema: z.object({ command: z.string().min(1).max(1000) }),
       execute: ({ command }, o: Options) =>
         run(o.toolCallId, "start_background", { command }, async () => {
           const verdict = classifyCommand(command, d.worktree);
+          if (verdict.action === "deny") throw new Error("Not allowed: this command deletes a repository or rewrites what was pushed. Never do that.");
           if (verdict.action === "ask" && !(await d.hooks.askApproval(command, verdict.reason, o.abortSignal))) {
             throw new Error("The user denied this command.");
           }

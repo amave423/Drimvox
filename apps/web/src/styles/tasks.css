@@ -50,12 +50,15 @@
 .task-notice.is-asking .approval code { max-height: 180px; overflow: auto; }
 /* The agent's questions: answers to pick as buttons, the user's own in a field. */
 /* A question is no alarm: the calm ink of a choice, not the pencil red of a permission. */
-.approval.agent-question-card { border: 1.5px solid var(--ink); background: var(--sheet); }
+/* Seen live: four questions with long answers made the card taller than the window and wider than the feed. It scrolls
+   inside, and every answer is a full-width row whose words wrap. */
+.approval.agent-question-card { border: 1.5px solid var(--ink); background: var(--sheet); max-height: min(70vh, 640px); overflow: auto; min-width: 0; }
 .agent-question { display: grid; gap: 8px; margin: 4px 0 0; padding: 0; border: 0; min-width: 0; }
 .agent-question legend { padding: 0; margin-bottom: 6px; font: inherit; font-weight: 600; }
 .agent-question-header { margin-right: 8px; color: var(--muted); font-weight: 500; }
-.agent-question-options { display: flex; flex-wrap: wrap; gap: 6px; }
-.agent-question-option { display: grid; gap: 2px; text-align: left; max-width: 100%; }
+.agent-question-options { display: grid; gap: 6px; min-width: 0; }
+.agent-question-option { display: grid; gap: 2px; justify-content: stretch; justify-items: start; text-align: left; width: 100%; min-width: 0; padding: 8px 16px; border-radius: 12px; white-space: normal; overflow-wrap: anywhere; }
+.agent-question .field-input { width: 100%; min-width: 0; box-sizing: border-box; }
 .agent-question-option.is-picked { border-color: var(--ink); background: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--ink); }
 .task-notice p { margin: 0; flex: 1; min-width: 240px; }
 .task-notice.is-wait { border-color: var(--wait); }

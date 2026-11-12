@@ -136,6 +136,23 @@ describe("classifyCommand", () => {
     expect(classifyCommand(cmd, root)).toEqual({ action: "ask", reason });
   });
 
+  // Asked for: the agent commits as in OpenCode, but never deletes a repository or its history.
+  it.each(["gh repo delete me/fiit --yes", "gh api -X DELETE repos/me/fiit", "rm -rf .git", "Remove-Item -Recurse -Force .git", "git push --force origin main", "git push -f"])(
+    "refuses %s outright",
+    (cmd) => {
+      expect(classifyCommand(cmd, root)).toEqual({ action: "deny", reason: "destroy" });
+    },
+  );
+
+  // Seen live: building an Electron app asked for permission, as electron-builder unpacks its tools into its own cache.
+  it.runIf(process.platform === "win32")("lets builds use the tools' own caches without asking", () => {
+    const local = process.env.LOCALAPPDATA!;
+    expect(classifyCommand(`& "${join(local, "electron-builder", "Cache", "winCodeSign", "7za.exe")}" x -snl- a.7z`, root)).toEqual({ action: "allow" });
+    expect(classifyCommand(`dir "${join(local, "ms-playwright")}"`, root)).toEqual({ action: "allow" });
+    expect(classifyCommand(`Remove-Item -Recurse "${join(local, "electron-builder", "Cache", "winCodeSign")}"`, root)).toEqual({ action: "allow" });
+    expect(classifyCommand(`Remove-Item -Recurse "${join(local, "Programs")}"`, root)).toEqual({ action: "ask", reason: "outside" });
+  });
+
   it("allows absolute paths inside the copy", () => {
     expect(classifyCommand(`type ${join(root, "README.md")}`, root)).toEqual({ action: "allow" });
   });

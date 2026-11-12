@@ -151,7 +151,8 @@ test("a project: the agent's question as a card, the picked answer, the same con
   await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").press("Enter");
   await expect(page.locator(".msg-user", { hasText: "Сделай заголовок крупнее" })).toBeVisible();
 
-  await expect(state).toContainText("готово", { timeout: 30_000 });
+  // Done, the line under the project goes: an answer reads as a chat's (asked for), the dot only for one not seen.
+  await expect(state).toHaveCount(0, { timeout: 30_000 });
   // No checklist any more (asked for).
   await expect(page.getByRole("list", { name: "Чек-лист" })).toHaveCount(0);
   // The file written stands where it was written, with its lines (asked for), and opens to look at.
@@ -206,9 +207,10 @@ test("a project: the agent's question as a card, the picked answer, the same con
   await page.getByRole("separator", { name: "Показать боковую панель" }).dblclick();
   await expect(page.locator("#sidebar")).toBeVisible();
   expect(readFileSync(join(repo, "index.html"), "utf8")).toContain("Запись");
-  // The work is committed in the branch the project is on, in the user's name: no branch of the agent's own (asked for).
+  // The work stays in the branch the project is on: no branch of the agent's own (asked for).
   expect(execFileSync("git", ["branch", "--show-current"], { cwd: repo, encoding: "utf8" }).trim()).toBe("main");
-  expect(execFileSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" }).trim()).toBe("");
+  // The agent commits itself (asked for: as OpenCode); this one did not, and Drimvox makes no commit of its own.
+  expect(execFileSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" }).trim()).toBe("?? index.html");
   expect(fake!.requests.some((r) => JSON.stringify(r.body?.messages ?? []).includes("Сделай заголовок крупнее"))).toBe(true);
 });
 
@@ -383,7 +385,7 @@ test("a run's screenshots: a switch in the timeline, none in the result panel", 
     await pickCoder(page);
     await page.getByPlaceholder("Вопрос или задача по проекту").fill("Две страницы");
     await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
-    await expect(page.locator(".side-project.is-on").getByRole("status")).toContainText("готово", { timeout: 30_000 });
+    await expect(page.locator(".side-project.is-on").getByRole("status")).toHaveCount(0, { timeout: 30_000 });
 
     // The timeline: a screenshot opens over the window, the arrows go to the next one.
     await page.locator(".timeline .msg-shot").first().click();

@@ -3,7 +3,34 @@ import { closeOfficeLeftovers } from "./office";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-export type CommandVerdict = { action: "allow" } | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" | "ssh" };
+export type CommandVerdict =
+  | { action: "allow" }
+  | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" | "ssh" }
+  | { action: "deny"; reason: "destroy" };
+
+/**
+ * Never run, even when asked: deleting a repository or rewriting what was pushed (asked for: the agent commits itself,
+ * as in OpenCode, and may never delete a repository).
+ */
+const DESTROYS = [
+  /\bgh\s+repo\s+delete\b/i,
+  /\bgh\s+api\b[^\n;|]*(-X|--method)\s*DELETE\b[^\n;|]*\brepos\//i,
+  /\bgit\s+push\b[^\n;|&]*(\s--force(-with-lease)?\b|\s-f\b)/i,
+  /\b(rm|del|rmdir|rd|remove-item|ri)\b[^\n;|&]*(^|[\s"'\/])\.git(["'\s\/]|$)/i,
+];
+
+/** Where tools keep what they download for builds and tests: using them touches nothing of the user's. */
+const TOOL_CACHES = ["electron-builder", "electron", "ms-playwright", "npm-cache", "node-gyp", "pnpm", "Yarn", "pip", "Cypress"];
+
+function inToolCache(path: string): boolean {
+  const roots = [process.env.LOCALAPPDATA, process.env.APPDATA, process.env.HOME && join(process.env.HOME, ".cache")].filter((r): r is string => !!r);
+  return roots.some((root) =>
+    TOOL_CACHES.some((name) => {
+      const rel = relative(join(root, name), path);
+      return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+    }),
+  );
+}
 
 /** A browser of the user's: with a window it opens on the user's screen, with the user's profile. */
 const BROWSER_NAME = String.raw`(?:chrome|msedge|firefox|brave|opera|vivaldi)(?:\.exe)?`;
@@ -22,7 +49,7 @@ function opensBrowser(command: string): boolean {
   return RUNS_BROWSER.test(command) || (BROWSER.test(command) && RUNS_VARIABLE.test(command));
 }
 
-const rules: [RegExp, Exclude<CommandVerdict, { action: "allow" }>["reason"]][] = [
+const rules: [RegExp, Extract<CommandVerdict, { action: "ask" }>["reason"]][] = [
   [/\bgit\s+push\b/i, "push"],
   // Seen: plink downloaded and run with the server's password in the command, kept in the chat (ssh_run does it safely).
   [/\b(plink|putty|sshpass)(\.exe)?\b/i, "ssh"],
@@ -41,6 +68,7 @@ const rules: [RegExp, Exclude<CommandVerdict, { action: "allow" }>["reason"]][] 
  * A guard against obvious harm, not a sandbox: the command still runs with the user's rights.
  */
 export function classifyCommand(command: string, root: string): CommandVerdict {
+  if (DESTROYS.some((p) => p.test(command))) return { action: "deny", reason: "destroy" };
   for (const [pattern, reason] of rules) if (pattern.test(command)) return { action: "ask", reason };
   if (opensBrowser(command)) return { action: "ask", reason: "browser" };
   if (/(^|[\s;&|(])(cd|chdir|set-location|pushd|sl)\s+["']?\.\.(?=[\\/\s"']|$)/i.test(command)) return { action: "ask", reason: "outside" };
@@ -49,6 +77,7 @@ export function classifyCommand(command: string, root: string): CommandVerdict {
   const movesFiles = MOVES_FILES.test(command);
   for (const path of absolutePaths(command)) {
     if (!movesFiles && PROGRAM.test(path)) continue;
+    if (inToolCache(path)) continue;
     // Bare slashes in code (a string, a division, a // comment) are not the drive's root on Windows, unless something is deleted.
     if (process.platform === "win32" && /^\/+$/.test(path) && !movesFiles) continue;
     const rel = relative(home, realName(path));
@@ -140,9 +169,15 @@ const HEAD_LIMIT = 2_000;
 /** The whole output kept for a file, at most this much. */
 const FULL_LIMIT = 5_000_000;
 
+/**
+ * No sign-in windows from the agent's commands: Git Credential Manager asked the user for GitHub's eight-letter code again
+ * and again when an agent's git command reached GitHub (seen). Such a command fails instead, with git's own words.
+ */
+export const NO_PROMPTS = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never", GIT_ASKPASS: "", SSH_ASKPASS: "" };
+
 /** Starts a command in the user's shell: PowerShell on Windows, sh elsewhere (in its own process group). */
 export function spawnShell(command: string, cwd: string, env?: Record<string, string>): ChildProcessWithoutNullStreams {
-  const withEnv = env ? { env: { ...process.env, ...env } } : {};
+  const withEnv = { env: { ...process.env, ...NO_PROMPTS, ...env } };
   return process.platform === "win32"
     ? spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShell(command)], { cwd, windowsHide: true, ...withEnv })
     : spawn("/bin/sh", ["-c", command], { cwd, detached: true, ...withEnv });

@@ -47,11 +47,14 @@ export function agentPrompt(folder: string, platform = process.platform, gitIsUs
     ...(gitIsUsers
       ? ["- Never commit or push: git stays the user's (the project's rules say so)."]
       : [
-          "- Do not run git commit or git push: Drimvox commits your changes at the end of each answer and sends them to GitHub",
-          "  when the project has a GitHub remote. When the user asks to put the project on GitHub and it has no remote, create",
-          "  it with `gh repo create <name> --private --source . --remote origin` (without --push). When the user asks for a",
-          "  release, make it with `gh release create` and attach the built installers or archives as its files: never put",
-          "  built apps, installers or files over 50 MB into the project's git.",
+          "- Commit your work with git yourself, as you go: when a piece of it is done and checked, `git add` what belongs to",
+          "  it and `git commit -m` with a short message in English saying what changed (\"Add voice channel join\"), in the",
+          "  style of the project's history. Keep dependencies, builds, installers and files over 50 MB out: add them to",
+          "  .gitignore first. Do not push: Drimvox sends your commits to GitHub after each answer when the project has a",
+          "  remote. When the user asks to put the project on GitHub and it has no remote, create it with",
+          "  `gh repo create <name> --private --source . --remote origin` (without --push). When the user asks for a release,",
+          "  make it with `gh release create` and attach the built installers or archives as its files.",
+          "- Never delete a repository, a branch on GitHub or history: no `gh repo delete`, no force push, no removing .git.",
         ]),
     "- Never write a password, key or token into a file, the project's notes or a commit, even one the user gave you.",
     "- Keep the project's notes (update_notes) for what the next conversation must know: commands, decisions.",
