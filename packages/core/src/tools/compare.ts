@@ -124,12 +124,33 @@ export function compareTools(
       ? {
           page_match_design: tool({
             description:
-              "Compare the page shown in the browser with a design picture in the folder (a PNG exported from Figma or a mock-up): the design is scaled to the page's width, then how much differs and where, a difference picture, and what a model that sees says differs (spacing, sizes, colours, missing parts).",
-            inputSchema: z.object({ design: z.string().min(1).describe("The design's PNG in the folder"), width: z.number().int().min(320).max(1920).optional().describe("The page's width to compare at: the design's own width by default") }),
+              "Compare the page shown in the browser with its design: a picture in the folder (a PNG exported from Figma) or a mock-up page by its address. Both at the same width; how much differs and where, and a model that sees both side by side lists what differs (layout, sizes, spacing, colours, fonts, controls, missing parts).",
+            inputSchema: z.object({
+              design: z.string().min(1).describe("The design's PNG in the folder, or the address of a mock-up page (http://127.0.0.1:5173/)"),
+              width: z.number().int().min(320).max(1920).optional().describe("The width to compare at: the picture's own width, or 1440 for a mock-up page"),
+            }),
             execute: ({ design, width: w }, o: { abortSignal?: AbortSignal }) =>
               run("page_match_design", design, async () => {
-                const mock = PNG.sync.read(readFileSync(ws.resolve(design)));
-                const at = w ?? Math.min(1920, Math.max(320, mock.width));
+                // A mock-up page is photographed in a tab of its own at the same width (seen live: an HTML mock-up the
+                // agent never compared its screens with, and a user who found them "hardly alike").
+                const byAddress = /^https?:\/\//i.test(design);
+                let at = w ?? 1440;
+                let mock: PNG;
+                if (byAddress) {
+                  const before = driver.state().active;
+                  await driver.newTab(design);
+                  const tab = driver.state().active;
+                  try {
+                    await new Promise((r) => setTimeout(r, 1500));
+                    mock = PNG.sync.read(await shoot(at));
+                  } finally {
+                    if (tab && tab !== before) await driver.close(tab).catch(() => {});
+                    if (before && driver.state().active !== before) await driver.select(before).catch(() => {});
+                  }
+                } else {
+                  mock = PNG.sync.read(readFileSync(ws.resolve(design)));
+                  at = w ?? Math.min(1920, Math.max(320, mock.width));
+                }
                 const page = PNG.sync.read(await shoot(at));
                 const scaled = mock.width === page.width ? mock : resize(mock, page.width, Math.round((mock.height * page.width) / mock.width));
                 const height = Math.min(scaled.height, page.height);
@@ -157,7 +178,20 @@ export function compareTools(
                 const heights = Math.abs(scaled.height - page.height) > 20 ? ` The page is ${page.height} px tall, the design ${scaled.height} px at this width.` : "";
                 const summary = `${((changed / (page.width * height)) * 100).toFixed(1)}% differs from the design at ${page.width} px.${worst.length ? ` Most in: ${worst.join(", ")} from the top.` : ""}${heights}`;
                 if (!see) return summary;
-                const said = await see(PNG.sync.write(diff), "This is a difference picture between a design and the built web page: red marks pixels that differ. Say briefly which parts differ and how (spacing, sizes, colours, missing or extra parts).", o.abortSignal).catch(() => "");
+                // Both side by side, not only the red pixels: the model names what the design has and the page has not.
+                const gap = 24;
+                const pair = new PNG({ width: page.width * 2 + gap, height, fill: true });
+                pair.data.fill(255);
+                PNG.bitblt(a, pair, 0, 0, page.width, height, 0, 0);
+                PNG.bitblt(b, pair, 0, 0, page.width, height, page.width + gap, 0);
+                const shown = pair.width > 2400 ? resize(pair, 2400, Math.round((pair.height * 2400) / pair.width)) : pair;
+                const said = await see(
+                  PNG.sync.write(shown),
+                  "Left: the design, the reference. Right: the built page at the same width. List concretely what differs, biggest first: " +
+                    "layout and placement, sizes and spacing, colours, fonts, the shape of buttons and controls, parts missing or extra. " +
+                    "For each: where, what the design has, what the page has. Say plainly if they look alike.",
+                  o.abortSignal,
+                ).catch(() => "");
                 return said ? `${summary}\n${said}` : summary;
               }),
           }),

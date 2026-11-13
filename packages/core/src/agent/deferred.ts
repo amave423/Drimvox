@@ -13,7 +13,6 @@ const RARE_NAMES = new Set([
   "media_edit",
   "page_snapshot",
   "page_compare",
-  "page_match_design",
   "icons_from_logo",
   "load_test",
   "dev_environment",

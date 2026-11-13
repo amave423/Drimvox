@@ -305,6 +305,18 @@ describe("a real browser", () => {
       expect(await call(design, "page_match_design", { design: "design.png", width: 1280 })).toMatch(/^0\.\d% differs from the design at 1280 px/);
       await driver.command("Runtime.evaluate", { expression: "document.getElementById('t').style.marginLeft = '600px'" });
       expect(await call(design, "page_match_design", { design: "design.png", width: 1280 })).toMatch(/[1-9]\d*\.\d% differs from the design at 1280 px\. Most in: 75–150 px/);
+      // A mock-up page by its address (seen live: an HTML mock-up nobody compared the app with): photographed at the same
+      // width in a tab of its own, then shown with the page side by side to the model that sees.
+      const seen: { width: number; question: string }[] = [];
+      const eyes = compareTools(driver, snaps, hooks, async (png, question) => (seen.push({ width: PNG.sync.read(png).width, question }), "Заголовок сдвинут вправо."), new Workspace(folder));
+      const tabs = driver.state().tabs.length;
+      const byAddress = await call(eyes, "page_match_design", { design: url, width: 1280 });
+      // The heading is moved on the page and not on the mock-up: they differ.
+      expect(byAddress).toMatch(/[1-9]\d*\.\d% differs from the design at 1280 px/);
+      expect(byAddress).toContain("Заголовок сдвинут вправо.");
+      expect(seen[0]).toMatchObject({ width: 2400 });
+      expect(seen[0]!.question).toMatch(/^Left: the design/);
+      expect(driver.state().tabs.length).toBe(tabs);
       // A diagram from Mermaid: the copy the chat uses, no internet needed.
       const drawn = await call(design, "render_diagram", { code: "flowchart LR\n  A[Запись] --> B[Приём]", output: "docs/flow.svg" });
       // Cyrillic labels stay Cyrillic (seen: without a charset they came out garbled).

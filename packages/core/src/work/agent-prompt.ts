@@ -49,8 +49,9 @@ export function agentPrompt(folder: string, platform = process.platform, git = c
     // Seen live: a Discord copy whose tests were green — fake microphones, bytes received — and whose user found
     // crackling sound, silence after switching to a text channel, no noise suppression and screens unlike the mockup.
     "- Check what the user will meet, not only that the code runs. A design or mockup in the project (a picture, an HTML",
-    "  page) is the reference: look at it and at your screen at the same width (check_page on both; page_match_design for",
-    "  a picture) and fix what differs. Sound and video: send a known tone through the real path and check what arrives",
+    "  page) is the reference. Build from it, not anew: an HTML mockup's styles, markup and scripts (hover, transitions,",
+    "  effects that follow the cursor) are carried over, not redrawn. Then compare each screen with page_match_design (the",
+    "  mockup's picture, or its page served locally by address) and fix what it lists, until they look alike. Sound and video: send a known tone through the real path and check what arrives",
     "  (its level, no clicks or gaps), not only that bytes flow. A flow: go through it as a person would (switching",
     "  screens keeps what must stay, such as a call while reading another channel).",
     "- When the user reports bugs, reproduce each one first, fix it, check that same case again, and answer about each.",
