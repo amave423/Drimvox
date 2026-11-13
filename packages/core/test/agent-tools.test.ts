@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { storeOf } from "../src/agent/store";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { classifyCommand, gitBash, runCommand, shellNote } from "../src/agent/commands";
@@ -147,6 +148,19 @@ describe("classifyCommand", () => {
   );
 
   // Seen live: building an Electron app asked for permission, as electron-builder unpacks its tools into its own cache.
+  // Seen live: the tester asked for permission to write its probe into the temporary folder and to run it from there.
+  it("lets scripts of its own live and run in the system's temporary folder, not delete the folder itself", () => {
+    const probe = join(tmpdir(), "nexus-probe.mjs").split("\\").join("/");
+    // A project outside the temporary folder (the test's own copy is inside it, where neighbours are someone's).
+    const project = join(process.cwd(), "src");
+    expect(classifyCommand(`cat > "${probe}" <<'EOF'
+console.log(1)
+EOF`, project)).toEqual({ action: "allow" });
+    expect(classifyCommand(`node "${probe}"`, project)).toEqual({ action: "allow" });
+    expect(classifyCommand(`rm -rf "${tmpdir().split("\\").join("/")}"`, project)).toEqual({ action: "ask", reason: "outside" });
+    expect(classifyCommand(`node "${probe}"`, root)).toEqual({ action: "ask", reason: "outside" });
+  });
+
   it.runIf(process.platform === "win32")("lets builds use the tools' own caches without asking", () => {
     const local = process.env.LOCALAPPDATA!;
     expect(classifyCommand(`& "${join(local, "electron-builder", "Cache", "winCodeSign", "7za.exe")}" x -snl- a.7z`, root)).toEqual({ action: "allow" });
