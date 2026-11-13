@@ -271,7 +271,7 @@ export function gitBash(): string | null {
 export function shellNote(platform: NodeJS.Platform = process.platform): string {
   if (platform !== "win32") return "sh";
   if (platform === process.platform && gitBash())
-    return "bash (Git for Windows): Unix commands, pipes and && work; write paths as C:/Users/... For Windows-only things run powershell -NoProfile -Command \"...\"";
+    return "bash (Git for Windows): Unix commands, pipes and && work; write paths as C:/Users/..., discard output to /dev/null (`> nul` makes a file named nul). For Windows-only things run powershell -NoProfile -Command \"...\"";
   return "Windows PowerShell 5.1 (no && or ||: separate commands with ; or use if ($?) { ... })";
 }
 
