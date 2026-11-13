@@ -4,7 +4,8 @@ import { ok } from "../../api";
 import { useApp } from "../../context";
 import { useBoxPrefs } from "../../lib/boxPrefs";
 import { CATALOG } from "../../lib/catalog";
-import type { ModelChoice } from "../../lib/lastModel";
+import { readLastModel, type ModelChoice } from "../../lib/lastModel";
+import { loadModels } from "../../lib/models";
 import { useEntryText } from "../catalog/CatalogDetails";
 import { ModelPicker } from "../chat/ModelPicker";
 import { ThinkingSwitch } from "../chat/ThinkingSwitch";
@@ -38,6 +39,17 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
       .then(setExt)
       .catch(() => setExt(null));
   }, [api, project.id]);
+  // Does the working model see pictures? Then it looks itself and the switch for another one is not shown (asked for).
+  const working = work?.models?.work ?? readLastModel();
+  const [sees, setSees] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!working) return setSees(null);
+    let live = true;
+    void loadModels(api, working.providerId)
+      .then((r) => live && setSees("models" in r ? (r.models.find((m) => m.id === working.model)?.vision ?? null) : null))
+      .catch(() => live && setSees(null));
+    return () => void (live = false);
+  }, [api, working?.providerId, working?.model]);
   async function save(patch: ExtensionsPatch) {
     const next = await api.projects[":id"].extensions
       .$put({ param: { id: project.id }, json: patch })
@@ -49,6 +61,7 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
     <div className="project-params">
       <WorkOptions
         projectId={project.id}
+        sees={sees === true}
         vision={ext?.vision ?? null}
         onVision={(m) => void save({ vision: refOf(m) })}
         service={ext?.service ?? null}
@@ -77,12 +90,14 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
 }
 
 /**
- * Whether an interview and a plan come first and their models, the strong model, the model for screenshots, the
- * thinking (useBoxPrefs; the screenshots' model is kept by the core). A model left unchosen is the working one: the
+ * The model for screenshots (only for a working model that does not see), the service model, the tester and the
+ * thinking (useBoxPrefs; the rest is kept by the core). A model left unchosen is the working one: the
  * button says so, and "As the working one" beside a chosen model puts it back.
  */
 function WorkOptions(p: {
   projectId: string;
+  /** The working model sees pictures itself: no switch for another one. */
+  sees: boolean;
   vision: ModelChoice | null;
   onVision(m: ModelChoice | null): void;
   service: ModelChoice | null;
@@ -93,24 +108,13 @@ function WorkOptions(p: {
   const { projectId } = p;
   const { t } = useApp();
   const [prefs, set] = useBoxPrefs(projectId);
-  const strongOn = prefs.strongOn || !!prefs.strong;
   return (
     <section className="params-block" aria-labelledby="params-work-h">
       <h3 className="margin-h" id="params-work-h">
         {t("projectParams.work")}
       </h3>
-      <Toggle checked={strongOn} onChange={(on) => set(on ? { strongOn: true } : { strongOn: false, strong: null })}>
-        <span>
-          {t("projectBox.strong")} <span className="options-about">{t("projectBox.strongHint")}</span>
-        </span>
-      </Toggle>
-      {strongOn && (
-        <div className="params-row is-model">
-          <ModelPicker value={prefs.strong} onChange={(strong) => set({ strong })} placement="above" />
-        </div>
-      )}
       {/* Switches as the strong model's (asked for): off, the working model does it. */}
-      <ModelSwitch label={t("projectParams.vision")} hint={t("projectParams.visionHint")} value={p.vision} onChange={p.onVision} vision />
+      {!p.sees && <ModelSwitch label={t("projectParams.vision")} hint={t("projectParams.visionHint")} value={p.vision} onChange={p.onVision} vision />}
       <ModelSwitch label={t("projectParams.service")} hint={t("projectParams.serviceHint")} value={p.service} onChange={p.onService} />
       {/* Asked for: the agent says done and the user finds the bugs; a tester tries the work first. */}
       <Toggle checked={p.check} onChange={p.onCheck}>

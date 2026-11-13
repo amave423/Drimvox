@@ -1,21 +1,16 @@
 import type { ThinkingLevel } from "@drimvox/shared";
 import { useCallback, useEffect, useState } from "react";
-import type { ModelChoice } from "./lastModel";
 
 /**
- * How a project's work goes, kept per project between messages and visits: whether an interview and a plan to approve
- * come first, their models, the strong model, how much the model thinks. Set in the project's parameters on the right
- * (asked for: they moved there from a pop-up under the box), read by the box when it sends.
+ * How a project's work goes, kept per project between messages and visits: how much the model thinks. Set in the
+ * project's parameters on the right (asked for: they moved there from a pop-up under the box), read by the box when it
+ * sends. The strong model is gone (asked for: useless; the work is stopped and another model picked instead).
  */
 export interface BoxPrefs {
-  /** The model that takes over when the working one keeps failing; null: none. */
-  strong: ModelChoice | null;
-  /** The strong model is switched on; it is chosen after. */
-  strongOn: boolean;
   thinking: ThinkingLevel;
 }
 
-const DEFAULTS: BoxPrefs = { strong: null, strongOn: false, thinking: "auto" };
+const DEFAULTS: BoxPrefs = { thinking: "auto" };
 const keyOf = (projectId: string) => `drimvox.projectBox.${projectId}`;
 const listeners = new Map<string, Set<(p: BoxPrefs) => void>>();
 

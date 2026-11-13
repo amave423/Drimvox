@@ -21,8 +21,13 @@ const list = async () => models;
 
 // Seen live: DeepSeek V4 Pro built a whole service and nobody looked at its pages, though DeepSeek Flash on the same key sees.
 describe("who looks at pages", () => {
-  it("is the model the settings name", async () => {
-    expect((await resolveVision({ providerId: "ds", model: "deepseek-v4-pro" }, providers, { providerId: "ds", model: "deepseek-flash" }, find, list))?.model).toBe("deepseek-v4-pro");
+  it("is the model the settings name when the task's own does not see", async () => {
+    expect((await resolveVision({ providerId: "ds", model: "some-vl" }, providers, { providerId: "ds", model: "deepseek-v4-pro" }, find, list))?.model).toBe("some-vl");
+  });
+
+  // Asked for: a model that sees looks itself; the switch for another one is only for models that do not.
+  it("is the task's own model when it sees, whatever the settings name", async () => {
+    expect((await resolveVision({ providerId: "ds", model: "some-vl" }, providers, { providerId: "ds", model: "deepseek-flash" }, find, list))?.model).toBe("deepseek-flash");
   });
 
   it("is the task's own model when it sees", async () => {

@@ -49,7 +49,7 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
     const res = await api.projects[":id"].work.chat
       .$post({
         param: { id: projectId },
-        json: { content, model: ref(choice), thinking: prefs.thinking, strong: prefs.strong ? ref(prefs.strong) : null },
+        json: { content, model: ref(choice), thinking: prefs.thinking, strong: null },
       })
       .catch(() => null);
     if (!res?.ok) {

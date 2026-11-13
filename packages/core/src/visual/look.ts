@@ -88,8 +88,8 @@ export async function askAboutPictures(vision: Vision, pictures: Picture[], prom
 }
 
 /**
- * The model for screenshots: the one picked in the settings, else the task's own when it sees pictures.
- * Null when neither is available.
+ * The model for screenshots: the task's own when it sees pictures (asked for: a model that sees looks itself, the switch
+ * for another one is only for models that do not), else the one picked, else one found. Null when there is none.
  */
 export async function resolveVision(
   setting: { providerId: string; model: string } | null,
@@ -100,14 +100,14 @@ export async function resolveVision(
   /** The provider's models, to find one that sees when the task's own does not. */
   list?: (conn: Connection) => Promise<ModelInfo[]>,
 ): Promise<Vision | null> {
-  if (setting) {
-    const conn = providers.connection(setting.providerId);
-    if (conn) return { conn, model: setting.model, price: await find(conn, setting.model) };
-  }
   const conn = task.providerId ? providers.connection(task.providerId) : null;
+  const info = conn ? await find(conn, task.model) : undefined;
+  if (conn && info?.vision) return { conn, model: task.model, price: info };
+  if (setting) {
+    const chosen = providers.connection(setting.providerId);
+    if (chosen) return { conn: chosen, model: setting.model, price: await find(chosen, setting.model) };
+  }
   if (!conn) return null;
-  const info = await find(conn, task.model);
-  if (info?.vision) return { conn, model: task.model, price: info };
   // Seen live: DeepSeek V4 Pro built a whole service and nobody looked at its pages, while DeepSeek Flash on the same key
   // sees pictures. The cheapest model of the same provider that sees and can be asked in text looks instead.
   const own = await cheapestSeeing(conn, list, task.model);

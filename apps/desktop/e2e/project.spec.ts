@@ -115,18 +115,14 @@ test("a project: the agent's question as a card, the picked answer, the same con
   // They are in the parameters on the right (asked for: not a pop-up under the box).
   await expect(page.locator(".composer").getByRole("button", { name: /^Параметры/ })).toHaveCount(0);
   const options = page.getByRole("region", { name: "Параметры" });
-  await expect(options).toContainText("Сильная модель");
+  // No strong model (asked for: useless; the work is stopped and another model picked instead).
+  await expect(options).not.toContainText("Сильная модель");
   await expect(options).toContainText("Мышление");
   // No interview and plan switches (asked for): the agent asks when it must.
   await expect(options).not.toContainText("Опрос");
   await expect(options).not.toContainText("План на утверждение");
-  // The strong model is a switch with its hint, its model chosen once it is on.
-  await expect(options.getByRole("switch", { name: /Если рабочая модель застрянет/ })).not.toBeChecked();
-  await options.getByText(/^Если рабочая модель застрянет/).click();
-  await expect(options.getByRole("switch", { name: /Если рабочая модель застрянет/ })).toBeChecked();
-  await expect(options.getByRole("button", { name: "Выбери модель" })).toHaveCount(1);
-  await options.getByText(/^Если рабочая модель застрянет/).click();
-  // The model for screenshots and the service model are the project's too, switches with their hints.
+  // The model for screenshots and the service model are the project's too, switches with their hints. The Coder does not
+  // see pictures: the switch for another model is there.
   await expect(options).toContainText("Модель для зрения");
   // The tester is on by default (asked for: the agent says done, and the user finds the bugs).
   await expect(options.getByRole("switch", { name: /Проверка как у пользователя/ })).toBeChecked();
