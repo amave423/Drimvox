@@ -37,14 +37,15 @@ function inToolCache(path: string): boolean {
  * Inside the system's temporary folder (not the folder itself): probes and scripts of the tester's and the agent's own,
  * nobody's files (seen live: the tester asked for permission to write its probe there, as its rules tell it to).
  */
-function inTemp(path: string, home: string): boolean {
+function inTemp(path: string, home: string, movesFiles: boolean): boolean {
   const temp = realName(tmpdir());
-  const inside = (p: string) => {
+  const inside = (p: string, itself = false) => {
     const rel = relative(temp, p);
-    return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+    return (itself || rel !== "") && !rel.startsWith("..") && !isAbsolute(rel);
   };
-  // A project kept in the temporary folder itself has its neighbours there: those are someone's.
-  return inside(realName(path)) && !inside(home);
+  // A project kept in the temporary folder itself has its neighbours there: those are someone's. The folder itself may be
+  // gone into (seen live: `cd …/Temp && mkdir nexustest` asked), not moved or deleted.
+  return inside(realName(path), !movesFiles) && !inside(home);
 }
 
 /** A browser of the user's: with a window it opens on the user's screen, with the user's profile. */
@@ -110,7 +111,7 @@ export function classifyCommand(command: string, root: string): CommandVerdict {
   const movesFiles = MOVES_FILES.test(command);
   for (const path of absolutePaths(command)) {
     if (!movesFiles && PROGRAM.test(path)) continue;
-    if (inToolCache(path) || inTemp(path, home)) continue;
+    if (inToolCache(path) || inTemp(path, home, movesFiles)) continue;
     // Bare slashes in code (a string, a division, a // comment, a regular expression in `node -e`) are not the drive's root
     // on Windows, unless the root itself is what is moved or deleted (seen live: `cp a /tmp/b && node -e "s.replace(/x/, …)"`
     // asked for permission).

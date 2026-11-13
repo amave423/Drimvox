@@ -157,6 +157,11 @@ describe("classifyCommand", () => {
 console.log(1)
 EOF`, project)).toEqual({ action: "allow" });
     expect(classifyCommand(`node "${probe}"`, project)).toEqual({ action: "allow" });
+    // Seen live: going into the folder itself to make one's own there asked (its long name, in Git Bash's form).
+    const long = realpathSync.native(tmpdir()).replace(/^([A-Za-z]):/, (_, d: string) => `/${d.toLowerCase()}`).split("\\").join("/");
+    expect(classifyCommand(`cd ${long} && mkdir -p nexustest && cat > nexustest/serve.mjs <<'EOF'
+console.log(1)
+EOF`, project)).toEqual({ action: "allow" });
     expect(classifyCommand(`rm -rf "${tmpdir().split("\\").join("/")}"`, project)).toEqual({ action: "ask", reason: "outside" });
     expect(classifyCommand(`node "${probe}"`, root)).toEqual({ action: "ask", reason: "outside" });
   });
