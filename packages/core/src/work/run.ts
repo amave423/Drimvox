@@ -20,6 +20,7 @@ import type { Connection, ProviderRepo } from "../providers/repo";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 import { askAboutPictures, type Vision } from "../visual/look";
 import { visualTools, type VisualKit } from "../visual/tools";
+import { fitForModel } from "../tools/images";
 import type { ProjectGit } from "./project-git";
 import { changedSince, checkpoint, dropCheckpoint } from "../chats/checkpoint";
 import { writeState } from "../agent/notes";
@@ -352,6 +353,11 @@ export class WorkRun {
     // The project's own skills, the downloaded ones it switched on, its model for screenshots (asked for: per project).
     const chosen = this.d.extensions?.(this.projectId) ?? { skills: null, mcp: null, vision: null, service: null };
     const vision = await this.d.vision(conn, model, chosen.vision);
+    // The working model sees pictures itself: its screenshots go into its own conversation, and it looks with all it knows
+    // of the task (asked for: "DeepSeek sees, why does another request look for it"). The latest ones only.
+    const selfSees = !!vision && vision.conn.id === conn.id && vision.model === model;
+    let board: { pictures: Buffer[]; caption: string } | null = null;
+    const show = selfSees ? (pictures: Buffer[], caption: string) => void (board = { pictures: pictures.map(fitForModel), caption }) : undefined;
     const serviceConn = chosen.service ? this.d.providers.connection(chosen.service.providerId) : null;
     const service = chosen.service && serviceConn ? { conn: serviceConn, model: chosen.service.model } : null;
     const skills = findSkills([...projectSkillRoots(this.folder), { dir: this.d.skillsDir, scope: "shared" }]).filter(
@@ -388,9 +394,11 @@ export class WorkRun {
             vision,
             hooks,
             owner: this.chatId,
-            see: vision
-              ? async (png, question, signal) => (await askAboutPictures(vision, [{ data: png, mediaType: "image/png" }], question, signal)).text
-              : undefined,
+            see: show
+              ? async (png, question) => (show([png], question), `The picture follows in the conversation. Look at it yourself: ${question}`)
+              : vision
+                ? async (png, question, signal) => (await askAboutPictures(vision, [{ data: png, mediaType: "image/png" }], question, signal)).text
+                : undefined,
           })
         : {}),
       ...imageTools,
@@ -427,6 +435,7 @@ export class WorkRun {
             // The screenshot goes into the conversation where it was taken (seen: on the right, nobody knew when).
             if (kind === "screenshot") onCall("screenshot", (data as { id: string }).id);
           },
+          show,
         },
         LOOKS,
       ),
@@ -479,6 +488,13 @@ export class WorkRun {
       prune: true,
       rare: Object.keys(mcpTools),
       maxSteps: SEGMENT_STEPS,
+      // Shown once, with the step right after: as a person glances at the screen and goes on (and the steps after keep the
+      // provider's cache).
+      pictures: () => {
+        const once = board;
+        board = null;
+        return once;
+      },
       stopWhen: () => {
         limited = outOfTime();
         return this.inbox.length > 0 || limited || overBudget();

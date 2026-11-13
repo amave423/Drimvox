@@ -25,7 +25,15 @@ export interface VisualDeps {
   onSpend(usd: number): void;
   /** A screenshot taken: its id among the shots, and the page. */
   event(kind: "screenshot", data: { id: string; url: string }): void;
+  /**
+   * The agent's own model sees pictures: the screenshots go into its conversation and it looks itself, with all it knows
+   * of the task, instead of reading another request's words about them (asked for: DeepSeek sees, why another look).
+   */
+  show?(pictures: Buffer[], caption: string): void;
 }
+
+/** What the agent is told when the screenshots are in its conversation. */
+const SHOWN = "The screenshot follows in the conversation: look at it yourself.";
 
 const SIZE = { width: 1280, height: 800 };
 /** A window of this width, as tall as a desktop or a phone screen. */
@@ -57,8 +65,13 @@ async function look(d: VisualDeps, url: string, question: string, signal?: Abort
   const errors = Buffer.isBuffer(taken) ? [] : taken.console;
   const shot = d.kit.shots.save(png);
   d.event("screenshot", { id: shot, url });
-  const { text, costUsd } = await askAboutPicture(d.vision, png, question, signal);
-  d.onSpend(costUsd);
+  let text = SHOWN;
+  if (d.show) d.show([png], `${url}${width ? ` at ${width} px` : ""}: ${question}`);
+  else {
+    const said = await askAboutPicture(d.vision, png, question, signal);
+    d.onSpend(said.costUsd);
+    text = said.text;
+  }
   // What the picture cannot show: a script that failed, a file that did not load.
   return { shot, answer: errors.length ? `${text}\n\nErrors in the page's console:\n${errors.map((e) => `- ${e}`).join("\n")}` : text };
 }
@@ -162,6 +175,14 @@ ${d.kit.background.read(d.taskId, already.id)}`;
           d.event("screenshot", { id: d.kit.shots.save(png), url });
           return { data: png, mediaType: "image/png" };
         });
+        const consoleErrors = errors.length ? `\n\nErrors in the page's console:\n${errors.map((e) => `- ${e}`).join("\n")}` : "";
+        if (d.show) {
+          d.show(
+            pictures.map((p) => p.data),
+            `${url} at a desktop width (1280) and a phone width (390)${focus ? `; look closely at: ${focus}` : ""}`,
+          );
+          return `The two screenshots, desktop then phone, follow in the conversation: look at them yourself.${consoleErrors}`;
+        }
         const { text, costUsd } = await askAboutPictures(
           d.vision!,
           pictures,

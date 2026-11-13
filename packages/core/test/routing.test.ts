@@ -59,5 +59,11 @@ describe("the cheapest provider of a model", () => {
     unpinCheapest("https://stuck.test/api/v1", "deepseek/flash", -1);
     await ask();
     expect(sent.map((b) => (b as { provider?: unknown }).provider ?? null)).toEqual([{ order: ["morph"] }, null, { order: ["morph"] }]);
+    // A screenshot for the agent's own eyes: the list does not say which providers take pictures, the router picks.
+    await routed("https://stuck.test/api/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify({ model: "deepseek/flash", messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "data:image/png;base64,AA" } }] }] }),
+    });
+    expect(sent.at(-1)).not.toHaveProperty("provider");
   });
 });

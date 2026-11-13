@@ -32,6 +32,28 @@ export function resize(src: PNG, width: number, height: number): PNG {
   return out;
 }
 
+/** The widest and tallest screenshot a model is shown: a long page is cut to its top, a wide one scaled down. */
+const MODEL_WIDTH = 1280;
+const MODEL_HEIGHT = 2400;
+
+/** A screenshot made small enough to show a model (a page photographed whole can be 8000 px tall). */
+export function fitForModel(png: Buffer): Buffer {
+  let img: PNG;
+  try {
+    img = PNG.sync.read(png);
+  } catch {
+    return png;
+  }
+  if (img.width <= MODEL_WIDTH && img.height <= MODEL_HEIGHT) return png;
+  if (img.width > MODEL_WIDTH) img = resize(img, MODEL_WIDTH, Math.round((img.height * MODEL_WIDTH) / img.width));
+  if (img.height > MODEL_HEIGHT) {
+    const top = new PNG({ width: img.width, height: MODEL_HEIGHT });
+    PNG.bitblt(img, top, 0, 0, img.width, MODEL_HEIGHT, 0, 0);
+    img = top;
+  }
+  return PNG.sync.write(img);
+}
+
 /** A canvas of a size, filled with a colour (#rrggbb) or transparent, with the picture fitted in the middle at `share`. */
 export function placed(logo: PNG, width: number, height: number, share: number, background: string | null): PNG {
   const out = new PNG({ width, height });

@@ -66,6 +66,33 @@ function results(name: string): string[] {
 const call = (name: string, args: Record<string, unknown>): FakeTurn => ({ toolCalls: [{ name, args }] });
 const visionRequests = () => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === "eyes");
 
+// Asked for: "DeepSeek sees, why does another request look for it". A working model that sees gets its screenshots in
+// its own conversation, with all it knows of the task; no other request is asked about them.
+describe("an agent whose model sees", () => {
+  it("looks at its screenshots itself, in its own conversation", async () => {
+    const queue: FakeTurn[] = [call("check_page", { url: "http://localhost:5173/", focus: "кнопки" })];
+    fake = await startFakeProvider({
+      key: KEY,
+      models: [{ id: "seer", supported_parameters: ["tools"], architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] } }],
+      respond: () => queue.shift() ?? { text: "Кнопки на месте." },
+    });
+    const provider = await (await env.call("POST", "/api/providers", { preset: "custom", baseUrl: fake.baseUrl, apiKey: KEY })).json();
+    const project = await (await env.call("POST", "/api/projects", { path: repo, kind: "existing" })).json();
+    await env.call("POST", `/api/projects/${project.id}/work/chat`, { content: "Проверь страницу", model: { providerId: provider.id, model: "seer" } });
+    await settle(project.id);
+    const asks = fake.requests.filter((r) => r.path === "/v1/chat/completions");
+    // The step after the check: the tool said to look, the two screenshots came after it as the user's.
+    expect(asks).toHaveLength(2);
+    const answer = asks[1]!.body.messages.find((m: { role: string }) => m.role === "tool");
+    expect(String(answer.content)).toMatch(/follow in the conversation: look at them yourself/);
+    const last = asks[1]!.body.messages.at(-1);
+    expect(last.role).toBe("user");
+    expect(JSON.stringify(last.content)).toContain("the screenshots you just took");
+    expect(last.content.filter((p: { type: string }) => p.type === "image_url")).toHaveLength(2);
+    expect(widths).toEqual([1280, 390]);
+  });
+});
+
 describe("look_at_page", () => {
   it("photographs a local page and returns what the vision model sees", async () => {
     const id = await start([call("look_at_page", { url: "http://localhost:5173/", question: "Виден заголовок Привет?" })], ["Да, заголовок «Привет» по центру."]);

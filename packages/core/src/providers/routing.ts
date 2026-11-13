@@ -86,6 +86,8 @@ export function withCheapestProvider(baseUrl: string, fetchFn: typeof fetch): ty
     }
     if (typeof body.model !== "string" || body.provider || body.model.includes("@")) return fetchFn(input, init);
     if ((avoided.get(`${baseUrl}|${body.model}`) ?? 0) > Date.now()) return fetchFn(input, init);
+    // The list does not say which providers take pictures: a request with a screenshot goes where the router sends it.
+    if (init.body.includes('"type":"image_url"')) return fetchFn(input, init);
     const tag = await cheapest(baseUrl, body.model, fetchFn);
     if (!tag) return fetchFn(input, init);
     return fetchFn(input, { ...init, body: JSON.stringify({ ...body, provider: { order: [tag] } }) });

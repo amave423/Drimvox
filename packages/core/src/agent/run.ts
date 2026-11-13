@@ -54,6 +54,8 @@ export interface RunInput {
   stopWhen?: () => boolean;
   /** Asked before every step: a reminder that goes with that request only, such as ticking off the checklist. */
   remind?: () => string | null;
+  /** The latest screenshots the agent took, for its own model to look at (visual/tools.ts `show`): with every step after. */
+  pictures?: () => { pictures: Buffer[]; caption: string } | null;
   /** Old tool outputs leave the conversation as OpenCode prunes them (prune.ts): a project's run. */
   prune?: boolean;
   /** More tools kept out of every step until the model loads them, such as the user's MCP servers' (deferred.ts). */
@@ -200,6 +202,20 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           }
           const note = i.remind?.();
           if (note) sent = [...sent, { role: "user", content: note }];
+          // A tool's answer cannot hold a picture with OpenAI-like providers: the screenshots come after it, as the user's.
+          const seen = i.pictures?.();
+          if (seen?.pictures.length) {
+            sent = [
+              ...sent,
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: `[Drimvox: the screenshots you just took, ${seen.caption}. Look at them yourself.]` },
+                  ...seen.pictures.map((png) => ({ type: "image" as const, image: png, mediaType: "image/png" })),
+                ],
+              },
+            ];
+          }
           // The same text as long as the notes stay the same: the provider's cache holds.
           const active = deferral?.active();
           traceStep(system(), deferral?.tools ?? tools, active, sent);
