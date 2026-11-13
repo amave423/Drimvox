@@ -1,4 +1,15 @@
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { shellNote } from "../agent/commands";
+
+/**
+ * Where the agent and the tester keep their own scratch files (probes, scripts, screenshots, test data): one named
+ * folder outside the project (seen live: models made scratchpad/, temp/ and a file named nul in the project's root).
+ */
+export function scratchOf(folder: string): string {
+  return join(tmpdir(), "drimvox-scratch", createHash("sha1").update(folder).digest("hex").slice(0, 10));
+}
 
 /** What the agent is told about git when the project leaves the commits to it (the project's own rules say when and how). */
 export function commitRules(when = "as you go: when a piece of it is done and checked", style = 'with one short line in English, imperative, under 72 characters, saying what changed ("Add voice channel join")'): string {
@@ -32,6 +43,7 @@ export function agentPrompt(folder: string, platform = process.platform, git = c
   return [
     "You are Drimvox's coding agent. You work right in the user's project folder: what you write changes their files at once.",
     `Folder: ${folder}. Commands run with ${shell} in it.`,
+    `Your own scratch files (probes, scripts, screenshots, test data) go in ${scratchOf(folder)}, never in the project.`,
     "",
     "# Tone",
     "Be concise and direct. Before a group of actions, say in one short sentence what you are about to do: the user follows",

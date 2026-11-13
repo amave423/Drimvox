@@ -843,6 +843,31 @@ describe("the tester", () => {
     expect(chat.messages.some((m: any) => m.role === "assistant" && m.content.includes("Кнопка называется «Запись»"))).toBe(true);
   });
 
+  // Seen live: Haiku's tester went to $0.25 on a $0.15 budget. It comes only with money left, and keeps to the allowance.
+  const priced = async (coderTokens: number) => {
+    const write: FakeTurn = { ...call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }), usage: { prompt_tokens: coderTokens, completion_tokens: 0 } };
+    const look: FakeTurn = { ...call("list_files", { path: "." }), usage: { prompt_tokens: 200_000, completion_tokens: 0 } };
+    // $1 per million tokens, a budget of $1: the allowance past it is $0.15.
+    const s = await setup({ coder: [write, { text: "Готово." }], tester: [look, look, look, found("Кнопка не та")] }, PRICED);
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("PATCH", `/api/projects/${s.project.id}/work`, { budgetUsd: 1 });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай кнопку записи", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status !== "running");
+  };
+
+  it("does not come when the answer spent the budget", async () => {
+    await priced(1_100_000);
+    expect(testerAsks()).toHaveLength(0);
+  });
+
+  it("stops at the allowance past the limit and reports what it saw", async () => {
+    // $0.90 spent: $0.25 is left to the allowance, so a $0.20 look or two, and then one more step that can only report.
+    await priced(900_000);
+    expect(testerAsks().length).toBeGreaterThan(0);
+    expect(testerAsks().length).toBeLessThanOrEqual(3);
+    expect(testerAsks().at(-1)!.body.tools.map((t: any) => t.function.name)).toEqual(["report_check"]);
+  });
+
   it("does not come after an answer that changed nothing, nor when the project switched it off", async () => {
     await open({ coder: [{ text: "Это кнопка записи в index.html." }] });
     expect(testerAsks()).toHaveLength(0);

@@ -1,4 +1,5 @@
 import type { ModelInfo } from "@drimvox/shared";
+import { scratchOf } from "./agent-prompt";
 import { tool, type ModelMessage, type ToolSet } from "ai";
 import { z } from "zod";
 import { runAgent } from "../agent/run";
@@ -29,6 +30,8 @@ export interface CheckDeps {
   conn: Connection;
   model: string;
   price: ModelInfo | undefined;
+  /** What it may spend: the run's allowance past its limit (seen live: a tester went $0.10 past a $0.15 budget). */
+  budgetUsd?: number;
   folder: string;
   signal: AbortSignal;
   idleTimeoutMs: number;
@@ -66,7 +69,7 @@ const SYSTEM = (folder: string) =>
     "  not only that bytes flow. Chromium plays a WAV file as the microphone with --use-file-for-fake-audio-capture=<path>",
     "  (the full path, written as a Windows path on Windows).",
     "- Two people where it takes two: two browser contexts, two accounts. Someone without the right must be refused.",
-    "- Scripts of your own (a Playwright run, a probe) go outside the project: in the system's temporary folder.",
+    `- Scripts of your own (a Playwright run, a probe, screenshots) go in ${scratchOf(folder)}, never in the project.`,
     "- Test on this computer: a local server with a temporary database, never the user's live server and its accounts.",
     "",
     "# What to report",
@@ -135,7 +138,7 @@ export async function checkWork(d: CheckDeps, job: { asked: string; said: string
       remind: () => (steps >= CHECK_STEPS - WRAP_UP ? `${CHECK_STEPS - steps} steps left: stop what you are trying and call report_check with what you saw.` : null),
       system: SYSTEM(d.folder),
       spentUsd: 0,
-      budgetUsd: Number.POSITIVE_INFINITY,
+      budgetUsd: d.budgetUsd ?? Number.POSITIVE_INFINITY,
       signal: d.signal,
       idleTimeoutMs: d.idleTimeoutMs,
       hooks: d.hooks,
