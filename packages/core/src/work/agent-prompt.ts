@@ -13,7 +13,10 @@ export function commitRules(when = "as you go: when a piece of it is done and ch
     "  on GitHub and it has no remote, create it with `gh repo create <name> --private --source . --remote origin` (without",
     "  --push). When the user asks for a release, make it with `gh release create` and attach the built installers or",
     "  archives as its files.",
-    "- Never delete a repository, a branch on GitHub or history: no `gh repo delete`, no force push, no removing .git.",
+    "- Never delete a repository, a branch on GitHub or history: no `gh repo delete`, no removing .git, and no force push",
+    "  unless the user asked to rewrite the history. Then rewrite it without an editor (`git rebase` with",
+    "  GIT_SEQUENCE_EDITOR, `git filter-branch`), keep a backup branch until GitHub has the new history, move the release",
+    "  tags onto the new commits, and push with `--force-with-lease` (the user approves it).",
   ].join("\n");
 }
 

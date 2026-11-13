@@ -6,17 +6,16 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export type CommandVerdict =
   | { action: "allow" }
-  | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" | "ssh" }
+  | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" | "ssh" | "rewrite" }
   | { action: "deny"; reason: "destroy" };
 
 /**
- * Never run, even when asked: deleting a repository or rewriting what was pushed (asked for: the agent commits itself,
- * as in OpenCode, and may never delete a repository).
+ * Never run, even when asked: deleting a repository (asked for: the agent commits itself, as in OpenCode, and may never
+ * delete a repository). Rewriting what was pushed is asked instead (`rules`).
  */
 const DESTROYS = [
   /\bgh\s+repo\s+delete\b/i,
   /\bgh\s+api\b[^\n;|]*(-X|--method)\s*DELETE\b[^\n;|]*\brepos\//i,
-  /\bgit\s+push\b[^\n;|&]*(\s--force(-with-lease)?\b|\s-f\b)/i,
   /\b(rm|del|rmdir|rd|remove-item|ri)\b[^\n;|&]*(^|[\s"'\/])\.git(["'\s\/]|$)/i,
 ];
 
@@ -66,6 +65,9 @@ function opensBrowser(command: string): boolean {
 }
 
 const rules: [RegExp, Extract<CommandVerdict, { action: "ask" }>["reason"]][] = [
+  // Replaces the history on GitHub: only when the user asked for it (asked for: "rewrite Nexus's commit history, better
+  // the agent itself"), and the user says yes to it.
+  [/\bgit\s+push\b[^\n;|&]*(\s--force(-with-lease)?\b|\s-f\b|\s\+\S)/i, "rewrite"],
   [/\bgit\s+push\b/i, "push"],
   // Seen: plink downloaded and run with the server's password in the command, kept in the chat (ssh_run does it safely).
   [/\b(plink|putty|sshpass)(\.exe)?\b/i, "ssh"],

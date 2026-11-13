@@ -140,12 +140,18 @@ describe("classifyCommand", () => {
   });
 
   // Asked for: the agent commits as in OpenCode, but never deletes a repository or its history.
-  it.each(["gh repo delete me/fiit --yes", "gh api -X DELETE repos/me/fiit", "rm -rf .git", "Remove-Item -Recurse -Force .git", "git push --force origin main", "git push -f"])(
+  it.each(["gh repo delete me/fiit --yes", "gh api -X DELETE repos/me/fiit", "rm -rf .git", "Remove-Item -Recurse -Force .git"])(
     "refuses %s outright",
     (cmd) => {
       expect(classifyCommand(cmd, root)).toEqual({ action: "deny", reason: "destroy" });
     },
   );
+
+  // Asked for: "rewrite the commit history, better the agent itself". A force push replaces GitHub's history: the user
+  // says yes to it first.
+  it.each(["git push --force origin main", "git push -f", "git push --force-with-lease", "git push origin +main"])("asks before %s", (cmd) => {
+    expect(classifyCommand(cmd, root)).toEqual({ action: "ask", reason: "rewrite" });
+  });
 
   // Seen live: building an Electron app asked for permission, as electron-builder unpacks its tools into its own cache.
   // Seen live: the tester asked for permission to write its probe into the temporary folder and to run it from there.
