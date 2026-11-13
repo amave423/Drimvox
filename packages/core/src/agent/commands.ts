@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { noteShell } from "./leftovers";
 import { closeOfficeLeftovers } from "./office";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -307,12 +308,28 @@ export function killTree(child: ChildProcess): void {
 /** How long the output may stay open after the shell has exited. */
 const LINGER_MS = 2_000;
 
+let shellCount = 0;
+
 /** Runs a shell command in `cwd`; keeps the tail of the output and kills the whole tree on timeout. */
 export function runCommand(command: string, cwd: string, timeoutMs: number, signal?: AbortSignal, env?: Record<string, string>): Promise<CommandResult> {
   return new Promise((done) => {
     // A second back: the clock of a process's start is coarser than this one.
     const startedAt = new Date(Date.now() - 1000);
-    const child = spawnShell(command, cwd, env);
+    // Git Bash runs the real bash under a launcher, and a command's `&` forks under the real one, which is soon gone: it
+    // tells its own Windows number, so that what it leaves running is still found as ours (leftovers.ts).
+    const pidFile = process.platform === "win32" && gitBash() ? join(tmpdir(), `drimvox-shell-${process.pid}-${++shellCount}.pid`) : null;
+    const child = spawnShell(pidFile ? `cat /proc/$$/winpid > '${pidFile.split(sep).join("/")}' 2>/dev/null; ${command}` : command, cwd, env);
+    // What it leaves running is stopped when the run in this folder is over.
+    noteShell(cwd, child.pid, startedAt);
+    const noteRealShell = () => {
+      if (!pidFile) return;
+      try {
+        noteShell(cwd, Number(readFileSync(pidFile, "utf8").trim()) || undefined, startedAt);
+        rmSync(pidFile, { force: true });
+      } catch {
+        // It never ran so far.
+      }
+    };
 
     let output = "";
     let full = "";
@@ -330,6 +347,7 @@ export function runCommand(command: string, cwd: string, timeoutMs: number, sign
     const finish = (exitCode: number | null) => {
       if (settled) return;
       settled = true;
+      noteRealShell();
       clearTimeout(timer);
       signal?.removeEventListener("abort", kill);
       child.stdout.destroy();

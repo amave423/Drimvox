@@ -21,6 +21,7 @@ import type { Connection, ProviderRepo } from "../providers/repo";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 import { askAboutPictures, type Vision } from "../visual/look";
 import { visualTools, type VisualKit } from "../visual/tools";
+import { stopLeftovers } from "../agent/leftovers";
 import { fitForModel } from "../tools/images";
 import { CHECK_ROUNDS, checkWork, findingsMessage, type CheckResult } from "./check";
 import type { ProjectGit } from "./project-git";
@@ -345,7 +346,8 @@ export class WorkRun {
         if (outcome.kind === "limit" || outcome.kind === "steps") continue;
         // The agent says it is done: when the turn changed files, a tester tries it as the user will, and what it finds
         // goes back to the agent (asked for: "why do I find the bugs").
-        if (this.turnChanged && this.checkRounds < CHECK_ROUNDS && this.testerOn() && !this.publishing) {
+        // Not with the money spent: the tester would only add to it (seen live: $0.25 on a $0.15 budget, no code changed).
+        if (this.turnChanged && this.checkRounds < CHECK_ROUNDS && this.testerOn() && !this.publishing && this.spent() < this.row().budgetUsd) {
           this.checkRounds++;
           this.turnChanged = false;
           const found = await this.check(conn, ref.model);
@@ -369,6 +371,8 @@ export class WorkRun {
       // chat, it stays between messages (seen live: the agent started the same server three times over).
       const how = (final as { status: string } | null)?.status;
       if (!(how === "done" && !this.row().site)) this.d.visualKit.background.stopAll(this.chatId);
+      // And what its commands left running on their own (a server started with &): seen live, ten of them over a day.
+      void stopLeftovers(this.folder);
       // The project's state for whoever picks it up next, in Drimvox or another program (AGENTS.md, notes.ts).
       try {
         const row = this.row();
@@ -759,6 +763,8 @@ export class WorkRun {
         conn,
         model,
         price,
+        // Up to the allowance past the limit, as the agent's own wrap-up; then it reports what it saw.
+        budgetUsd: Math.max(0, this.row().budgetUsd * GRACE - this.spent()),
         folder: this.folder,
         signal,
         idleTimeoutMs: this.d.idleTimeoutMs,
