@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cheapestEndpoint, unpinCheapest, withCheapestProvider } from "../src/providers/routing";
+import { cheapestEndpoint, pinnedRates, unpinCheapest, withCheapestProvider } from "../src/providers/routing";
 
 const endpoint = (tag: string, prompt: number, cache: number | null, completion: number, extra: Record<string, unknown> = {}) => ({
   tag,
@@ -39,6 +39,9 @@ describe("the cheapest provider of a model", () => {
     await routed("https://router.test/api/v1/chat/completions", { method: "POST", body: JSON.stringify({ model: "deepseek/flash", messages: [] }) });
     await routed("https://router.test/api/v1/chat/completions", { method: "POST", body: JSON.stringify({ model: "other/model", messages: [] }) });
     expect(sent[0]!.body).toMatchObject({ model: "deepseek/flash", provider: { order: ["morph"] } });
+    // Its prices are known now: what the steps are billed at (per token, in the router's money).
+    expect(pinnedRates("https://router.test/api/v1", "deepseek/flash")).toEqual({ input: 2.6 / 1e6, cached: 0.47 / 1e6, output: 47.3 / 1e6 });
+    expect(pinnedRates("https://router.test/api/v1", "other/model")).toBeNull();
     expect((sent[0]!.body as { provider: { allow_fallbacks?: boolean } }).provider.allow_fallbacks).toBeUndefined();
     expect(sent[1]!.body).not.toHaveProperty("provider");
   });

@@ -290,6 +290,8 @@ const migrations: string[] = [
   // What an answer's last step sent: the chat's context bar (seen: the sum over all steps of an answer with 43 actions,
   // 1.6 million tokens, showed a context far past the model's window that was never there).
   `alter table messages add column context_tokens integer;`,
+  // The rates the run's model was billed at, USD per million (asked for: what reading, the cache and writing each cost).
+  `alter table project_work add column rates text;`,
 ];
 
 export interface Database {

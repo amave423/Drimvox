@@ -73,6 +73,7 @@ export class ProjectWork {
         cached: spending.cachedTokens + (live?.progress().cachedTokens ?? 0),
         context: row?.contextTokens ?? null,
       },
+      rates: row?.rates ?? null,
       waitingApproval: !!chatId && !!live && (this.o.approvals.open(chatId).length > 0 || this.o.questions.open(chatId).length > 0),
       escalated: row?.escalated ?? false,
       startedAt: row?.startedAt ?? null,

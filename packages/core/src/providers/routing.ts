@@ -21,9 +21,21 @@ const SHARE = { input: 0.148, cached: 0.816, output: 0.036 };
 
 const price = (v: number | string | undefined) => (v === undefined || v === "" ? null : Number(v));
 
+/** A provider's prices per token, in the router's money: new input, input from the cache, output. */
+export interface EndpointRates {
+  input: number;
+  cached: number;
+  output: number;
+}
+
 /** The cheapest working provider that takes tools, by an agent's work; null when none is listed. */
 export function cheapestEndpoint(endpoints: Endpoint[]): string | null {
-  let best: { tag: string; cost: number } | null = null;
+  return cheapestChoice(endpoints)?.tag ?? null;
+}
+
+/** The cheapest provider with its prices. */
+function cheapestChoice(endpoints: Endpoint[]): { tag: string; rates: EndpointRates } | null {
+  let best: { tag: string; cost: number; rates: EndpointRates } | null = null;
   for (const e of endpoints) {
     // "deepinfra/flex", "baseten/priority": another queue and another speed, not the model's usual service.
     if (!e.tag || e.tag.includes("/") || (e.status ?? 0) < 0) continue;
@@ -33,14 +45,26 @@ export function cheapestEndpoint(endpoints: Endpoint[]): string | null {
     if (input === null || output === null || !Number.isFinite(input) || !Number.isFinite(output)) continue;
     const cached = price(e.pricing?.input_cache_read) ?? input;
     const cost = SHARE.input * input + SHARE.cached * cached + SHARE.output * output;
-    if (!best || cost < best.cost) best = { tag: e.tag, cost };
+    if (!best || cost < best.cost) best = { tag: e.tag, cost, rates: { input, cached, output } };
   }
-  return best?.tag ?? null;
+  return best ? { tag: best.tag, rates: best.rates } : null;
 }
 
 /** A model's choice is looked up again after this long: prices move with the exchange rate. */
 const FRESH_MS = 6 * 3_600_000;
 const chosen = new Map<string, { at: number; tag: Promise<string | null> }>();
+/** The prices of the provider chosen for a model, once known: what its steps are billed at. */
+const chosenRates = new Map<string, EndpointRates>();
+
+/**
+ * What a model's requests are billed at now, per token in the router's money (asked for: the rates of reading, the cache
+ * and writing); null when its requests are not pinned to one provider.
+ */
+export function pinnedRates(baseUrl: string, model: string): EndpointRates | null {
+  const key = `${baseUrl}|${model}`;
+  if ((avoided.get(key) ?? 0) > Date.now()) return null;
+  return chosenRates.get(key) ?? null;
+}
 
 async function choose(baseUrl: string, model: string, fetchFn: typeof fetch): Promise<string | null> {
   try {
@@ -48,7 +72,9 @@ async function choose(baseUrl: string, model: string, fetchFn: typeof fetch): Pr
     const res = await fetchFn(`${baseUrl.replace(/\/$/, "")}/models/${model.replace(/^~/, "")}/endpoints`, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return null;
     const body = (await res.json()) as { data?: { endpoints?: Endpoint[] } };
-    return cheapestEndpoint(body.data?.endpoints ?? []);
+    const choice = cheapestChoice(body.data?.endpoints ?? []);
+    if (choice) chosenRates.set(`${baseUrl}|${model}`, choice.rates);
+    return choice?.tag ?? null;
   } catch {
     return null;
   }

@@ -1,4 +1,4 @@
-import type { AgentQuestion, ChecklistItem, ProjectModels, ProjectWorkReason, ProjectWorkStatus, ThinkingLevel, WorkShot } from "@drimvox/shared";
+import type { AgentQuestion, ChecklistItem, ProjectModels, ProjectWorkReason, ProjectWorkStatus, ThinkingLevel, WorkRates, WorkShot } from "@drimvox/shared";
 import type { Database } from "../db";
 
 interface Row {
@@ -21,6 +21,7 @@ interface Row {
   site_command: string | null;
   site_url: string | null;
   context_tokens: number | null;
+  rates: string | null;
   thinking: string | null;
   planned: number;
 }
@@ -47,6 +48,8 @@ export interface WorkRow {
   site: { command: string; url: string } | null;
   /** What the latest step sent the model: how full its context is now. */
   contextTokens: number | null;
+  /** What the model was billed at, USD per million tokens: new input, input from the cache, output. */
+  rates: WorkRates | null;
   /** How much the model thinks, as picked under the box; null: as the provider decides. */
   thinking: ThinkingLevel | null;
   /** The run goes by an approved plan, to the end of its checklist; otherwise it answers as a chat. */
@@ -72,6 +75,7 @@ const toWork = (r: Row): WorkRow => ({
   report: r.report ?? null,
   site: r.site_command && r.site_url ? { command: r.site_command, url: r.site_url } : null,
   contextTokens: r.context_tokens ?? null,
+  rates: r.rates ? (JSON.parse(r.rates) as WorkRates) : null,
   thinking: (r.thinking as ThinkingLevel | null) ?? null,
   planned: r.planned === 1,
 });
@@ -153,6 +157,7 @@ export class ProjectWorkRepo {
     if (patch.startedAt !== undefined) columns.started_at = patch.startedAt;
     if (patch.report !== undefined) columns.report = patch.report;
     if (patch.contextTokens !== undefined) columns.context_tokens = patch.contextTokens;
+    if (patch.rates !== undefined) columns.rates = patch.rates ? JSON.stringify(patch.rates) : null;
     if (patch.thinking !== undefined) columns.thinking = patch.thinking;
     if (patch.planned !== undefined) columns.planned = patch.planned ? 1 : 0;
     if (patch.site !== undefined) {

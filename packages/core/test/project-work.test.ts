@@ -124,6 +124,15 @@ describe("work on a project", () => {
     expect([1, 2].map((n) => retryWait("provider_error", n))).toEqual([5_000, null]);
   });
 
+  // Asked for: what reading, the cache and writing each cost, at what rate.
+  it("keeps the rates the model was billed at: new input, input from the cache, output", async () => {
+    const s = await setup({ coder: [{ text: "Готово." }] }, [{ id: "coder", supported_parameters: ["tools"], pricing: { prompt: "0.000001", completion: "0.000002", input_cache_read: "0.0000001" } }]);
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Привет", model: s.ref("coder") });
+    const done = await until(s.project.id, (w) => w.status === "done");
+    expect(done.rates).toEqual({ input: 1, cached: 0.1, output: 2 });
+  });
+
   // The working model keeps failing: the strong one takes over, when the project has one.
   it("hands the work to the strong model when the working one keeps failing", async () => {
     const s = await setup({ coder: [{ fail: { status: 400, message: "Broken" } }, { fail: { status: 400, message: "Broken" } }], strong: [{ text: "Сделал." }] });

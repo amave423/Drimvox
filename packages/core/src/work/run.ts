@@ -15,7 +15,8 @@ import { webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
 import { todayLine } from "../now";
 import { findModel } from "../providers/catalog";
-import { unpinCheapest } from "../providers/routing";
+import { pinnedRates, unpinCheapest } from "../providers/routing";
+import { usdRub } from "../rates";
 import type { Connection, ProviderRepo } from "../providers/repo";
 import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from "../skills/skills";
 import { askAboutPictures, type Vision } from "../visual/look";
@@ -580,6 +581,17 @@ export class WorkRun {
         if (!step.priced) priced = false;
       },
     });
+    // What the model was billed at (asked for: the rates of reading, the cache and writing): the provider its requests
+    // were pinned to behind a router, else the catalog's prices.
+    const pinned = pinnedRates(conn.baseUrl, model);
+    const perUnit = pinned && conn.currency === "RUB" ? 1 / (await usdRub().catch(() => 0)) : 1;
+    const rates =
+      pinned && Number.isFinite(perUnit)
+        ? { input: pinned.input * 1e6 * perUnit, cached: pinned.cached * 1e6 * perUnit, output: pinned.output * 1e6 * perUnit }
+        : price && price.priceIn !== null && price.priceOut !== null
+          ? { input: price.priceIn, cached: price.priceCacheRead ?? price.priceIn, output: price.priceOut }
+          : null;
+    if (rates) this.d.repo.update(this.projectId, { rates });
     const stopped = outcome.kind === "stopped";
     const error = outcome.kind === "error" ? outcome.error : null;
     // From here the answer's cost is in its message: not counted twice.

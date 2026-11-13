@@ -1,6 +1,8 @@
 import type { ProjectWorkView } from "@drimvox/shared";
+import { Fragment } from "react";
 import { useApp } from "../../context";
-import { formatTokens, formatUsd } from "../../lib/format";
+import type { MessageKey } from "../../i18n";
+import { formatPrice, formatTokens, formatUsd } from "../../lib/format";
 import { useModelInfo } from "../chat/ModelNote";
 import { hoursAndMinutes } from "./useProjectWork";
 
@@ -20,6 +22,7 @@ export function WorkTokens({ work, onFresh }: { work: ProjectWorkView; /** A rea
   const { input, output, cached, context } = work.tokens;
   if (!work.startedAt || (input === 0 && output === 0 && context === null)) return null;
   const tokens = (n: number) => formatTokens(n, settings.locale);
+  const split = moneyByKind(work);
   const size = model?.contextLength ?? null;
   return (
     <section className="work-tokens" aria-label={t("workTokens.title")}>
@@ -42,15 +45,16 @@ export function WorkTokens({ work, onFresh }: { work: ProjectWorkView; /** A rea
         context !== null && <p className="mono margin-figure">{t("workTokens.contextOnly", { used: tokens(context) })}</p>
       )}
       <dl className="work-tokens-list">
-        <dt>{t("workTokens.read")}</dt>
-        <dd className="mono">{tokens(input)}</dd>
-        {/* What the provider served from its cache, for less: none at all means the cache does not work here. */}
-        <dt className="work-tokens-sub">{t("workTokens.cached")}</dt>
-        <dd className="mono">
-          {input > 0 ? t("workTokens.cachedShare", { tokens: tokens(cached), share: Math.round((cached / input) * 100) }) : tokens(cached)}
-        </dd>
-        <dt>{t("workTokens.written")}</dt>
-        <dd className="mono">{tokens(output)}</dd>
+        {/* Asked for: reading, the cache apart from it, writing; the tokens, the money and the rate of each. */}
+        {split.map((row) => (
+          <Fragment key={row.key}>
+            <dt>{t(row.label)}</dt>
+            <dd className="mono">
+              {row.money === null ? tokens(row.tokens) : t("workTokens.amount", { tokens: tokens(row.tokens), money: formatUsd(row.money) })}
+              {row.rate !== null && <span className="work-tokens-rate">{t("workTokens.rate", { price: formatPrice(row.rate) })}</span>}
+            </dd>
+          </Fragment>
+        ))}
         {/* The time and the money of the run, with their limits (asked for: here, not in the top bar). */}
         <dt>{t("workTokens.time")}</dt>
         <dd className="mono">{t("workTokens.ofLimit", { used: hoursAndMinutes(work.workedMs, t), limit: t("projectWork.hoursShort", { h: work.hours }) })}</dd>
@@ -70,4 +74,29 @@ export function WorkTokens({ work, onFresh }: { work: ProjectWorkView; /** A rea
       )}
     </section>
   );
+}
+
+/**
+ * The money of each kind of token: by the rates the model was billed at, fitted to the provider's own bill, so the three
+ * add up to what was spent. The cache is apart from new reading (asked for: what the cache alone costs).
+ */
+export function moneyByKind(work: Pick<ProjectWorkView, "tokens" | "rates" | "spentUsd">): {
+  key: string;
+  label: MessageKey;
+  tokens: number;
+  money: number | null;
+  rate: number | null;
+}[] {
+  const { input, cached, output } = work.tokens;
+  const fresh = Math.max(0, input - cached);
+  const r = work.rates;
+  const raw = r ? [(fresh * r.input) / 1e6, (cached * r.cached) / 1e6, (output * r.output) / 1e6] : null;
+  const sum = raw ? raw[0]! + raw[1]! + raw[2]! : 0;
+  const fit = raw && sum > 0 && work.spentUsd > 0 ? work.spentUsd / sum : 1;
+  const money = (i: number) => (raw ? raw[i]! * fit : null);
+  return [
+    { key: "fresh", label: "workTokens.readNew", tokens: fresh, money: money(0), rate: r?.input ?? null },
+    { key: "cached", label: "workTokens.readCached", tokens: cached, money: money(1), rate: r?.cached ?? null },
+    { key: "out", label: "workTokens.write", tokens: output, money: money(2), rate: r?.output ?? null },
+  ];
 }

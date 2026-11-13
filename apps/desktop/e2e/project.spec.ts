@@ -283,9 +283,9 @@ test("a stopped project goes on with Continue, and the timeline shows the answer
   await expect(page.locator(".timeline .msg-user")).toHaveCount(2);
   // What the tokens went to, beside the work (asked for: as a chat shows its context).
   const tokens = page.getByRole("region", { name: "Контекст и токены" });
-  await expect(tokens).toContainText("Прочитано моделью");
-  await expect(tokens).toContainText("Написано моделью");
-  await expect(tokens).toContainText("из них из кэша");
+  await expect(tokens).toContainText("Чтение, новое");
+  await expect(tokens).toContainText("Запись");
+  await expect(tokens).toContainText("Чтение из кэша");
 
   // Opened again, the project shows its latest messages, not its first (seen live: it opened at the very top).
   await page.getByRole("button", { name: "Чат", exact: true }).click();

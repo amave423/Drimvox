@@ -51,6 +51,13 @@ export interface WorkShot {
   at: number;
 }
 
+/** What a model was billed at, USD per million tokens: new input, input served from the cache, output. */
+export interface WorkRates {
+  input: number;
+  cached: number;
+  output: number;
+}
+
 export interface ProjectWorkView {
   projectId: string;
   status: ProjectWorkStatus;
@@ -77,6 +84,8 @@ export interface ProjectWorkView {
    * what it wrote; `context` what the latest step sent: how full it is now.
    */
   tokens: { input: number; output: number; cached: number; context: number | null };
+  /** The rates of the run's model, as billed (the provider it was pinned to behind a router); null when unknown. */
+  rates: WorkRates | null;
   /** The run waits for the user's permission on a command. */
   waitingApproval: boolean;
   /** The strong model took over. */
