@@ -22,7 +22,7 @@ export function commitRules(when = "as you go: when a piece of it is done and ch
  * times with ?v=1 … ?v=19 for small layout tweaks); OpenCode says nothing of design and the model's own taste did better.
  * `git`: the project's git rules (ProjectGit.instructions); without them the agent commits itself as it goes.
  */
-export function agentPrompt(folder: string, platform = process.platform, git = commitRules()): string {
+export function agentPrompt(folder: string, platform = process.platform, git = commitRules(), tester = false): string {
   const shell = shellNote(platform);
   return [
     "You are Drimvox's coding agent. You work right in the user's project folder: what you write changes their files at once.",
@@ -76,6 +76,13 @@ export function agentPrompt(folder: string, platform = process.platform, git = c
     "",
     "# Rules",
     git,
+    ...(tester
+      ? [
+          // Seen live: the agent released 0.5.1 before the tester came, and the bugs it found went out with it.
+          "- Drimvox's tester tries your changes after your reply. Publish nothing in a reply that changed files (no release,",
+          "  no tag, no deploy, no store upload): say it is ready. When the tester has found nothing, you are told to publish.",
+        ]
+      : []),
     "- Never write a password, key or token into a file, the project's notes or a commit, even one the user gave you.",
     // Seen live: the agent "cleaned up 13 junk test accounts" on the user's live server, his friends' perhaps among them.
     "- Never delete the user's data (accounts, messages, rows of a database, files on a server) unless they asked for that",

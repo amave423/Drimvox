@@ -43,6 +43,9 @@ export const SEGMENT_STEPS = 60;
 /** Drimvox's word to a project worked as a chat, at every 60 steps of one answer. */
 export const DONE_YET =
   "[Drimvox: 60 steps on this message.] If what the user asked is done and nothing is broken, stop now and reply what you made. Otherwise go on with what is left, without polishing what already works.";
+/** After a clean check: what the agent held back for the tester goes out now (agent-prompt.ts). */
+export const CLEAN_CHECK =
+  "[Drimvox's tester tried your work as the user will and found nothing.] If the user asked to publish it (a release, a deploy, an upload), do it now. Otherwise reply in one line that it is checked.";
 /** Provider errors in a row before the run stops and waits. */
 const MAX_ERRORS = 2;
 const RETRY_MS = 5000;
@@ -140,6 +143,11 @@ export class WorkRun {
   private checkRounds = 0;
   /** What the last answer said, for the tester. */
   private lastSaid = "";
+  /** The tester found nothing: the agent publishes what it held back, without another check. */
+  private publishing = false;
+  private testerOn(): boolean {
+    return (this.d.extensions?.(this.projectId).check ?? true) && !!this.d.visualKit;
+  }
 
   constructor(
     private readonly d: RunDeps,
@@ -214,6 +222,7 @@ export class WorkRun {
     this.runStart = Date.now();
     this.turnChanged = false;
     this.checkRounds = 0;
+    this.publishing = false;
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
     // The branch the project's git rules ask for, before anything changes.
     await this.d.git?.prepare(this.projectId, this.folder).catch(() => {});
@@ -289,13 +298,19 @@ export class WorkRun {
         if (outcome.kind === "limit" || outcome.kind === "steps") continue;
         // The agent says it is done: when the turn changed files, a tester tries it as the user will, and what it finds
         // goes back to the agent (asked for: "why do I find the bugs").
-        if (this.turnChanged && this.checkRounds < CHECK_ROUNDS && (this.d.extensions?.(this.projectId).check ?? true) && this.d.visualKit) {
+        if (this.turnChanged && this.checkRounds < CHECK_ROUNDS && this.testerOn() && !this.publishing) {
           this.checkRounds++;
           this.turnChanged = false;
           const found = await this.check(conn, ref.model);
           if (signal.aborted) return stopWith("stopped", "user");
           if (found?.problems.length) {
             messages.push({ role: "user", content: findingsMessage(found) });
+            continue;
+          }
+          // Checked and clean: what the agent held back (a release, a deploy) goes out now, once.
+          if (found) {
+            messages.push({ role: "user", content: CLEAN_CHECK });
+            this.publishing = true;
             continue;
           }
         }
@@ -527,7 +542,7 @@ export class WorkRun {
       // Short as OpenCode's (agent-prompt.ts): the folder, the tone, how to do a task and stop; no rules of design.
       system: [
         this.startedAt,
-        agentPrompt(this.folder, process.platform, gitLine),
+        agentPrompt(this.folder, process.platform, gitLine, this.testerOn() && !this.publishing),
         LANGUAGE_HINT,
         HONEST_HINT,
         // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).

@@ -7,6 +7,8 @@ import type { Connection } from "../providers/repo";
 
 /** Steps the tester may take: enough to start the result and go through what was asked, not to wander. */
 export const CHECK_STEPS = 60;
+/** Steps before the end at which the tester is told to wrap up. */
+const WRAP_UP = 8;
 /** Rounds of "found, fixed, checked again" in one turn: past them the user decides. */
 export const CHECK_ROUNDS = 2;
 
@@ -105,32 +107,44 @@ export async function checkWork(d: CheckDeps, job: { asked: string; said: string
       return "Reported.";
     },
   });
-  await runAgent({
-    conn: d.conn,
-    model: d.model,
-    price: d.price,
-    worktree: d.folder,
-    messages,
-    mode: "review",
-    extraTools: { report_check: report },
-    ownTools: d.tools,
-    stopTools: ["report_check"],
-    noFinish: true,
-    prune: true,
-    maxSteps: CHECK_STEPS,
-    pictures: d.pictures,
-    system: SYSTEM(d.folder),
-    spentUsd: 0,
-    budgetUsd: Number.POSITIVE_INFINITY,
-    signal: d.signal,
-    idleTimeoutMs: d.idleTimeoutMs,
-    hooks: d.hooks,
-    onText: d.onText,
-    onStep: (step) => {
-      messages.push(...step.messages);
-      d.onSpend(step.costUsd, { inputTokens: step.inputTokens, outputTokens: step.outputTokens, cachedTokens: step.cachedTokens ?? 0 });
-    },
-  }).catch(() => null);
+  let steps = 0;
+  const pass = (only?: string, maxSteps = CHECK_STEPS) =>
+    runAgent({
+      conn: d.conn,
+      model: d.model,
+      price: d.price,
+      worktree: d.folder,
+      messages,
+      mode: "review",
+      extraTools: { report_check: report },
+      ownTools: only ? undefined : d.tools,
+      stopTools: ["report_check"],
+      noFinish: true,
+      prune: true,
+      maxSteps,
+      ...(only ? { only } : {}),
+      pictures: d.pictures,
+      // Near the end, a word to wrap up (seen live: 61 steps of real testing, and no report: all of it lost).
+      remind: () => (steps >= CHECK_STEPS - WRAP_UP ? `${CHECK_STEPS - steps} steps left: stop what you are trying and call report_check with what you saw.` : null),
+      system: SYSTEM(d.folder),
+      spentUsd: 0,
+      budgetUsd: Number.POSITIVE_INFINITY,
+      signal: d.signal,
+      idleTimeoutMs: d.idleTimeoutMs,
+      hooks: d.hooks,
+      onText: d.onText,
+      onStep: (step) => {
+        steps++;
+        messages.push(...step.messages);
+        d.onSpend(step.costUsd, { inputTokens: step.inputTokens, outputTokens: step.outputTokens, cachedTokens: step.cachedTokens ?? 0 });
+      },
+    }).catch(() => null);
+  await pass();
+  // Out of steps without a report: one more step that can only give it.
+  if (!result && !d.signal.aborted) {
+    messages.push({ role: "user", content: "You are out of steps. Call report_check now with what you saw, problems found so far included." });
+    await pass("report_check", 1);
+  }
   return result;
 }
 

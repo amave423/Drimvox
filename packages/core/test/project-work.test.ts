@@ -2,6 +2,7 @@ import { slug } from "../src/work/project-git";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { storeOf } from "../src/agent/store";
 import { retryWait } from "../src/work/run";
+import { CHECK_STEPS } from "../src/work/check";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -576,8 +577,10 @@ describe("a ready project", () => {
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай стили", model: s.ref("coder") });
     await until(s.project.id, (w) => w.status === "done");
     expect(readFileSync(join(folder, "styles.css"), "utf8")).toBe("body {}\n");
-    expect(requestsOf("coder")).toHaveLength(3);
+    // The fourth: after the tester found nothing, the word to publish what was held back.
+    expect(requestsOf("coder")).toHaveLength(4);
     expect(JSON.stringify(requestsOf("coder")[1]!.body.messages)).toContain("cut off by the output limit");
+    expect(JSON.stringify(requestsOf("coder")[3]!.body.messages)).toContain("found nothing");
   });
 });
 
@@ -763,6 +766,9 @@ describe("the tester", () => {
     // The agent got the findings as the next message, and the tester came again after the fix.
     expect(JSON.stringify(requestsOf("coder")[2]!.body.messages)).toContain("Кнопка называется «Запись»");
     expect(testerAsks().length).toBe(2);
+    // Clean the second time: the agent is told so, and that a release or a deploy it held back goes out now.
+    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("found nothing");
+    expect(JSON.stringify(requestsOf("coder")[0]!.body.messages[0])).toContain("Publish nothing in a reply that changed files");
     // The tester sees the request and the agent's words, and cannot change the project's files.
     const first = JSON.stringify(testerAsks()[0]!.body.messages);
     expect(first).toContain("Сделай кнопку записи");
@@ -786,6 +792,19 @@ describe("the tester", () => {
     folder = makeRepo({ "index.html": "<h1>Клиника</h1>\n" });
     await open({ coder: [call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }), { text: "Готово." }] }, false);
     expect(testerAsks()).toHaveLength(0);
+  });
+
+  // Seen live: 61 steps of real testing and no report, all of it lost.
+  it("is told to wrap up near its last step, and out of steps gives its report all the same", async () => {
+    const work = await open({
+      coder: [call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }), { text: "Готово." }, { text: "Исправил." }],
+      tester: [...Array.from({ length: CHECK_STEPS }, () => call("list_files", { path: "." })), found("Кнопка не нажимается")],
+    });
+    expect(work.status).toBe("done");
+    expect(JSON.stringify(testerAsks().at(-2)!.body.messages)).toContain("steps left: stop what you are trying and call report_check");
+    // The last step could only report, and the agent got what it found.
+    expect(testerAsks().at(-1)!.body.tools.map((t: any) => t.function.name)).toEqual(["report_check"]);
+    expect(JSON.stringify(requestsOf("coder").at(-1)!.body.messages)).toContain("Кнопка не нажимается");
   });
 
   it("stops after two rounds, whatever it still finds", async () => {
