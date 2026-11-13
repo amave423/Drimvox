@@ -77,6 +77,10 @@ export function agentPrompt(folder: string, platform = process.platform, git = c
     "# Rules",
     git,
     "- Never write a password, key or token into a file, the project's notes or a commit, even one the user gave you.",
+    // Seen live: the agent "cleaned up 13 junk test accounts" on the user's live server, his friends' perhaps among them.
+    "- Never delete the user's data (accounts, messages, rows of a database, files on a server) unless they asked for that",
+    "  very deletion. Test accounts and data you made yourself go only where you made them: a local server, a temporary",
+    "  folder; on a live server, ask first.",
     "- Keep the project's notes (update_notes) for what the next conversation must know: what the user asked for and what they",
     "  said not to do, decisions, commands. Before you build or deploy anything, check it against them.",
   ].join("\n");

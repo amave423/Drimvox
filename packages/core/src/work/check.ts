@@ -59,6 +59,7 @@ const SYSTEM = (folder: string) =>
     "  (the full path, written as a Windows path on Windows).",
     "- Two people where it takes two: two browser contexts, two accounts. Someone without the right must be refused.",
     "- Scripts of your own (a Playwright run, a probe) go outside the project: in the system's temporary folder.",
+    "- Test on this computer: a local server with a temporary database, never the user's live server and its accounts.",
     "",
     "# What to report",
     "Call report_check once at the end. Report only what you saw happen yourself, each with the steps to see it again;",
