@@ -3,7 +3,7 @@ import { pageStepsInput } from "./steps";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Background } from "../agent/background";
-import { classifyCommand } from "../agent/commands";
+import { classifyCommand, DENIED } from "../agent/commands";
 import type { ToolHooks } from "../agent/tools";
 import { askAboutPicture, askAboutPictures, mayLookAt, type Screenshotter, type Shots, type Vision } from "./look";
 
@@ -103,7 +103,7 @@ export function visualTools(d: VisualDeps, limit: LookLimit = { looks: MAX_LOOKS
       execute: ({ command }, o: Options) =>
         run(o.toolCallId, "start_background", { command }, async () => {
           const verdict = classifyCommand(command, d.worktree);
-          if (verdict.action === "deny") throw new Error("Not allowed: this command deletes a repository or rewrites what was pushed. Never do that.");
+          if (verdict.action === "deny") throw new Error(DENIED[verdict.reason]);
           if (verdict.action === "ask" && !(await d.hooks.askApproval(command, verdict.reason, o.abortSignal))) {
             throw new Error("The user denied this command.");
           }

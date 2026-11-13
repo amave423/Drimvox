@@ -115,7 +115,7 @@ describe("workspace", () => {
 
 describe("classifyCommand", () => {
   // Seen live: `cd server && npm test && cd ../app` asked for permission, though ../app is the project's own.
-  const allowed = ["npm test", "npm install", "node build.js", "git status", "git commit -m wip", "pytest -q", "dir src", "rm -rf dist", "cd server && npm test && cd ../app && npm test", `cp src/app.js /tmp/app.bak && node -e "s.replace(/  app\\.addHook\\(/, '')"`, "taskkill //F //IM app.exe 2>/dev/null; npm run dist"];
+  const allowed = ["npm test", "npm install", "node build.js", "git status", "git commit -m wip", "pytest -q", "dir src", "rm -rf dist", "cd server && npm test && cd ../app && npm test", `cp src/app.js src/app.bak && node -e "s.replace(/  app\\.addHook\\(/, '')"`, "taskkill //F //IM app.exe 2>/dev/null; npm run dist"];
   const asked: [string, string][] = [
     ["git push origin main", "push"],
     ["npm install -g typescript", "global"],
@@ -147,6 +147,25 @@ describe("classifyCommand", () => {
     },
   );
 
+  // Seen live: the tester closed its Nexus with `Get-Process electron | Stop-Process -Force`, and Drimvox went with it.
+  it.each([
+    "Get-Process electron -ErrorAction SilentlyContinue | Stop-Process -Force",
+    "taskkill /F /IM electron.exe",
+    "Stop-Process -Name Drimvox -Force",
+    "pkill -f electron",
+  ])("refuses to stop Drimvox's own program by name: %s", (cmd) => {
+    expect(classifyCommand(cmd, root)).toEqual({ action: "deny", reason: "self" });
+  });
+
+  it.each(["taskkill /F /IM node.exe", "Get-Process chrome | Stop-Process", "killall node"])("asks before stopping programs by name: %s", (cmd) => {
+    expect(classifyCommand(cmd, root)).toEqual({ action: "ask", reason: "kill" });
+  });
+
+  it("stops a process of its own by its number without asking", () => {
+    expect(classifyCommand("taskkill /F /PID 4120", root)).toEqual({ action: "allow" });
+    expect(classifyCommand("Stop-Process -Id 4120 -Force", root)).toEqual({ action: "allow" });
+  });
+
   // Asked for: "rewrite the commit history, better the agent itself". A force push replaces GitHub's history: the user
   // says yes to it first.
   it.each(["git push --force origin main", "git push -f", "git push --force-with-lease", "git push origin +main"])("asks before %s", (cmd) => {
@@ -163,6 +182,8 @@ describe("classifyCommand", () => {
 console.log(1)
 EOF`, project)).toEqual({ action: "allow" });
     expect(classifyCommand(`node "${probe}"`, project)).toEqual({ action: "allow" });
+    // Git Bash's /tmp is the temporary folder, whatever sits at C:\tmp (seen live: a probe run by Node made one).
+    expect(classifyCommand("mkdir -p /tmp/nexus-live && cp src/app.js /tmp/nexus-live/", project)).toEqual({ action: "allow" });
     // Seen live: going into the folder itself to make one's own there asked (its long name, in Git Bash's form).
     const long = realpathSync.native(tmpdir()).replace(/^([A-Za-z]):/, (_, d: string) => `/${d.toLowerCase()}`).split("\\").join("/");
     expect(classifyCommand(`cd ${long} && mkdir -p nexustest && cat > nexustest/serve.mjs <<'EOF'

@@ -6,8 +6,25 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export type CommandVerdict =
   | { action: "allow" }
-  | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" | "ssh" | "rewrite" }
-  | { action: "deny"; reason: "destroy" };
+  | { action: "ask"; reason: "push" | "global" | "outside" | "system" | "download" | "browser" | "ssh" | "rewrite" | "kill" }
+  | { action: "deny"; reason: "destroy" | "self" };
+
+/**
+ * Stops programs by their name or a filter, not by a number of its own: every copy, the user's too (seen live: the
+ * tester closed its Nexus with `Get-Process electron | Stop-Process -Force`, and Drimvox, an electron.exe too, went with it).
+ */
+const KILLS_BY_NAME =
+  /\btaskkill\b[^\n;|&]*\/im\b|\b(pkill|killall)\b|\bstop-process\b[^\n;|&]*-name\b|\b(get-process|gps)\b[^\n;|&]*\|\s*(stop-process|spps|kill)\b|\|\s*invoke-cimmethod\b[^\n;|&]*terminate\b|\bwmic\b[^\n;|&]*\bprocess\b[^\n;|&]*\bdelete\b/i;
+/** Names Drimvox itself runs under: such a command would stop the app the agent works in. */
+const DRIMVOX_NAMES = /\b(electron|drimvox)(\.exe)?\b/i;
+/** Programs the user runs too: closing them all by name closes the user's as well. */
+const SHARED_PROGRAMS = /\b(node|chrome|msedge|firefox|brave|python3?|pythonw|java|javaw|code|explorer|git|bash|powershell|pwsh|cmd)(\.exe)?\b/i;
+
+/** What the agent is told when a command is refused, by the reason. */
+export const DENIED: Record<Extract<CommandVerdict, { action: "deny" }>["reason"], string> = {
+  destroy: "Not allowed: this command deletes a repository. Never do that.",
+  self: "Not allowed: this stops every program of that name, Drimvox itself among them. Stop only what you started, by its process id (the PID start_background or the command printed).",
+};
 
 /**
  * Never run, even when asked: deleting a repository (asked for: the agent commits itself, as in OpenCode, and may never
@@ -105,6 +122,11 @@ function leavesFolder(command: string, root: string): boolean {
 
 export function classifyCommand(command: string, root: string): CommandVerdict {
   if (DESTROYS.some((p) => p.test(command))) return { action: "deny", reason: "destroy" };
+  if (KILLS_BY_NAME.test(command)) {
+    if (DRIMVOX_NAMES.test(command)) return { action: "deny", reason: "self" };
+    // The project's own program (its built .exe before a rebuild) may be closed by name; a runtime others share asks.
+    if (SHARED_PROGRAMS.test(command)) return { action: "ask", reason: "kill" };
+  }
   for (const [pattern, reason] of rules) if (pattern.test(command)) return { action: "ask", reason };
   if (opensBrowser(command)) return { action: "ask", reason: "browser" };
   if (leavesFolder(command, root)) return { action: "ask", reason: "outside" };
@@ -167,6 +189,11 @@ function absolutePaths(command: string): string[] {
     const drive = process.platform === "win32" ? /^\/([a-zA-Z])(?=\/|$)/.exec(path) : null;
     if (drive) {
       found.push(`${drive[1]!.toUpperCase()}:/${path.slice(3)}`);
+      continue;
+    }
+    // …and /tmp the system's temporary folder, even when a C:\tmp exists (seen live: a probe run by Node made one).
+    if (process.platform === "win32" && top === "tmp") {
+      found.push(join(tmpdir(), path.slice(4)));
       continue;
     }
     if (process.platform === "win32" && path.startsWith("/") && top && (!/^[\w .-]+$/.test(top) || !existsSync(resolve("/", top)))) continue;

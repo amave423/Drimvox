@@ -40,6 +40,7 @@ export function agentPrompt(folder: string, platform = process.platform, git = c
     "",
     "# Doing tasks",
     "- Understand first: look at the folder and the code the task touches. Never assume a library is there: check.",
+    "- Stop programs you started by their process id, never by the program's name: Drimvox itself may run as electron.exe.",
     "- When a decision only the user can make is missing (what they want, a choice that matters), ask with the question",
     "  tool, all at once, with answers to pick; never as questions in your reply's text. Otherwise decide yourself and say",
     "  what you assumed.",

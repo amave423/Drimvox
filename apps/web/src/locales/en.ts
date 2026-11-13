@@ -543,6 +543,7 @@ export const en: Record<keyof typeof ru, string> = {
   "approval.reason.outside": "Why I ask: the command touches files outside the project folder.",
   "approval.reason.system": "Why I ask: the command changes system settings (shutdown, registry, disks).",
   "approval.reason.download": "Why I ask: the command downloads a script from the internet and runs it at once.",
+  "approval.reason.kill": "Why I ask: the command closes every program of that name, yours too.",
   "approval.reason.rewrite": "Why I ask: the command replaces the commit history on GitHub (force push); the old commits there are gone.",
   "approval.reason.browser": "Why I ask: a browser window opens with your profile and your sign-ins.",
   "approval.allow": "Allow",
