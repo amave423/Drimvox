@@ -59,11 +59,25 @@ describe("the cheapest provider of a model", () => {
     unpinCheapest("https://stuck.test/api/v1", "deepseek/flash", -1);
     await ask();
     expect(sent.map((b) => (b as { provider?: unknown }).provider ?? null)).toEqual([{ order: ["morph"] }, null, { order: ["morph"] }]);
-    // A screenshot for the agent's own eyes: the list does not say which providers take pictures, the router picks.
-    await routed("https://stuck.test/api/v1/chat/completions", {
-      method: "POST",
-      body: JSON.stringify({ model: "deepseek/flash", messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "data:image/png;base64,AA" } }] }] }),
-    });
-    expect(sent.at(-1)).not.toHaveProperty("provider");
+  });
+
+  // Seen live: a screenshot sent where the router chose cost 1.20 ₽ a step against 0.10 ₽. The cheapest provider first;
+  // the router only when that one refuses pictures.
+  it("sends a screenshot to the cheapest provider too, and to the router only when that one refuses it", async () => {
+    const sent: { provider?: unknown }[] = [];
+    let takesPictures = true;
+    const fake: typeof fetch = async (input, init) => {
+      if (String(input).includes("/endpoints")) return new Response(JSON.stringify({ data: { endpoints: [endpoint("morph", 2.6, 0.47, 47.3)] } }));
+      const body = JSON.parse(String(init?.body)) as { provider?: unknown };
+      sent.push(body);
+      return body.provider && !takesPictures ? new Response('{"error":{"message":"image input not supported"}}', { status: 400 }) : new Response("{}");
+    };
+    const routed = withCheapestProvider("https://eyes.test/api/v1", fake);
+    const picture = { method: "POST", body: JSON.stringify({ model: "deepseek/flash", messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "data:image/png;base64,AA" } }] }] }) };
+    expect((await routed("https://eyes.test/api/v1/chat/completions", picture)).ok).toBe(true);
+    expect(sent.map((b) => b.provider ?? null)).toEqual([{ order: ["morph"] }]);
+    takesPictures = false;
+    expect((await routed("https://eyes.test/api/v1/chat/completions", picture)).ok).toBe(true);
+    expect(sent.slice(1).map((b) => b.provider ?? null)).toEqual([{ order: ["morph"] }, null]);
   });
 });
