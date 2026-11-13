@@ -336,6 +336,17 @@ describe("a ready project", () => {
     expect(efforts.length).toBeGreaterThanOrEqual(4);
   });
 
+  // Seen live: GPT-6 Luna, in OpenAI's strict mode, filled the single fields with "." beside its list of edits, and each
+  // call was refused as an edit of a file named ".". The list is what it meant.
+  it("takes a list of edits whatever fills the single fields beside it", async () => {
+    const s = await setup({
+      coder: [call("edit_file", { path: ".", old: "none", new: "", edits: [{ path: "index.html", old: "Клиника", new: "Клиника «Здоровье»" }] }), { text: "Готово." }],
+    });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Поправь заголовок", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status === "done");
+    expect(readFileSync(join(folder, "index.html"), "utf8")).toContain("Клиника «Здоровье»");
+  });
+
   // Asked for: "in project mode one cannot attach screenshots". They go as in a chat: the model sees the picture, reads
   // the text file, and the message keeps both.
   it("takes screenshots and files with the message, shows them to the model and keeps them on the message", async () => {

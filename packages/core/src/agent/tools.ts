@@ -155,7 +155,10 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
         })
         .refine((x) => (x.path && x.old !== undefined && x.new !== undefined) || x.edits?.length, "Give path, old and new, or edits"),
       async ({ path, old, new: replacement, edits }) => {
-        const all = [...(path && old !== undefined && replacement !== undefined ? [{ path, old, new: replacement }] : []), ...(edits ?? []).map((e) => ({ ...e, path: e.path ?? path ?? "" }))];
+        // With a list, the single fields are not one more edit: models in OpenAI's strict mode must fill every field and
+        // put fillers there (seen live: GPT-6 Luna sent path "." or "none" beside its edits, 16 calls refused in a row).
+        const single = !edits?.length && path && old !== undefined && replacement !== undefined ? [{ path, old, new: replacement }] : [];
+        const all = [...single, ...(edits ?? []).map((e) => ({ ...e, path: e.path || path || "" }))];
         const files = ws.editMany(all);
         return ok(all.length === 1 ? `Edited ${files[0]}` : `Made ${all.length} edits in ${files.join(", ")}`);
       },
