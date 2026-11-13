@@ -128,6 +128,8 @@ test("a project: the agent's question as a card, the picked answer, the same con
   await options.getByText(/^Если рабочая модель застрянет/).click();
   // The model for screenshots and the service model are the project's too, switches with their hints.
   await expect(options).toContainText("Модель для зрения");
+  // The tester is on by default (asked for: the agent says done, and the user finds the bugs).
+  await expect(options.getByRole("switch", { name: /Проверка как у пользователя/ })).toBeChecked();
   await expect(options.getByRole("switch", { name: /Подагенты, сводки длинной истории/ })).not.toBeChecked();
   await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт клиники");
   await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");

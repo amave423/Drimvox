@@ -18,8 +18,9 @@ interface Extensions {
   mcp: { id: string; name: string; on: boolean; installed: boolean }[];
   vision: ModelChoice | null;
   service: ModelChoice | null;
+  check: boolean;
 }
-type ExtensionsPatch = { skills?: string[]; mcp?: string[]; vision?: ModelChoice | null; service?: ModelChoice | null };
+type ExtensionsPatch = { skills?: string[]; mcp?: string[]; vision?: ModelChoice | null; service?: ModelChoice | null; check?: boolean };
 const refOf = (m: ModelChoice | null) => (m ? { providerId: m.providerId, model: m.model } : null);
 
 /**
@@ -52,6 +53,8 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
         onVision={(m) => void save({ vision: refOf(m) })}
         service={ext?.service ?? null}
         onService={(m) => void save({ service: refOf(m) })}
+        check={ext?.check ?? true}
+        onCheck={(check) => void save({ check })}
       />
       {work && (
         <section className="params-block" aria-labelledby="params-limits-h">
@@ -84,6 +87,8 @@ function WorkOptions(p: {
   onVision(m: ModelChoice | null): void;
   service: ModelChoice | null;
   onService(m: ModelChoice | null): void;
+  check: boolean;
+  onCheck(on: boolean): void;
 }) {
   const { projectId } = p;
   const { t } = useApp();
@@ -107,6 +112,12 @@ function WorkOptions(p: {
       {/* Switches as the strong model's (asked for): off, the working model does it. */}
       <ModelSwitch label={t("projectParams.vision")} hint={t("projectParams.visionHint")} value={p.vision} onChange={p.onVision} vision />
       <ModelSwitch label={t("projectParams.service")} hint={t("projectParams.serviceHint")} value={p.service} onChange={p.onService} />
+      {/* Asked for: the agent says done and the user finds the bugs; a tester tries the work first. */}
+      <Toggle checked={p.check} onChange={p.onCheck}>
+        <span>
+          {t("projectParams.check")} <span className="options-about">{t("projectParams.checkHint")}</span>
+        </span>
+      </Toggle>
       <div className="params-row">
         <span className="muted">{t("thinking.label")}</span>
         <ThinkingSwitch value={prefs.thinking} onChange={(thinking) => set({ thinking })} />

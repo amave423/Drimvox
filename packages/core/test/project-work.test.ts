@@ -39,8 +39,13 @@ async function setup(queues: Record<string, FakeTurn[]>, models: Record<string, 
     key: KEY,
     models: [...models, ...Object.keys(queues).filter((id) => !models.some((m) => m.id === id)).map((id) => ({ id, supported_parameters: ["tools"] }))],
     // The code reviewer before the end answers from its own queue, "nothing found" by default.
+    // The tester after an answer that changed files answers from its own queue, "nothing found" by default.
     respond: (body) =>
-      isReviewer(body) ? (queues.reviewer?.shift() ?? call("report_review", { issues: [], summary: "Проблем нет." })) : (queues[body.model]?.shift() ?? { text: "Готово." }),
+      isReviewer(body)
+        ? (queues.reviewer?.shift() ?? call("report_review", { issues: [], summary: "Проблем нет." }))
+        : isTester(body)
+          ? (queues.tester?.shift() ?? call("report_check", { problems: [], summary: "Проверил, всё работает." }))
+          : (queues[body.model]?.shift() ?? { text: "Готово." }),
   });
   const provider = await (await env.call("POST", "/api/providers", { preset: "custom", name: "Fake", baseUrl: fake.baseUrl, apiKey: KEY })).json();
   const project = await (await env.call("POST", "/api/projects", { path: folder })).json();
@@ -73,7 +78,8 @@ async function go(s: Awaited<ReturnType<typeof setup>>, limits: { budgetUsd: num
 }
 
 const isReviewer = (body: any) => /You are the code reviewer/.test(JSON.stringify(body.messages?.[0]?.content ?? ""));
-const requestsOf = (model: string) => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === model && !isReviewer(r.body));
+const isTester = (body: any) => /You are the tester/.test(JSON.stringify(body.messages?.[0]?.content ?? ""));
+const requestsOf = (model: string) => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && r.body.model === model && !isReviewer(r.body) && !isTester(r.body));
 
 describe("work on a project", () => {
   // Seen live: with a laptop saved in the settings, the interview asked the user twice for its address and password.
@@ -457,7 +463,8 @@ describe("a ready project", () => {
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Поправь страницу", model: s.ref("coder") });
     const work = await until(s.project.id, (w) => w.status === "done");
     const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
-    const acts = chat.messages.at(-1).activity.map(({ at: _at, ...a }: any) => a);
+    // The agent's answer, not the tester's after it.
+    const acts = chat.messages.find((m: any) => m.activity?.some((a: any) => a.name === "write_file")).activity.map(({ at: _at, ...a }: any) => a);
     // The folder had "<h1>Клиника</h1>": the write kept it and added two lines; the edit changed one and added one.
     expect(acts).toEqual([
       { name: "write_file", input: "index.html", added: 2, removed: 0 },
@@ -730,5 +737,64 @@ describe("a project's service model", () => {
     const asks = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
     expect(asks.some((r) => r.body.model === "cheap" && isSub(r.body))).toBe(true);
     expect(asks.some((r) => r.body.model === "coder" && isSub(r.body))).toBe(false);
+  });
+});
+
+// Asked for: "why do I find the bugs". After an answer that changed files a tester tries the work as the user will; what
+// it finds goes back to the agent, at most twice in a turn.
+describe("the tester", () => {
+  const testerAsks = () => fake!.requests.filter((r) => r.path === "/v1/chat/completions" && isTester(r.body));
+  const found = (what: string) => call("report_check", { problems: [{ what, steps: "Открыть страницу", severity: "broken" }], summary: "Открыл страницу." });
+  async function open(queues: Record<string, FakeTurn[]>, check?: boolean) {
+    const s = await setup(queues);
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    if (check !== undefined) await env.call("PUT", `/api/projects/${s.project.id}/extensions`, { check });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай кнопку записи", model: s.ref("coder") });
+    return until(s.project.id, (w) => w.status !== "running");
+  }
+
+  it("tries the changed work, sends what it found back to the agent, and checks again after the fix", async () => {
+    const work = await open({
+      coder: [call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }), { text: "Готово." }, call("edit_file", { edits: [{ path: "index.html", old: "Запись", new: "Записаться" }] }), { text: "Исправил." }],
+      tester: [found("Кнопка называется «Запись», а не «Записаться»")],
+    });
+    expect(work.status).toBe("done");
+    expect(readFileSync(join(folder, "index.html"), "utf8")).toBe("<button>Записаться</button>\n");
+    // The agent got the findings as the next message, and the tester came again after the fix.
+    expect(JSON.stringify(requestsOf("coder")[2]!.body.messages)).toContain("Кнопка называется «Запись»");
+    expect(testerAsks().length).toBe(2);
+    // The tester sees the request and the agent's words, and cannot change the project's files.
+    const first = JSON.stringify(testerAsks()[0]!.body.messages);
+    expect(first).toContain("Сделай кнопку записи");
+    expect(first).toContain("Готово.");
+    const tools = testerAsks()[0]!.body.tools.map((t: any) => t.function.name);
+    expect(tools).toContain("run_command");
+    expect(tools).toContain("report_check");
+    expect(tools).not.toContain("write_file");
+    expect(tools).not.toContain("edit_file");
+    // Its report is in the conversation for the user.
+    const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
+    expect(chat.messages.some((m: any) => m.role === "assistant" && m.content.includes("Кнопка называется «Запись»"))).toBe(true);
+  });
+
+  it("does not come after an answer that changed nothing, nor when the project switched it off", async () => {
+    await open({ coder: [{ text: "Это кнопка записи в index.html." }] });
+    expect(testerAsks()).toHaveLength(0);
+    await fake!.close();
+    fake = undefined;
+    rmSync(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    folder = makeRepo({ "index.html": "<h1>Клиника</h1>\n" });
+    await open({ coder: [call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }), { text: "Готово." }] }, false);
+    expect(testerAsks()).toHaveLength(0);
+  });
+
+  it("stops after two rounds, whatever it still finds", async () => {
+    const write = (n: number) => call("write_file", { path: "index.html", content: `<button>${n}</button>\n` });
+    const work = await open({
+      coder: [write(1), { text: "Готово." }, write(2), { text: "Исправил." }, write(3), { text: "Исправил ещё." }],
+      tester: [found("Не то"), found("Всё ещё не то"), found("Опять не то")],
+    });
+    expect(work.status).toBe("done");
+    expect(testerAsks()).toHaveLength(2);
   });
 });

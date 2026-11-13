@@ -21,9 +21,10 @@ import { findSkills, projectSkillRoots, skillsInstructions, skillTools } from ".
 import { askAboutPictures, type Vision } from "../visual/look";
 import { visualTools, type VisualKit } from "../visual/tools";
 import { fitForModel } from "../tools/images";
+import { CHECK_ROUNDS, checkWork, findingsMessage, type CheckResult } from "./check";
 import type { ProjectGit } from "./project-git";
 import { changedSince, checkpoint, dropCheckpoint } from "../chats/checkpoint";
-import { writeState } from "../agent/notes";
+import { notesBlock, writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
 import { sshNote } from "../tools/ssh";
 import { memoryLimit, sizeOf, TRIM_SHARE } from "../agent/memory";
@@ -81,6 +82,8 @@ export interface RunDeps {
     mcp: string[] | null;
     vision: { providerId: string; model: string } | null;
     service: { providerId: string; model: string } | null;
+    /** The tester after an answer that changed files (check.ts); on unless switched off. */
+    check?: boolean;
   };
   idleTimeoutMs: number;
   /** This month's spending against the app's budget. */
@@ -131,6 +134,12 @@ export class WorkRun {
   // The day only: the minute changed the start of every message's request, and the whole history went at full price.
   private readonly startedAt = todayLine();
   private map: Promise<string> | null = null;
+  /** This turn's answers changed files, so the tester comes before the turn ends (check.ts). */
+  private turnChanged = false;
+  /** Tester rounds in this turn: found, fixed, checked again, at most CHECK_ROUNDS. */
+  private checkRounds = 0;
+  /** What the last answer said, for the tester. */
+  private lastSaid = "";
 
   constructor(
     private readonly d: RunDeps,
@@ -203,6 +212,8 @@ export class WorkRun {
     this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
     let errors = 0;
     this.runStart = Date.now();
+    this.turnChanged = false;
+    this.checkRounds = 0;
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
     // The branch the project's git rules ask for, before anything changes.
     await this.d.git?.prepare(this.projectId, this.folder).catch(() => {});
@@ -276,6 +287,18 @@ export class WorkRun {
         // at each 60 steps: if what was asked is done, stop now (seen live: a site fine at 20 rubles, polished on and on).
         if (outcome.kind === "steps") messages.push({ role: "user", content: DONE_YET });
         if (outcome.kind === "limit" || outcome.kind === "steps") continue;
+        // The agent says it is done: when the turn changed files, a tester tries it as the user will, and what it finds
+        // goes back to the agent (asked for: "why do I find the bugs").
+        if (this.turnChanged && this.checkRounds < CHECK_ROUNDS && (this.d.extensions?.(this.projectId).check ?? true) && this.d.visualKit) {
+          this.checkRounds++;
+          this.turnChanged = false;
+          const found = await this.check(conn, ref.model);
+          if (signal.aborted) return stopWith("stopped", "user");
+          if (found?.problems.length) {
+            messages.push({ role: "user", content: findingsMessage(found) });
+            continue;
+          }
+        }
         // As in a chat: the answer is the end of the turn; the next message goes on.
         return stopWith("done", null);
       }
@@ -550,9 +573,13 @@ export class WorkRun {
     this.stretch.outputTokens = 0;
     this.stretch.cachedTokens = 0;
     if (snapshot) {
-      if (await changedSince(this.folder, snapshot).catch(() => false)) this.d.chats.setCheckpoint(answer.id, snapshot);
+      const changed = await changedSince(this.folder, snapshot).catch(() => false);
+      // The tester comes after a turn whose answers changed files (check.ts).
+      if (changed) this.turnChanged = true;
+      if (changed) this.d.chats.setCheckpoint(answer.id, snapshot);
       else await dropCheckpoint(this.folder, checkpointRef).catch(() => {});
     }
+    this.lastSaid = content;
     this.d.chats.finishAnswer(answer.id, {
       content,
       reasoning: null,
@@ -571,6 +598,125 @@ export class WorkRun {
     if (overBudget()) return { kind: "budget" };
     if (limited) return { kind: "limit" };
     return { kind: "natural" };
+  }
+
+  /**
+   * The tester's turn (check.ts): its own answer in the conversation, its actions in the feed, its report as the words;
+   * the same working model with a fresh context, only hands and eyes, nothing that changes the project or a server.
+   */
+  private async check(conn: Connection, model: string): Promise<CheckResult | null> {
+    const signal = this.controller.signal;
+    const answer = this.d.chats.addMessage({ chatId: this.chatId, role: "assistant", content: "", status: "streaming", providerId: conn.id, model });
+    const activity: ActivityEntry[] = [];
+    let content = "";
+    let input = 0;
+    let output = 0;
+    let cached = 0;
+    let cost = 0;
+    const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
+    const onCall = (name: string, what: string) => {
+      activity.push({ name, input: what, at: content.length });
+      save();
+    };
+    const emit = async (event: StreamEvent) => {
+      if (event.type === "tool") onCall(event.name, event.input);
+    };
+    const hooks = {
+      onCall: (call: { name: string; input: unknown }) => onCall(call.name, describeCall(call.input)),
+      onResult: () => {},
+      askApproval: ((command, reason, sig, purpose) =>
+        this.d.approvals.ask(this.chatId, emit, { server: "", tool: command, input: null, reason, purpose, signal: sig })) as ToolHooks["askApproval"],
+    };
+    // Its first line says whose answer this is.
+    onCall("tester", "");
+    const price = await findModel(conn, model);
+    const chosen = this.d.extensions?.(this.projectId) ?? { skills: null, mcp: null, vision: null, service: null };
+    const vision = await this.d.vision(conn, model, chosen.vision);
+    const selfSees = !!vision && vision.conn.id === conn.id && vision.model === model;
+    let board: { pictures: Buffer[]; caption: string } | null = null;
+    const show = selfSees ? (pictures: Buffer[], caption: string) => void (board = { pictures: pictures.map(fitForModel), caption }) : undefined;
+    const see = show
+      ? async (png: Buffer, question: string) => (show([png], question), `The picture follows in the conversation. Look at it yourself: ${question}`)
+      : vision
+        ? async (png: Buffer, question: string, sig?: AbortSignal) => (await askAboutPictures(vision, [{ data: png, mediaType: "image/png" }], question, sig)).text
+        : undefined;
+    // Hands and eyes only: no servers over SSH, no mail, no downloads into the project, no pictures drawn.
+    const hands = this.d.toolbox
+      ? Object.fromEntries(
+          Object.entries(toolbox(this.d.toolbox, { folder: this.folder, vision, hooks, owner: `${this.chatId}:check`, see })).filter(([name]) => !/^(ssh_|email_|downloads_)/.test(name)),
+        )
+      : {};
+    const own: ToolSet = {
+      ...hands,
+      ...visualTools(
+        {
+          kit: this.d.visualKit,
+          taskId: `${this.chatId}:check`,
+          worktree: this.folder,
+          vision,
+          hooks,
+          onSpend: (usd) => (cost += usd),
+          event: (kind, data) => {
+            this.shot(kind, data);
+            if (kind === "screenshot") onCall("screenshot", (data as { id: string }).id);
+          },
+          show,
+        },
+        LOOKS,
+      ),
+    };
+    const asked =
+      this.d.chats
+        .history(this.chatId)
+        .filter((m) => m.role === "user" && !m.content.startsWith("[Drimvox's tester"))
+        .at(-1)?.content ?? "";
+    const found = await checkWork(
+      {
+        conn,
+        model,
+        price,
+        folder: this.folder,
+        signal,
+        idleTimeoutMs: this.d.idleTimeoutMs,
+        tools: oneBrowser(own, Object.keys(own).filter(isRare)),
+        pictures: () => {
+          const once = board;
+          board = null;
+          return once;
+        },
+        hooks,
+        onSpend: (usd, t) => {
+          cost += usd;
+          input += t.inputTokens;
+          output += t.outputTokens;
+          cached += t.cachedTokens;
+        },
+        onText: (text) => {
+          content = content ? `${content}\n\n${text}` : text;
+          save();
+        },
+      },
+      { asked, said: this.lastSaid, notes: notesBlock(this.folder) },
+    );
+    // What it started is stopped: the agent's own servers stay as they were.
+    this.d.visualKit.background.stopAll(`${this.chatId}:check`);
+    if (found) {
+      const list = found.problems.map((p, i) => `${i + 1}. ${p.what}`).join("\n");
+      content = [content, found.summary, list].filter(Boolean).join("\n\n");
+    }
+    this.d.chats.finishAnswer(answer.id, {
+      content: content || "—",
+      reasoning: null,
+      status: signal.aborted ? "stopped" : "done",
+      inputTokens: input,
+      outputTokens: output,
+      cachedTokens: cached,
+      contextTokens: null,
+      costUsd: cost,
+      error: null,
+      activity,
+    });
+    return found;
   }
 
   /** Screenshots the agent took are kept for the panel next to the conversation. */

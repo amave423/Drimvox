@@ -1,0 +1,145 @@
+import type { ModelInfo } from "@drimvox/shared";
+import { tool, type ModelMessage, type ToolSet } from "ai";
+import { z } from "zod";
+import { runAgent } from "../agent/run";
+import type { ToolHooks } from "../agent/tools";
+import type { Connection } from "../providers/repo";
+
+/** Steps the tester may take: enough to start the result and go through what was asked, not to wander. */
+export const CHECK_STEPS = 60;
+/** Rounds of "found, fixed, checked again" in one turn: past them the user decides. */
+export const CHECK_ROUNDS = 2;
+
+export interface Problem {
+  what: string;
+  /** How the tester got there, step by step, so the agent can do the same. */
+  steps: string;
+  severity: "broken" | "wrong" | "minor";
+}
+
+export interface CheckResult {
+  problems: Problem[];
+  /** What it tried, in a few lines, for the user. */
+  summary: string;
+}
+
+export interface CheckDeps {
+  conn: Connection;
+  model: string;
+  price: ModelInfo | undefined;
+  folder: string;
+  signal: AbortSignal;
+  idleTimeoutMs: number;
+  /** Its hands and eyes: the background processes, the browser, screenshots, the comparison with a design. */
+  tools: ToolSet;
+  /** The screenshots for its own eyes when its model sees (visual/tools.ts `show`), once each. */
+  pictures?: () => { pictures: Buffer[]; caption: string } | null;
+  hooks: Omit<ToolHooks, "onFinish">;
+  onSpend(usd: number, tokens: { inputTokens: number; outputTokens: number; cachedTokens: number }): void;
+  /** Words it says on the way, for the feed. */
+  onText(text: string): void;
+}
+
+const SYSTEM = (folder: string) =>
+  [
+    `You are the tester of a coding agent's work in ${folder}. The agent says it is done; the user has not tried it yet.`,
+    "Try it as the user will, before them: start what was made the way the user starts it, and go through what they asked",
+    "for, click by click, as a person would. You do not change the project's files: you only run, open, look and report.",
+    "",
+    "# How to test",
+    "- Start the real thing: the dev server or the built app, as the project's notes and README say. Use start_background",
+    "  for servers, run_command for the rest. Stop what you started before you report.",
+    "- Go through each thing the user asked for in this turn, and the flows around it that it may have broken. Use the",
+    "  browser tools to click, type and read; look at the screens yourself (look_at_page, check_page).",
+    "- A design or mockup in the project (a picture, an HTML page) is the reference: compare the screens with it",
+    "  (page_match_design, the mockup's page served locally by address), and the effects only its code shows (hover,",
+    "  transitions, effects that follow the cursor).",
+    "- Sound and video: send a known signal through the real path and check what arrives (its level, no clicks or gaps),",
+    "  not only that bytes flow. Chromium plays a WAV file as the microphone with --use-file-for-fake-audio-capture=<path>",
+    "  (the full path, written as a Windows path on Windows).",
+    "- Two people where it takes two: two browser contexts, two accounts. Someone without the right must be refused.",
+    "- Scripts of your own (a Playwright run, a probe) go outside the project: in the system's temporary folder.",
+    "",
+    "# What to report",
+    "Call report_check once at the end. Report only what you saw happen yourself, each with the steps to see it again;",
+    "not guesses from reading code, not taste. Nothing found is a fine result: then say what you tried. Be concise.",
+    "Write your words and the report in the language of the user's request.",
+  ].join("\n");
+
+/**
+ * The tester (asked for: "the agent says done, and I find the bugs"): a second agent with a fresh context and one job,
+ * to try the result as the user will and find what is broken. Its report goes back to the working agent to fix.
+ */
+export async function checkWork(d: CheckDeps, job: { asked: string; said: string; notes: string }): Promise<CheckResult | null> {
+  let result: CheckResult | null = null;
+  const messages: ModelMessage[] = [
+    {
+      role: "user",
+      content: [
+        `What the user asked for in this turn:\n${job.asked}`,
+        `What the agent says it did:\n${job.said || "(nothing said)"}`,
+        job.notes ? `The project's notes (how to build, run and deploy; what the user wants and does not):\n${job.notes}` : "",
+        "Test it now.",
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    },
+  ];
+  const report = tool({
+    description: "Give your findings and end. Only what you saw happen, each with the steps to see it again.",
+    inputSchema: z.object({
+      problems: z
+        .array(
+          z.object({
+            what: z.string().min(1).max(1000),
+            steps: z.string().min(1).max(2000),
+            severity: z.enum(["broken", "wrong", "minor"]).describe("broken: does not work; wrong: works, not as asked; minor: small"),
+          }),
+        )
+        .max(30),
+      summary: z.string().min(1).max(2000).describe("What you tried, in a few lines"),
+    }),
+    execute: async (r) => {
+      result = r;
+      return "Reported.";
+    },
+  });
+  await runAgent({
+    conn: d.conn,
+    model: d.model,
+    price: d.price,
+    worktree: d.folder,
+    messages,
+    mode: "review",
+    extraTools: { report_check: report },
+    ownTools: d.tools,
+    stopTools: ["report_check"],
+    noFinish: true,
+    prune: true,
+    maxSteps: CHECK_STEPS,
+    pictures: d.pictures,
+    system: SYSTEM(d.folder),
+    spentUsd: 0,
+    budgetUsd: Number.POSITIVE_INFINITY,
+    signal: d.signal,
+    idleTimeoutMs: d.idleTimeoutMs,
+    hooks: d.hooks,
+    onText: d.onText,
+    onStep: (step) => {
+      messages.push(...step.messages);
+      d.onSpend(step.costUsd, { inputTokens: step.inputTokens, outputTokens: step.outputTokens, cachedTokens: step.cachedTokens ?? 0 });
+    },
+  }).catch(() => null);
+  return result;
+}
+
+/** The tester's findings, as the next message of the working agent's conversation. */
+export function findingsMessage(r: CheckResult): string {
+  const lines = r.problems.map((p, i) => `${i + 1}. [${p.severity}] ${p.what}\n   How to see it: ${p.steps}`);
+  return [
+    "[Drimvox's tester tried your work as the user will, and found:]",
+    ...lines,
+    "",
+    "Reproduce each, fix it, check that same case again, and reply about each.",
+  ].join("\n");
+}
