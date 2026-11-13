@@ -47,6 +47,21 @@ export const DONE_YET =
 /** After a clean check: what the agent held back for the tester goes out now (agent-prompt.ts). */
 export const CLEAN_CHECK =
   "[Drimvox's tester tried your work as the user will and found nothing.] If the user asked to publish it (a release, a deploy, an upload), do it now. Otherwise reply in one line that it is checked.";
+/**
+ * The limits of a message's money and time (asked for: the agent should know when it nears them, without hurrying or
+ * doing worse, and end a task it cannot finish in a working state instead of breaking off mid-edit). Nothing is said
+ * before NEAR_SHARE of a limit is used: early words about limits make a model rush.
+ */
+const NEAR_SHARE = 0.8;
+/** At the limit: how far past it the agent may go to leave the code working, and in how many steps. */
+const GRACE = 1.15;
+const GRACE_STEPS = 12;
+export const WRAP_UP =
+  "[Drimvox: the limit of money or time for this message is reached.] Do not start anything new. Leave the code working: finish or undo the change you are in the middle of, make sure it builds and its tests pass, commit, and reply with what is done and what is left.";
+/** Said with every step past NEAR_SHARE of a limit. */
+export function nearLimit(usedShare: number, left: string): string {
+  return `[Drimvox: ${Math.round(usedShare * 100)} % of this message's limit is used, ${left} left.] Keep the same care: do not hurry or skip checks. If what was asked is done, stop now. If not, plan to end in a working state within what is left: finish the piece you are on so it builds and runs, commit it, and say what is left; start nothing big.`;
+}
 /** Provider errors in a row before the run stops and waits. */
 const MAX_ERRORS = 2;
 const RETRY_MS = 5000;
@@ -144,6 +159,10 @@ export class WorkRun {
   private checkRounds = 0;
   /** What the last answer said, for the tester. */
   private lastSaid = "";
+  /** At a limit: the agent leaves the code working within a short allowance, then the run stops (NEAR_SHARE, GRACE). */
+  private wrapUp: "budget" | "limit" | null = null;
+  /** What the run may have spent by the end of wrapping up. */
+  private wrapBudget = 0;
   /** The tester found nothing: the agent publishes what it held back, without another check. */
   private publishing = false;
   private testerOn(): boolean {
@@ -224,6 +243,7 @@ export class WorkRun {
     this.turnChanged = false;
     this.checkRounds = 0;
     this.publishing = false;
+    this.wrapUp = null;
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
     // The branch the project's git rules ask for, before anything changes.
     await this.d.git?.prepare(this.projectId, this.folder).catch(() => {});
@@ -248,8 +268,9 @@ export class WorkRun {
         if (signal.aborted) return stopWith("stopped", "user");
         const row = this.row();
         const ranMs = () => Date.now() - this.runStart;
-        if (this.spent() >= row.budgetUsd) return stopWith("paused", "budget");
-        if (ranMs() >= row.hours * 3_600_000 && !this.localNow()) return stopWith("paused", "time");
+        // Wrapping up at a limit, the allowance is the answer's own (GRACE_STEPS, wrapBudget): it always gets its chance.
+        if (!this.wrapUp && this.spent() >= row.budgetUsd) return stopWith("paused", "budget");
+        if (!this.wrapUp && ranMs() >= row.hours * 3_600_000 && !this.localNow()) return stopWith("paused", "time");
 
         const escalated = row.escalated && row.models?.strong;
         const ref = escalated ? row.models!.strong! : (row.models?.work ?? { providerId: chat.providerId!, model: chat.model! });
@@ -261,10 +282,25 @@ export class WorkRun {
         // The older part of a long run is shortened between answers only half way to the model's limit (asked for: as
         // OpenCode; trimmed every time, the agent read the same files again and again).
         if (sizeOf(messages) > memoryLimit(await findModel(conn, ref.model).catch(() => undefined)) * TRIM_SHARE) compactHistory(messages);
-        const outcome = await this.answer(messages, conn, ref.model, () => {
-          const now = this.row();
-          return ranMs() >= now.hours * 3_600_000 && !isLocal(conn);
-        });
+        const outcome = await this.answer(
+          messages,
+          conn,
+          ref.model,
+          () => {
+            const now = this.row();
+            return !this.wrapUp && ranMs() >= now.hours * 3_600_000 && !isLocal(conn);
+          },
+          // How much of the message's limits is used, and what is left in words, for the reminder near them.
+          () => {
+            const now = this.row();
+            // What finished answers spent, and this one so far.
+            const spentNow = this.spent() + this.stretch.costUsd;
+            const money = spentNow / now.budgetUsd;
+            const time = isLocal(conn) ? 0 : ranMs() / (now.hours * 3_600_000);
+            const minutes = Math.max(0, Math.round((now.hours * 3_600_000 - ranMs()) / 60_000));
+            return { share: Math.max(money, time), left: `about $${Math.max(0, now.budgetUsd - spentNow).toFixed(2)} and ${minutes} min` };
+          },
+        );
         this.d.repo.update(this.projectId, { workedMs: worked() });
         workedBase = worked();
         since = Date.now();
@@ -292,6 +328,16 @@ export class WorkRun {
           for (const text of this.inbox.splice(0)) messages.push({ role: "user", content: text });
           continue;
         }
+        // At a limit the first time: a short allowance to leave the code working, not a stop in the middle of an edit.
+        if ((outcome.kind === "budget" || outcome.kind === "limit") && !this.wrapUp) {
+          this.wrapUp = outcome.kind;
+          // A step can overshoot a limit far: the allowance counts from here.
+          this.wrapBudget = this.spent() + this.row().budgetUsd * (GRACE - 1);
+          messages.push({ role: "user", content: WRAP_UP });
+          continue;
+        }
+        // The allowance is over: the work waits, the limit named, the agent's reply saying what is left.
+        if (this.wrapUp) return stopWith("paused", this.wrapUp === "budget" ? "budget" : "time");
         if (outcome.kind === "budget") return stopWith("paused", "budget");
         // A long answer goes on without a pause (asked for: as Claude Code, give the task and get it done), with one word
         // at each 60 steps: if what was asked is done, stop now (seen live: a site fine at 20 rubles, polished on and on).
@@ -355,6 +401,7 @@ export class WorkRun {
     conn: Connection,
     model: string,
     outOfTime: () => boolean,
+    used: () => { share: number; left: string } = () => ({ share: 0, left: "" }),
   ): Promise<{ kind: "natural" | "steps" | "budget" | "limit" | "stopped" } | { kind: "error"; error: ProviderError }> {
     const signal = this.controller.signal;
     const answer = this.d.chats.addMessage({ chatId: this.chatId, role: "assistant", content: "", status: "streaming", providerId: conn.id, model });
@@ -369,6 +416,8 @@ export class WorkRun {
     let cost = 0;
     let priced = true;
     let lastStep = 0;
+    // The last step called tools: a limit stopped the agent in the middle, not its own end (then it wraps up).
+    let midWork = false;
     const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
     const onCall = (name: string, what: string, stat?: Pick<ActivityEntry, "added" | "removed" | "perFile"> | null) => {
       if (name === "use_skill") this.skillsOpened.add(what);
@@ -510,7 +559,7 @@ export class WorkRun {
     // The browser's usual tools go as one (browser/one.ts); its rare ones stay apart, loaded when needed (deferred.ts).
     const tools = oneBrowser(own, Object.keys(own).filter(isRare));
     const spentBefore = this.spent();
-    const overBudget = () => spentBefore + cost >= this.row().budgetUsd;
+    const overBudget = () => spentBefore + cost >= (this.wrapUp ? this.wrapBudget : this.row().budgetUsd);
     let limited = false;
     const outcome = await runAgent({
       service,
@@ -526,7 +575,12 @@ export class WorkRun {
       // Old outputs leave the conversation (prune.ts); the MCP servers' tools wait until loaded, as the rare ones do.
       prune: true,
       rare: Object.keys(mcpTools),
-      maxSteps: SEGMENT_STEPS,
+      maxSteps: this.wrapUp ? GRACE_STEPS : SEGMENT_STEPS,
+      remind: () => {
+        if (this.wrapUp) return null;
+        const now = used();
+        return now.share >= NEAR_SHARE ? nearLimit(now.share, now.left) : null;
+      },
       // Shown once, with the step right after: as a person glances at the screen and goes on (and the steps after keep the
       // provider's cache).
       pictures: () => {
@@ -567,6 +621,7 @@ export class WorkRun {
       },
       onStep: (step) => {
         messages.push(...step.messages);
+        midWork = step.messages.some((m) => m.role === "tool");
         input += step.inputTokens;
         output += step.outputTokens;
         cached += step.cachedTokens;
@@ -622,6 +677,8 @@ export class WorkRun {
     if (stopped) return { kind: "stopped" };
     if (error) return { kind: "error", error };
     if (outcome.kind === "steps") return { kind: "steps" };
+    // Its own end, though past a limit at it: nothing to wrap up.
+    if (!midWork) return { kind: "natural" };
     if (overBudget()) return { kind: "budget" };
     if (limited) return { kind: "limit" };
     return { kind: "natural" };

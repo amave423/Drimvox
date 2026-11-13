@@ -104,8 +104,10 @@ describe("work on a project", () => {
     // The first message spent a dollar in one step: it was over at its end.
     await until(s.project.id, (w) => w.status !== "running" && requestsOf("coder").length === 1);
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Второе", model: s.ref("coder") });
-    const paused = await until(s.project.id, (w) => w.status === "paused" && requestsOf("coder").length === 2);
+    // Stopped by the budget in the middle of its work: one answer more to leave the code working, then it waits.
+    const paused = await until(s.project.id, (w) => w.status === "paused" && requestsOf("coder").length === 3);
     expect(paused.reason).toBe("budget");
+    expect(JSON.stringify(requestsOf("coder")[2]!.body.messages)).toContain("the limit of money or time for this message is reached");
   });
 
   // Seen live: a long answer of DeepSeek through RouterAI broke off twice in a row, and the run stopped mid-work.
@@ -131,6 +133,25 @@ describe("work on a project", () => {
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Привет", model: s.ref("coder") });
     const done = await until(s.project.id, (w) => w.status === "done");
     expect(done.rates).toEqual({ input: 1, cached: 0.1, output: 2 });
+  });
+
+  // Asked for: the agent knows when a limit nears, without hurrying before it, and at the limit leaves the code working
+  // instead of breaking off mid-edit.
+  it("says nothing of the limits early, warns past 80 %, and at the limit gives a short allowance to leave the code working", async () => {
+    const step = (tokens: number): FakeTurn => ({ ...call("list_files", { path: "." }), usage: { prompt_tokens: tokens, completion_tokens: 0 } });
+    // $1 per million: 300k, then 550k more (85 % of a $1 budget), then 300k more (past it).
+    const s = await setup({ coder: [step(300_000), step(550_000), step(300_000), { text: "Довёл до рабочего состояния, осталось: стили." }] }, PRICED);
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("PATCH", `/api/projects/${s.project.id}/work`, { budgetUsd: 1 });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай сайт", model: s.ref("coder") });
+    const work = await until(s.project.id, (w) => w.status !== "running");
+    const asks = requestsOf("coder").map((r) => JSON.stringify(r.body.messages));
+    expect(asks[1]).not.toContain("of this message's limit is used");
+    expect(asks[2]).toContain("85 % of this message's limit is used");
+    expect(asks[2]).toContain("Keep the same care: do not hurry");
+    // At the limit: one more answer to leave the code working, then the work waits, the limit named.
+    expect(asks.at(-1)).toContain("the limit of money or time for this message is reached");
+    expect(work).toMatchObject({ status: "paused", reason: "budget" });
   });
 
   // The working model keeps failing: the strong one takes over, when the project has one.
