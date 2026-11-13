@@ -743,7 +743,7 @@ export const en: Record<keyof typeof ru, string> = {
   "workTokens.ofLimit": "{used} of {limit}",
   "workTokens.fresh": "Start with a clean context",
   "workTokens.long": "The conversation is long: each message reads it whole again, so a new task here costs several times more. For a new task, start with a clean context; the project's notes and state stay.",
-  "workTokens.note": "The bar is how much of the model's context the latest step took. \"Read\" is larger: at every step the model reads the whole conversation, the files and the tools' answers again; many providers charge less for what they read again.",
+  "workTokens.note": "The bar is how much of the model's context the latest step took. Reading is larger: at every step the model reads the whole conversation, the files and the tools' answers again. What it reads again comes from the cache for less; the money of each kind is by the model's rates, fitted to the provider's bill.",
   "margin.model": "Model",
   "margin.files": "Files in this chat",
   "files.touch.written": "written",
