@@ -336,6 +336,25 @@ describe("a ready project", () => {
     expect(efforts.length).toBeGreaterThanOrEqual(4);
   });
 
+  // Asked for: "in project mode one cannot attach screenshots". They go as in a chat: the model sees the picture, reads
+  // the text file, and the message keeps both.
+  it("takes screenshots and files with the message, shows them to the model and keeps them on the message", async () => {
+    const s = await setup({ coder: [{ text: "Вижу скриншот." }] });
+    const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const files = [
+      { name: "bug.png", type: "image/png", data: png },
+      { name: "log.txt", type: "text/plain", data: Buffer.from("TypeError: voice dropped").toString("base64") },
+    ];
+    const res = await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Вот баг", model: s.ref("coder"), files });
+    expect(res.status).toBe(200);
+    const work = await until(s.project.id, (w) => w.status === "done");
+    const sent = JSON.stringify(requestsOf("coder")[0]!.body.messages);
+    expect(sent).toContain("image_url");
+    expect(sent).toContain("TypeError: voice dropped");
+    const chat = await (await env.call("GET", `/api/chats/${work.chatId}`)).json();
+    expect(chat.messages[0].attachments.map((a: any) => a.name)).toEqual(["bug.png", "log.txt"]);
+  });
+
   // Seen live: "the site looked fine at 20 rubles", and the agent polished on, answer after answer. Asked for: no pause,
   // as Claude Code; at each 60 steps the agent is asked whether what was asked is done.
   it("goes on past 60 steps without a pause, asking the agent to stop if the task is done", async () => {

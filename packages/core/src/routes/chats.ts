@@ -22,7 +22,7 @@ import { z } from "zod";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { Workspace } from "../agent/workspace";
 import { resolve } from "node:path";
-import { extract, imageType } from "../chats/attachments";
+import { extract, imageType, MAX_ATTACHMENT } from "../chats/attachments";
 import { restore } from "../chats/checkpoint";
 import { folderTools } from "../chats/folder";
 import { reply } from "../chats/reply";
@@ -75,8 +75,6 @@ export interface WorkDeps {
   toolbox?: ToolboxDeps;
 }
 
-/** One attached file at most; the window sends ten at most. */
-const MAX_ATTACHMENT = 20 * 1024 * 1024;
 
 export function chatRoutes(
   chats: ChatRepo,

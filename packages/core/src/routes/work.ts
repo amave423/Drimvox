@@ -3,6 +3,7 @@ import { projectGitRulesSchema, projectWorkChatSchema, projectWorkMessageSchema,
 import { Hono } from "hono";
 import { readFile } from "node:fs/promises";
 import type { ProjectRepo } from "../agent/repo";
+import { readSent } from "../chats/attachments";
 import type { ProviderRepo } from "../providers/repo";
 import type { Shots } from "../visual/look";
 import { folderChanges } from "../work/changes";
@@ -21,23 +22,27 @@ export function workRoutes(projects: ProjectRepo, providers: ProviderRepo, work:
   };
   return new Hono()
     .get("/:id/work", (c) => (projects.get(c.req.param("id")) ? c.json(work.view(c.req.param("id")), 200) : c.json(notFound, 404)))
-    .post("/:id/work/message", zValidator("json", projectWorkMessageSchema), (c) => {
+    .post("/:id/work/message", zValidator("json", projectWorkMessageSchema), async (c) => {
       const id = c.req.param("id");
       if (!projects.get(id)) return c.json(notFound, 404);
+      const { content, thinking, files } = c.req.valid("json");
+      const sent = await readSent(files);
+      if (!sent) return c.json({ error: { code: "too_big" as const } }, 413);
       try {
-        const { content, thinking } = c.req.valid("json");
-        return c.json(work.message(id, content, thinking), 200);
+        return c.json(work.message(id, content, thinking, sent), 200);
       } catch (err) {
         return c.json(refused(err), 409);
       }
     })
-    .post("/:id/work/chat", zValidator("json", projectWorkChatSchema), (c) => {
+    .post("/:id/work/chat", zValidator("json", projectWorkChatSchema), async (c) => {
       const id = c.req.param("id");
       if (!projects.get(id)) return c.json(notFound, 404);
-      const { content, model, thinking, strong } = c.req.valid("json");
+      const { content, model, thinking, strong, files } = c.req.valid("json");
       if (!providers.get(model.providerId)) return c.json({ error: { code: "invalid", detail: "Unknown provider" } }, 400);
+      const sent = await readSent(files);
+      if (!sent) return c.json({ error: { code: "too_big" as const } }, 413);
       try {
-        return c.json(work.chat(id, content, model, { thinking, strong }), 200);
+        return c.json(work.chat(id, content, model, { thinking, strong, files: sent }), 200);
       } catch (err) {
         return c.json(refused(err), 409);
       }

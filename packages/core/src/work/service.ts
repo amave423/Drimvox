@@ -1,6 +1,8 @@
 import type { ActivityEntry, ModelRef, ProjectModels, ProjectWorkView, ThinkingLevel } from "@drimvox/shared";
 import type { ProjectRepo } from "../agent/repo";
 import type { ChatApprovals } from "../chats/approvals";
+import type { AttachmentKind } from "../chats/attachments";
+import { toModelMessages } from "../chats/history";
 import type { ChatQuestions } from "../chats/questions";
 import { reply } from "../chats/reply";
 import type { ChatRepo } from "../chats/repo";
@@ -8,6 +10,15 @@ import { isCli } from "../cli/kinds";
 import { projectRules } from "./prompt";
 import type { ProjectWorkRepo } from "./repo";
 import { WorkRun, type Carried, type RunDeps } from "./run";
+
+/** A screenshot or file sent with a message, already read out (routes/work.ts). */
+export interface SentFile {
+  name: string;
+  type: string;
+  data: Buffer;
+  kind: AttachmentKind;
+  text: string | null;
+}
 
 /** Refusals the API turns into 409 with a code the UI explains. */
 export class WorkRefused extends Error {
@@ -111,19 +122,25 @@ export class ProjectWork {
   }
 
   /** A message in the project's conversation: the run takes it on the way, or starts again with it. */
-  message(projectId: string, content: string, thinking?: ThinkingLevel): { chatId: string; queued: boolean } {
+  message(projectId: string, content: string, thinking?: ThinkingLevel, files: SentFile[] = []): { chatId: string; queued: boolean } {
     const row = this.o.repo.get(projectId);
     const project = this.o.projects.get(projectId);
     if (!row?.chatId || !project || !row.startedAt) throw new WorkRefused("not_started");
     if (thinking) this.o.repo.update(projectId, { thinking });
     const live = this.runs.get(projectId);
     if (live) {
-      this.o.chats.addMessage({ chatId: row.chatId, role: "user", content, status: "done" });
+      const ids = this.keep(row.chatId, files);
+      const added = this.o.chats.addMessage({ chatId: row.chatId, role: "user", content, status: "done" });
+      this.o.chats.attachments.attach(row.chatId, added.id, ids);
       // Written while the agent waits on its question: the message is the answer (as in OpenCode, where one may type it).
-      if (!this.o.questions.answerWith(row.chatId, content)) live.post(content);
+      // With files it goes to the model too, since the answer is text only.
+      if (!this.o.questions.answerWith(row.chatId, content) || ids.length) {
+        const attachments = ids.map((id) => this.o.chats.attachments.get(id)!);
+        live.post(toModelMessages([{ role: "user", content, attachments }], this.o.chats.attachments, true)[0]!);
+      }
       return { chatId: row.chatId, queued: true };
     }
-    this.launch(projectId, row.chatId, project.path, content);
+    this.launch(projectId, row.chatId, project.path, content, files);
     return { chatId: row.chatId, queued: false };
   }
 
@@ -135,12 +152,12 @@ export class ProjectWork {
     projectId: string,
     content: string,
     model: ModelRef,
-    o: { thinking?: ThinkingLevel; strong?: ModelRef | null } = {},
+    o: { thinking?: ThinkingLevel; strong?: ModelRef | null; files?: SentFile[] } = {},
   ): { chatId: string; queued: boolean } {
     const project = this.o.projects.get(projectId);
     if (!project) throw new WorkRefused("not_repo");
     const row = this.o.repo.get(projectId);
-    if (this.runs.has(projectId) && row?.startedAt) return this.message(projectId, content, o.thinking);
+    if (this.runs.has(projectId) && row?.startedAt) return this.message(projectId, content, o.thinking, o.files);
     const known = row?.chatId ? this.o.chats.get(row.chatId) : null;
     const chat = known ?? this.o.chats.create(model.providerId, model.model, "text", { folder: project.path, projectId, itemId: null, title: project.name });
     if (known) this.o.chats.update(chat.id, { providerId: model.providerId, model: model.model });
@@ -153,7 +170,7 @@ export class ProjectWork {
       escalated: false,
       report: null,
     });
-    this.launch(projectId, chat.id, project.path, content);
+    this.launch(projectId, chat.id, project.path, content, o.files);
     return { chatId: chat.id, queued: false };
   }
 
@@ -208,7 +225,12 @@ export class ProjectWork {
     await Promise.all([...this.runs.values()].map((r) => r.done.catch(() => {})));
   }
 
-  private launch(projectId: string, chatId: string, folder: string, content: string): void {
+  /** The files kept in the chat, not yet tied to a message. */
+  private keep(chatId: string, files: SentFile[]): string[] {
+    return files.map((f) => this.o.chats.attachments.add(chatId, f).id);
+  }
+
+  private launch(projectId: string, chatId: string, folder: string, content: string, files: SentFile[] = []): void {
     const row = this.o.repo.get(projectId)!;
     const work = row.models?.work;
     const conn = work ? this.o.run.providers.connection(work.providerId) : null;
@@ -234,14 +256,16 @@ export class ProjectWork {
     // Claude Code and Codex work with their own loop: the message goes to them as it is (reply() keeps it).
     if (isCli(conn.preset)) {
       this.o.repo.update(projectId, { status: "running", reason: null, detail: null });
-      run.done = this.cliTurn(run, conn, work.model, content).finally(() => this.runs.get(projectId) === run && this.runs.delete(projectId));
+      run.done = this.cliTurn(run, conn, work.model, content, this.keep(chatId, files)).finally(() => this.runs.get(projectId) === run && this.runs.delete(projectId));
       return;
     }
-    this.o.chats.addMessage({ chatId, role: "user", content, status: "done" });
+    const ids = this.keep(chatId, files);
+    const added = this.o.chats.addMessage({ chatId, role: "user", content, status: "done" });
+    this.o.chats.attachments.attach(chatId, added.id, ids);
     run.start();
   }
 
-  private async cliTurn(run: WorkRun, conn: NonNullable<ReturnType<RunDeps["providers"]["connection"]>>, model: string, content: string): Promise<void> {
+  private async cliTurn(run: WorkRun, conn: NonNullable<ReturnType<RunDeps["providers"]["connection"]>>, model: string, content: string, attachments: string[]): Promise<void> {
     const activity: ActivityEntry[] = [];
     let written = 0;
     await reply({
@@ -250,6 +274,7 @@ export class ProjectWork {
       conn,
       model,
       content,
+      attachments,
       signal: run.controller.signal,
       idleTimeoutMs: this.o.run.idleTimeoutMs,
       web: "off",

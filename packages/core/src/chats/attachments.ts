@@ -9,6 +9,16 @@ export type AttachmentKind = "image" | "text" | "none";
 
 /** Characters of one file's text the model gets at most. */
 export const TEXT_LIMIT = 100_000;
+
+/** One attached file at most; the window sends ten at most. */
+export const MAX_ATTACHMENT = 20 * 1024 * 1024;
+
+/** Files sent inside a request (a project's message), read out; null when one is too big. */
+export async function readSent(files: { name: string; type: string; data: string }[]) {
+  const bytes = files.map((f) => Buffer.from(f.data, "base64"));
+  if (bytes.some((b) => b.length > MAX_ATTACHMENT)) return null;
+  return Promise.all(files.map(async (f, i) => ({ name: f.name, type: f.type, data: bytes[i]!, ...(await extract(f.name, f.type, bytes[i]!)) })));
+}
 /** Characters of a ZIP's text files, all together. */
 const ZIP_LIMIT = 200_000;
 const ZIP_FILES = 200;

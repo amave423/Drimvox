@@ -143,7 +143,7 @@ const sleep = (ms: number, signal: AbortSignal) =>
 export class WorkRun {
   readonly controller = new AbortController();
   done: Promise<void> = Promise.resolve();
-  private readonly inbox: string[] = [];
+  private readonly inbox: ModelMessage[] = [];
   /** Skills the agent opened in this run (the once-a-task reviews and reminders: repo.rounds). */
   private readonly skillsOpened = new Set<string>();
   /**
@@ -177,8 +177,8 @@ export class WorkRun {
   ) {}
 
   /** A message the user wrote while the run goes on; it is already in the conversation. */
-  post(content: string): void {
-    this.inbox.push(content);
+  post(message: ModelMessage): void {
+    this.inbox.push(message);
   }
 
   start(): void {
@@ -325,7 +325,7 @@ export class WorkRun {
         errors = 0;
         // What the user wrote while the agent worked: in the conversation already, now in the model's context too.
         if (this.inbox.length) {
-          for (const text of this.inbox.splice(0)) messages.push({ role: "user", content: text });
+          messages.push(...this.inbox.splice(0));
           continue;
         }
         // At a limit the first time: a short allowance to leave the code working, not a stop in the middle of an edit.
