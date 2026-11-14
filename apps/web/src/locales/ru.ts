@@ -1284,7 +1284,7 @@ export const ru = {
   "workshop.dot.run": "работает",
   "workshop.dot.wait": "ждёт вас",
   "workshop.dot.ok": "готово",
-  "projectWork.waitingApproval": "Ждёт твоего разрешения на команду — ответь в разговоре.",
+  "projectWork.waitingApproval": "Ждёт твоего ответа или разрешения — посмотри в разговоре.",
   "projectWork.reason.month_budget": "Месячный бюджет приложения исчерпан. Подними его в настройках («Модели и деньги») и нажми «Продолжить».",
   "chat.monthBudget": "Месячный бюджет исчерпан: потрачено {spent} из {budget}. Подними его в настройках или выбери бесплатную или локальную модель.",
   "bottom.month": "Месяц: {spent} из {budget}",

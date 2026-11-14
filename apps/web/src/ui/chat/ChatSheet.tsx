@@ -69,7 +69,7 @@ const PENDING_POLL_MS = 3000;
  * user's messages in time, with the box to write to the run under them.
  */
 export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: string | null; viewKey: string; autoSend?: string; workshop?: boolean }) {
-  const { api, token, t, settings, updateSettings, providers, navigate, reloadChats, reloadToday } = useApp();
+  const { api, token, t, settings, updateSettings, providers, navigate, reloadChats, reloadToday, reloadWorks } = useApp();
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -422,12 +422,15 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
   async function answerQuestion(questionId: string, answers: string[]) {
     if (!chat) return;
     await api.chats[":id"].questions[":questionId"].$post({ param: { id: chat.id, questionId }, json: { answers } }).catch(() => null);
+    // A project waiting on it shows "!" in the sidebar: gone at once, not at the next look (seen: it stayed three seconds).
+    reloadWorks();
     await load(chat.id);
   }
 
   async function approve(approvalId: string, allow: boolean, always: boolean, server = false) {
     if (!chat) return;
     await api.chats[":id"].approvals[":approvalId"].$post({ param: { id: chat.id, approvalId }, json: { allow, always, server } }).catch(() => null);
+    reloadWorks();
     if (!draft) await load(chat.id);
   }
 

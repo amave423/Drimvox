@@ -1284,7 +1284,7 @@ export const en: Record<keyof typeof ru, string> = {
   "workshop.dot.run": "working",
   "workshop.dot.wait": "waiting for you",
   "workshop.dot.ok": "done",
-  "projectWork.waitingApproval": "Waiting for your permission on a command: answer in the conversation.",
+  "projectWork.waitingApproval": "Waiting for your answer or permission: see the conversation.",
   "projectWork.reason.month_budget": "The app's monthly budget is used up. Raise it in the settings (Models and money) and press Continue.",
   "chat.monthBudget": "The monthly budget is used up: {spent} of {budget} spent. Raise it in the settings, or choose a free or local model.",
   "bottom.month": "Month: {spent} of {budget}",

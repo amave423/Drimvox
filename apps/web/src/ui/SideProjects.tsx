@@ -132,31 +132,21 @@ export function SideProjects() {
 }
 
 /**
- * How a project's work goes, under its name: working or waiting. An answer not read yet is a dot, as a chat's (asked
- * for: a project answers as a chat does, it is not "done").
+ * How a project's work goes, at the right of its name, as a chat shows its answer (asked for: "as in a chat: a spinner
+ * while the agent works, a green dot when it has finished, another mark when it needs a confirmation; no captions").
+ * Why it waits is on hover.
  */
 function WorkLine({ work, unread }: { work: ProjectWorkView | null; unread: boolean }) {
   const { t } = useApp();
-  if (!work || work.status === "idle") return null;
-  if (work.status === "done") return unread ? <span className="side-chat-dot side-chat-state" role="img" aria-label={t("side.unread")} /> : null;
-  // Waiting on the user's answer or permission counts as waiting, not as running.
-  const tone = work.status === "running" ? (work.waitingApproval ? "wait" : "run") : "wait";
+  // Stopped by the user: nothing waits, nothing to mark.
+  if (!work || work.status === "idle" || work.status === "stopped" || work.reason === "user") return null;
+  if (work.status === "done") return unread ? <span className="side-chat-dot side-chat-state is-ok" role="img" aria-label={t("workshop.dot.ok")} /> : null;
+  // A question or a permission the agent waits on, or a stop at a limit or an error: the user's turn.
+  if (work.status === "running" && !work.waitingApproval) return <span className="action-spinner side-chat-state" role="img" aria-label={t("workshop.dot.run")} />;
+  const why = t(work.waitingApproval ? "projectWork.waitingApproval" : (`projectWork.reason.${work.reason ?? "user"}` as MessageKey), { detail: work.detail ?? "" });
   return (
-    <>
-      {/* The project's state, the only place it is shown (asked for); why it waits, on hover. */}
-      <small
-        className={`side-work is-${tone}`}
-        role="status"
-        title={
-          tone === "wait"
-            ? t(work.waitingApproval ? "projectWork.waitingApproval" : (`projectWork.reason.${work.reason ?? "user"}` as MessageKey), {
-                detail: work.detail ?? "",
-              })
-            : undefined
-        }
-      >
-        {t(`workshop.dot.${tone}` as MessageKey)}
-      </small>
-    </>
+    <span className="side-attention side-chat-state" role="img" aria-label={`${t("workshop.dot.wait")}: ${why}`} title={why}>
+      !
+    </span>
   );
 }

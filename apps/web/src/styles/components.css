@@ -148,6 +148,10 @@ input.field-input, select.field-input { height: var(--control-h); padding-block:
 .side-chat-state { position: absolute; right: 12px; top: calc(50% - 7px); }
 .side-chat-dot { width: 8px; height: 8px; top: calc(50% - 4px); right: 15px; border-radius: 50%; background: var(--ink); }
 .side-chat:hover .side-chat-state { visibility: hidden; }
+/* A project's marks: green once its answer is ready, "!" when the agent waits on the user. */
+.side-chat-dot.is-ok { background: var(--ok); }
+.side-attention { display: grid; place-items: center; width: 16px; height: 16px; top: calc(50% - 8px); right: 11px; border-radius: 50%; background: var(--wait); color: var(--sheet); font-size: 11px; font-weight: 700; line-height: 1; }
+.side-project-row:hover .side-chat-state, .side-project-row:has(.side-project.is-on) .side-chat-state { visibility: hidden; }
 
 /* "?" with its explanation on hover or focus, instead of text under every switch. */
 .hint { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; margin-left: 6px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: var(--sheet); vertical-align: middle; cursor: default; flex: none; }

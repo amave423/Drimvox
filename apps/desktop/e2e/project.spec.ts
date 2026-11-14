@@ -135,6 +135,9 @@ test("a project: the agent's question as a card, the picked answer, the same con
   await expect(card).toContainText("Запись по телефону или онлайн?", { timeout: 30_000 });
   await expect(card.getByPlaceholder("Свой ответ")).toBeVisible();
   await expect(card.getByRole("button", { name: "Ответить" })).toBeDisabled();
+  // While the agent waits on the question, the project shows "!" instead of the spinner (asked for: another mark).
+  // Hidden on the open project (its state is in the project itself), so found by its mark, not by what is seen.
+  await expect(page.locator(".side-project.is-on .side-attention")).toHaveAttribute("aria-label", /ждёт вас/);
   await card.getByRole("button", { name: /Онлайн/ }).click();
   await card.getByRole("button", { name: "Ответить" }).click();
   await expect(card).toHaveCount(0);
@@ -142,14 +145,16 @@ test("a project: the agent's question as a card, the picked answer, the same con
   // The state is on the project in the sidebar only.
   await expect(page.locator(".timeline .msg-user").first()).toContainText("Сайт клиники");
   await expect(page.locator(".topbar").getByRole("status")).toHaveCount(0);
-  const state = page.locator(".side-project.is-on").getByRole("status");
-  await expect(state).toContainText("работает");
+  // Answered, the "!" goes at once; while it works a spinner as a chat has, no caption (asked for).
+  await expect(page.locator(".side-project.is-on .side-attention")).toHaveCount(0, { timeout: 2_000 });
+  await expect(page.locator(".side-project.is-on")).not.toContainText("работает");
+  const state = page.locator(".side-project.is-on .side-chat-state");
   // A message while it works goes in at once and the agent takes it on the way.
   await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").fill("Сделай заголовок крупнее");
   await page.getByPlaceholder("Напиши агенту — он учтёт на ходу").press("Enter");
   await expect(page.locator(".msg-user", { hasText: "Сделай заголовок крупнее" })).toBeVisible();
 
-  // Done, the line under the project goes: an answer reads as a chat's (asked for), the dot only for one not seen.
+  // Done, the spinner goes: an answer reads as a chat's (asked for), the green dot only for one not seen.
   await expect(state).toHaveCount(0, { timeout: 30_000 });
   // No checklist any more (asked for).
   await expect(page.getByRole("list", { name: "Чек-лист" })).toHaveCount(0);
