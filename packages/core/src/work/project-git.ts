@@ -1,7 +1,7 @@
 import { defaultGitRules, projectGitRulesSchema, type ProjectGitRules, type ProjectGitState } from "@drimvox/shared";
 import { addWork, currentBranch, runGit } from "../agent/git";
 import type { Database } from "../db";
-import type { GitHub } from "../github/github";
+import { GithubFailure, type GitHub } from "../github/github";
 import { commitRules } from "./agent-prompt";
 
 /** Files that never go into the agent's commits: keys and passwords stay out of git (and so out of GitHub). */
@@ -140,7 +140,9 @@ export class ProjectGit {
       this.db.sql.prepare("delete from settings where key = ?").run(pushErrorKey(projectId));
       return true;
     } catch (err) {
-      this.put(pushErrorKey(projectId), (err instanceof Error ? err.message : String(err)).slice(0, 600));
+      // A refused sign-in is kept as its code: the card asks to connect GitHub again, in the user's language.
+      const why = err instanceof GithubFailure && err.code === "github_login" ? "github_login" : err instanceof Error ? err.message : String(err);
+      this.put(pushErrorKey(projectId), why.slice(0, 600));
       return false;
     }
   }

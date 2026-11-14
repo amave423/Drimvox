@@ -154,7 +154,7 @@ export function GithubPublish({ project }: { project: ProjectView }) {
               {sent?.github && (
                 <p className={sent.unsent ? "is-pencil-text" : "muted"}>{sent.unsent ? t("git.unsent", { n: sent.unsent }) : t("git.sent")}</p>
               )}
-              {sent?.pushError && sent.unsent > 0 && <p className="error-note">{t("git.pushError", { reason: sent.pushError })}</p>}
+              {sent?.pushError && sent.unsent > 0 && <p className="error-note">{sent.pushError === "github_login" ? t("github.error.github_login") : t("git.pushError", { reason: sent.pushError })}</p>}
             </>
           ) : (
             <>

@@ -19,6 +19,16 @@ export interface GithubOptions {
 }
 
 /** A failure the page can name: nobody signed in, the name is taken, the project already has a remote, git refused. */
+/**
+ * Git's words when GitHub refused the sign-in: with prompts off it cannot ask, and says so (seen live: "could not read
+ * Username … terminal prompts disabled" in the git card, for a revoked sign-in that only a new one could fix).
+ */
+const SIGN_IN_REFUSED = /could not read Username|Authentication failed|Invalid username or (password|token)|returned error: 40[13]/i;
+
+export function pushFailure(said: string, token: string): GithubFailure {
+  return SIGN_IN_REFUSED.test(said) ? new GithubFailure("github_login", "GitHub no longer takes Drimvox's sign-in") : new GithubFailure("push_failed", hide(said, token));
+}
+
 export class GithubFailure extends Error {
   constructor(
     readonly code: "github_login" | "name_taken" | "has_remote" | "no_remote" | "push_failed" | "github_error",
@@ -276,7 +286,7 @@ export class GitHub {
       Object.assign(env, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: `http.${new URL(remote).origin}/.extraheader`, GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}` });
     }
     const result = await runGit(dir, ["-c", "credential.helper=", "push", "--force", "origin", refspec], true, env);
-    if (result.code !== 0) throw new GithubFailure("push_failed", hide(result.stderr.trim() || result.stdout.trim(), account.token));
+    if (result.code !== 0) throw pushFailure(result.stderr.trim() || result.stdout.trim(), account.token);
   }
 
   private async pushTo(dir: string, account: Account, first: boolean): Promise<void> {
@@ -291,7 +301,7 @@ export class GitHub {
     }
     try {
       const result = await runGit(dir, ["-c", "credential.helper=", "push", ...(first ? ["-u"] : []), "origin", branch], true, env);
-      if (result.code !== 0) throw new GithubFailure("push_failed", hide(result.stderr.trim() || result.stdout.trim(), account.token));
+      if (result.code !== 0) throw pushFailure(result.stderr.trim() || result.stdout.trim(), account.token);
     } catch (err) {
       if (err instanceof GitError) throw new GithubFailure("push_failed", err.message);
       throw err;
