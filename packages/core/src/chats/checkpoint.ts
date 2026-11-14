@@ -16,7 +16,9 @@ async function treeOf(folder: string): Promise<string> {
   const index = join(tmpdir(), `drimvox-index-${randomUUID()}`);
   const env = { GIT_INDEX_FILE: index };
   try {
-    await runGit(folder, ["add", "-A", "--", ".", ...withoutDependencies()], false, env);
+    // A file git cannot take is left out, not the whole snapshot (seen live: a file named nul, made by `> nul` in Git Bash,
+    // failed every snapshot of Nexus, so no answer counted as a change: no tester came and nothing could be undone).
+    await runGit(folder, ["add", "-A", "--ignore-errors", "--", ".", ...withoutDependencies()], true, env);
     return (await runGit(folder, ["write-tree"], false, env)).stdout.trim();
   } finally {
     rmSync(index, { force: true });

@@ -23,6 +23,16 @@ describe("chat folder snapshots", () => {
     expect(await changedSince(repo, commit!)).toBe(false);
   });
 
+  // Seen live: a file named nul (from `> nul` in Git Bash) failed every snapshot of a project: no tester, no undo.
+  it.runIf(process.platform === "win32")("snapshots past a file git cannot take, and still sees changes", async () => {
+    writeFileSync(`\\\\?\\${join(repo, "nul")}`, "junk\n");
+    const commit = await checkpoint(repo, REF);
+    expect(commit).toMatch(/^[0-9a-f]{40}$/);
+    writeFileSync(join(repo, "app.js"), "const a = 2;\n");
+    expect(await changedSince(repo, commit!)).toBe(true);
+    rmSync(`\\\\?\\${join(repo, "nul")}`, { force: true });
+  });
+
   it("undoes the model's work: changed files come back, created ones go, ignored ones stay", async () => {
     const commit = (await checkpoint(repo, REF))!;
     writeFileSync(join(repo, "app.js"), "const a = 2;\n");
