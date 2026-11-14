@@ -678,3 +678,45 @@ test("a chat works in the built-in browser by itself and hands a check to the us
     await new Promise((r) => site.close(r));
   }
 });
+
+// Seen live: the agent said "the browser panel has zero size" and turned to Playwright. With the panel closed, the page it
+// works in has a desktop's size.
+test("the agent's page has a desktop's size while the browser panel is closed", async () => {
+  test.setTimeout(90_000);
+  const site = createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end("<title>Страница</title><p>Привет</p>");
+  });
+  await new Promise<void>((r) => site.listen(0, "127.0.0.1", r));
+  const url = `http://127.0.0.1:${(site.address() as AddressInfo).port}/`;
+  fake = await startFakeProvider({
+    key: KEY,
+    models,
+    script: [
+      { toolCalls: [{ name: "browser_open", args: { url } }] },
+      { toolCalls: [{ name: "browser_eval", args: { script: "JSON.stringify({ w: innerWidth, h: innerHeight })" } }] },
+      { text: "Посмотрел." },
+    ],
+  });
+  try {
+    const page = await launch({ DRIMVOX_TEST_BROWSER_LOCAL: "1" });
+    await connect(page);
+    await expect(page.getByText("Моделей: 1")).toBeVisible();
+    await startChat(page);
+    await page.locator(".composer").getByRole("button", { name: "Параметры", exact: true }).click();
+    await page.getByRole("dialog", { name: "Параметры" }).getByRole("button", { name: /^Интернет:/ }).click();
+    await page.getByRole("option", { name: /Поиск Drimvox/ }).click();
+    await page.keyboard.press("Escape");
+    await say(page, "Посмотри страницу");
+    await expect(page.getByText("Посмотрел.")).toBeVisible({ timeout: 30_000 });
+    const sent = JSON.stringify(fake.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => r.body.messages));
+    // The tool's answer, as the model got it: {"w":…,"h":…} written out inside the conversation's text.
+    const size = /w\W+(\d+)\W+h\W+(\d+)/.exec(sent.slice(sent.lastIndexOf("browser_eval")));
+    expect(size, sent.slice(-600)).not.toBeNull();
+    expect(Number(size![1])).toBeGreaterThanOrEqual(320);
+    expect(Number(size![2])).toBeGreaterThanOrEqual(200);
+  } finally {
+    site.closeAllConnections();
+    await new Promise((r) => site.close(r));
+  }
+});

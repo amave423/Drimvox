@@ -257,8 +257,26 @@ export class AgentView {
       tools.attach("1.3");
       // Out of sight the page never has the focus; it must believe it does, or typed text goes nowhere.
       await tools.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => {});
+      if (this.unseen(tab.id)) await this.desktopSize(tab);
     }
+    // Back to "its own size" out of sight is back to a desktop's, not to nothing.
+    if (method === "Emulation.clearDeviceMetricsOverride" && this.unseen(tab.id)) return this.desktopSize(tab);
     return tools.sendCommand(method, params);
+  }
+
+  /** Not shown in the panel: past the window's edge, where Chromium gives the page 0 × 0. */
+  private unseen(id: string): boolean {
+    return id !== this.active || !this.place;
+  }
+
+  /**
+   * The page of a tab out of sight takes a desktop's size (seen live: "the browser panel has zero size", innerWidth 0, and
+   * the agent turned to Playwright). Shown in the panel, it takes the panel's own size again.
+   */
+  private async desktopSize(tab: { view: WebContentsView }): Promise<void> {
+    const tools = tab.view.webContents.debugger;
+    if (!tools.isAttached()) return;
+    await tools.sendCommand("Emulation.setDeviceMetricsOverride", { ...UNSEEN, deviceScaleFactor: 1, mobile: false }).catch(() => {});
   }
 
   /**
@@ -274,6 +292,11 @@ export class AgentView {
       if (t.id === this.active) continue;
       root.addChildView(t.view);
       t.view.setBounds({ x: -UNSEEN.width - 50, y: 0, ...UNSEEN });
+    }
+    for (const t of this.tabs) {
+      if (!t.view.webContents.debugger.isAttached()) continue;
+      if (this.unseen(t.id)) void this.desktopSize(t);
+      else void t.view.webContents.debugger.sendCommand("Emulation.clearDeviceMetricsOverride").catch(() => {});
     }
     const shown = this.shown();
     if (!shown) return;
