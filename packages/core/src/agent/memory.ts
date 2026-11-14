@@ -41,8 +41,14 @@ export function memoryLimit(price: ModelInfo | undefined): number {
 /** A model whose window is not listed is taken to hold this many tokens. */
 const UNKNOWN_CONTEXT = 128_000;
 
-/** Older tools' outputs are shortened only past this share of the limit; before it, the history goes whole. */
-export const TRIM_SHARE = 0.5;
+/**
+ * Older tools' outputs are shortened only past this share of the limit; before it, the history goes whole. With
+ * DRIMVOX_CONTEXT=full nothing is shortened before the limit itself, as OpenCode and DeepSeek Harness keep the whole
+ * conversation to 80–85 % of the window (an A/B of the two, asked for).
+ */
+export const TRIM_SHARE = process.env.DRIMVOX_CONTEXT === "full" ? 1 : 0.5;
+/** Whether old tool outputs leave the conversation where the provider caches (prune.ts); not with DRIMVOX_CONTEXT=full. */
+export const PRUNE_CACHED = process.env.DRIMVOX_CONTEXT !== "full";
 
 /**
  * The conversation as the model gets it: the task, the summary, then the newer messages. A chat has no task at its start

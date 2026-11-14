@@ -10,7 +10,7 @@ import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
 import { codeTool } from "./code-mode";
-import { memoryLimit, sizeOf, TRIM_SHARE } from "./memory";
+import { memoryLimit, sizeOf, PRUNE_CACHED, TRIM_SHARE } from "./memory";
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
@@ -193,7 +193,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           // Old thinking too, except Anthropic's: it is signed and refused once changed.
           // Only where the provider caches nothing, or near the model's window (measured on DeepSeek: a cached token costs a
           // fiftieth of a new one, and each move of the line sent the whole conversation at full price again).
-          if (i.prune && (!cacheSeen || sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE)) sent = pruneOutputs(sent, PROTECT, CHUNK, i.conn.preset !== "anthropic").messages;
+          if (i.prune && ((!cacheSeen && PRUNE_CACHED) || sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE)) sent = pruneOutputs(sent, PROTECT, CHUNK, i.conn.preset !== "anthropic").messages;
           // Older outputs go shortened, on a copy, only once the history is half way to the model's limit: before it the
           // agent keeps what it read (asked for: as OpenCode; shortened at every step, files were read again and again).
           if (sent.length > KEEP_WHOLE && sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE) {
