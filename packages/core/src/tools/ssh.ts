@@ -220,7 +220,7 @@ export function sshNote(servers: SshServers): string {
  * The agent's SSH tools: the saved servers by name, a command on one (asked first unless the server is trusted), a file
  * there and back. Files on this side are inside the chat's or the project's folder.
  */
-export function sshTools(servers: SshServers, ws: Workspace | null, hooks: Pick<ToolHooks, "onCall" | "askApproval">): ToolSet {
+export function sshTools(servers: SshServers, ws: Workspace | null, hooks: Pick<ToolHooks, "onCall" | "askApproval" | "held">): ToolSet {
   if (servers.list().length === 0) return {};
   const pick = (name: string) => {
     const s = servers.find(name);
@@ -242,6 +242,8 @@ export function sshTools(servers: SshServers, ws: Workspace | null, hooks: Pick<
       execute: ({ server, command, timeout_seconds }, o: { abortSignal?: AbortSignal }) =>
         run("ssh_run", `${server}: ${command.slice(0, 200)}`, async () => {
           const s = pick(server);
+          const held = hooks.held?.(command);
+          if (held) return held;
           if (!(await allowed(s, command, o.abortSignal))) return "The user denied this command. Do not retry it.";
           const r = await servers.exec(s, command, (timeout_seconds ?? 300) * 1000, o.abortSignal);
           return `Exit code: ${r.code ?? "none"}\n${clip(r.output, servers.secretOf(s)) || "(no output)"}`;
@@ -253,6 +255,9 @@ export function sshTools(servers: SshServers, ws: Workspace | null, hooks: Pick<
       execute: ({ server, path, remote_path }, o: { abortSignal?: AbortSignal }) =>
         run("ssh_upload", `${server}: ${path} → ${remote_path}`, async () => {
           const s = pick(server);
+          // Code copied to a server is a deploy.
+          const held = hooks.held?.(`ssh_upload ${remote_path}`);
+          if (held) return held;
           if (!(await allowed(s, `upload ${path} → ${remote_path}`, o.abortSignal))) return "The user denied this. Do not retry it.";
           await servers.copy(s, "up", local(path), remote_path, o.abortSignal);
           return `Copied ${path} to ${s.name}:${remote_path}.`;

@@ -34,7 +34,7 @@ export function toolbox(
   o: {
     folder: string | null;
     vision: Vision | null;
-    hooks: Pick<ToolHooks, "onCall" | "askApproval">;
+    hooks: Pick<ToolHooks, "onCall" | "askApproval" | "held">;
     see?: (png: Buffer, question: string, signal?: AbortSignal) => Promise<string>;
     /** The chat or task whose own tab of the browser the tools use (Browser.own). */
     owner?: string;

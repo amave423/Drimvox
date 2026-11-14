@@ -1,6 +1,7 @@
 import type { ActivityEntry, MonthUsage, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { McpAsk, McpHooks } from "../mcp/hub";
 import { fitContext } from "./context";
+import { HELD, NOTHING_TO_CHECK, PUBLISHES } from "./publish";
 import { tool, type ModelMessage, type ToolSet } from "ai";
 import { z } from "zod";
 import { runAgent } from "../agent/run";
@@ -172,6 +173,8 @@ export class WorkRun {
   private turnChanged = false;
   /** How many times this turn went on after "not finished" (GO_ON). */
   private continues = 0;
+  /** A release or a deploy waited for the tester this turn (held). */
+  private publishHeld = false;
   /** What shortening the conversation cost before the next answer (a summary): counted with that answer. */
   private pendingCost = 0;
   /** Tester rounds in this turn: found, fixed, checked again, at most CHECK_ROUNDS. */
@@ -189,6 +192,13 @@ export class WorkRun {
     const service = this.d.extensions?.(this.projectId).service;
     const conn = service ? this.d.providers.connection(service.providerId) : null;
     return service && conn ? { conn, model: service.model } : null;
+  }
+
+  /** A command that publishes waits while the tester has yet to try the turn's work (publish.ts). */
+  private held(command: string): string | null {
+    if (!PUBLISHES.test(command) || this.publishing || !this.testerOn() || this.checkRounds >= CHECK_ROUNDS) return null;
+    this.publishHeld = true;
+    return HELD;
   }
 
   private testerOn(): boolean {
@@ -271,6 +281,7 @@ export class WorkRun {
     this.runStart = Date.now();
     this.turnChanged = false;
     this.continues = 0;
+    this.publishHeld = false;
     this.checkRounds = 0;
     this.publishing = false;
     this.wrapUp = null;
@@ -410,6 +421,12 @@ export class WorkRun {
             continue;
           }
         }
+        // A release that waited, in a turn that changed nothing: nothing to check, it goes out now, once.
+        if (this.publishHeld && !this.turnChanged && !this.publishing && this.checkRounds === 0) {
+          messages.push({ role: "user", content: NOTHING_TO_CHECK });
+          this.publishing = true;
+          continue;
+        }
         // As in a chat: the answer is the end of the turn; the next message goes on.
         return stopWith("done", null);
       }
@@ -488,6 +505,7 @@ export class WorkRun {
       onCall: (call: { name: string; input: unknown }) => onCall(call.name, describeCall(call.input), lineStat(this.folder, call.name, call.input)),
       onResult: () => {},
       askApproval,
+      held: (command: string) => this.held(command),
     };
 
     const price = await findModel(conn, model);

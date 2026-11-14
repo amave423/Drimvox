@@ -896,6 +896,30 @@ describe("the tester", () => {
     expect(testerAsks().at(-1)!.body.tools.map((t: any) => t.function.name)).toEqual(["report_check"]);
   });
 
+  // Seen live: the agent released Nexus 0.7.0 in the same answer, before the tester, though its rules said not to.
+  // Drimvox holds the command itself; after a clean check it goes.
+  it("holds a release until a clean check of the turn's changes", async () => {
+    const release = call("run_command", { command: "pm2 restart app" });
+    await open({
+      coder: [call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }), release, { text: "Готово, жду проверки." }, release, { text: "Выпустил." }],
+    });
+    const asks = requestsOf("coder").map((r) => JSON.stringify(r.body.messages));
+    expect(asks[2]).toContain("Not yet: Drimvox's tester tries this turn's work");
+    expect(testerAsks().length).toBe(1);
+    expect(asks[3]).toContain("found nothing");
+    expect((asks.at(-1)!.match(/Not yet: Drimvox's tester/g) ?? []).length).toBe(1);
+  });
+
+  it("lets a release go in a turn that changed nothing, as there is nothing to check", async () => {
+    const release = call("run_command", { command: "pm2 restart app" });
+    await open({ coder: [release, { text: "Готово." }, release, { text: "Выпустил." }] });
+    const asks = requestsOf("coder").map((r) => JSON.stringify(r.body.messages));
+    expect(asks[1]).toContain("Not yet");
+    expect(asks[2]).toContain("this turn changed no files");
+    expect(testerAsks()).toHaveLength(0);
+    expect((asks.at(-1)!.match(/Not yet: Drimvox's tester/g) ?? []).length).toBe(1);
+  });
+
   it("does not come after an answer that changed nothing, nor when the project switched it off", async () => {
     await open({ coder: [{ text: "Это кнопка записи в index.html." }] });
     expect(testerAsks()).toHaveLength(0);

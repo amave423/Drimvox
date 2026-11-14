@@ -19,6 +19,8 @@ export interface ToolHooks {
   /** Resolves true when the user allows it once, "always" when for good (MCP tools), false when not. */
   askApproval(command: string, reason: ApprovalReason, signal?: AbortSignal, purpose?: string): Promise<ApprovalAnswer>;
   onFinish(result: { summary: string; commitMessage: string }): void;
+  /** Why a command that publishes (a release, a deploy) must wait, or null when it may run (work/publish.ts). */
+  held?(command: string): string | null;
 }
 
 const OUTPUT_FOR_EVENTS = 4000;
@@ -107,6 +109,8 @@ export function buildTools(ws: Workspace, hooks: ToolHooks, mode: "read" | "revi
             "Not run: commands hung three times in a row. Stop running commands now. Tell the user what you tried, that the commands kept hanging (a program may be waiting for input nobody can give, such as a hidden Office window), and suggest another way.",
         };
       }
+      const held = hooks.held?.(command);
+      if (held) return { ok: false, output: held };
       const verdict = classifyCommand(command, ws.root);
       if (verdict.action === "deny") throw new Error(DENIED[verdict.reason]);
       if (verdict.action === "ask" && !(await hooks.askApproval(command, verdict.reason, signal, purpose))) {
