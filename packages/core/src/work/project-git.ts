@@ -114,11 +114,11 @@ export class ProjectGit {
     const rules = this.rules(projectId);
     // The project's own branch goes to GitHub as it is, when the project is there.
     if (rules.target === "current") {
-      if (rules.push && (await this.github.ready(folder).catch(() => false))) await this.send(projectId, folder);
+      if (rules.push && (await this.github.canPush(folder).catch(() => false))) await this.send(projectId, folder);
       return;
     }
     const kept = this.kept(projectId);
-    if (!kept || !rules.push || (await currentBranch(folder)) !== kept.branch || !(await this.github.ready(folder))) return;
+    if (!kept || !rules.push || (await currentBranch(folder)) !== kept.branch || !(await this.github.canPush(folder))) return;
     try {
       if (!(await this.send(projectId, folder))) return;
       if (rules.pullRequest && !kept.pullRequest && (await ahead(folder, kept.base)) > 0) {
@@ -156,7 +156,7 @@ export class ProjectGit {
     const branch = await currentBranch(folder);
     const kept = this.kept(projectId);
     const mine = kept && kept.branch === branch ? kept : null;
-    const github = await this.github.ready(folder).catch(() => false);
+    const github = await this.github.canPush(folder).catch(() => false);
     const login = this.github.status().user;
     return {
       branch,
@@ -183,7 +183,7 @@ export class ProjectGit {
       return false;
     }
     this.keep(projectId, null);
-    if (this.rules(projectId).push && (await this.github.ready(folder))) await this.send(projectId, folder);
+    if (this.rules(projectId).push && (await this.github.canPush(folder))) await this.send(projectId, folder);
     return true;
   }
 

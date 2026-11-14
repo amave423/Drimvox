@@ -206,11 +206,16 @@ export class GitHub {
     return { url: body.html_url ?? pageOf(body.clone_url) ?? body.clone_url };
   }
 
-  /** Pushes the current branch to `origin`. */
+  /** Pushes the current branch to `origin`: with the computer's git sign-in, or Drimvox's (gitPush). */
   async push(dir: string): Promise<void> {
-    const account = this.signedIn();
     if (!(await this.project(dir)).remote) throw new GithubFailure("no_remote", "The project has no remote");
-    await this.pushTo(dir, account, false);
+    await this.pushTo(dir, this.account(), false);
+  }
+
+  /** The project's remote is on GitHub over https: its commits can go there, signed in to Drimvox or not. */
+  async canPush(dir: string): Promise<boolean> {
+    const remote = (await this.project(dir)).remote;
+    return !!remote && !!this.repoOf(remote);
   }
 
   /** Signed in, and the project's remote is on GitHub over https: the agent's branch can go there with a pull request. */
@@ -276,36 +281,39 @@ export class GitHub {
     return { url: body.html_url ?? `https://${account.user}.github.io/${repo}/` };
   }
 
-  /** Pushes one ref to `origin` with the token, as pushTo does for the branch. */
+  /** Pushes one ref to `origin`, as pushTo does for the branch. */
   private async pushRef(dir: string, account: Account, refspec: string): Promise<void> {
-    const remote = (await this.project(dir)).remote ?? "";
-    // No Git Credential Manager window asking for a code: the token goes as a header (seen: asked again and again).
-    const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
-    if (/^https:\/\//i.test(remote)) {
-      const basic = Buffer.from(`x-access-token:${account.token}`).toString("base64");
-      Object.assign(env, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: `http.${new URL(remote).origin}/.extraheader`, GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}` });
-    }
-    const result = await runGit(dir, ["-c", "credential.helper=", "push", "--force", "origin", refspec], true, env);
-    if (result.code !== 0) throw pushFailure(result.stderr.trim() || result.stdout.trim(), account.token);
+    await this.gitPush(dir, account, ["--force", "origin", refspec]);
   }
 
-  private async pushTo(dir: string, account: Account, first: boolean): Promise<void> {
+  private async pushTo(dir: string, account: Account | null, first: boolean): Promise<void> {
     const branch = (await currentBranch(dir)) ?? "HEAD";
-    const remote = (await this.project(dir)).remote ?? "";
-    // The token goes as a header for the remote's host, through the environment: never in the arguments or the config.
-    // No Git Credential Manager window asking for a code: the token goes as a header (seen: asked again and again).
-    const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
-    if (/^https:\/\//i.test(remote)) {
-      const basic = Buffer.from(`x-access-token:${account.token}`).toString("base64");
-      Object.assign(env, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: `http.${new URL(remote).origin}/.extraheader`, GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}` });
-    }
     try {
-      const result = await runGit(dir, ["-c", "credential.helper=", "push", ...(first ? ["-u"] : []), "origin", branch], true, env);
-      if (result.code !== 0) throw pushFailure(result.stderr.trim() || result.stdout.trim(), account.token);
+      await this.gitPush(dir, account, [...(first ? ["-u"] : []), "origin", branch]);
     } catch (err) {
       if (err instanceof GitError) throw new GithubFailure("push_failed", err.message);
       throw err;
     }
+  }
+
+  /**
+   * A push with the computer's own git sign-in first, the one the user pushes with by hand (asked for: "why all these
+   * GitHub sign-ins, can't it use my git sign-in on this PC"); then, only if GitHub refused that, with Drimvox's token.
+   * No Git Credential Manager window either way: a stored sign-in is used silently, a missing one fails (seen: asked for
+   * a code again and again).
+   */
+  private async gitPush(dir: string, account: Account | null, args: string[]): Promise<void> {
+    const quiet = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
+    const own = await runGit(dir, ["push", ...args], true, quiet);
+    if (own.code === 0) return;
+    const said = own.stderr.trim() || own.stdout.trim();
+    const remote = (await this.project(dir)).remote ?? "";
+    if (!account || !SIGN_IN_REFUSED.test(said) || !/^https:\/\//i.test(remote)) throw pushFailure(said, account?.token ?? "");
+    // The token goes as a header for the remote's host, through the environment: never in the arguments or the config.
+    const basic = Buffer.from(`x-access-token:${account.token}`).toString("base64");
+    const env = { ...quiet, GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: `http.${new URL(remote).origin}/.extraheader`, GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}` };
+    const result = await runGit(dir, ["-c", "credential.helper=", "push", ...args], true, env);
+    if (result.code !== 0) throw pushFailure(result.stderr.trim() || result.stdout.trim(), account.token);
   }
 }
 

@@ -69,6 +69,19 @@ describe("signing in", () => {
 });
 
 describe("publishing", () => {
+  // Asked for: "can't it use my git sign-in on this PC". A remote the computer's git can reach takes the commits without
+  // Drimvox's own sign-in.
+  it("pushes with the computer's own git sign-in, not signed in to Drimvox", async () => {
+    await start();
+    const p = await project();
+    const bare = join(p.path, "..", `${p.path.split(/[\\/]/).pop()}-remote.git`);
+    repos.push(bare);
+    execFileSync("git", ["init", "-q", "--bare", bare]);
+    git(p.path, "remote", "add", "origin", bare);
+    expect((await env.call("POST", `/api/github/projects/${p.id}/push`)).status).toBe(200);
+    expect(git(bare, "rev-parse", "main")).toBe(git(p.path, "rev-parse", "HEAD"));
+  });
+
   it("creates a private repository, pushes the branch, then pushes new commits", async () => {
     await start();
     const p = await project();
