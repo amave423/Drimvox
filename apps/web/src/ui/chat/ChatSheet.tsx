@@ -595,6 +595,7 @@ export function ChatSheet({ chatId, viewKey, autoSend, workshop }: { chatId: str
             <Composer
               disabled={!choice || (kind !== "text" && !mediaModel)}
               streaming={!!draft || pending}
+              draftKey={`chat:${chat?.id ?? "new"}`}
               onSend={(text) => void send(text)}
               // An answer from this window stops with its request; one seen after coming back, through the core.
               onStop={() => (draft ? abort.current?.abort() : chat && void api.chats[":id"].stop.$post({ param: { id: chat.id } }).then(() => load(chat.id)))}

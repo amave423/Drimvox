@@ -88,6 +88,7 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
         onStop={() => {}}
         picker={<ModelPicker value={choice} onChange={setChoice} placement="above" />}
         attach={{ files, onAdd: (added) => void addFiles(added), onRemove: (key) => setFiles(files.filter((f) => f.key !== key)) }}
+        draftKey={`project:${projectId}`}
         // The strong model and the thinking are in the project's parameters on the right (asked for: they were a pop-up here).
         options={{ changed: [], rows: [] }}
         placeholder={t(running ? "chat.workPlaceholder" : "chat.readyPlaceholder")}

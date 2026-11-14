@@ -4,6 +4,7 @@ import { PendingFiles, type PendingFile } from "./Attachments";
 import { ChatOptions, type OptionRow } from "./ChatOptions";
 import { splitLinks } from "../../lib/links";
 import { DictateButton } from "./Voice";
+import { keepDraft, readDraft } from "../../lib/drafts";
 
 /** Below this width the model and the paperclip move into Options, so the bar stays one tidy row. */
 const NARROW = 480;
@@ -32,9 +33,11 @@ interface Props {
    * model takes no photos), shown on it instead of hiding it.
    */
   attach?: { files: PendingFile[]; onAdd(files: File[]): void; onRemove(key: string): void; photos?: boolean; blocked?: string };
+  /** Which chat or project the box is for: what is typed and not sent stays there (lib/drafts.ts). */
+  draftKey?: string;
 }
 
-export function Composer({ disabled, streaming, onSend, onStop, picker, options, extra, beforeSend, sendLabel, placeholder, attach }: Props) {
+export function Composer({ disabled, streaming, onSend, onStop, picker, options, extra, beforeSend, sendLabel, placeholder, attach, draftKey }: Props) {
   const { t } = useApp();
   const form = useRef<HTMLFormElement>(null);
   const [narrow, setNarrow] = useState(false);
@@ -45,7 +48,16 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
     watch.observe(el);
     return () => watch.disconnect();
   }, []);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => readDraft(draftKey));
+  // Another chat or project in the same box: its own unsent text.
+  useEffect(() => {
+    setText(readDraft(draftKey));
+    requestAnimationFrame(grow);
+  }, [draftKey]);
+  const put = (next: string) => {
+    setText(next);
+    keepDraft(draftKey, next);
+  };
   const area = useRef<HTMLTextAreaElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
@@ -64,7 +76,7 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
     const value = text.trim() || (hasFiles ? t("attach.default") : "");
     if (!value || disabled || streaming) return;
     onSend(value);
-    setText("");
+    put("");
     requestAnimationFrame(grow);
   }
 
@@ -134,7 +146,7 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
           placeholder={placeholder ?? t("chat.placeholder")}
           aria-label={placeholder ?? t("chat.placeholder")}
           onChange={(e) => {
-            setText(e.target.value);
+            put(e.target.value);
             grow();
           }}
           onKeyDown={onKeyDown}
@@ -165,7 +177,7 @@ export function Composer({ disabled, streaming, onSend, onStop, picker, options,
       <div className="composer-bar">
         <div className="composer-tools">
           {attach && !narrow && attachButton}
-          {!attach?.photos && <DictateButton disabled={disabled || streaming} onText={(said) => setText((now) => (now.trim() ? `${now.trimEnd()} ${said}` : said))} />}
+          {!attach?.photos && <DictateButton disabled={disabled || streaming} onText={(said) => put(text.trim() ? `${text.trimEnd()} ${said}` : said)} />}
           {!narrow && picker}
           {(narrow || options.rows.length > 0) && (
             <ChatOptions

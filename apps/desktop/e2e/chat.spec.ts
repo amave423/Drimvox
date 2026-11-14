@@ -720,3 +720,23 @@ test("the agent's page has a desktop's size while the browser panel is closed", 
     await new Promise((r) => site.close(r));
   }
 });
+
+// Asked for: what is typed in the box and not sent stays when one leaves the chat and comes back.
+test("keeps the unsent text of a chat's box when one leaves and comes back", async () => {
+  fake = await startFakeProvider({ key: KEY, models, script: [{ text: "Ответ." }] });
+  const page = await launch();
+  await connect(page);
+  await expect(page.getByText("Моделей: 1")).toBeVisible();
+  await startChat(page);
+  await say(page, "Первое сообщение");
+  await expect(page.getByText("Ответ.")).toBeVisible({ timeout: 20_000 });
+  const box = page.getByRole("textbox", { name: /Сообщение/ });
+  await box.fill("недописанная мысль");
+  await page.getByRole("button", { name: "Проекты", exact: true }).click();
+  await page.getByRole("button", { name: "Чат", exact: true }).click();
+  await page.locator(".side-chat").first().click();
+  await expect(page.getByRole("textbox", { name: /Сообщение/ })).toHaveValue("недописанная мысль");
+  // Sent, it is gone from the box for good.
+  await page.getByRole("textbox", { name: /Сообщение/ }).press("Enter");
+  await expect(page.getByRole("textbox", { name: /Сообщение/ })).toHaveValue("");
+});
