@@ -56,7 +56,8 @@ export const CONTINUES = 2;
 /** Words of an answer that leaves the asked work unfinished (narrow: "not checked live" is a finished answer). */
 const UNFINISHED =
   /работа не завершена|не завершил|не закончил|не доделал|не успел|осталось (сделать|доделать|реализовать)|ещё не сделан|\bnot (yet )?(finished|complete|done)\b|\bincomplete\b|\bremaining (work|items|tasks)\b/i;
-export const unfinished = (said: string) => UNFINISHED.test(said);
+// Markdown marks are left out: agents write "**не завершена**".
+export const unfinished = (said: string) => UNFINISHED.test(said.replace(/[*_`]/g, ""));
 
 /** After a clean check: what the agent held back for the tester goes out now (agent-prompt.ts). */
 export const CLEAN_CHECK =
