@@ -73,6 +73,8 @@ const SYSTEM = (folder: string) =>
     "- Test on this computer: a local server with a temporary database, never the user's live server and its accounts.",
     "",
     "# What to report",
+    "A release or a deploy the user asked for waits for your clean check (Drimvox holds it until then): that it is not out",
+    "yet is not a problem to report. Report on the work itself.",
     "Call report_check once at the end. Report only what you saw happen yourself, each with the steps to see it again;",
     "not guesses from reading code, not taste. When the user listed points, say for each whether it works as asked. Nothing",
     "found is a fine result: then say what you tried. Be concise.",

@@ -907,6 +907,8 @@ describe("the tester", () => {
     expect(asks[2]).toContain("Not yet: Drimvox's tester tries this turn's work");
     expect(testerAsks().length).toBe(1);
     expect(asks[3]).toContain("found nothing");
+    // The tester knows the release waits for it, and does not report its absence (seen live: a loop of "not released").
+    expect(JSON.stringify(testerAsks()[0]!.body.messages[0])).toContain("waits for your clean check");
     expect((asks.at(-1)!.match(/Not yet: Drimvox's tester/g) ?? []).length).toBe(1);
   });
 
