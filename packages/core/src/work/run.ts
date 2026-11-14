@@ -1,6 +1,6 @@
 import type { ActivityEntry, MonthUsage, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { McpAsk, McpHooks } from "../mcp/hub";
-import { compactHistory } from "./compact";
+import { fitContext } from "./context";
 import { tool, type ModelMessage, type ToolSet } from "ai";
 import { z } from "zod";
 import { runAgent } from "../agent/run";
@@ -29,7 +29,7 @@ import { changedSince, checkpoint, dropCheckpoint } from "../chats/checkpoint";
 import { notesBlock, writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
 import { sshNote } from "../tools/ssh";
-import { memoryLimit, sizeOf, TRIM_SHARE } from "../agent/memory";
+import { memoryLimit, remember } from "../agent/memory";
 import type { ProjectWorkRepo } from "./repo";
 import { projectMap } from "../agent/repo-map";
 import { proxyHint } from "../internet/blocked";
@@ -156,6 +156,8 @@ export class WorkRun {
   private map: Promise<string> | null = null;
   /** This turn's answers changed files, so the tester comes before the turn ends (check.ts). */
   private turnChanged = false;
+  /** What shortening the conversation cost before the next answer (a summary): counted with that answer. */
+  private pendingCost = 0;
   /** Tester rounds in this turn: found, fixed, checked again, at most CHECK_ROUNDS. */
   private checkRounds = 0;
   /** What the last answer said, for the tester. */
@@ -166,6 +168,13 @@ export class WorkRun {
   private wrapBudget = 0;
   /** The tester found nothing: the agent publishes what it held back, without another check. */
   private publishing = false;
+  /** The project's own service model, when it chose one: summaries are written by it. */
+  private serviceModel(): { conn: Connection; model: string } | null {
+    const service = this.d.extensions?.(this.projectId).service;
+    const conn = service ? this.d.providers.connection(service.providerId) : null;
+    return service && conn ? { conn, model: service.model } : null;
+  }
+
   private testerOn(): boolean {
     return (this.d.extensions?.(this.projectId).check ?? true) && !!this.d.visualKit;
   }
@@ -240,6 +249,9 @@ export class WorkRun {
     const worked = () => workedBase + (Date.now() - since);
     this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
     let errors = 0;
+    // Set after a "too long" refusal: the next answer starts from a shortened conversation (context.ts), once.
+    let tooLong = false;
+    let overflowTried = false;
     this.runStart = Date.now();
     this.turnChanged = false;
     this.checkRounds = 0;
@@ -280,9 +292,16 @@ export class WorkRun {
         // The app's budget for the month is used up: the run waits until it is raised.
         if (this.d.month().over && !isFreeToRun(conn)) return stopWith("paused", "month_budget");
 
-        // The older part of a long run is shortened between answers only half way to the model's limit (asked for: as
-        // OpenCode; trimmed every time, the agent read the same files again and again).
-        if (sizeOf(messages) > memoryLimit(await findModel(conn, ref.model).catch(() => undefined)) * TRIM_SHARE) compactHistory(messages);
+        // The whole conversation goes to the model until it nears the model's limit; then old outputs are cut, and if that
+        // is not enough the older part becomes a summary (context.ts). The summary's cost goes with the next answer.
+        const fitted = await fitContext(
+          messages,
+          memoryLimit(await findModel(conn, ref.model).catch(() => undefined)),
+          (upTo) => remember(conn, ref.model, this.folder, messages, null, upTo, signal, undefined, this.serviceModel()),
+          { force: tooLong, thinking: conn.preset !== "anthropic" },
+        ).catch(() => null);
+        tooLong = false;
+        this.pendingCost += fitted?.costUsd ?? 0;
         const outcome = await this.answer(
           messages,
           conn,
@@ -308,6 +327,11 @@ export class WorkRun {
         this.stretch = { since, base: workedBase, costUsd: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
         if (signal.aborted || outcome.kind === "stopped") return stopWith("stopped", "user");
         if (outcome.kind === "error") {
+          // The provider said the request was too long: shortened once and sent again (as DeepSeek Harness recovers).
+          if (outcome.error.code === "too_large" && !overflowTried) {
+            overflowTried = tooLong = true;
+            continue;
+          }
           const wait = retryWait(outcome.error.code, ++errors);
           // Not the same provider again: the router picks another for a while (routing.ts).
           if (TRANSIENT.has(outcome.error.code)) unpinCheapest(conn.baseUrl, ref.model);
@@ -417,7 +441,9 @@ export class WorkRun {
     let input = 0;
     let output = 0;
     let cached = 0;
-    let cost = 0;
+    // A summary written before this answer is paid with it (context.ts).
+    let cost = this.pendingCost;
+    this.pendingCost = 0;
     let priced = true;
     let lastStep = 0;
     // The last step called tools: a limit stopped the agent in the middle, not its own end (then it wraps up).

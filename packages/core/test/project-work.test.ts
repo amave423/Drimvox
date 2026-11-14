@@ -347,6 +347,15 @@ describe("a ready project", () => {
     expect(readFileSync(join(folder, "index.html"), "utf8")).toContain("Клиника «Здоровье»");
   });
 
+  // As DeepSeek Harness recovers: a "too long" refusal shortens the conversation and sends it again, once.
+  it("sends a shortened conversation again after the provider says it is too long", async () => {
+    const s = await setup({ coder: [{ fail: { status: 400, message: "This model's maximum context length is 131072 tokens" } }, { text: "Готово." }] });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Посмотри проект", model: s.ref("coder") });
+    const work = await until(s.project.id, (w) => w.status !== "running");
+    expect(work).toMatchObject({ status: "done" });
+    expect(requestsOf("coder").length).toBe(2);
+  });
+
   // Asked for: "in project mode one cannot attach screenshots". They go as in a chat: the model sees the picture, reads
   // the text file, and the message keeps both.
   it("takes screenshots and files with the message, shows them to the model and keeps them on the message", async () => {

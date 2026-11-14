@@ -10,7 +10,7 @@ import type { Connection } from "../providers/repo";
 import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
 import { codeTool } from "./code-mode";
-import { memoryLimit, sizeOf, PRUNE_CACHED, TRIM_SHARE } from "./memory";
+import { memoryLimit, sizeOf } from "./memory";
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
@@ -94,6 +94,9 @@ export type RunOutcome =
   | { kind: "error"; error: ProviderError };
 
 /** One pass of the agent loop: model and tools until finish, a limit, Stop or an error. */
+/** Models whose provider was seen caching: their conversation goes whole (prepareStep). */
+const caching = new Set<string>();
+
 export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let finished: { summary: string; commitMessage: string } | null = null;
   let error: ProviderError | null = null;
@@ -102,6 +105,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let steps = 0;
   /** The provider served part of a request from its cache: the history is then kept as it is (see prepareStep). */
   let cacheSeen = false;
+  const cacheKey = `${i.conn.baseUrl}|${i.model}`;
 
   // The provider's own bill when it sends one (in rubles for RouterAI), else the catalog's prices.
   const usdPerUnit = i.conn.currency === "RUB" ? 1 / (await usdRub()) : 1;
@@ -191,12 +195,14 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         prepareStep: async ({ messages, stepNumber }) => {
           let sent = messages;
           // Old thinking too, except Anthropic's: it is signed and refused once changed.
-          // Only where the provider caches nothing, or near the model's window (measured on DeepSeek: a cached token costs a
-          // fiftieth of a new one, and each move of the line sent the whole conversation at full price again).
-          if (i.prune && ((!cacheSeen && PRUNE_CACHED) || sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE)) sent = pruneOutputs(sent, PROTECT, CHUNK, i.conn.preset !== "anthropic").messages;
-          // Older outputs go shortened, on a copy, only once the history is half way to the model's limit: before it the
-          // agent keeps what it read (asked for: as OpenCode; shortened at every step, files were read again and again).
-          if (sent.length > KEEP_WHOLE && sizeOf(sent) > memoryLimit(i.price) * TRIM_SHARE) {
+          // Where the model's provider is not known to cache, after a step that showed it does not: each step pays for the
+          // whole conversation, so old outputs go. Where it caches, the conversation goes whole to the model's limit, as
+          // OpenCode and DeepSeek Harness keep it (seen: "not seen yet" at the start of each 60 steps cut DeepSeek's
+          // conversation to about 100 thousand tokens, and the agent read files again). work/context.ts fits it between
+          // answers; this is the backstop within a long one.
+          const caches = cacheSeen || caching.has(cacheKey);
+          if (i.prune && ((!caches && stepNumber > 0) || sizeOf(sent) > memoryLimit(i.price))) sent = pruneOutputs(sent, PROTECT, CHUNK, i.conn.preset !== "anthropic").messages;
+          if (sent.length > KEEP_WHOLE && sizeOf(sent) > memoryLimit(i.price)) {
             sent = structuredClone(sent);
             compactHistory(sent);
           }
@@ -251,7 +257,10 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           const output = step.usage.outputTokens ?? 0;
           const cost = stepCost(step);
           traceUsage(step.usage, cost, (step.providerMetadata as { drimvox?: { usage?: unknown } } | undefined)?.drimvox?.usage);
-          if (usageOf(step.usage).cacheRead > 0) cacheSeen = true;
+          if (usageOf(step.usage).cacheRead > 0) {
+            cacheSeen = true;
+            caching.add(cacheKey);
+          }
           spent += cost;
           i.onStep({
             messages: step.response.messages as ModelMessage[],

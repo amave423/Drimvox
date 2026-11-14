@@ -41,14 +41,8 @@ export function memoryLimit(price: ModelInfo | undefined): number {
 /** A model whose window is not listed is taken to hold this many tokens. */
 const UNKNOWN_CONTEXT = 128_000;
 
-/**
- * Older tools' outputs are shortened only past this share of the limit; before it, the history goes whole. With
- * DRIMVOX_CONTEXT=full nothing is shortened before the limit itself, as OpenCode and DeepSeek Harness keep the whole
- * conversation to 80–85 % of the window (an A/B of the two, asked for).
- */
-export const TRIM_SHARE = process.env.DRIMVOX_CONTEXT === "full" ? 1 : 0.5;
-/** Whether old tool outputs leave the conversation where the provider caches (prune.ts); not with DRIMVOX_CONTEXT=full. */
-export const PRUNE_CACHED = process.env.DRIMVOX_CONTEXT !== "full";
+/** Older tools' outputs are shortened only past this share of the limit; before it, the history goes whole. */
+export const TRIM_SHARE = 0.5;
 
 /**
  * The conversation as the model gets it: the task, the summary, then the newer messages. A chat has no task at its start
@@ -73,7 +67,7 @@ export const sizeOf = (messages: ModelMessage[]) =>
  * Where a new summary may end: before an assistant message, so that the newest messages after it take no more than
  * their share of the limit (at least the last exchange stays). Null when there is nothing older to summarize.
  */
-export function cutPoint(messages: ModelMessage[], memory: Memory | null, limit: number, keepFrom?: number): number | null {
+export function cutPoint(messages: ModelMessage[], memory: Memory | null, limit: number, keepFrom?: number, keepShare = KEEP_SHARE): number | null {
   const floor = Math.max(1, memory?.upTo ?? 1);
   let kept = 0;
   let cut: number | null = null;
@@ -82,7 +76,7 @@ export function cutPoint(messages: ModelMessage[], memory: Memory | null, limit:
     // The user's newest question is never summarized away (seen live: a chat answered an old question instead).
     if (keepFrom !== undefined && i > keepFrom) continue;
     if (messages[i]!.role !== "assistant") continue;
-    if (cut !== null && kept > limit * KEEP_SHARE) break;
+    if (cut !== null && kept > limit * keepShare) break;
     cut = i;
   }
   return cut !== null && cut < messages.length - 1 ? cut : null;
