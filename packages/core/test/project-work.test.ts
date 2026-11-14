@@ -347,6 +347,25 @@ describe("a ready project", () => {
     expect(readFileSync(join(folder, "index.html"), "utf8")).toContain("Клиника «Здоровье»");
   });
 
+  // Seen live: GPT-6 Luna ended "the work is not finished" on a long list, with money left, and waited. It goes on, at
+  // most twice in a row; a finished answer, even one naming what was not checked, ends the turn.
+  it("goes on after an answer that says the work is not finished, at most twice", async () => {
+    const s = await setup({ coder: [{ text: "Работа не завершена: осталось сделать каналы." }, { text: "Всё ещё не закончил." }, { text: "Работа не завершена." }] });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай каналы", model: s.ref("coder") });
+    const work = await until(s.project.id, (w) => w.status !== "running");
+    expect(work.status).toBe("done");
+    const asks = requestsOf("coder");
+    expect(asks).toHaveLength(3);
+    expect(JSON.stringify(asks[1]!.body.messages)).toContain("you said the work is not finished");
+  });
+
+  it("does not go on after a finished answer that names what was not checked", async () => {
+    const s = await setup({ coder: [{ text: "Готово: каналы сделаны. Не проверено вживую на телефоне." }] });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай каналы", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status !== "running");
+    expect(requestsOf("coder")).toHaveLength(1);
+  });
+
   // As DeepSeek Harness recovers: a "too long" refusal shortens the conversation and sends it again, once.
   it("sends a shortened conversation again after the provider says it is too long", async () => {
     const s = await setup({ coder: [{ fail: { status: 400, message: "This model's maximum context length is 131072 tokens" } }, { text: "Готово." }] });

@@ -45,6 +45,19 @@ export const SEGMENT_STEPS = 60;
 /** Drimvox's word to a project worked as a chat, at every 60 steps of one answer. */
 export const DONE_YET =
   "[Drimvox: 60 steps on this message.] If what the user asked is done and nothing is broken, stop now and reply what you made. Otherwise go on with what is left, without polishing what already works.";
+/**
+ * The agent ended its answer saying the work is not done, with money and time left: it goes on (asked for, after GPT-6
+ * Luna twice stopped with "the work is not finished" on a long list, waiting, while DeepSeek went on by itself). At most
+ * `CONTINUES` times in a row; a decision only the user can make comes as a question, which waits for the user.
+ */
+export const GO_ON =
+  "[Drimvox: you said the work is not finished, and there is money and time left.] Go on with what is left of the user's request now. Stop only when it is done, or ask with the question tool when a decision only the user can make is missing.";
+export const CONTINUES = 2;
+/** Words of an answer that leaves the asked work unfinished (narrow: "not checked live" is a finished answer). */
+const UNFINISHED =
+  /работа не завершена|не завершил|не закончил|не доделал|не успел|осталось (сделать|доделать|реализовать)|ещё не сделан|\bnot (yet )?(finished|complete|done)\b|\bincomplete\b|\bremaining (work|items|tasks)\b/i;
+export const unfinished = (said: string) => UNFINISHED.test(said);
+
 /** After a clean check: what the agent held back for the tester goes out now (agent-prompt.ts). */
 export const CLEAN_CHECK =
   "[Drimvox's tester tried your work as the user will and found nothing.] If the user asked to publish it (a release, a deploy, an upload), do it now. Otherwise reply in one line that it is checked.";
@@ -156,6 +169,8 @@ export class WorkRun {
   private map: Promise<string> | null = null;
   /** This turn's answers changed files, so the tester comes before the turn ends (check.ts). */
   private turnChanged = false;
+  /** How many times this turn went on after "not finished" (GO_ON). */
+  private continues = 0;
   /** What shortening the conversation cost before the next answer (a summary): counted with that answer. */
   private pendingCost = 0;
   /** Tester rounds in this turn: found, fixed, checked again, at most CHECK_ROUNDS. */
@@ -254,6 +269,7 @@ export class WorkRun {
     let overflowTried = false;
     this.runStart = Date.now();
     this.turnChanged = false;
+    this.continues = 0;
     this.checkRounds = 0;
     this.publishing = false;
     this.wrapUp = null;
@@ -368,6 +384,12 @@ export class WorkRun {
         // at each 60 steps: if what was asked is done, stop now (seen live: a site fine at 20 rubles, polished on and on).
         if (outcome.kind === "steps") messages.push({ role: "user", content: DONE_YET });
         if (outcome.kind === "limit" || outcome.kind === "steps") continue;
+        // It says the work is not done and there is room to go on: it goes on, before any tester tries half the work.
+        if (unfinished(this.lastSaid) && this.continues < CONTINUES && !this.publishing && this.spent() < this.row().budgetUsd * NEAR_SHARE && ranMs() < this.row().hours * 3_600_000 * NEAR_SHARE) {
+          this.continues++;
+          messages.push({ role: "user", content: GO_ON });
+          continue;
+        }
         // The agent says it is done: when the turn changed files, a tester tries it as the user will, and what it finds
         // goes back to the agent (asked for: "why do I find the bugs").
         // Not with the money spent: the tester would only add to it (seen live: $0.25 on a $0.15 budget, no code changed).
