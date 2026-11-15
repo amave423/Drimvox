@@ -24,6 +24,8 @@ export interface CheckResult {
   problems: Problem[];
   /** What it tried, in a few lines, for the user. */
   summary: string;
+  /** How it started the project to try it: kept for the next tester (asked for: half its steps went on finding that). */
+  start?: string;
 }
 
 export interface CheckDeps {
@@ -85,7 +87,10 @@ const SYSTEM = (folder: string) =>
  * The tester (asked for: "the agent says done, and I find the bugs"): a second agent with a fresh context and one job,
  * to try the result as the user will and find what is broken. Its report goes back to the working agent to fix.
  */
-export async function checkWork(d: CheckDeps, job: { asked: string; said: string; notes: string }): Promise<CheckResult | null> {
+export async function checkWork(
+  d: CheckDeps,
+  job: { asked: string; said: string; notes: string; tests?: string; recipe?: string; screens?: string[] },
+): Promise<CheckResult | null> {
   let result: CheckResult | null = null;
   const messages: ModelMessage[] = [
     {
@@ -93,6 +98,9 @@ export async function checkWork(d: CheckDeps, job: { asked: string; said: string
       content: [
         `What the user asked for in this turn:\n${job.asked}`,
         `What the agent says it did:\n${job.said || "(nothing said)"}`,
+        job.tests ?? "",
+        job.screens?.length ? `Interface files changed in this turn: ${job.screens.join(", ")}. Look at the screens they draw, up close.` : "",
+        job.recipe ? `How the last tester started this project to try it (use it; fix it if it no longer works):\n${job.recipe}` : "",
         job.notes ? `The project's notes (how to build, run and deploy; what the user wants and does not):\n${job.notes}` : "",
         "Test it now.",
       ]
@@ -113,6 +121,7 @@ export async function checkWork(d: CheckDeps, job: { asked: string; said: string
         )
         .max(30),
       summary: z.string().min(1).max(2000).describe("What you tried, in a few lines"),
+      start: z.string().max(2000).optional().describe("The commands and steps that started the project for trying it, for the next tester"),
     }),
     execute: async (r) => {
       result = r;

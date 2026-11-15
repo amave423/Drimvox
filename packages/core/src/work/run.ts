@@ -10,7 +10,7 @@ import type { ToolHooks } from "../agent/tools";
 import type { ChatApprovals } from "../chats/approvals";
 import type { ChatQuestions } from "../chats/questions";
 import { describeCall, folderTools } from "../chats/folder";
-import { toModelMessages, HONEST_HINT } from "../chats/history";
+import { toModelMessages, DATA_HINT, FACTS_HINT, HONEST_HINT } from "../chats/history";
 import type { ChatRepo } from "../chats/repo";
 import { webTools } from "../internet/tools";
 import type { WebAccess } from "../internet/web";
@@ -26,7 +26,10 @@ import { stopLeftovers } from "../agent/leftovers";
 import { fitForModel } from "../tools/images";
 import { CHECK_ROUNDS, checkWork, findingsMessage, type CheckResult } from "./check";
 import type { ProjectGit } from "./project-git";
-import { changedSince, checkpoint, dropCheckpoint } from "../chats/checkpoint";
+import { changedSince, checkpoint, diffSince, dropCheckpoint } from "../chats/checkpoint";
+import { weakenedNote, weakenedTests } from "./weakened";
+import { changedScreens, keepRecipe, readRecipe } from "./tester-memory";
+import { reviewCode, reviewMessage, type ReviewResult } from "./review";
 import { notesBlock, writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
 import { sshNote } from "../tools/ssh";
@@ -119,6 +122,7 @@ export interface RunDeps {
     service: { providerId: string; model: string } | null;
     /** The tester after an answer that changed files (check.ts); on unless switched off. */
     check?: boolean;
+    review?: boolean;
   };
   idleTimeoutMs: number;
   /** This month's spending against the app's budget. */
@@ -173,12 +177,16 @@ export class WorkRun {
   private turnChanged = false;
   /** How many times this turn went on after "not finished" (GO_ON). */
   private continues = 0;
+  /** The folder's snapshot at the turn's first answer. */
+  private turnStart: string | null = null;
   /** A release or a deploy waited for the tester this turn (held). */
   private publishHeld = false;
   /** What shortening the conversation cost before the next answer (a summary): counted with that answer. */
   private pendingCost = 0;
   /** Tester rounds in this turn: found, fixed, checked again, at most CHECK_ROUNDS. */
   private checkRounds = 0;
+  /** The code reviewer read this turn's changes already (review.ts): once a turn. */
+  private reviewed = false;
   /** What the last answer said, for the tester. */
   private lastSaid = "";
   /** At a limit: the agent leaves the code working within a short allowance, then the run stops (NEAR_SHARE, GRACE). */
@@ -199,6 +207,68 @@ export class WorkRun {
     if (!PUBLISHES.test(command) || this.publishing || !this.testerOn() || this.checkRounds >= CHECK_ROUNDS) return null;
     this.publishHeld = true;
     return HELD;
+  }
+
+  private reviewOn(): boolean {
+    return this.d.extensions?.(this.projectId).review === true;
+  }
+
+  /** The code reviewer's answer in the conversation, its cost with it (review.ts). */
+  private async review(conn: Connection, model: string): Promise<ReviewResult | null> {
+    const signal = this.controller.signal;
+    const answer = this.d.chats.addMessage({ chatId: this.chatId, role: "assistant", content: "", status: "streaming", providerId: conn.id, model });
+    const activity: ActivityEntry[] = [{ name: "reviewer", input: "", at: 0 }];
+    let content = "";
+    const spent = { cost: 0, input: 0, output: 0, cached: 0 };
+    const save = () => this.d.chats.saveProgress(answer.id, { content, reasoning: null, activity });
+    save();
+    const asked = this.d.chats.history(this.chatId).filter((m) => m.role === "user" && !m.content.startsWith("[Drimvox")).at(-1)?.content ?? "";
+    const diff = this.turnStart ? await diffSince(this.folder, this.turnStart).catch(() => "") : "";
+    const found = await reviewCode(
+      {
+        conn,
+        model,
+        price: await findModel(conn, model),
+        folder: this.folder,
+        signal,
+        idleTimeoutMs: this.d.idleTimeoutMs,
+        // Within the run's allowance past its limit, as the tester.
+        budgetUsd: Math.max(0, this.row().budgetUsd * GRACE - this.spent()),
+        hooks: {
+          onCall: (call) => {
+            activity.push({ name: call.name, input: describeCall(call.input), at: content.length });
+            save();
+          },
+          onResult: () => {},
+          askApproval: (() => Promise.resolve(false)) as ToolHooks["askApproval"],
+        },
+        onSpend: (usd, t) => {
+          spent.cost += usd;
+          spent.input += t.inputTokens;
+          spent.output += t.outputTokens;
+          spent.cached += t.cachedTokens;
+        },
+        onText: (text) => {
+          content = content ? `${content}\n\n${text}` : text;
+          save();
+        },
+      },
+      { asked, diff },
+    );
+    if (found) content = [content, found.summary, ...found.issues.map((x, i) => `${i + 1}. ${x.file}: ${x.what}`)].filter(Boolean).join("\n\n");
+    this.d.chats.finishAnswer(answer.id, {
+      content: content || "—",
+      reasoning: null,
+      status: signal.aborted ? "stopped" : "done",
+      inputTokens: spent.input,
+      outputTokens: spent.output,
+      cachedTokens: spent.cached,
+      contextTokens: null,
+      costUsd: spent.cost,
+      error: null,
+      activity,
+    });
+    return found;
   }
 
   private testerOn(): boolean {
@@ -281,8 +351,10 @@ export class WorkRun {
     this.runStart = Date.now();
     this.turnChanged = false;
     this.continues = 0;
+    this.turnStart = null;
     this.publishHeld = false;
     this.checkRounds = 0;
+    this.reviewed = false;
     this.publishing = false;
     this.wrapUp = null;
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
@@ -402,6 +474,16 @@ export class WorkRun {
           messages.push({ role: "user", content: GO_ON });
           continue;
         }
+        // Switched on in the project: a reviewer reads the turn's changes for bugs first, once (asked for, with a switch).
+        if (this.turnChanged && !this.reviewed && this.reviewOn() && !this.publishing && this.spent() < this.row().budgetUsd) {
+          this.reviewed = true;
+          const found = await this.review(conn, ref.model);
+          if (signal.aborted) return stopWith("stopped", "user");
+          if (found?.issues.length) {
+            messages.push({ role: "user", content: reviewMessage(found) });
+            continue;
+          }
+        }
         // The agent says it is done: when the turn changed files, a tester tries it as the user will, and what it finds
         // goes back to the agent (asked for: "why do I find the bugs").
         // Not with the money spent: the tester would only add to it (seen live: $0.25 on a $0.15 budget, no code changed).
@@ -476,6 +558,8 @@ export class WorkRun {
     // The folder as it was before this answer: "Undo" under it brings it back, as in a chat with a folder (asked for).
     const checkpointRef = `refs/drimvox/chat/${this.chatId}/${answer.id}`;
     const snapshot = await checkpoint(this.folder, checkpointRef).catch(() => null);
+    // The folder as the turn found it: what its answers did to the tests is shown to the tester (weakened.ts).
+    if (snapshot && !this.turnStart) this.turnStart = snapshot;
     const activity: ActivityEntry[] = [];
     let content = "";
     let input = 0;
@@ -671,6 +755,8 @@ export class WorkRun {
         agentPrompt(this.folder, process.platform, gitLine, this.testerOn() && !this.publishing),
         LANGUAGE_HINT,
         HONEST_HINT,
+        DATA_HINT,
+        FACTS_HINT,
         // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
         proxyHint(this.d.web),
         TOOLS_NOTE,
@@ -825,6 +911,8 @@ export class WorkRun {
         .history(this.chatId)
         .filter((m) => m.role === "user" && !m.content.startsWith("[Drimvox's tester"))
         .at(-1)?.content ?? "";
+    // What the turn changed: the tests that lost checks and the screens to look at go to the tester.
+    const turnDiff = this.turnStart ? await diffSince(this.folder, this.turnStart).catch(() => "") : "";
     const found = await checkWork(
       {
         conn,
@@ -853,10 +941,12 @@ export class WorkRun {
           save();
         },
       },
-      { asked, said: this.lastSaid, notes: notesBlock(this.folder) },
+      { asked, said: this.lastSaid, notes: notesBlock(this.folder), tests: weakenedNote(weakenedTests(turnDiff)), screens: changedScreens(turnDiff), recipe: readRecipe(this.folder) },
     );
     // What it started is stopped: the agent's own servers stay as they were.
     this.d.visualKit.background.stopAll(`${this.chatId}:check`);
+    // How it started the project, for the next tester (tester-memory.ts).
+    keepRecipe(this.folder, found?.start);
     if (found) {
       const list = found.problems.map((p, i) => `${i + 1}. ${p.what}`).join("\n");
       content = [content, found.summary, list].filter(Boolean).join("\n\n");
