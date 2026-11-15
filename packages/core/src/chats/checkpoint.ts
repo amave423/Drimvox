@@ -34,6 +34,11 @@ export async function checkpoint(folder: string, ref: string): Promise<string | 
   return commit;
 }
 
+/** What changed in the folder since the snapshot, as a unified diff. */
+export async function diffSince(folder: string, commit: string): Promise<string> {
+  return (await runGit(folder, ["diff-tree", "-p", "--no-renames", commit, await treeOf(folder)], true)).stdout;
+}
+
 /** Whether the folder differs from the snapshot. */
 export async function changedSince(folder: string, commit: string): Promise<boolean> {
   const then = (await runGit(folder, ["rev-parse", `${commit}^{tree}`])).stdout.trim();
