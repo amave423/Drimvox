@@ -1,6 +1,6 @@
 import { APICallError } from "ai";
 import { describe, expect, it } from "vitest";
-import { describeError } from "../src/providers/errors";
+import { describeError, detailFromBody } from "../src/providers/errors";
 
 const failure = (status: number, message: string) =>
   new APICallError({ message, url: "https://x/v1/chat/completions", requestBodyValues: {}, statusCode: status, responseBody: JSON.stringify({ error: { message } }) });
@@ -42,5 +42,21 @@ describe("describeError", () => {
   it("says when the provider does not serve the user's country", () => {
     expect(describeError(failure(400, "User location is not supported for the API use.")).code).toBe("region");
     expect(describeError(failure(403, "unsupported_country_region_territory")).code).toBe("region");
+  });
+});
+
+// Seen live: "Provider returned error" three times in an hour, the provider's own words hidden in metadata.raw.
+describe("a router's error", () => {
+  it("says what the provider behind the router said", () => {
+    const body = { error: { message: "Provider returned error", code: 502, metadata: { raw: "upstream timeout after 60s", provider_name: "DeepInfra" } } };
+    expect(detailFromBody(body)).toBe("Provider returned error (DeepInfra: upstream timeout after 60s)");
+    expect(detailFromBody({ error: { message: "Provider returned error" } })).toBe("Provider returned error");
+  });
+
+  it("reads one sent inside the stream as the provider's object", () => {
+    expect(describeError({ message: "Provider returned error", metadata: { raw: { error: "context length exceeded" } } })).toEqual({
+      code: "too_large",
+      detail: 'Provider returned error ({"error":"context length exceeded"})',
+    });
   });
 });

@@ -26,6 +26,22 @@ export const REGION = /location is not supported|unsupported_country|country, re
 const NO_FREE_TIER = /free_tier[\s\S]*limit: 0\b|limit: 0\b[\s\S]*free_tier/i;
 
 /** Pulls the human-readable message out of an OpenAI-style error body. */
+interface RouterError {
+  message: string;
+  metadata?: { raw?: unknown; provider_name?: unknown };
+}
+
+/**
+ * A router's error with what the provider behind it said (seen live: "Provider returned error", and nothing else, three
+ * times in an hour; OpenRouter-like routers put the provider's own words in `metadata.raw`, its name in `provider_name`).
+ */
+function routerDetail(e: RouterError): string {
+  const raw = e.metadata?.raw;
+  const said = typeof raw === "string" ? raw : raw && typeof raw === "object" ? JSON.stringify(raw) : "";
+  const who = typeof e.metadata?.provider_name === "string" ? e.metadata.provider_name : "";
+  return said || who ? `${e.message} (${[who, said].filter(Boolean).join(": ")})` : e.message;
+}
+
 export function detailFromBody(body: unknown): string | undefined {
   let data: unknown = body;
   if (typeof body === "string") {
@@ -39,9 +55,7 @@ export function detailFromBody(body: unknown): string | undefined {
     const record = data as { error?: unknown; message?: unknown; detail?: unknown };
     const error = record.error;
     if (typeof error === "string") return clip(error);
-    if (error && typeof error === "object" && typeof (error as { message?: unknown }).message === "string") {
-      return clip((error as { message: string }).message);
-    }
+    if (error && typeof error === "object" && typeof (error as { message?: unknown }).message === "string") return clip(routerDetail(error as RouterError));
     if (typeof record.message === "string") return clip(record.message);
     if (typeof record.detail === "string") return clip(record.detail);
   }
@@ -84,6 +98,11 @@ export function describeError(err: unknown): ProviderError {
                 : codeForStatus(err.statusCode),
       detail,
     );
+  }
+  // An error sent inside the stream comes as the provider's own object, not as an HTTP error.
+  if (err && typeof err === "object" && !(err instanceof Error) && typeof (err as { message?: unknown }).message === "string") {
+    const detail = routerDetail(err as RouterError);
+    return withDetail(TOO_LARGE.test(detail) ? "too_large" : BUSY.test(detail) ? "overloaded" : "bad_response", detail);
   }
   if (err instanceof Error && UNREADABLE.test(err.message)) return withDetail("bad_response", err.message);
   if (err instanceof Error && BUSY.test(err.message)) return withDetail("overloaded", err.message);
