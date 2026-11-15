@@ -10,6 +10,8 @@ export interface ProjectExtensionsChoice {
   service: { providerId: string; model: string } | null;
   /** A tester tries the work as the user will after each answer that changed files (asked for); on unless switched off. */
   check: boolean;
+  /** A reviewer reads the turn's changes for bugs before the tester (asked for, with a switch); off unless switched on. */
+  review: boolean;
 }
 
 const key = (projectId: string) => `project.extensions:${projectId}`;
@@ -23,9 +25,9 @@ export class ProjectExtensions {
 
   get(projectId: string): ProjectExtensionsChoice {
     const row = this.db.sql.prepare("select value from settings where key = ?").get(key(projectId)) as { value: string } | undefined;
-    if (!row) return { skills: null, mcp: null, vision: null, service: null, check: true };
+    if (!row) return { skills: null, mcp: null, vision: null, service: null, check: true, review: false };
     const kept = JSON.parse(row.value) as Partial<ProjectExtensionsChoice>;
-    return { skills: kept.skills ?? null, mcp: kept.mcp ?? null, vision: kept.vision ?? null, service: kept.service ?? null, check: kept.check ?? true };
+    return { skills: kept.skills ?? null, mcp: kept.mcp ?? null, vision: kept.vision ?? null, service: kept.service ?? null, check: kept.check ?? true, review: kept.review ?? false };
   }
 
   set(projectId: string, patch: Partial<ProjectExtensionsChoice>): ProjectExtensionsChoice {

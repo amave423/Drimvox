@@ -11,11 +11,11 @@ describe("a project's skills and MCP servers", () => {
 
   it("uses all of them until chosen, then only the chosen ones, each project its own", () => {
     const ext = new ProjectExtensions(db);
-    expect(ext.get("a")).toEqual({ skills: null, mcp: null, vision: null, service: null, check: true });
+    expect(ext.get("a")).toEqual({ skills: null, mcp: null, vision: null, service: null, check: true, review: false });
     ext.set("a", { skills: ["frontend"] });
     ext.set("a", { mcp: [] });
-    expect(ext.get("a")).toEqual({ skills: ["frontend"], mcp: [], vision: null, service: null, check: true });
-    expect(ext.get("b")).toEqual({ skills: null, mcp: null, vision: null, service: null, check: true });
+    expect(ext.get("a")).toEqual({ skills: ["frontend"], mcp: [], vision: null, service: null, check: true, review: false });
+    expect(ext.get("b")).toEqual({ skills: null, mcp: null, vision: null, service: null, check: true, review: false });
     db.sql.close();
     rmSync(dir, { recursive: true, force: true });
   });

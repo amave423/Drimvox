@@ -20,8 +20,9 @@ interface Extensions {
   vision: ModelChoice | null;
   service: ModelChoice | null;
   check: boolean;
+  review?: boolean;
 }
-type ExtensionsPatch = { skills?: string[]; mcp?: string[]; vision?: ModelChoice | null; service?: ModelChoice | null; check?: boolean };
+type ExtensionsPatch = { skills?: string[]; mcp?: string[]; vision?: ModelChoice | null; service?: ModelChoice | null; check?: boolean; review?: boolean };
 const refOf = (m: ModelChoice | null) => (m ? { providerId: m.providerId, model: m.model } : null);
 
 /**
@@ -68,6 +69,8 @@ export function ProjectParams({ project, work }: { project: ProjectView; work: P
         onService={(m) => void save({ service: refOf(m) })}
         check={ext?.check ?? true}
         onCheck={(check) => void save({ check })}
+        review={ext?.review ?? false}
+        onReview={(review) => void save({ review })}
       />
       {work && (
         <section className="params-block" aria-labelledby="params-limits-h">
@@ -104,6 +107,8 @@ function WorkOptions(p: {
   onService(m: ModelChoice | null): void;
   check: boolean;
   onCheck(on: boolean): void;
+  review: boolean;
+  onReview(on: boolean): void;
 }) {
   const { projectId } = p;
   const { t } = useApp();
@@ -120,6 +125,12 @@ function WorkOptions(p: {
       <Toggle checked={p.check} onChange={p.onCheck}>
         <span>
           {t("projectParams.check")} <span className="options-about">{t("projectParams.checkHint")}</span>
+        </span>
+      </Toggle>
+      {/* Asked for, with a switch: a reviewer reads the changes for bugs the tester cannot see yet. */}
+      <Toggle checked={p.review} onChange={p.onReview}>
+        <span>
+          {t("projectParams.review")} <span className="options-about">{t("projectParams.reviewHint")}</span>
         </span>
       </Toggle>
       <div className="params-row">

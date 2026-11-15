@@ -502,6 +502,8 @@ export const en: Record<keyof typeof ru, string> = {
   "projectParams.publish": "Publishing",
   "projectParams.noContext": "How much of the model's context is taken, and the time and money spent, show here after the first message.",
   "projectParams.vision": "Vision model",
+  "projectParams.review": "Code review",
+  "projectParams.reviewHint": "Before the check, a third agent reads the turn's changes and looks for bugs that have not shown yet. What it finds goes back to fix.",
   "projectParams.check": "Check as a user would",
   "projectParams.checkHint": "After an answer that changed files, a second agent starts the result, goes through what was asked and sends back what it finds to fix.",
   "projectParams.service": "Service model",
