@@ -1,6 +1,6 @@
 import { isLocal, NO_LIMIT_MS } from "../budget";
 import { mergeOptions, thinkingOptions } from "./thinking";
-import { HONEST_HINT, toModelMessages } from "./history";
+import { DATA_HINT, FACTS_HINT, HONEST_HINT, toModelMessages } from "./history";
 import { stuckNote } from "./stuck";
 import { subagentTools } from "../agent/subagent";
 import { notesBlock } from "../agent/notes";
@@ -213,7 +213,7 @@ export async function reply(i: ReplyInput): Promise<void> {
           Object.keys(tools).length && i.web !== "free" ? FAIR_USE_HINT : "",
           i.web === "free" ? WEB_HINT : i.web === "provider" ? "Use the web search results you are given and name the sources." : "",
           i.folder ? folderHint(i.folder) : "",
-          Object.keys(tools).length ? HONEST_HINT : "",
+          Object.keys(tools).length ? [HONEST_HINT, DATA_HINT, FACTS_HINT].join("\n\n") : "",
           // What goes through the user's proxy and what does not (seen live: 18 commands spent on the network).
           i.folder && i.web === "free" ? proxyHint(i.webAccess) : "",
           i.folder ? notesBlock(i.folder) : "",
