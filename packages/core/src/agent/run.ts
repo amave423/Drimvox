@@ -11,6 +11,7 @@ import { systemPrompt } from "./prompt";
 import { buildTools, type ToolHooks } from "./tools";
 import { codeTool } from "./code-mode";
 import { memoryLimit, sizeOf } from "./memory";
+import { Repeats } from "./repeats";
 import { notesBlock } from "./notes";
 import { compactHistory, KEEP_WHOLE } from "../work/compact";
 import { answeredOnly, repairToolJson } from "./repair";
@@ -105,6 +106,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
   let steps = 0;
   /** The provider served part of a request from its cache: the history is then kept as it is (see prepareStep). */
   let cacheSeen = false;
+  // The same call again with nothing changed in between: told on the third (repeats.ts).
+  const repeats = new Repeats();
   const cacheKey = `${i.conn.baseUrl}|${i.model}`;
 
   // The provider's own bill when it sends one (in rubles for RouterAI), else the catalog's prices.
@@ -208,6 +211,8 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
           }
           const note = i.remind?.();
           if (note) sent = [...sent, { role: "user", content: note }];
+          const repeated = repeats.take();
+          if (repeated) sent = [...sent, { role: "user", content: repeated }];
           // A tool's answer cannot hold a picture with OpenAI-like providers: the screenshots come after it, as the user's.
           const seen = i.pictures?.();
           if (seen?.pictures.length) {
@@ -250,6 +255,7 @@ export async function runAgent(i: RunInput): Promise<RunOutcome> {
         onError: () => {},
         onStepEnd: (step) => {
           steps++;
+          repeats.seen(step.toolCalls);
           lastFailed = step.content.some((part) => part.type === "tool-error");
           cut = step.finishReason === "length";
           said.push(...(step.response.messages as ModelMessage[]));
