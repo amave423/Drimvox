@@ -1,6 +1,7 @@
 import { isLocal, NO_LIMIT_MS } from "../budget";
 import { mergeOptions, thinkingOptions } from "./thinking";
 import { HONEST_HINT, toModelMessages } from "./history";
+import { stuckNote } from "./stuck";
 import { subagentTools } from "../agent/subagent";
 import { notesBlock } from "../agent/notes";
 import { changedSince, checkpoint, dropCheckpoint } from "./checkpoint";
@@ -114,7 +115,11 @@ export async function reply(i: ReplyInput): Promise<void> {
   else if (i.edit) i.chats.attachments.copy(i.edit.from, added.id);
   const userMessage = i.chats.message(added.id)!;
   i.chats.nameIfUntitled(i.chatId, i.content);
-  const history = toModelMessages(i.chats.history(i.chatId), i.chats.attachments, i.vision !== false);
+  const turns = i.chats.history(i.chatId);
+  const history = toModelMessages(turns, i.chats.attachments, i.vision !== false);
+  // The same failure again and again: a word to step back, in this request only (stuck.ts).
+  const stuck = stuckNote(turns);
+  if (stuck) history.push({ role: "user", content: stuck });
   const answer = i.chats.addMessage({
     chatId: i.chatId,
     role: "assistant",

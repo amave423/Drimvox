@@ -461,3 +461,17 @@ describe("recovery", () => {
     expect(saved.messages.at(-1)).toMatchObject({ id: "m1", status: "stopped", content: "полу" });
   });
 });
+
+// Seen live: a VPN chat went on for hours on the same failure; the cause on the user's PC was never looked for.
+describe("a chat stuck on the same failure", () => {
+  it("tells the model to step back once the user keeps saying it still fails", async () => {
+    const { chat } = await setup({ script: [{ text: "Поправил." }, { text: "Ещё поправил." }, { text: "Проверю всё по списку." }] });
+    for (const content of ["сделай впн", "не работает", "всё так же, не удалось подключиться"]) await (await send(chat.id, content)).text();
+    const asks = fake.requests.filter((r) => r.path === "/v1/chat/completions").map((r) => JSON.stringify(r.body.messages));
+    expect(asks[1]).not.toContain("Stop changing the same layer");
+    expect(asks[2]).toContain("Stop changing the same layer");
+    // Not kept in the conversation: the user does not see it.
+    const kept = await (await env.call("GET", `/api/chats/${chat.id}`)).json();
+    expect(JSON.stringify(kept.messages)).not.toContain("Stop changing the same layer");
+  });
+});
