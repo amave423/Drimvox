@@ -987,6 +987,7 @@ export const en: Record<keyof typeof ru, string> = {
   "providers.proxyNotSet": "No proxy set — add one in the settings",
   "error.no_proxy": "This provider is set to use the proxy, but no proxy is set. Add one in the settings or switch off “Through the proxy”.",
   "error.proxy_down": "This provider is set to use the proxy, and the proxy does not answer. Check it in the settings or switch off “Through the proxy”.",
+  "error.folder_missing": "This chat's folder is no longer there. Connect another folder or disconnect it to go on.",
   "error.cli_update": "The program is too old for this model. Update it (for Claude Code run claude update in a terminal) or pick another model.",
   "error.cli_retired": "Google no longer serves Gemini CLI to personal accounts (free, AI Pro and Ultra) since June 18, 2026. Signing in again will not help: connect Antigravity CLI in \"Keys and models\", or \"Google Gemini\" by key.",
   "error.cli_limit": "Your subscription's limit for this model is used up. Pick another model or wait until the limit resets.",

@@ -999,6 +999,8 @@ export const providerErrorCodes = [
   "no_proxy",
   /** The provider goes through the proxy, and the proxy does not answer. */
   "proxy_down",
+  /** The chat's folder is no longer there (deleted or moved after it was connected). */
+  "folder_missing",
   /** The answer stopped where the model ran out of room (its context or its answer limit). */
   "cut_off",
   "step_limit",

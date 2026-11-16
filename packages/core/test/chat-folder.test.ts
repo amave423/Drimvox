@@ -211,6 +211,19 @@ describe("a chat with a folder", () => {
 
   // Seen live: DeepSeek V4.1 Flash, which sees pictures, said in a chat with a folder that it could not see the pictures
   // in it and measured their pixels with scripts instead.
+  // Seen live: the folder was deleted, the chat went on, and the model made files nobody could find.
+  it("stops when its folder is gone, without calling the model", async () => {
+    const chat = await chatWith([call("write_file", { path: "lost.txt", content: "x" }), { text: "Готово." }]);
+    expect((await connect(chat.id, folder)).status).toBe(200);
+    rmSync(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+
+    const events = await readEvents(await send(chat.id, "Создай файл"));
+    expect(events.at(-1).message).toMatchObject({ status: "error", content: "", error: { code: "folder_missing", detail: folder } });
+    expect(events.some((e: any) => e.type === "tool")).toBe(false);
+    expect(existsSync(folder)).toBe(false);
+    expect(fake!.requests.filter((r) => r.path.includes("chat/completions"))).toHaveLength(0);
+  });
+
   it("lets the model look at a picture in the folder through a model that sees pictures", async () => {
     writeFileSync(join(folder, "ref.png"), Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"));
     const chatTurns: FakeTurn[] = [call("look_at_image", { path: "ref.png", question: "Что на картинке?" }), { text: "На референсе оранжевый круг." }];

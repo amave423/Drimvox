@@ -1,4 +1,5 @@
 import { isLocal, NO_LIMIT_MS } from "../budget";
+import { existsSync, statSync } from "node:fs";
 import { mergeOptions, thinkingOptions } from "./thinking";
 import { DATA_HINT, FACTS_HINT, HONEST_HINT, toModelMessages } from "./history";
 import { stuckNote } from "./stuck";
@@ -129,6 +130,13 @@ export async function reply(i: ReplyInput): Promise<void> {
     model: i.model,
   });
   await i.emit({ type: "start", userMessage, assistantMessageId: answer.id });
+  // The folder was deleted or moved after it was connected (seen live: the chat went on and the model made files nobody
+  // could find). Nothing runs: the user connects another folder or disconnects this one.
+  if (i.folder && !isFolder(i.folder)) {
+    const message = i.chats.finishAnswer(answer.id, { content: "", reasoning: null, status: "error", inputTokens: null, outputTokens: null, cachedTokens: null, contextTokens: null, costUsd: null, error: { code: "folder_missing", detail: i.folder } });
+    await i.emit({ type: "done", message });
+    return;
+  }
   // The folder as it was before this answer: "Undo" brings it back. No git, no snapshot.
   const ref = `refs/drimvox/chat/${i.chatId}/${answer.id}`;
   const snapshot = i.folder ? await checkpoint(i.folder, ref).catch(() => null) : null;
@@ -340,6 +348,14 @@ export async function reply(i: ReplyInput): Promise<void> {
     activity: i.activity?.(),
   });
   if (!stopped) await i.emit({ type: "done", message });
+}
+
+function isFolder(path: string): boolean {
+  try {
+    return existsSync(path) && statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 type Totals = Parameters<typeof usageOf>[0];
