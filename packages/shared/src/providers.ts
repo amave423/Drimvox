@@ -997,6 +997,8 @@ export const providerErrorCodes = [
   "no_free_tier",
   /** The provider should go through a proxy, but none is set in the settings. */
   "no_proxy",
+  /** The provider goes through the proxy, and the proxy does not answer. */
+  "proxy_down",
   /** The answer stopped where the model ran out of room (its context or its answer limit). */
   "cut_off",
   "step_limit",

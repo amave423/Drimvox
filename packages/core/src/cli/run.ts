@@ -107,7 +107,7 @@ export function runCli(i: CliRunInput): Promise<CliRunResult> {
       else if (silent) error = { code: "timeout" };
       else if (finished?.error) error = classify(finished.error);
       else if (!finished) error = classify(stderr.trim() || `The program ended with code ${code ?? "?"} and no answer`);
-      resolve({ session, done: finished, stopped, error });
+      resolve({ session, done: finished, stopped, error: blameProxy(error, Boolean(i.proxy)) });
     });
   });
 }
@@ -134,5 +134,15 @@ export function classify(raw: string): ProviderError {
   if (/does not support this model|newer is required|claude update|please update|upgrade to the latest/i.test(message)) return { code: "cli_update", detail };
   if (/out of usage|usage credits|usage limit|limit reached|reached your .*limit|quota/i.test(message)) return { code: "cli_limit", detail };
   if (/rate.?limit/i.test(message)) return { code: "rate_limited", detail };
+  if (NO_LINK.test(message)) return { code: "unreachable", detail };
   return { code: "provider_error", detail };
+}
+
+/** The CLI's words for a connection it could not make or keep (seen: Codex with its proxy down). */
+const NO_LINK = /routing discovery (failed|timed out)|error sending request|stream disconnected|connection (refused|reset|closed)|failed to connect|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND/i;
+
+/** A lost connection of a CLI that goes through the proxy is the proxy's: the provider itself was never reached. */
+export function blameProxy(error: ProviderError | null, proxied: boolean): ProviderError | null {
+  if (!error || !proxied || error.code !== "unreachable") return error;
+  return { ...error, code: "proxy_down" };
 }
