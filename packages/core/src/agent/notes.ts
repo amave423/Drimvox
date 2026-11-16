@@ -30,7 +30,14 @@ export function notesBlock(root: string): string {
     if (text) parts.push(`The project's ${own}:\n${text.length > FILE_LIMIT ? `${text.slice(0, FILE_LIMIT)}\n…` : text}`);
   }
   for (const [file, title] of [
-    [NOTES, "Your notes on this project, kept by Drimvox outside the project (update_notes changes them)"],
+    // Seen live: a server address the agent got wrong and wrote here outweighed the user saying three times that it
+    // was gone; each answer read it again as a fact.
+    [
+      NOTES,
+      "Your notes on this project, kept by Drimvox outside the project. An earlier agent wrote them and they may be out of " +
+        "date or wrong: what the user says in this conversation and what you check now come first. When either " +
+        "contradicts a note, fix the note with update_notes at once",
+    ],
     [STATE, "The project's state, kept by Drimvox"],
   ] as const) {
     const path = join(store, file);

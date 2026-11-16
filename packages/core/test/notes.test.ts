@@ -26,6 +26,8 @@ describe("the agent's notes, kept outside the project", () => {
     expect(storeOf(dir).startsWith(store)).toBe(true);
     const block = notesBlock(dir);
     expect(block).toContain("Сайт-таймер");
+    // Seen live: a wrong server address in the notes outweighed the user saying three times it was gone.
+    expect(block).toMatch(/may be out of date[\s\S]*user says[\s\S]*update_notes/);
     expect(block).toContain("Goal: Сделай таймер");
   });
 
