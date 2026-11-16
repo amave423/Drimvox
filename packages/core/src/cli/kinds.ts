@@ -1,6 +1,7 @@
 import type { SubscriptionLimit } from "@drimvox/shared";
 import { realpathSync } from "node:fs";
 import { windowName } from "./limits";
+import { codexOverHttp } from "./codex-http";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 
 export type CliId = "claude-code" | "codex" | "gemini-cli" | "antigravity";
@@ -220,6 +221,7 @@ const codex: CliKind = {
     "--sandbox",
     l.mode === "write" ? "workspace-write" : "read-only",
     ...(l.model !== "default" ? ["-m", l.model] : []),
+    ...codexOverHttp(),
     ...(l.resume ? ["resume", l.resume] : []),
     "-",
   ],
