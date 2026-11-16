@@ -1,4 +1,5 @@
 import type { ActivityEntry, ModelRef, ProjectModels, ProjectWorkView, ThinkingLevel } from "@drimvox/shared";
+import { cliRules } from "../cli/windows";
 import type { ProjectRepo } from "../agent/repo";
 import type { ChatApprovals } from "../chats/approvals";
 import type { AttachmentKind } from "../chats/attachments";
@@ -281,7 +282,7 @@ export class ProjectWork {
       webAccess: this.o.run.web,
       folder: this.o.projects.get(run.projectId)?.path ?? null,
       // The CLI works in the project's folder with the project's rules, as in a terminal.
-      work: { system: projectRules(false), steps: 0 },
+      work: { system: cliRules(projectRules(false)), steps: 0 },
       cliDir: this.o.cliDir,
       activity: () => activity,
       emit: async (e) => {
