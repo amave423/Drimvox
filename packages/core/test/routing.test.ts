@@ -38,7 +38,7 @@ describe("the cheapest provider of a model", () => {
     const routed = withCheapestProvider("https://router.test/api/v1", fake);
     await routed("https://router.test/api/v1/chat/completions", { method: "POST", body: JSON.stringify({ model: "deepseek/flash", messages: [] }) });
     await routed("https://router.test/api/v1/chat/completions", { method: "POST", body: JSON.stringify({ model: "other/model", messages: [] }) });
-    expect(sent[0]!.body).toMatchObject({ model: "deepseek/flash", provider: { order: ["morph"] } });
+    expect(sent[0]!.body).toMatchObject({ model: "deepseek/flash", provider: { order: ["morph", "fireworks"] } });
     // Its prices are known now: what the steps are billed at (per token, in the router's money).
     expect(pinnedRates("https://router.test/api/v1", "deepseek/flash")).toEqual({ input: 2.6 / 1e6, cached: 0.47 / 1e6, output: 47.3 / 1e6 });
     expect(pinnedRates("https://router.test/api/v1", "other/model")).toBeNull();
@@ -46,11 +46,19 @@ describe("the cheapest provider of a model", () => {
     expect(sent[1]!.body).not.toHaveProperty("provider");
   });
 
-  // Seen live: four tries in a row waited two minutes each for one provider of DeepSeek 1017.
-  it("leaves the choice to the router for a while once the cheapest one failed", async () => {
+  // Seen live: four tries in a row waited two minutes each for one provider of DeepSeek 1017; then, with the router
+  // choosing, the steps went over 48 providers and read most of the conversation anew each time.
+  it("starts from the same second cheapest for a while once the cheapest one failed", async () => {
     const sent: unknown[] = [];
     const fake: typeof fetch = async (input, init) => {
-      if (String(input).includes("/endpoints")) return new Response(JSON.stringify({ data: { endpoints: [endpoint("morph", 2.6, 0.47, 47.3)] } }));
+      if (String(input).includes("/endpoints"))
+        return new Response(
+          JSON.stringify({
+            data: {
+              endpoints: [endpoint("fireworks", 35.5, 0.71, 142), endpoint("morph", 2.6, 0.47, 47.3), endpoint("baidu", 8.6, 0.18, 34.7), endpoint("river", 10.2, 0.2, 40.8), endpoint("sail", 8.3, 0.83, 11.8)],
+            },
+          }),
+        );
       sent.push(JSON.parse(String(init?.body)));
       return new Response("{}");
     };
@@ -61,7 +69,11 @@ describe("the cheapest provider of a model", () => {
     await ask();
     unpinCheapest("https://stuck.test/api/v1", "deepseek/flash", -1);
     await ask();
-    expect(sent.map((b) => (b as { provider?: unknown }).provider ?? null)).toEqual([{ order: ["morph"] }, null, { order: ["morph"] }]);
+    expect(sent.map((b) => (b as { provider?: unknown }).provider ?? null)).toEqual([
+      { order: ["sail", "morph", "baidu"] },
+      { order: ["morph", "baidu", "river"] },
+      { order: ["sail", "morph", "baidu"] },
+    ]);
   });
 
   // Seen live: a screenshot sent where the router chose cost 1.20 ₽ a step against 0.10 ₽. The cheapest provider first;
