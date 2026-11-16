@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { NOTES_LIMIT, notesBlock, writeNotes, writeState } from "../src/agent/notes";
+import { mirrorNotes, NOTES_LIMIT, notesBlock, notesChangedSince, writeNotes, writeState } from "../src/agent/notes";
 import { setStoreDir, storeOf } from "../src/agent/store";
 
 let dir: string;
@@ -40,20 +40,48 @@ describe("the agent's notes, kept outside the project", () => {
     expect(notesBlock(dir)).toContain("Сборка: pnpm build");
   });
 
-  it("takes its sections out of an AGENTS.md it wrote before, and removes the file when nothing of the user's is left", () => {
-    writeFileSync(join(dir, "AGENTS.md"), "# Notes for agents\n\n<!-- drimvox -->\nСтарые заметки\n<!-- /drimvox -->\n");
-    writeFileSync(join(dir, "CLAUDE.md"), "@AGENTS.md\n");
-    expect(notesBlock(dir)).toContain("Старые заметки");
-    expect(existsSync(join(dir, "AGENTS.md"))).toBe(false);
-    expect(existsSync(join(dir, "CLAUDE.md"))).toBe(false);
+  // Asked for (2026-11-16, after 2026-11-10's "no files of Drimvox's in the project"): an AGENTS.md in the folder, so a
+  // new conversation or another agent (Codex, Claude Code) can go on, kept current.
+  it("copies the notes into the project's AGENTS.md, in a section of its own, and sends them once", () => {
+    writeNotes(dir, "Запуск: npm start");
+    mirrorNotes(dir);
+    const file = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    expect(file).toContain("<!-- drimvox -->");
+    expect(file).toContain("Запуск: npm start");
+    writeNotes(dir, "Запуск: npm run dev");
+    mirrorNotes(dir);
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).not.toContain("npm start");
+    const block = notesBlock(dir);
+    expect(block.match(/npm run dev/g)).toHaveLength(1);
+    expect(block).not.toContain("The project's AGENTS.md");
   });
 
-  it("leaves the user's own text in AGENTS.md when it takes its sections out", () => {
-    writeFileSync(join(dir, "AGENTS.md"), "# Правила\nКоммиты по-английски.\n\n<!-- drimvox -->\nСтарые заметки\n<!-- /drimvox -->\n");
+  it("keeps the user's own text in AGENTS.md around its section", () => {
+    writeFileSync(join(dir, "AGENTS.md"), "# Правила\nКоммиты по-английски.\n");
+    writeNotes(dir, "Сборка: pnpm build");
+    writeNotes(dir, "Сборка: pnpm build --prod");
+    mirrorNotes(dir);
+    const file = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    expect(file.startsWith("# Правила\nКоммиты по-английски.\n")).toBe(true);
+    expect(file.match(/<!-- drimvox -->/g)).toHaveLength(1);
     const block = notesBlock(dir);
-    expect(readFileSync(join(dir, "AGENTS.md"), "utf8").trim()).toBe("# Правила\nКоммиты по-английски.");
     expect(block).toContain("Коммиты по-английски.");
-    expect(block).toContain("Старые заметки");
+    expect(block.match(/pnpm build --prod/g)).toHaveLength(1);
+  });
+
+  it("takes notes an earlier version left in AGENTS.md as its own, and leaves the file", () => {
+    writeFileSync(join(dir, "AGENTS.md"), "# Notes for agents\n\n<!-- drimvox -->\nСтарые заметки\n<!-- /drimvox -->\n");
+    expect(notesBlock(dir)).toContain("Старые заметки");
+    expect(readFileSync(join(storeOf(dir), "notes.md"), "utf8")).toContain("Старые заметки");
+    expect(existsSync(join(dir, "AGENTS.md"))).toBe(true);
+  });
+
+  it("knows when the notes were last changed", () => {
+    const before = Date.now() - 1000;
+    expect(notesChangedSince(dir, before)).toBe(false);
+    writeNotes(dir, "Что-то");
+    expect(notesChangedSince(dir, before)).toBe(true);
+    expect(notesChangedSince(dir, Date.now() + 60_000)).toBe(false);
   });
 
   it("refuses notes too long to keep in every request", () => {

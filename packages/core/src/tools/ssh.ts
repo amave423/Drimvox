@@ -242,7 +242,7 @@ export function sshTools(servers: SshServers, ws: Workspace | null, hooks: Pick<
       execute: ({ server, command, timeout_seconds }, o: { abortSignal?: AbortSignal }) =>
         run("ssh_run", `${server}: ${command.slice(0, 200)}`, async () => {
           const s = pick(server);
-          const held = hooks.held?.(command);
+          const held = await hooks.held?.(command);
           if (held) return held;
           if (!(await allowed(s, command, o.abortSignal))) return "The user denied this command. Do not retry it.";
           const r = await servers.exec(s, command, (timeout_seconds ?? 300) * 1000, o.abortSignal);
@@ -256,7 +256,7 @@ export function sshTools(servers: SshServers, ws: Workspace | null, hooks: Pick<
         run("ssh_upload", `${server}: ${path} → ${remote_path}`, async () => {
           const s = pick(server);
           // Code copied to a server is a deploy.
-          const held = hooks.held?.(`ssh_upload ${remote_path}`);
+          const held = await hooks.held?.(`ssh_upload ${remote_path}`);
           if (held) return held;
           if (!(await allowed(s, `upload ${path} → ${remote_path}`, o.abortSignal))) return "The user denied this. Do not retry it.";
           await servers.copy(s, "up", local(path), remote_path, o.abortSignal);

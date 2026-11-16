@@ -1,12 +1,13 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { agentFileNames } from "@drimvox/shared";
 import { storeOf } from "./store";
 
 /**
  * The project's notes for agents, sent whole at the start of every request and never summarized. The user's own
- * AGENTS.md (or CLAUDE.md) is read as it is; what Drimvox writes — the agent's notes (update_notes) and the project's
- * state — is kept in Drimvox's data (store.ts), not in the project (asked for: no files of Drimvox's there).
+ * AGENTS.md (or CLAUDE.md) is read as it is; the agent's notes (update_notes) and the project's state are kept in
+ * Drimvox's data (store.ts). In a project the notes are also copied into a section of its AGENTS.md (asked for on
+ * 2026-11-16, after 2026-11-10's "no files of Drimvox's in the project": a new conversation or another agent such as
+ * Codex or Claude Code goes on from them). The user's text in that file stays as it is.
  */
 export const NOTES_LIMIT = 4000;
 /** More of a user's own file than this is not sent. */
@@ -21,12 +22,13 @@ const STATE = "state.md";
 
 /** The notes as the system prompt carries them; empty when the project has none yet. */
 export function notesBlock(root: string): string {
-  moveOut(root);
+  adoptOld(root);
   const store = storeOf(root);
-  const own = ["AGENTS.md", "CLAUDE.md"].find((name) => existsSync(join(root, name)));
   const parts: string[] = [];
+  // The user's own file, without Drimvox's copy of the notes: they come below, once.
+  const own = ["AGENTS.md", "CLAUDE.md"].find((name) => existsSync(join(root, name)) && withoutOurs(readFileSync(join(root, name), "utf8")).trim());
   if (own) {
-    const text = readFileSync(join(root, own), "utf8").trim();
+    const text = withoutOurs(readFileSync(join(root, own), "utf8")).trim();
     if (text) parts.push(`The project's ${own}:\n${text.length > FILE_LIMIT ? `${text.slice(0, FILE_LIMIT)}\n…` : text}`);
   }
   for (const [file, title] of [
@@ -92,21 +94,24 @@ export function writeState(root: string, s: ProjectState): void {
   writeFileSync(join(storeOf(root), STATE), `${lines.join("\n")}\n`);
 }
 
-/** Pointer files Drimvox once made for other agents, by their exact text: removed with the sections they pointed to. */
-const IMPORT_POINTER = "@AGENTS.md\n";
-const WORD_POINTER = "Read AGENTS.md in the project root first: the project's rules, state, plan and notes, kept current by Drimvox.\n";
-const POINTER_FILES = Object.values(agentFileNames);
+/** The project's AGENTS.md without Drimvox's sections: what the user wrote there. */
+function withoutOurs(text: string): string {
+  for (const [open, close] of [
+    [START, END],
+    [STATE_START, STATE_END],
+  ] as const) {
+    const at = text.indexOf(open);
+    const end = text.indexOf(close);
+    if (at >= 0 && end > at) text = text.slice(0, at) + text.slice(end + close.length);
+  }
+  return text.replace(/^\s*# Notes for agents\s*$/m, "").replace(/\n{3,}/g, "\n\n");
+}
 
-/**
- * What earlier versions wrote into the project: Drimvox's sections of AGENTS.md go to its data, the file goes when
- * nothing of the user's is left, and so do the pointer files made for other agents.
- */
-function moveOut(root: string): void {
+/** Notes an earlier version left in the project's AGENTS.md become Drimvox's own, when it has none yet. */
+function adoptOld(root: string): void {
   const file = join(root, "AGENTS.md");
   if (!existsSync(file)) return;
-  let text = readFileSync(file, "utf8");
-  if (!text.includes(START) && !text.includes(STATE_START)) return;
-  const store = storeOf(root);
+  const text = readFileSync(file, "utf8");
   for (const [open, close, name] of [
     [START, END, NOTES],
     [STATE_START, STATE_END, STATE],
@@ -115,17 +120,40 @@ function moveOut(root: string): void {
     const end = text.indexOf(close);
     if (at < 0 || end < at) continue;
     const body = text.slice(at + open.length, end).trim();
-    if (body && !existsSync(join(store, name))) writeFileSync(join(store, name), `${body}\n`);
-    text = text.slice(0, at) + text.slice(end + close.length);
+    const path = join(storeOf(root), name);
+    if (body && !existsSync(path)) writeFileSync(path, `${body}\n`);
   }
-  if (text.replace(/^\s*# Notes for agents\s*/, "").trim()) {
-    writeFileSync(file, `${text.trim()}\n`);
-    return;
-  }
-  rmSync(file, { force: true });
-  for (const path of POINTER_FILES.map((n) => join(root, n))) {
-    if (!existsSync(path)) continue;
-    const body = readFileSync(path, "utf8");
-    if (body === IMPORT_POINTER || body === WORD_POINTER) rmSync(path, { force: true });
+}
+
+/**
+ * The agent's notes copied into the project's AGENTS.md, in a section of their own, the user's text around it as it was.
+ * Written when the agent changes its notes, so its own commit takes the file along.
+ */
+export function mirrorNotes(root: string): void {
+  const path = join(storeOf(root), NOTES);
+  const notes = existsSync(path) ? readFileSync(path, "utf8").trim() : "";
+  if (!notes) return;
+  const file = join(root, "AGENTS.md");
+  const old = existsSync(file) ? readFileSync(file, "utf8") : "";
+  const own = withoutOurs(old).trim();
+  const section = [
+    START,
+    "## Notes for agents",
+    "Kept by the agent that builds this project in Drimvox, rewritten as the work goes on. Anyone continuing here (a new",
+    "conversation, Codex, Claude Code) reads this first; what the user says now comes before it.",
+    "",
+    notes,
+    END,
+  ].join("\n");
+  const next = own ? `${own}\n\n${section}\n` : `${section}\n`;
+  if (next !== old) writeFileSync(file, next);
+}
+
+/** Whether the agent changed its notes after this moment. */
+export function notesChangedSince(root: string, since: number): boolean {
+  try {
+    return statSync(join(storeOf(root), NOTES)).mtimeMs >= since;
+  } catch {
+    return false;
   }
 }

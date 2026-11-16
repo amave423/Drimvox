@@ -12,7 +12,7 @@ import { isRepoRoot, runGit, withoutDependencies } from "../agent/git";
 const DRIMVOX = { GIT_AUTHOR_NAME: "Drimvox", GIT_AUTHOR_EMAIL: "drimvox@localhost", GIT_COMMITTER_NAME: "Drimvox", GIT_COMMITTER_EMAIL: "drimvox@localhost" };
 
 /** The folder's files as a tree, read through a temporary index. */
-async function treeOf(folder: string): Promise<string> {
+export async function treeOf(folder: string): Promise<string> {
   const index = join(tmpdir(), `drimvox-index-${randomUUID()}`);
   const env = { GIT_INDEX_FILE: index };
   try {

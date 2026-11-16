@@ -688,10 +688,11 @@ describe("a ready project", () => {
     await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай стили", model: s.ref("coder") });
     await until(s.project.id, (w) => w.status === "done");
     expect(readFileSync(join(folder, "styles.css"), "utf8")).toBe("body {}\n");
-    // The fourth: after the tester found nothing, the word to publish what was held back.
-    expect(requestsOf("coder")).toHaveLength(4);
+    // The fourth: after the tester found nothing, the word to publish what was held back; the fifth asks for the notes.
+    expect(requestsOf("coder")).toHaveLength(5);
     expect(JSON.stringify(requestsOf("coder")[1]!.body.messages)).toContain("cut off by the output limit");
     expect(JSON.stringify(requestsOf("coder")[3]!.body.messages)).toContain("found nothing");
+    expect(JSON.stringify(requestsOf("coder")[4]!.body.messages.at(-1))).toContain("update_notes");
   });
 });
 
@@ -733,15 +734,31 @@ describe("a project's git rules", () => {
     expect(view.state).toMatchObject({ branch: "main", base: null, github: false, pullRequest: null });
   });
 
-  // Asked for: no AGENTS.md, .drimvox or pointer files of Drimvox's in the project; the notes are kept in its data.
-  it("leaves nothing of its own in the project's folder: notes, state and long outputs are kept in Drimvox's data", async () => {
+  // Asked for: the notes in the project's AGENTS.md for a new conversation or another agent; state and long outputs stay
+  // in Drimvox's data.
+  it("keeps the notes in the project's AGENTS.md, and the state and long outputs in Drimvox's data", async () => {
     const long = `node -e "for (let i = 1; i <= 3000; i++) console.log('line ' + i)"`;
     const s = await ready([call("update_notes", { notes: "Сборка: npm run build" }), call("run_command", { command: long, timeout_seconds: 60 }), { text: "Готово." }]);
     await ask(s, "Запиши заметки", 3);
-    expect(existsSync(join(folder, "AGENTS.md"))).toBe(false);
+    expect(readFileSync(join(folder, "AGENTS.md"), "utf8")).toContain("npm run build");
     expect(existsSync(join(folder, ".drimvox"))).toBe(false);
-    expect(git(folder, "status", "--porcelain")).toBe("");
+    expect(git(folder, "status", "--porcelain")).toBe("?? AGENTS.md");
     expect(readFileSync(join(storeOf(folder), "notes.md"), "utf8")).toContain("npm run build");
+  });
+
+  // Asked for: the agent keeps AGENTS.md current. A turn that changed files and left the notes as they were is asked once.
+  it("asks once for the notes after a turn that changed files without them", async () => {
+    const s = await ready([
+      call("write_file", { path: "a.js", content: "1\n" }),
+      { text: "Готово." },
+      { text: "Проверено." },
+      call("update_notes", { notes: "a.js — точка входа" }),
+      { text: "Заметки обновил." },
+    ]);
+    await ask(s, "Сделай a.js", 5);
+    const asked = requestsOf("coder").filter((r) => JSON.stringify(r.body.messages.at(-1)).includes("your notes are as they were"));
+    expect(asked).toHaveLength(1);
+    expect(readFileSync(join(folder, "AGENTS.md"), "utf8")).toContain("a.js — точка входа");
   });
 
   // Seen live: a project left on "drimvox/task-1106-2048 → master" from before, which said nothing to its user.
@@ -945,6 +962,33 @@ describe("the tester", () => {
     expect((asks.at(-1)!.match(/Not yet: Drimvox's tester/g) ?? []).length).toBe(1);
   });
 
+  // Seen live: Nexus 0.8.0 checked clean, then the user asked "where is the release?" three times, and each time it was
+  // held again, the agent telling the user that Drimvox would not let it.
+  it("lets a release go at once when nothing changed since the tester found the work clean", async () => {
+    const release = call("run_command", { command: "pm2 restart app" });
+    const s = await setup({
+      coder: [
+        call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }),
+        { text: "Готово." },
+        { text: "Проверено." },
+        { text: "Заметки не нужны." },
+        release,
+        { text: "Выпустил." },
+      ],
+      tester: [call("report_check", { problems: [], summary: "Проверил." })],
+    });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Сделай кнопку записи", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status !== "running");
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Где релиз?", model: s.ref("coder") });
+    await until(s.project.id, (w) => w.status !== "running" && requestsOf("coder").length >= 6);
+    const held = requestsOf("coder").filter((r) => JSON.stringify(r.body.messages.at(-1)).includes("Not yet"));
+    expect(held).toHaveLength(0);
+    // Released in the answer itself: no second round to be told to publish.
+    expect(requestsOf("coder")).toHaveLength(6);
+    expect(testerAsks()).toHaveLength(1);
+  });
+
   // Asked for after a video on harnesses, with a switch, off by default: a reviewer reads the turn's changes for bugs
   // before the tester; what it finds goes back to the agent.
   it("reviews the code only when switched on, before the tester, and sends the findings back", async () => {
@@ -972,7 +1016,15 @@ describe("the tester", () => {
   it("shows the tester the changed screens and how the last tester started the project", async () => {
     const started = call("report_check", { problems: [], summary: "Проверил.", start: "npm install && npm start, затем http://localhost:3000" });
     const s = await setup({
-      coder: [call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }), { text: "Готово." }, { text: "Ок." }, call("write_file", { path: "style.css", content: "button { color: red }\n" }), { text: "Готово." }, { text: "Ок." }],
+      coder: [
+        call("write_file", { path: "index.html", content: "<button>Запись</button>\n" }),
+        { text: "Готово." },
+        { text: "Ок." },
+        { text: "Заметки не нужны." },
+        call("write_file", { path: "style.css", content: "button { color: red }\n" }),
+        { text: "Готово." },
+        { text: "Ок." },
+      ],
       tester: [started, call("report_check", { problems: [], summary: "Проверил." })],
     });
     await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });

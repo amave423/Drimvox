@@ -1,7 +1,7 @@
 import type { ActivityEntry, MonthUsage, ProviderError, StreamEvent } from "@drimvox/shared";
 import type { McpAsk, McpHooks } from "../mcp/hub";
 import { fitContext } from "./context";
-import { HELD, NOTHING_TO_CHECK, PUBLISHES } from "./publish";
+import { HELD, keepChecked, lastChecked, NOTHING_TO_CHECK, PUBLISHES } from "./publish";
 import { tool, type ModelMessage, type ToolSet } from "ai";
 import { z } from "zod";
 import { runAgent } from "../agent/run";
@@ -26,11 +26,11 @@ import { stopLeftovers } from "../agent/leftovers";
 import { fitForModel } from "../tools/images";
 import { CHECK_ROUNDS, checkWork, findingsMessage, type CheckResult } from "./check";
 import type { ProjectGit } from "./project-git";
-import { changedSince, checkpoint, diffSince, dropCheckpoint } from "../chats/checkpoint";
+import { changedSince, checkpoint, diffSince, dropCheckpoint, treeOf } from "../chats/checkpoint";
 import { weakenedNote, weakenedTests } from "./weakened";
 import { changedScreens, keepRecipe, readRecipe } from "./tester-memory";
 import { reviewCode, reviewMessage, type ReviewResult } from "./review";
-import { notesBlock, writeState } from "../agent/notes";
+import { mirrorNotes, notesBlock, notesChangedSince, writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
 import { sshNote } from "../tools/ssh";
 import { memoryLimit, remember } from "../agent/memory";
@@ -57,6 +57,12 @@ export const DONE_YET =
 export const GO_ON =
   "[Drimvox: you said the work is not finished, and there is money and time left.] Go on with what is left of the user's request now. Stop only when it is done, or ask with the question tool when a decision only the user can make is missing.";
 export const CONTINUES = 2;
+/**
+ * Asked for: the project's AGENTS.md kept current, so a new conversation or another agent can go on. A turn that changed
+ * files and left the notes as they were is asked for them once.
+ */
+export const NOTES_DUE =
+  "[Drimvox: this turn changed the project, and your notes are as they were before it.] Bring them up to date with update_notes now: what changed, how to run and check it, what is done and what is next. They are copied into AGENTS.md in the project for whoever continues: commit that file with your work. Then end your turn as before.";
 /** Words of an answer that leaves the asked work unfinished (narrow: "not checked live" is a finished answer). */
 const UNFINISHED =
   /работа не завершена|не завершил|не закончил|не доделал|не успел|осталось (сделать|доделать|реализовать)|ещё не сделан|\bnot (yet )?(finished|complete|done)\b|\bincomplete\b|\bremaining (work|items|tasks)\b/i;
@@ -175,6 +181,10 @@ export class WorkRun {
   private map: Promise<string> | null = null;
   /** This turn's answers changed files, so the tester comes before the turn ends (check.ts). */
   private turnChanged = false;
+  /** NOTES_DUE was sent in this turn. */
+  private notesAsked = false;
+  /** Some answer of this turn changed files (turnChanged is cleared once the tester has seen them). */
+  private changedAny = false;
   /** How many times this turn went on after "not finished" (GO_ON). */
   private continues = 0;
   /** The folder's snapshot at the turn's first answer. */
@@ -203,8 +213,11 @@ export class WorkRun {
   }
 
   /** A command that publishes waits while the tester has yet to try the turn's work (publish.ts). */
-  private held(command: string): string | null {
+  private async held(command: string): Promise<string | null> {
     if (!PUBLISHES.test(command) || this.publishing || !this.testerOn() || this.checkRounds >= CHECK_ROUNDS) return null;
+    // Nothing changed since the tester found the work clean: it goes out now.
+    const checked = lastChecked(this.folder);
+    if (checked && checked === (await treeOf(this.folder).catch(() => null))) return null;
     this.publishHeld = true;
     return HELD;
   }
@@ -355,11 +368,19 @@ export class WorkRun {
     this.publishHeld = false;
     this.checkRounds = 0;
     this.reviewed = false;
+    this.notesAsked = false;
+    this.changedAny = false;
     this.publishing = false;
     this.wrapUp = null;
     this.d.repo.update(this.projectId, { status: "running", reason: null, detail: null });
     // The branch the project's git rules ask for, before anything changes.
     await this.d.git?.prepare(this.projectId, this.folder).catch(() => {});
+    // A project from before the notes went into AGENTS.md: there they are, for whoever continues.
+    try {
+      mirrorNotes(this.folder);
+    } catch {
+      // A folder that cannot be written: the notes stay in Drimvox's data.
+    }
 
     // How the run ended, written after git's last steps: until then it still counts as running (a new message waits).
     let final: {
@@ -498,6 +519,8 @@ export class WorkRun {
           }
           // Checked and clean: what the agent held back (a release, a deploy) goes out now, once.
           if (found) {
+            const tree = await treeOf(this.folder).catch(() => null);
+            if (tree) keepChecked(this.folder, tree);
             messages.push({ role: "user", content: CLEAN_CHECK });
             this.publishing = true;
             continue;
@@ -507,6 +530,12 @@ export class WorkRun {
         if (this.publishHeld && !this.turnChanged && !this.publishing && this.checkRounds === 0) {
           messages.push({ role: "user", content: NOTHING_TO_CHECK });
           this.publishing = true;
+          continue;
+        }
+        // Last, once the work is checked: notes that did not follow a turn's changes are asked for (NOTES_DUE).
+        if (this.changedAny && !this.notesAsked && !notesChangedSince(this.folder, this.runStart)) {
+          this.notesAsked = true;
+          messages.push({ role: "user", content: NOTES_DUE });
           continue;
         }
         // As in a chat: the answer is the end of the turn; the next message goes on.
@@ -587,7 +616,10 @@ export class WorkRun {
     // A write or an edit carries the lines it adds and removes, counted before it runs.
     const hooks = {
       onCall: (call: { name: string; input: unknown }) => onCall(call.name, describeCall(call.input), lineStat(this.folder, call.name, call.input)),
-      onResult: () => {},
+      // The notes go into the project's AGENTS.md as soon as they change, so the agent's own commit takes them along.
+      onResult: (r: { name: string; ok: boolean }) => {
+        if (r.name === "update_notes" && r.ok) mirrorNotes(this.folder);
+      },
       askApproval,
       held: (command: string) => this.held(command),
     };
@@ -815,6 +847,7 @@ export class WorkRun {
       const changed = await changedSince(this.folder, snapshot).catch(() => false);
       // The tester comes after a turn whose answers changed files (check.ts).
       if (changed) this.turnChanged = true;
+      if (changed) this.changedAny = true;
       if (changed) this.d.chats.setCheckpoint(answer.id, snapshot);
       else await dropCheckpoint(this.folder, checkpointRef).catch(() => {});
     }

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { storeOf } from "../agent/store";
 /**
  * Commands that publish the work: a release, a package, a deploy to a server. While Drimvox's tester has not yet tried
  * the turn's work, they wait (seen live: the rule "publish nothing before a clean check" was in the agent's instructions,
@@ -8,7 +11,30 @@ export const PUBLISHES =
 
 /** What the agent is told instead of running it. */
 export const HELD =
-  "Not yet: Drimvox's tester tries this turn's work before anything is published. Finish the work and reply that it is ready; after a clean check you are told to publish.";
+  "Not yet: Drimvox's tester tries this turn's work first, and you are told to publish right after a clean check, in this same turn. Finish the work and reply that it is ready. Do not tell the user that Drimvox blocks or refuses the release: it goes out once the check is clean.";
+
+/**
+ * The project's files as the tester last found them clean, kept in Drimvox's data for the folder. A release asked for
+ * with nothing changed since goes out at once (seen live: Nexus 0.8.0, checked clean, held again on each of the
+ * user's three "where is the release?").
+ */
+const checkedFile = (folder: string) => join(storeOf(folder), "checked-tree.txt");
+
+export function keepChecked(folder: string, tree: string): void {
+  try {
+    writeFileSync(checkedFile(folder), tree);
+  } catch {
+    // Not kept: the next release waits for a check again.
+  }
+}
+
+export function lastChecked(folder: string): string | null {
+  try {
+    return existsSync(checkedFile(folder)) ? readFileSync(checkedFile(folder), "utf8").trim() || null : null;
+  } catch {
+    return null;
+  }
+}
 
 /** After a turn that changed no files: nothing to check, the release or deploy that waited goes out now. */
 export const NOTHING_TO_CHECK =
