@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { LocalFit, LocalPull } from "./local";
 
 /** The checked picture and video models (docs/specs/local-images.md): each one also names a family for models found on Hugging Face. */
-export const localImageModelIds = ["z-image-turbo", "qwen-image-2512", "wan2.2-ti2v-5b", "wan2.1-t2v-1.3b"] as const;
+export const localImageModelIds = ["z-image-turbo", "qwen-image-2512", "wan2.2-ti2v-5b", "wan2.1-t2v-1.3b", "qwen-image-2.1"] as const;
 export type CheckedImageModelId = (typeof localImageModelIds)[number];
 /** A checked model, or a file found on Hugging Face: `hf:<repo>:<path>`. */
 export type LocalImageModelId = string;

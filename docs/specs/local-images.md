@@ -69,3 +69,13 @@
   перезапуск на другую модель, остановка без дела.
 - e2e: на листе «Локальные модели» скачать модель картинок, нарисовать картинку во вкладке «Картинки».
 - Живая проверка — на настоящем движке и Z-Image Turbo, перед релизом.
+
+## Qwen-Image 2.1 (2026-11-18)
+
+Видели: файл `Comfy-Org/Qwen-Image-2.1/…/qwen_image_2.1_int8_convrot.safetensors`, найденный на Hugging Face, Drimvox
+считал Qwen-Image 2512 и брал её кодировщик (Qwen2.5-VL 7B) и VAE; движок падал при загрузке («new_sd_ctx_t failed»: у
+кодировщика слои не той формы). У 2.1 свои (документация stable-diffusion.cpp, `docs/models/qwen_image_2.1.md`):
+кодировщик Qwen3-VL 8B (`Qwen/Qwen3-VL-8B-Instruct-GGUF`), VAE `qwen_image_2.1_vae_bf16`, `cfg 6`, `euler`.
+- Отдельное семейство `qwen-image-2.1` (`familyOf`: «qwen image 2.1» в имени репозитория или файла) — для найденных
+  файлов; их недостающие части Drimvox скачивает сам.
+- В короткий список не входит (`listed: false`): там только модели, проверенные с движком Drimvox.

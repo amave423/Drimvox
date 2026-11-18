@@ -59,7 +59,7 @@ export class LocalImages {
 
   /** The checked models and the ones downloaded from a search. */
   private defs(): ImageModelDef[] {
-    return [...IMAGE_MODELS, ...this.found.list()];
+    return [...IMAGE_MODELS.filter((m) => m.listed !== false), ...this.found.list()];
   }
 
   /** Models that make pictures or clips on Hugging Face, the ones Drimvox can run first. */

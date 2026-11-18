@@ -37,6 +37,8 @@ export interface ImageModelDef {
   /** From the best to the smallest: the best one this computer runs fast is taken, else the smallest that runs. */
   variants: ImageFile[][];
   settings: ImageSettings;
+  /** False for a family known only for models found on Hugging Face: not checked with the engine, not in the short list. */
+  listed?: boolean;
 }
 
 const wan22Vae: ImageFile = { role: "vae", repo: "Comfy-Org/Wan_2.2_ComfyUI_Repackaged", path: "split_files/vae/wan2.2_vae.safetensors", bytes: 1344 * MB };
@@ -45,6 +47,7 @@ const umt5Small: ImageFile = { role: "t5xxl", repo: "city96/umt5-xxl-encoder-ggu
 const WAN_NEGATIVE =
   "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走";
 
+const qwenImage21Vae: ImageFile = { role: "vae", repo: "Comfy-Org/Qwen-Image-2.1", path: "vae/qwen_image_2.1_vae_bf16.safetensors", bytes: 645 * MB };
 const zImageVae: ImageFile = { role: "vae", repo: "Comfy-Org/z_image_turbo", path: "split_files/vae/ae.safetensors", bytes: 320 * MB };
 
 /** The short list (docs/specs/local-images.md): each model checked with the engine Drimvox downloads. */
@@ -81,6 +84,29 @@ export const IMAGE_MODELS: ImageModelDef[] = [
       ],
     ],
     settings: { steps: 20, cfg: 2.5, flowShift: 3, sampler: "euler" },
+  },
+  {
+    // Seen live: Qwen-Image 2.1 taken for 2512 got 2512's encoder and VAE, and the engine stopped while loading it. It has
+    // its own (stable-diffusion.cpp's docs/models/qwen_image_2.1.md): Qwen3-VL 8B and its VAE, cfg 6, euler. Not checked
+    // with the engine here, so only for a file found on Hugging Face.
+    id: "qwen-image-2.1",
+    family: "qwen-image-2.1",
+    kind: "image",
+    name: "Qwen-Image 2.1",
+    listed: false,
+    variants: [
+      [
+        { role: "diffusion", repo: "leejet/Qwen-Image-2.1-GGUF", path: "qwen_image_2.1-Q8_0.gguf", bytes: 7331 * MB },
+        { role: "llm", repo: "Qwen/Qwen3-VL-8B-Instruct-GGUF", path: "Qwen3VL-8B-Instruct-Q8_0.gguf", bytes: 8306 * MB },
+        qwenImage21Vae,
+      ],
+      [
+        { role: "diffusion", repo: "leejet/Qwen-Image-2.1-GGUF", path: "qwen_image_2.1-Q4_K.gguf", bytes: 4003 * MB },
+        { role: "llm", repo: "Qwen/Qwen3-VL-8B-Instruct-GGUF", path: "Qwen3VL-8B-Instruct-Q4_K_M.gguf", bytes: 4795 * MB },
+        qwenImage21Vae,
+      ],
+    ],
+    settings: { steps: 20, cfg: 6, sampler: "euler" },
   },
   {
     // Text or a picture to video, 24 frames a second; its own VAE.
@@ -151,6 +177,7 @@ export const VIDEO_DURATIONS = [2, 3, 5];
  */
 export function familyOf(name: string): CheckedImageModelId | null {
   if (/z[-_ ]?image[-_ ]?turbo/i.test(name)) return "z-image-turbo";
+  if (/qwen[-_ ]?image[-_ ]?2[._]1/i.test(name) && !/edit|layered/i.test(name)) return "qwen-image-2.1";
   if (/qwen[-_ ]?image/i.test(name) && !/edit|layered|vl/i.test(name)) return "qwen-image-2512";
   if (/wan[-_ ]?2\.?2/i.test(name) && /ti2v|5b/i.test(name)) return "wan2.2-ti2v-5b";
   if (/wan[-_ ]?2\.?1/i.test(name) && /t2v/i.test(name) && /1\.3b/i.test(name)) return "wan2.1-t2v-1.3b";

@@ -1147,6 +1147,7 @@ export const ru = {
   "localImages.where": "Скачанные модели — во вкладке «Картинки» нового чата, у провайдера stable-diffusion.cpp. Первая картинка ждёт ещё и загрузки модели в память.",
   "localImages.model.z-image-turbo": "Быстрая: 8 шагов, хорошо пишет текст на картинках. Лучший выбор для большинства компьютеров.",
   "localImages.model.qwen-image-2512": "Сильнее в сложных сценах и надписях, но тяжёлая и заметно медленнее.",
+  "localImages.model.qwen-image-2.1": "Новая версия Qwen-Image: свой кодировщик Qwen3-VL 8B и свой VAE, Drimvox скачает их сам.",
   "local.remove": "Удалить",
   "local.removeConfirm": "Удалить с диска",
   "local.keep": "Оставить",

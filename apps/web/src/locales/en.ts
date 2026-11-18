@@ -1147,6 +1147,7 @@ export const en: Record<keyof typeof ru, string> = {
   "localImages.where": "Downloaded models are in the Pictures tab of a new chat, under stable-diffusion.cpp. The first picture also waits for the model to load.",
   "localImages.model.z-image-turbo": "Fast: 8 steps, good at text in pictures. The best choice for most computers.",
   "localImages.model.qwen-image-2512": "Stronger with complex scenes and lettering, but heavy and noticeably slower.",
+  "localImages.model.qwen-image-2.1": "The newer Qwen-Image: its own Qwen3-VL 8B encoder and VAE, which Drimvox downloads itself.",
   "local.remove": "Delete",
   "local.removeConfirm": "Delete from disk",
   "local.keep": "Keep",
