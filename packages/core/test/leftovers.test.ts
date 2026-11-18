@@ -42,7 +42,8 @@ describe("what an agent's commands leave running", () => {
       for (let i = 0; i < 50 && alive(pid); i++) await new Promise((r) => setTimeout(r, 100));
       expect(alive(pid)).toBe(false);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      // Windows lets go of a stopped process's folder a moment later (seen: EPERM in a full run).
+      rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }
   }, 60_000);
 });
