@@ -1,3 +1,5 @@
+import { autoWindow, kvBytesPerToken, LOCAL_WINDOWS, windowBytes, windowFit } from "./window";
+import type { LocalWindowChoice, LocalWindowView } from "@drimvox/shared";
 import { LocalAudio, type LocalAudioOptions } from "./audio/service";
 import { LocalSpeech, type LocalSpeechOptions } from "./speech/service";
 import { HF_FILE_BASES } from "./hf-download";
@@ -46,6 +48,13 @@ export interface LocalOptions {
   speechDir?: string;
   /** Reading aloud (docs/specs/local-speech.md); tests give a fake engine. */
   speech?: LocalSpeechOptions;
+  /** Where the window's choice and what "auto" picked are kept (the settings); in memory by default. */
+  windowStore?: { get(): { choice: LocalWindowChoice; auto: number | null }; set(v: { choice: LocalWindowChoice; auto: number | null }): void };
+}
+
+function memoryStore() {
+  let v: { choice: LocalWindowChoice; auto: number | null } = { choice: "auto", auto: null };
+  return { get: () => v, set: (next: typeof v) => void (v = next) };
 }
 
 /** An address on this computer. */
@@ -67,6 +76,7 @@ export class LocalModels {
   readonly audio: LocalAudio;
   readonly speech: LocalSpeech;
   private readonly canInstall: boolean;
+  private readonly windowStore: NonNullable<LocalOptions["windowStore"]>;
 
   constructor(
     private readonly providers: ProviderRepo,
@@ -75,6 +85,7 @@ export class LocalModels {
     o: LocalOptions = {},
   ) {
     this.hardware = o.hardware ? async () => o.hardware! : detectHardware;
+    this.windowStore = o.windowStore ?? memoryStore();
     const ollamaDir = o.ollamaDir ?? join(tmpdir(), "drimvox-ollama");
     // The user's own Ollama first (installed, on PATH); else the one Drimvox unpacked.
     const findAny = () => findOllama() ?? ownOllama(ollamaDir);
@@ -86,6 +97,10 @@ export class LocalModels {
       commandEnv: o.commandEnv,
       idleMs: o.idleMs ?? 10 * 60_000,
       hardware: this.hardware,
+      window: () => {
+        const w = this.windowStore.get();
+        return w.choice === "auto" ? w.auto : w.choice;
+      },
       onPulled: () => this.afterPull(),
       hf: { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "drimvox-downloads"), proxy: o.proxy ?? (() => null) },
     });
@@ -164,6 +179,40 @@ export class LocalModels {
       canInstall: this.canInstall,
       installCommand: process.platform === "linux" ? OLLAMA_LINUX_COMMAND : null,
     };
+  }
+
+  /** The window's choice and where each window would run for each downloaded model (local/window.ts). */
+  async windowView(): Promise<LocalWindowView> {
+    const hw = await this.hardware();
+    const running = await this.ollama.ensureRunning();
+    const models = running ? await this.ollama.models() : [];
+    const sized = await Promise.all(models.map(async (m) => ({ ...m, perToken: kvBytesPerToken(await this.ollama.info(m.name)) })));
+    const auto = autoWindow(hw, sized);
+    const stored = this.windowStore.get();
+    // Remembered for the next start: Ollama's models are not known before it runs.
+    if (models.length && stored.auto !== auto) this.windowStore.set({ ...stored, auto });
+    return {
+      choice: stored.choice,
+      auto,
+      applied: this.ollama.appliedWindow(),
+      userOllama: await this.ollama.foreign(),
+      models: sized.map((m) => ({
+        name: m.name,
+        sizeBytes: m.sizeBytes,
+        options: LOCAL_WINDOWS.map((tokens) => ({
+          tokens,
+          bytes: m.perToken === null ? null : Math.round(windowBytes(m.sizeBytes, m.perToken, tokens)),
+          fit: m.perToken === null ? null : windowFit(m.sizeBytes, m.perToken, tokens, hw),
+        })),
+      })),
+    };
+  }
+
+  /** A new choice: the Ollama Drimvox started is restarted with it at the next request. */
+  async setWindow(choice: LocalWindowChoice): Promise<LocalWindowView> {
+    this.windowStore.set({ ...this.windowStore.get(), choice });
+    this.ollama.restart();
+    return this.windowView();
   }
 
   private async installed(): Promise<string[]> {

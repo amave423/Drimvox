@@ -31,7 +31,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   if (url.pathname === "/api/version") return json(res, 200, { version: "0.31.1-fake" });
-  if (url.pathname === "/fake/env") return json(res, 200, { contextLength: process.env.OLLAMA_CONTEXT_LENGTH ?? null, pid: process.pid });
+  if (url.pathname === "/fake/env") return json(res, 200, { contextLength: process.env.OLLAMA_CONTEXT_LENGTH ?? null, flash: process.env.OLLAMA_FLASH_ATTENTION ?? null, kvCache: process.env.OLLAMA_KV_CACHE_TYPE ?? null, pid: process.pid });
   if (url.pathname === "/api/tags") {
     return json(res, 200, { models: [...models].map(([name, size]) => ({ name, model: name, size, modified_at: "2026-10-13T10:00:00Z" })) });
   }
@@ -77,7 +77,7 @@ createServer(async (req, res) => {
     const small = /llama3\.2|1\.7b/.test(model);
     return json(res, 200, {
       capabilities: ["completion", "tools", ...(/gemma/.test(model) ? ["vision"] : [])],
-      model_info: { "general.architecture": "llama", "general.parameter_count": small ? 3_200_000_000 : 8_000_000_000, "llama.context_length": 131072 },
+      model_info: { "general.architecture": "llama", "general.parameter_count": small ? 3_200_000_000 : 8_000_000_000, "llama.context_length": 131072, "llama.block_count": 32, "llama.attention.head_count": 32, "llama.attention.head_count_kv": 8, "llama.embedding_length": 4096 },
     });
   }
   if (url.pathname === "/api/delete" && req.method === "DELETE") {

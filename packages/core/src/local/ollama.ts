@@ -40,6 +40,8 @@ export interface OllamaOptions {
   /** Without requests, downloads or loaded models for this long, the Ollama Drimvox started goes away. */
   idleMs: number;
   hardware: () => Promise<LocalHardware>;
+  /** The window to start Ollama with; null for the one sized by the computer alone (contextFor). */
+  window?: () => number | null;
   /** A download finished: the chat should see the new model. */
   onPulled?: () => void;
   /** Hugging Face models are downloaded by Drimvox itself (see hf-download.ts): from where, and where partial files wait. */
@@ -67,6 +69,8 @@ export class OllamaManager {
   private child: ChildProcess | null = null;
   private starting: Promise<boolean> | null = null;
   private lastUse = Date.now();
+  /** The window the Ollama Drimvox started has. */
+  private started: number | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly pulls = new Map<string, Active>();
   private closed = false;
@@ -124,11 +128,14 @@ export class OllamaManager {
   private async start(): Promise<boolean> {
     const [file, ...args] = this.o.command!;
     const host = new URL(this.o.apiUrl).host;
-    const window = contextFor(await this.o.hardware());
+    const window = this.o.window?.() ?? contextFor(await this.o.hardware());
     // The agent counts on this window, not the model's own (ollama-details.ts).
     rememberOllamaWindow(this.o.apiUrl, window);
+    this.started = window;
     const child = spawn(file!, [...args, "serve"], {
-      env: { ...process.env, ...this.o.commandEnv, OLLAMA_HOST: host, OLLAMA_CONTEXT_LENGTH: String(window) },
+      // The window's cache in q8_0 with flash attention: half of f16, so a longer window stays in the video card
+      // (local/window.ts). What does not fit, Ollama keeps in main memory by itself.
+      env: { ...process.env, OLLAMA_FLASH_ATTENTION: "1", OLLAMA_KV_CACHE_TYPE: "q8_0", ...this.o.commandEnv, OLLAMA_HOST: host, OLLAMA_CONTEXT_LENGTH: String(window) },
       stdio: "ignore",
       windowsHide: true,
     });
@@ -177,6 +184,31 @@ export class OllamaManager {
   private stopWatching(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+  }
+
+  /** The window of the Ollama Drimvox started and runs now; null otherwise. */
+  appliedWindow(): number | null {
+    return this.child ? this.started : null;
+  }
+
+  /** Whether an Ollama answers that Drimvox did not start. */
+  async foreign(): Promise<boolean> {
+    return !this.child && (await this.version()) !== null;
+  }
+
+  /** The window changed: the Ollama Drimvox started goes, and the next request starts it with the new one. */
+  restart(): void {
+    if (this.child) this.stop();
+  }
+
+  /** What Ollama says of a model's build (/api/show model_info); empty when it does not answer. */
+  async info(model: string): Promise<Record<string, unknown>> {
+    try {
+      const res = await this.call("/api/show", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model }) });
+      return res.ok ? (((await res.json()) as { model_info?: Record<string, unknown> }).model_info ?? {}) : {};
+    } catch {
+      return {};
+    }
   }
 
   /** Stops the Ollama Drimvox started; one the user started is left alone. */

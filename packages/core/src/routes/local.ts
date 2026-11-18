@@ -1,5 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
-import { localAudioPullSchema, localAudioSearchSchema, localVoicePullSchema, hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema } from "@drimvox/shared";
+import { localAudioPullSchema, localAudioSearchSchema, localVoicePullSchema, hfMediaSearchSchema, hfRepoName, localImageModelId, localImagePullSchema, localModelName, localPullSchema, localWindowSchema } from "@drimvox/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 import { CatalogError } from "../local/catalog";
@@ -22,6 +22,9 @@ export function localRoutes(local: LocalModels) {
       return c.json(local.installer.state(), 202);
     })
     .get("/picks", async (c) => c.json(await local.picks()))
+    // The context window of the Ollama Drimvox starts (docs/specs/local-models.md).
+    .get("/window", async (c) => c.json(await local.windowView(), 200))
+    .put("/window", zValidator("json", localWindowSchema), async (c) => c.json(await local.setWindow(c.req.valid("json").choice), 200))
     .get("/search", zValidator("query", z.object({ q: z.string().trim().min(1).max(200) })), async (c) => {
       try {
         return c.json(await local.search(c.req.valid("query").q), 200);

@@ -6,6 +6,7 @@ import { useApp } from "../../context";
 import { InstallOllama } from "./InstallOllama";
 import { forgetModels } from "../../lib/models";
 import { LocalCatalogView } from "./LocalCatalog";
+import { LocalWindow } from "./LocalWindow";
 import { LocalImagesSection } from "./LocalImages";
 import { LocalAudioSection } from "./LocalAudio";
 import { LocalSpeechSection } from "./LocalSpeech";
@@ -172,6 +173,8 @@ export function LocalModelsSheet({ part: first }: { part?: LocalPart }) {
                 </ul>
               </>
             )}
+
+            {status?.running && status.models.length > 0 && <LocalWindow models={status.models.length} />}
 
             {status?.running && <LocalCatalogView status={status} actions={actions} />}
           </>

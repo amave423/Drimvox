@@ -6,7 +6,7 @@ import { processRoutes } from "./routes/processes";
 import { resolveVision } from "./visual/look";
 import { findModel, listModels } from "./providers/catalog";
 import { zValidator } from "@hono/zod-validator";
-import { settingsPatchSchema, speakSchema, speechText, type PresetId } from "@drimvox/shared";
+import { localWindowChoices, settingsPatchSchema, speakSchema, speechText, type LocalWindowChoice, type PresetId } from "@drimvox/shared";
 import { Hono } from "hono";
 import { join } from "node:path";
 import { ProjectRepo } from "./agent/repo";
@@ -155,7 +155,7 @@ export function createCore(o: AppOptions) {
   const searchStore = new SearchStore(o.db, cipher);
   const searchUrls = o.searchUrls ?? SEARCH_URLS;
   const providers = new ProviderRepo(o.db, cipher, proxies, o.presetUrls);
-  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), ollamaDir: join(o.dataDir, "engines", "ollama"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), ...o.local });
+  const local = new LocalModels(providers, providers.urlOf("ollama"), { downloadsDir: join(o.dataDir, "downloads"), imagesDir: join(o.dataDir, "images"), ollamaDir: join(o.dataDir, "engines", "ollama"), audioDir: join(o.dataDir, "audio"), speechDir: join(o.dataDir, "speech"), proxy: () => proxies.url(), windowStore: settingsWindowStore(o.db), ...o.local });
   providers.setWaker(local.ollama);
   // Chains of free models answer as models of their own provider (docs/specs/model-chains.md).
   // Free models kept between starts and asked a word in the background (docs/specs/model-chains.md).
@@ -400,3 +400,22 @@ export function createApp(o: AppOptions) {
 }
 
 export type AppType = ReturnType<typeof createApp>;
+
+/** The local models' window choice, kept in the settings (local/window.ts). */
+function settingsWindowStore(db: Database) {
+  const KEY = "local.window";
+  return {
+    get: (): { choice: LocalWindowChoice; auto: number | null } => {
+      try {
+        const row = db.sql.prepare("select value from settings where key = ?").get(KEY) as { value: string } | undefined;
+        const v = row ? (JSON.parse(row.value) as { choice?: unknown; auto?: unknown }) : {};
+        const choice = (localWindowChoices as readonly unknown[]).includes(v.choice) ? (v.choice as LocalWindowChoice) : "auto";
+        return { choice, auto: typeof v.auto === "number" ? v.auto : null };
+      } catch {
+        return { choice: "auto", auto: null };
+      }
+    },
+    set: (v: { choice: LocalWindowChoice; auto: number | null }) =>
+      void db.sql.prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value").run(KEY, JSON.stringify(v)),
+  };
+}

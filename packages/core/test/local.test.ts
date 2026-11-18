@@ -110,6 +110,28 @@ describe("Ollama on this computer", () => {
     await until(answers, (up) => !up, 5_000);
   });
 
+  // Asked for: Ollama's window as a setting of Drimvox, with part of the model in main memory when it does not fit.
+  it("starts Ollama with the chosen window and a small cache, and says where each window runs", async () => {
+    setup({ models: ["qwen3:8b"] });
+    await status();
+    expect(await (await fetch(`${base()}/fake/env`)).json()).toMatchObject({ contextLength: "16384", flash: "1", kvCache: "q8_0" });
+    type FakeEnv = { contextLength: string | null; pid: number };
+    const first = (await (await fetch(`${base()}/fake/env`)).json()) as FakeEnv;
+    const view = await (await env.call("PUT", "/api/local/window", { choice: 65536 })).json();
+    expect(view).toMatchObject({ choice: 65536, userOllama: false });
+    // The fake model's build: llama, 32 layers; the window's cache is counted from it.
+    expect(view.models[0].name).toBe("qwen3:8b");
+    expect(view.models[0].options.map((o: { tokens: number }) => o.tokens)).toEqual([16384, 32768, 65536, 131072]);
+    expect(view.models[0].options.every((o: { bytes: number | null }) => typeof o.bytes === "number")).toBe(true);
+    const after = await until(
+      async () => ((await fetch(`${base()}/fake/env`).catch(() => null))?.json().catch(() => null) ?? null) as Promise<FakeEnv | null>,
+      (e) => !!e && e.pid !== first.pid,
+    );
+    expect(after).toMatchObject({ contextLength: "65536" });
+    expect((await (await env.call("GET", "/api/local/window")).json()).applied).toBe(65536);
+    expect((await env.call("PUT", "/api/local/window", { choice: 50000 })).status).toBe(400);
+  });
+
   it("gives a bigger context window to a computer with a lot of video memory", async () => {
     setup({ hardware: { ramBytes: 64 * GB, gpu: { name: "RTX 4090", vramBytes: 24 * GB }, unified: false } });
     await status();

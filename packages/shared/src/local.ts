@@ -124,3 +124,20 @@ export function localModelTitle(name: string): { title: string; owner: string | 
   const repo = m[2]!.replace(/[-_.]?gguf$/i, "");
   return { title: m[3] ? `${repo} · ${m[3]}` : repo, owner: m[1]! };
 }
+
+/** The context window Drimvox gives the Ollama it starts: "auto" picks it by the computer and the models. */
+export const localWindowChoices = ["auto", 16384, 32768, 65536, 131072] as const;
+export type LocalWindowChoice = (typeof localWindowChoices)[number];
+export const localWindowSchema = z.object({ choice: z.union([z.literal("auto"), z.literal(16384), z.literal(32768), z.literal(65536), z.literal(131072)]) }).strict();
+
+/** The window's state, and for each downloaded model where each window would run on this computer. */
+export interface LocalWindowView {
+  choice: LocalWindowChoice;
+  /** What "auto" picks now. */
+  auto: number;
+  /** The window the running Ollama has, when Drimvox started it; null when it is not running or is the user's own. */
+  applied: number | null;
+  /** An Ollama the user started answers: its window is set in its own settings, not by Drimvox. */
+  userOllama: boolean;
+  models: { name: string; sizeBytes: number; options: { tokens: number; bytes: number | null; fit: LocalFit | null }[] }[];
+}
