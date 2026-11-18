@@ -211,6 +211,24 @@ describe("a chat with a folder", () => {
 
   // Seen live: DeepSeek V4.1 Flash, which sees pictures, said in a chat with a folder that it could not see the pictures
   // in it and measured their pixels with scripts instead.
+  // Seen live (OmniCoder 9B on Ollama, through a tap): it said what it would do, searched twice, thought "Погнали
+  // создавать проект!" and stopped with no word and no call; the answer counted as done.
+  it("asks a model whose last step only thought to do what it planned, once", async () => {
+    const chat = await chatWith([
+      { text: "Найду API.", toolCalls: [{ name: "list_files", args: { path: "." } }] },
+      { reasoning: "Нашёл всё. Погнали создавать проект!" },
+      call("write_file", { path: "index.html", content: "<h1>Погода</h1>\n" }),
+      { text: "Сайт готов." },
+    ]);
+    expect((await connect(chat.id, folder)).status).toBe(200);
+    const events = await readEvents(await send(chat.id, "Сделай сайт погоды"));
+    const asks = fake!.requests.filter((r) => r.path.includes("chat/completions"));
+    expect(JSON.stringify(asks[2]!.body.messages.at(-1))).toContain("did not do it");
+    expect(readFileSync(join(folder, "index.html"), "utf8")).toBe("<h1>Погода</h1>\n");
+    expect(events.at(-1).message).toMatchObject({ status: "done" });
+    expect(events.at(-1).message.content).toContain("Сайт готов.");
+  });
+
   // Seen live: the folder was deleted, the chat went on, and the model made files nobody could find.
   it("stops when its folder is gone, without calling the model", async () => {
     const chat = await chatWith([call("write_file", { path: "lost.txt", content: "x" }), { text: "Готово." }]);

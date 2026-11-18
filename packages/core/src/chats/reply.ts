@@ -46,6 +46,11 @@ const CONTINUE = "Your answer was cut off by its length. Continue exactly where 
  * stopped; the user took it for Drimvox cutting it off. Asked once to give the answer.
  */
 const ANSWER_NOW = "Your thinking ended without an answer: the user saw nothing. Write the answer now (or call the tools you planned), without thinking it all over again.";
+/**
+ * Seen live (OmniCoder 9B on Ollama, through a tap): after two searches it thought "let's build the project!" and stopped,
+ * with no word and no call; the answer counted as done because an earlier step had said something.
+ */
+const DO_IT_NOW = "Your last step only thought about what to do next and did not do it. Do it now: call the tools you planned, or write the answer, without thinking it all over again.";
 
 /** Seen live: "I need names in English" turned the whole conversation into English. */
 export const LANGUAGE_HINT =
@@ -214,6 +219,10 @@ export async function reply(i: ReplyInput): Promise<void> {
   /** What the next round is told: go on after a cut, or answer after thinking alone. */
   let nudge = CONTINUE;
   let askedToAnswer = false;
+  /** What the latest step said, thought and called. */
+  let stepSaid = "";
+  let stepThought = "";
+  let stepCalls = 0;
   for (let round = 0; round <= MAX_CONTINUES; round++) {
     resetClock();
     // The next round goes on mid-sentence, not as a new paragraph.
@@ -272,13 +281,20 @@ export async function reply(i: ReplyInput): Promise<void> {
         // an answer cut as "silent" while a search went on).
         if (part.type === "tool-call") clearTimeout(timer);
         else resetClock();
+        if (part.type === "start-step") {
+          stepSaid = "";
+          stepThought = "";
+          stepCalls = 0;
+        } else if (part.type === "tool-call") stepCalls++;
         if (part.type === "text-delta") {
+          stepSaid += part.text;
           // What the model says after a tool call is a new paragraph (seen live: "…folder.The folder is empty…").
           const piece = newStep && text && !/\n\s*$/.test(text) ? `\n\n${part.text.trimStart()}` : part.text;
           newStep = false;
           text += piece;
           await i.emit({ type: "text", text: piece });
         } else if (part.type === "reasoning-delta") {
+          stepThought += part.text;
           reasoning += part.text;
           await i.emit({ type: "reasoning", text: part.text });
         } else if (part.type === "error") {
@@ -300,10 +316,12 @@ export async function reply(i: ReplyInput): Promise<void> {
         nudge = CONTINUE;
         continue;
       }
-      if (finishReason === "stop" && !error && !text.trim() && reasoning.trim() && !askedToAnswer && round < MAX_CONTINUES && !i.signal.aborted) {
+      // The last step only thought: nothing said, nothing called. Once per answer, the model is told to do it.
+      const thoughtOnly = !stepSaid.trim() && stepCalls === 0 && stepThought.trim() !== "";
+      if (finishReason === "stop" && !error && thoughtOnly && !askedToAnswer && round < MAX_CONTINUES && !i.signal.aborted) {
         askedToAnswer = true;
         said.push(...((await result.response).messages as ModelMessage[]));
-        nudge = ANSWER_NOW;
+        nudge = text.trim() ? DO_IT_NOW : ANSWER_NOW;
         continue;
       }
     } catch (err) {

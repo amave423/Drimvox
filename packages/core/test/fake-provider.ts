@@ -17,6 +17,8 @@ export interface FakeChunk {
 /** One model reply in a scripted conversation: some text and/or tool calls. */
 export interface FakeTurn {
   text?: string;
+  /** Thinking streamed before the text (seen live: a step that only thought and stopped). */
+  reasoning?: string;
   /** `raw` sends the arguments as they are, broken JSON too (seen live from DeepSeek). */
   toolCalls?: { name: string; args: Record<string, unknown>; raw?: string }[];
   usage?: FakeUsage;
@@ -170,6 +172,7 @@ export async function startFakeProvider(o: FakeProviderOptions = {}): Promise<Fa
           });
         }
         res.writeHead(200, { "content-type": "text/event-stream" });
+        if (turn.reasoning) res.write(chunk({ role: "assistant", reasoning_content: turn.reasoning }));
         if (turn.text) res.write(chunk({ role: "assistant", content: turn.text }));
         (turn.toolCalls ?? []).forEach((call, index) => {
           const id = `call_${scriptIndex}_${index}`;
