@@ -36,7 +36,9 @@ createServer(async (req, res) => {
     return json(res, 200, { models: [...models].map(([name, size]) => ({ name, model: name, size, modified_at: "2026-10-13T10:00:00Z" })) });
   }
   if (url.pathname === "/api/ps") {
-    return json(res, 200, { models: Date.now() < loadedUntil ? [{ name: loadedModel, model: loadedModel, size: 1000 }] : [] });
+    // FAKE_OLLAMA_LOADED: models loaded from the start, with the window Ollama gave each ({"qwen3:8b": 16384}).
+    const preloaded = Object.entries(JSON.parse(process.env.FAKE_OLLAMA_LOADED ?? "{}")).map(([name, context_length]) => ({ name, model: name, size: 1000, context_length }));
+    return json(res, 200, { models: [...preloaded, ...(Date.now() < loadedUntil ? [{ name: loadedModel, model: loadedModel, size: 1000 }] : [])] });
   }
   if (url.pathname === "/fake/requests") return json(res, 200, chats);
   // Importing a GGUF Drimvox downloaded itself: the file as a blob, then a model made from it.

@@ -473,6 +473,20 @@ describe("what a local model can do", () => {
     expect(models.find((m: any) => m.id === "qwen3:8b")).toMatchObject({ contextLength: 4096 });
   });
 
+  // Seen live: Ollama 0.40 loaded OmniCoder 9B with 16 384 tokens on its own; Drimvox counted 4096, and the chat's context
+  // bar stood past its end. The window of a loaded model is the one /api/ps reports.
+  it("takes the window a loaded model really has from Ollama", async () => {
+    userOllama = spawn(process.execPath, [FAKE], {
+      env: { ...process.env, OLLAMA_HOST: `127.0.0.1:${port}`, FAKE_OLLAMA_MODELS: JSON.stringify(["qwen3:8b"]), FAKE_OLLAMA_LOADED: JSON.stringify({ "qwen3:8b": 16384 }) },
+      stdio: "ignore",
+    });
+    await until(answers, (up) => up);
+    setup({ models: ["qwen3:8b"] });
+    const { providerId } = await (await env.call("POST", "/api/local/connect")).json();
+    const models = await (await env.call("GET", `/api/providers/${providerId}/models`)).json();
+    expect(models.find((m: any) => m.id === "qwen3:8b")).toMatchObject({ contextLength: 16384 });
+  });
+
   // Seen live: llama3.2:3b with search on answered "привет" by writing a search call as text.
   it("chats with a model too small for tools without giving it the internet", async () => {
     setup({ models: ["llama3.2:3b"] });

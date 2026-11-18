@@ -32,6 +32,7 @@ export async function withOllamaDetails(conn: Connection, models: ModelInfo[]): 
   const root = conn.baseUrl.replace(/\/v1\/?$/, "").replace(/\/+$/, "");
   // What the server actually holds: the window Drimvox gave it, else Ollama's own default.
   const window = windows.get(originOf(root)) ?? OLLAMA_DEFAULT_WINDOW;
+  const loaded = await loadedWindows(conn, root);
   return Promise.all(
     models.map(async (m) => {
       try {
@@ -52,11 +53,35 @@ export async function withOllamaDetails(conn: Connection, models: ModelInfo[]): 
           ...m,
           tools: caps.includes("tools") && (params === null || params >= MIN_TOOL_PARAMS),
           vision: caps.includes("vision"),
-          contextLength: Math.min(typeof context === "number" ? context : (m.contextLength ?? window), window),
+          // A loaded model's window is the one Ollama gave it (seen live: 16 384 on Ollama 0.40, not 4096); the last one
+          // seen is kept for when it is unloaded.
+          contextLength: Math.min(typeof context === "number" ? context : (m.contextLength ?? window), loaded.get(m.id) ?? seen.get(`${originOf(root)}|${m.id}`) ?? window),
         };
       } catch {
         return m;
       }
     }),
   );
+}
+
+/** The windows Ollama gave models it held, by `origin|model`: kept after a model is unloaded. */
+const seen = new Map<string, number>();
+
+/** The models Ollama holds now and the window each was loaded with (/api/ps). */
+async function loadedWindows(conn: Connection, root: string): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  try {
+    const res = await conn.fetch(`${root}/api/ps`, { signal: AbortSignal.timeout(5_000) });
+    if (!res.ok) return out;
+    const body = (await res.json()) as { models?: { name?: string; model?: string; context_length?: unknown }[] };
+    for (const m of body.models ?? []) {
+      const name = m.name ?? m.model;
+      if (!name || typeof m.context_length !== "number" || m.context_length <= 0) continue;
+      out.set(name, m.context_length);
+      seen.set(`${originOf(root)}|${name}`, m.context_length);
+    }
+  } catch {
+    // An older Ollama without /api/ps: the window Drimvox knows.
+  }
+  return out;
 }
