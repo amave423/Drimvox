@@ -1,4 +1,5 @@
 import { useState, type RefObject } from "react";
+import { contextLevel } from "./context-level";
 import { useApp } from "../../context";
 import { authHeaders } from "../../api";
 import { formatTokens, formatUsd } from "../../lib/format";
@@ -84,7 +85,7 @@ export function ChatMargin({
       {model?.contextLength && used !== null && (
         <section className="margin-sec" aria-label={t("margin.context")}>
           <h3 className="margin-label">{t("margin.context")}</h3>
-          <div className="context-bar" role="meter" aria-valuemin={0} aria-valuemax={model.contextLength} aria-valuenow={Math.min(used, model.contextLength)} aria-label={t("margin.context")}>
+          <div className="context-bar" data-level={contextLevel(used, model.contextLength)} role="meter" aria-valuemin={0} aria-valuemax={model.contextLength} aria-valuenow={Math.min(used, model.contextLength)} aria-label={t("margin.context")}>
             <span style={{ width: `${Math.min(100, (used / model.contextLength) * 100)}%` }} />
           </div>
           <p className="mono margin-figure">{t("margin.contextUsed", { used: formatTokens(used, settings.locale), of: formatTokens(model.contextLength, settings.locale) })}</p>

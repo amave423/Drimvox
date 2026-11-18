@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useApp } from "../../context";
 
 /** Which of the user's messages is in view: the last one whose top has passed the top third of the window. */
@@ -32,6 +32,23 @@ function goTo(list: RefObject<HTMLDivElement | null>, i: number) {
 const line = (text: string) => text.replace(/\s+/g, " ").slice(0, 90);
 
 /**
+ * The open list ends where the conversation's own area ends (seen live: it ran under the message box, and the last four
+ * messages could not be reached), and shows the message in view.
+ */
+function fitPanel(nav: HTMLElement | null) {
+  const panel = nav?.querySelector<HTMLElement>(".msg-rail-panel");
+  if (!nav || !panel) return;
+  const scroller = nav.closest(".workshop-feed, .desk, .sheet-scroll");
+  const area = scroller?.getBoundingClientRect();
+  // The message box lies over the bottom of the conversation: the list ends above it.
+  const box = (scroller?.parentElement ?? document).querySelector("form.composer")?.getBoundingClientRect();
+  const bottom = Math.min(area?.bottom ?? window.innerHeight, box && box.top > 0 ? box.top : Infinity, window.innerHeight);
+  const room = bottom - (nav.getBoundingClientRect().top - 8) - 12;
+  panel.style.maxHeight = `${Math.max(140, Math.floor(room))}px`;
+  panel.querySelector<HTMLElement>("button.is-on")?.scrollIntoView({ block: "nearest" });
+}
+
+/**
  * The user's own messages along the workshop's conversation, as in DeepSeek (asked for: the marks that each grew a label
  * were awkward). Folded, a short dash per message at the right edge, the one in view longer; hovered or focused, one
  * card with all of them listed, the one in view marked, a click bringing it into view.
@@ -39,9 +56,10 @@ const line = (text: string) => text.replace(/\s+/g, " ").slice(0, 90);
 export function MessageRail({ texts, list }: { texts: string[]; list: RefObject<HTMLDivElement | null> }) {
   const { t } = useApp();
   const current = useCurrent(list, texts.length);
+  const nav = useRef<HTMLElement>(null);
   if (texts.length < 2) return null;
   return (
-    <nav className="msg-rail" aria-label={t("chat.yourMessages")}>
+    <nav ref={nav} className="msg-rail" aria-label={t("chat.yourMessages")} onPointerEnter={() => fitPanel(nav.current)} onFocus={() => fitPanel(nav.current)}>
       <div className="msg-rail-marks" aria-hidden>
         {texts.map((_, i) => (
           <span key={i} className={i === current ? "is-on" : undefined} />

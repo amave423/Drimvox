@@ -1,4 +1,5 @@
 import type { ProjectWorkView } from "@drimvox/shared";
+import { contextLevel } from "../chat/context-level";
 import { Fragment } from "react";
 import { useApp } from "../../context";
 import type { MessageKey } from "../../i18n";
@@ -31,6 +32,7 @@ export function WorkTokens({ work, onFresh }: { work: ProjectWorkView; /** A rea
         <>
           <div
             className="context-bar"
+            data-level={contextLevel(context, size)}
             role="meter"
             aria-valuemin={0}
             aria-valuemax={size}
