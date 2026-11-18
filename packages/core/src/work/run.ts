@@ -349,7 +349,10 @@ export class WorkRun {
     const kept = this.d.carry?.get(this.projectId);
     // The last run's whole conversation when only the user's new message came since; the saved text otherwise (a restart,
     // an undone answer, an edited message).
-    const fresh = kept && kept.chatId === this.chatId && history.length === kept.turns + 1 && history.at(-1)?.role === "user";
+    // Not the conversation another model left (seen live: OmniCoder's 16 thousand tokens fitted Nexus's conversation into a
+    // summary, and DeepSeek, with a million, would have gone on from it).
+    const model = this.row().models?.work?.model;
+    const fresh = kept && kept.chatId === this.chatId && (kept.model === undefined || kept.model === model) && history.length === kept.turns + 1 && history.at(-1)?.role === "user";
     const messages: ModelMessage[] = fresh
       ? [...kept.messages, ...toModelMessages(history.slice(-1), this.d.chats.attachments, true)]
       : toModelMessages(history, this.d.chats.attachments, true);
@@ -568,7 +571,7 @@ export class WorkRun {
             ?.content.split("\n")[0] ?? "";
         await this.d.git.finish(this.projectId, this.folder, asked).catch(() => {});
       }
-      this.d.carry?.set(this.projectId, { chatId: this.chatId, turns: this.d.chats.history(this.chatId).length, messages });
+      this.d.carry?.set(this.projectId, { chatId: this.chatId, turns: this.d.chats.history(this.chatId).length, model: this.row().models?.work?.model, messages });
       if (final) this.d.repo.update(this.projectId, final);
       this.d.ended(this.projectId);
     }
@@ -1017,6 +1020,8 @@ export interface Carried {
   chatId: string;
   /** How many turns the chat's saved history had when it was kept. */
   turns: number;
+  /** The model it was fitted for: another one (another window) starts from the saved messages. */
+  model?: string;
   messages: ModelMessage[];
 }
 

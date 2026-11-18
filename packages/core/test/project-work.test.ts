@@ -696,6 +696,24 @@ describe("a ready project", () => {
   });
 });
 
+// Seen live: OmniCoder ran, the user pressed Stop, picked DeepSeek and wrote "Продолжай"; the stopped turn was still
+// ending, the message went into it, OmniCoder answered again, and the project kept OmniCoder as its model.
+describe("another model picked while a turn still works", () => {
+  it("ends that turn and answers with the picked model, which the project keeps", async () => {
+    const s = await setup({ slow: [{ text: "Долго думаю…", delayMs: 1500 }], fast: [{ text: "На связи." }] });
+    await env.call("PATCH", `/api/projects/${s.project.id}`, { kind: "existing" });
+    await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Начни", model: s.ref("slow") });
+    await until(s.project.id, (w) => w.status === "running");
+    const sent = await env.call("POST", `/api/projects/${s.project.id}/work/chat`, { content: "Продолжай", model: s.ref("fast") });
+    expect(sent.status).toBe(200);
+    const w = await until(s.project.id, (v) => v.status !== "running" && requestsOf("fast").length > 0);
+    expect(w.models.work).toEqual(s.ref("fast"));
+    const chat = await (await env.call("GET", `/api/chats/${w.chatId}`)).json();
+    expect(chat.messages.at(-1)).toMatchObject({ role: "assistant", model: "fast", content: "На связи." });
+    expect(chat.messages.filter((m: { role: string; content: string }) => m.role === "user" && m.content === "Продолжай")).toHaveLength(1);
+  });
+});
+
 // Asked for: the agent works with git by the project's rules — a branch, commits on its word, accept or reject.
 describe("a project's git rules", () => {
   async function ready(turns: FakeTurn[], rules: Record<string, unknown> = {}) {

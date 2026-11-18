@@ -158,7 +158,22 @@ export class ProjectWork {
     const project = this.o.projects.get(projectId);
     if (!project) throw new WorkRefused("not_repo");
     const row = this.o.repo.get(projectId);
-    if (this.runs.has(projectId) && row?.startedAt) return this.message(projectId, content, o.thinking, o.files);
+    const live = this.runs.get(projectId);
+    if (live && row?.startedAt) {
+      const now = row.models?.work;
+      if (now && now.providerId === model.providerId && now.model === model.model) return this.message(projectId, content, o.thinking, o.files);
+      // Another model picked while a turn still works or is still ending after Stop (seen live: the message went into
+      // OmniCoder's ending turn, OmniCoder answered, and the project kept it): that turn ends, the next one is the picked
+      // model's.
+      live.controller.abort();
+      const chatId = row.chatId!;
+      void live.done
+        .catch(() => {})
+        .then(() => {
+          if (!this.runs.has(projectId)) this.chat(projectId, content, model, o);
+        });
+      return { chatId, queued: true };
+    }
     const known = row?.chatId ? this.o.chats.get(row.chatId) : null;
     const chat = known ?? this.o.chats.create(model.providerId, model.model, "text", { folder: project.path, projectId, itemId: null, title: project.name });
     if (known) this.o.chats.update(chat.id, { providerId: model.providerId, model: model.model });

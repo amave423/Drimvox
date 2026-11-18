@@ -56,7 +56,10 @@ export function ProjectComposer({ projectId, work, onSent }: { projectId: string
     setAttachError(null);
     const attached = await Promise.all(files.map(async (f) => ({ name: f.file.name, type: f.file.type, data: await toBase64(f.file) })));
     // While it works the message goes into the run on the way, as in a chat; it answers the agent's question, if one waits.
-    if (running) {
+    // Another model picked meanwhile: the message goes with it, and that turn ends (seen live: after Stop, DeepSeek was
+    // picked and OmniCoder answered).
+    const sameModel = !choice || (choice.providerId === workModel?.providerId && choice.model === workModel?.model);
+    if (running && sameModel) {
       const res = await api.projects[":id"].work.message.$post({ param: { id: projectId }, json: { content, thinking: prefs.thinking, files: attached } }).catch(() => null);
       if (!res?.ok) setFailed("unknown");
       else setFiles([]);
