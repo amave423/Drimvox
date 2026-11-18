@@ -84,7 +84,7 @@ async function banner(page: Page, name: string, dark: boolean) {
               <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:${t.muted}">Windows · Linux · macOS · свои ключи, подписки или локальные модели</div>
             </div>
             <div style="width:270px;display:flex;flex-direction:column;justify-content:center;gap:16px;font-family:Onest,sans-serif;font-size:16px;line-height:1.45">
-              <div style="border-left:2px solid ${t.ink};padding-left:14px;color:${t.ink}">Опрос → план → работа<br>с проверками на телефоне</div>
+              <div style="border-left:2px solid ${t.ink};padding-left:14px;color:${t.ink}">Агент прямо в папке,<br>проверяющий после него</div>
               <div style="border-left:2px solid ${t.ok};padding-left:14px;color:${t.ok}">60+ провайдеров,<br>бесплатные модели отмечены</div>
               <div style="border-left:2px solid ${t.pencil};padding-left:14px;color:${t.pencil};font-family:'Source Serif 4',serif;font-style:italic;font-size:18px">«Сделай сайт клиники с записью»</div>
             </div>
@@ -208,50 +208,10 @@ test("README screenshots", async () => {
   await shot(page, "skills");
   await page.getByRole("button", { name: "Назад" }).click();
 
-  // A project from scratch: the interview with choices, the plan, the work.
+  // A project: one conversation, as in Claude Code — the agent writes, keeps its checklist and answers.
   folder = project;
   await app.evaluate((_e, dir) => (process.env.DRIMVOX_TEST_PICK_FOLDER = dir), folder);
   queue.push(
-    call("ask_questions", {
-      understood: "Нужен сайт стоматологической клиники «Улыбка» с онлайн-записью к врачу. Пациенты чаще заходят с телефона.",
-      unknown: ["Нужна ли оплата на сайте", "Сколько врачей и услуг"],
-      questions: [
-        {
-          id: "booking",
-          question: "Как пациент записывается?",
-          options: [
-            { label: "Выбор врача и времени", description: "Свободные окна из расписания, подтверждение по SMS" },
-            { label: "Заявка с обратным звонком", description: "Администратор перезванивает и записывает сам" },
-          ],
-          recommended: 0,
-        },
-        {
-          id: "style",
-          question: "Какой стиль сайта?",
-          options: [
-            { label: "Светлый и спокойный", description: "Много воздуха, мягкие цвета, фото врачей" },
-            { label: "Строгий медицинский", description: "Белый, синий, акцент на лицензиях" },
-            { label: "Тёплый семейный", description: "Детский уголок, тёплые цвета" },
-          ],
-          recommended: 0,
-        },
-      ],
-    }),
-    call("ask_questions", { questions: [], understood: "Сайт клиники с записью к врачу и подтверждением по SMS, светлый стиль.", unknown: [] }),
-    call("write_plan", {
-      summary: "Сайт стоматологии «Улыбка»: услуги и цены, врачи, отзывы и онлайн-запись с выбором врача и времени. Запись подтверждается кодом из SMS; администратор видит записи в простой панели.",
-      steps: ["Каркас сайта и общий стиль", "Главная: услуги, врачи, отзывы", "Онлайн-запись: врач, день, время", "Подтверждение по SMS", "Панель администратора", "Проверить на телефоне и компьютере"],
-      checks: ["npm run build", "npm test"],
-      screens: [
-        { name: "Главная", contents: "Первый экран с кнопкой «Записаться», услуги с ценами, врачи, отзывы, адрес и карта" },
-        { name: "Запись", contents: "Выбор врача, дня и времени из свободных окон; имя и телефон; код из SMS" },
-        { name: "Панель администратора", contents: "Записи на сегодня и неделю, отмена и перенос" },
-      ],
-      decisions: [
-        { what: "Next.js и SQLite", why: "Один небольшой сервер без отдельной базы данных: дёшево держать и просто переносить" },
-        { what: "SMS через SMS.ru", why: "Российский сервис с понятными ценами; ключ хранится в .env" },
-      ],
-    }),
     { ...call("write_file", { path: "index.html", content: PAGE }), delayMs: 600 },
     call("update_checklist", {
       items: [
@@ -263,30 +223,18 @@ test("README screenshots", async () => {
         { text: "Проверить на телефоне и компьютере", done: true },
       ],
     }),
-    call("finish_work", { report: "Сайт готов: запись к врачу с подтверждением по SMS, панель администратора. Запуск: npm run dev, адрес http://localhost:3000." }),
-    { text: "Сайт готов: запись к врачу с подтверждением по SMS, панель администратора. Запуск: npm run dev." },
+    call("update_notes", { notes: "Сайт клиники «Улыбка»: index.html. Запуск: npm run dev, http://localhost:3000." }),
+    { text: "Сайт готов: запись к врачу с подтверждением по SMS, панель администратора. Запуск: npm run dev, адрес http://localhost:3000." },
+    // The tester: it starts the site as a patient would and finds nothing; then the agent says it is checked.
+    call("report_check", { problems: [], summary: "Открыл сайт на компьютере и телефоне, записался к врачу: всё работает." }),
+    { text: "Проверено: запись работает на компьютере и телефоне." },
   );
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
   await addProject(page);
-  // The last model of the chat is picked already; the project gets a stronger one, and asks for the interview and the plan.
-  await page.locator(".composer").getByRole("button", { name: /DeepSeek V4 Flash/ }).click();
-  await page.getByRole("option", { name: /Claude Sonnet 5.5/ }).click();
-  await page.locator(".composer").getByRole("button", { name: /^Параметры/ }).click();
-  const options = page.getByRole("dialog", { name: "Параметры" });
-  await options.getByText(/^Сначала пара вопросов/).click();
-  await options.getByText(/^План на утверждение/).click();
-  await page.keyboard.press("Escape");
   await page.getByPlaceholder("Вопрос или задача по проекту").fill("Сайт стоматологической клиники «Улыбка» с онлайн-записью к врачу");
   await page.getByPlaceholder("Вопрос или задача по проекту").press("Enter");
-  await expect(page.getByText("Как пациент записывается?")).toBeVisible({ timeout: 30_000 });
-  await shot(page, "project-interview");
-  for (const option of ["Выбор врача и времени", "Светлый и спокойный"]) await page.getByText(option, { exact: true }).click();
-  await page.getByRole("button", { name: "Ответить" }).click();
-  const plan = page.getByRole("region", { name: "Итоговый план" });
-  await expect(plan).toContainText("стоматологии «Улыбка»", { timeout: 30_000 });
-  await shot(page, "project-plan");
-  await plan.getByRole("button", { name: "Начать работу" }).click();
-  await expect(page.locator(".topbar").getByRole("status")).toContainText("Готово", { timeout: 60_000 });
+  await expect(page.getByText(/^Сайт готов: запись к врачу/)).toBeVisible({ timeout: 60_000 });
+  await page.waitForTimeout(3000);
   await shot(page, "project-work");
 
   // The same in the dark theme.
