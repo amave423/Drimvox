@@ -41,6 +41,11 @@ export const WEB_STEPS = 60;
 /** Rounds an answer cut by its length may go on for, in the same message. */
 const MAX_CONTINUES = 2;
 const CONTINUE = "Your answer was cut off by its length. Continue exactly where it stopped: no repeating, no introduction.";
+/**
+ * Seen live: a 9B model on Ollama thought through a whole site, ended its thinking with "let's write the code" and
+ * stopped; the user took it for Drimvox cutting it off. Asked once to give the answer.
+ */
+const ANSWER_NOW = "Your thinking ended without an answer: the user saw nothing. Write the answer now (or call the tools you planned), without thinking it all over again.";
 
 /** Seen live: "I need names in English" turned the whole conversation into English. */
 export const LANGUAGE_HINT =
@@ -206,6 +211,9 @@ export async function reply(i: ReplyInput): Promise<void> {
   let lastStep = false;
   /** What the earlier rounds said and did: a round cut by the answer's length goes on from there. */
   const said: ModelMessage[] = [];
+  /** What the next round is told: go on after a cut, or answer after thinking alone. */
+  let nudge = CONTINUE;
+  let askedToAnswer = false;
   for (let round = 0; round <= MAX_CONTINUES; round++) {
     resetClock();
     // The next round goes on mid-sentence, not as a new paragraph.
@@ -229,7 +237,7 @@ export async function reply(i: ReplyInput): Promise<void> {
         ]
           .filter(Boolean)
           .join("\n"),
-        messages: answeredOnly(round === 0 ? history : [...history, ...said, { role: "user" as const, content: CONTINUE }]),
+        messages: answeredOnly(round === 0 ? history : [...history, ...said, { role: "user" as const, content: nudge }]),
         ...(Object.keys(tools).length
           ? {
               tools: deferral.tools,
@@ -289,6 +297,13 @@ export async function reply(i: ReplyInput): Promise<void> {
       // Cut by the answer's length (seen live: a long page of code stopped mid-tag): the next round goes on from there.
       if (finishReason === "length" && !error && text.trim() && round < MAX_CONTINUES && !i.signal.aborted) {
         said.push(...((await result.response).messages as ModelMessage[]));
+        nudge = CONTINUE;
+        continue;
+      }
+      if (finishReason === "stop" && !error && !text.trim() && reasoning.trim() && !askedToAnswer && round < MAX_CONTINUES && !i.signal.aborted) {
+        askedToAnswer = true;
+        said.push(...((await result.response).messages as ModelMessage[]));
+        nudge = ANSWER_NOW;
         continue;
       }
     } catch (err) {

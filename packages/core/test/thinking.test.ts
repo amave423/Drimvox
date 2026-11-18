@@ -64,6 +64,17 @@ describe("thinking in a chat", () => {
     const events = await readEvents(await env.call("POST", `/api/chats/${c.id}/messages`, { content: "Что это за игра?" }));
     expect(events.at(-1).message).toMatchObject({ status: "error", error: { code: "no_answer" } });
   });
+
+  // Seen live: OmniCoder 9B on Ollama thought through the whole design, ended with "Приступим к коду!" and stopped; the
+  // user took it for Drimvox cutting it off. The model is asked once to write the answer.
+  it("asks a model that ended on its thinking to write the answer, once", async () => {
+    const c = await chat([{ reasoning: "Сделаю арку… Приступим к коду!" }]);
+    const events = await readEvents(await env.call("POST", `/api/chats/${c.id}/messages`, { content: "Сделай сайт погоды" }));
+    const asks = fake!.requests.filter((r) => r.path === "/v1/chat/completions");
+    expect(asks).toHaveLength(2);
+    expect(JSON.stringify(asks[1]!.body.messages.at(-1))).toContain("thinking ended without an answer");
+    expect(events.at(-1).message).toMatchObject({ status: "error", error: { code: "no_answer" } });
+  });
 });
 
 describe("thinking on a local model", () => {
