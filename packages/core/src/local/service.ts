@@ -102,6 +102,8 @@ export class LocalModels {
         return w.choice === "auto" ? w.auto : w.choice;
       },
       onPulled: () => this.afterPull(),
+      // The list from before (Ollama's own small window) goes: seen live, the chat said 4 096 while Ollama held 65 536.
+      onStarted: () => this.forgetList(),
       hf: { apiUrl: o.hfUrl ?? "https://huggingface.co", bases: o.hfFiles ?? HF_FILE_BASES, dir: o.downloadsDir ?? join(tmpdir(), "drimvox-downloads"), proxy: o.proxy ?? (() => null) },
     });
     const test = o.install;
@@ -160,6 +162,12 @@ export class LocalModels {
     if ((await this.ollama.models()).length > 0) this.connect();
   }
 
+  /** The Ollama provider's cached model list goes, if there is a provider. */
+  private forgetList(): void {
+    const id = this.providerId();
+    if (id) this.providers.update(id, {});
+  }
+
   private afterPull(): void {
     // A fresh timestamp drops the provider's cached model list, so the new model shows at once.
     this.providers.update(this.connect(), {});
@@ -212,6 +220,7 @@ export class LocalModels {
   async setWindow(choice: LocalWindowChoice): Promise<LocalWindowView> {
     this.windowStore.set({ ...this.windowStore.get(), choice });
     this.ollama.restart();
+    this.forgetList();
     return this.windowView();
   }
 

@@ -5,21 +5,31 @@ import { formatPrice } from "../../lib/format";
 import type { ModelChoice } from "../../lib/lastModel";
 import { loadModels } from "../../lib/models";
 
-/** The chosen model as its provider lists it: context size, price and abilities; null until known. */
-export function useModelInfo(choice: ModelChoice | null): ModelInfo | null {
-  const { api } = useApp();
+/** Providers on this computer: their models' windows change with what Ollama holds (local/window.ts). */
+const LOCAL = new Set(["ollama", "lmstudio"]);
+
+/**
+ * The chosen model as its provider lists it: context size, price and abilities; null until known. A local model is asked
+ * again whenever `fresh` changes (an answer came): its window is the one the engine holds now (seen live: the list
+ * from the app's start said 4 096 all session, while Ollama held the model with 65 536).
+ */
+export function useModelInfo(choice: ModelChoice | null, fresh?: unknown): ModelInfo | null {
+  const { api, providers } = useApp();
   const [model, setModel] = useState<ModelInfo | null>(null);
+  const local = !!choice && LOCAL.has(providers.find((p) => p.id === choice.providerId)?.preset ?? "");
+  useEffect(() => {
+    setModel(null);
+  }, [choice?.providerId, choice?.model]);
   useEffect(() => {
     let live = true;
-    setModel(null);
     if (!choice) return;
-    void loadModels(api, choice.providerId).then((r) => {
+    void loadModels(api, choice.providerId, local && fresh !== undefined).then((r) => {
       if (live && "models" in r) setModel(r.models.find((m) => m.id === choice.model) ?? null);
     });
     return () => {
       live = false;
     };
-  }, [api, choice?.providerId, choice?.model]);
+  }, [api, choice?.providerId, choice?.model, local, local ? fresh : undefined]);
   return model;
 }
 

@@ -19,7 +19,7 @@ const LONG_TOKENS = 60_000;
 export function WorkTokens({ work, onFresh }: { work: ProjectWorkView; /** A ready project's next task in a new conversation. */ onFresh?: () => void }) {
   const { t, settings } = useApp();
   const ref = work.escalated && work.models?.strong ? work.models.strong : (work.models?.work ?? null);
-  const model = useModelInfo(ref);
+  const model = useModelInfo(ref, work.tokens.context);
   const { input, output, cached, context } = work.tokens;
   if (!work.startedAt || (input === 0 && output === 0 && context === null)) return null;
   const tokens = (n: number) => formatTokens(n, settings.locale);

@@ -44,6 +44,8 @@ export interface OllamaOptions {
   window?: () => number | null;
   /** A download finished: the chat should see the new model. */
   onPulled?: () => void;
+  /** Drimvox started Ollama with a window: the models' listed windows change (ollama-details.ts). */
+  onStarted?: () => void;
   /** Hugging Face models are downloaded by Drimvox itself (see hf-download.ts): from where, and where partial files wait. */
   hf?: { apiUrl: string; bases: string[]; dir: string; /** The proxy from the settings, tried when the direct way fails. */ proxy(): string | null };
 }
@@ -151,6 +153,7 @@ export class OllamaManager {
     while (Date.now() < until && this.child === child) {
       if ((await this.version()) !== null) {
         this.watchIdle();
+        this.o.onStarted?.();
         return true;
       }
       await new Promise((r) => setTimeout(r, 200));

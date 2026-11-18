@@ -40,7 +40,8 @@ export function ChatMargin({
   const { t, settings, providers, token } = useApp();
   const [saved, setSaved] = useState<string | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
-  const model = useModelInfo(choice);
+  // Asked again after each answer for a local model (its window is the engine's now).
+  const model = useModelInfo(choice, `${answers.length}:${answers.at(-1)?.contextTokens ?? ""}`);
 
   /** Markdown from the core, saved as a file (asked for: export a chat). */
   async function exportMarkdown() {
