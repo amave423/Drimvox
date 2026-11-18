@@ -72,6 +72,7 @@ export const presetIds = [
   "lmstudio",
   "sdcpp",
   "whispercpp",
+  "comfyui",
   "custom",
 ] as const;
 export type PresetId = (typeof presetIds)[number];
@@ -873,6 +874,16 @@ export const presets: Record<PresetId, Preset> = {
     baseUrl: "drimvox://sdcpp",
     keyRequired: false,
     editableUrl: false,
+    billing: "free",
+    currency: "USD",
+  },
+  // Pictures through a ComfyUI the user runs (docs/specs/local-images.md): its models, Drimvox's graphs.
+  comfyui: {
+    id: "comfyui",
+    name: "ComfyUI",
+    baseUrl: "http://127.0.0.1:8188",
+    keyRequired: false,
+    editableUrl: true,
     billing: "free",
     currency: "USD",
   },

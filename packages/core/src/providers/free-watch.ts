@@ -82,7 +82,7 @@ export class FreeWatch {
       await Promise.all(
         this.providers.list().map(async (p) => {
           const conn = this.providers.connection(p.id);
-          if (!conn || isCli(conn.preset) || conn.preset === "sdcpp" || conn.preset === "whispercpp") return;
+          if (!conn || isCli(conn.preset) || conn.preset === "sdcpp" || conn.preset === "whispercpp" || conn.preset === "comfyui") return;
           const models = await within(
             listModels(conn).catch(() => null),
             LIST_MS,

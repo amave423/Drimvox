@@ -18,7 +18,7 @@ export async function allModels(conn: Connection): Promise<ListedModel[]> {
   const where = (id: string): ListedModel["offered"] =>
     text.some((m) => m.id === id) ? "text" : images.some((m) => m.id === id) ? "image" : videos.some((m) => m.id === id) ? "video" : null;
   // Programs on a subscription and local engines have no list of their own beyond what Drimvox shows.
-  const raw = isCli(conn.preset) || conn.preset === "sdcpp" || conn.preset === "whispercpp" ? [] : await rawList(conn).catch(() => []);
+  const raw = isCli(conn.preset) || conn.preset === "sdcpp" || conn.preset === "whispercpp" || conn.preset === "comfyui" ? [] : await rawList(conn).catch(() => []);
   const seen = new Set<string>();
   const out: ListedModel[] = [];
   for (const m of [...raw, ...text, ...images, ...videos].map((m) => ({ id: m.id, name: m.name }))) {

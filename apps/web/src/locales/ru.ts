@@ -210,6 +210,7 @@ export const ru = {
   "providers.hint.nvidia": "Модели в облаке NVIDIA, оплата кредитами",
   "providers.hint.ollama": "Локальные модели на этом компьютере",
   "providers.hint.lmstudio": "Локальные модели через LM Studio",
+  "providers.hint.comfyui": "Картинки через ComfyUI на этом компьютере",
   "providers.hint.groq": "Очень быстрые открытые модели; есть бесплатный тариф с лимитами",
   "providers.hint.cerebras": "Самые быстрые ответы открытых моделей; бесплатный тариф с лимитами",
   "providers.hint.mistral": "Mistral и Codestral напрямую; бесплатный тариф для опытов",

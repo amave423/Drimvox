@@ -27,7 +27,7 @@ const FAMILIES: [RegExp, string[]][] = [
 const SPEECH_ID = /(^|[/-])tts([-.]|$)|tts-1|orpheus|kokoro/i;
 
 /** Providers that never have voices: on this computer, by subscription, or a chain of chat models. */
-const NO_VOICES = new Set(["ollama", "lmstudio", "sdcpp", "whispercpp", "anthropic", "deepseek"]);
+const NO_VOICES = new Set(["ollama", "lmstudio", "sdcpp", "whispercpp", "comfyui", "anthropic", "deepseek"]);
 /** What each provider's catalog said, for a while: the settings list opens often, the catalogs change seldom. */
 const listed = new Map<string, { at: number; models: Omit<CloudSpeechModel, "providerId" | "provider">[] }>();
 const LISTED_MS = 30 * 60_000;

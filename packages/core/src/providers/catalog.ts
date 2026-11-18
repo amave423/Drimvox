@@ -196,7 +196,7 @@ export async function listModels(conn: Connection, fresh = false): Promise<Model
   // A CLI's list is cheap to build and shows the model its default last turned out to be.
   if (isCli(conn.preset)) return cliModels({ ...conn, preset: conn.preset });
   // Pictures on this computer have no models to talk to (docs/specs/local-images.md).
-  if (conn.preset === "sdcpp") return [];
+  if (conn.preset === "sdcpp" || conn.preset === "comfyui") return [];
   // Speech on this computer (docs/specs/local-audio.md): the downloaded models, all of which hear.
   if (conn.preset === "whispercpp")
     return (localAudio()?.installed() ?? []).map((m) => ({ id: m.id, name: m.name, contextLength: null, priceIn: 0, priceOut: 0, priceEstimated: false, tools: false, vision: false, audio: true }));

@@ -79,3 +79,21 @@
 - Отдельное семейство `qwen-image-2.1` (`familyOf`: «qwen image 2.1» в имени репозитория или файла) — для найденных
   файлов; их недостающие части Drimvox скачивает сам.
 - В короткий список не входит (`listed: false`): там только модели, проверенные с движком Drimvox.
+
+## ComfyUI (2026-11-18)
+
+Попросили: движки кроме stable-diffusion.cpp. ComfyUI поддерживает новые модели раньше всех и в их собственных форматах
+(`int8_convrot`, раздельные файлы), но ставится тяжело (Python и PyTorch, 5–7 ГБ), поэтому его ставит сам человек, а
+Drimvox к нему подключается: «Ключи и модели» → «Свой сервер» → ComfyUI, адрес `http://127.0.0.1:8188` (`preset: comfyui`,
+`media/comfyui.ts`).
+- Модели — из папок ComfyUI (`GET /models/<папка>`). Drimvox предлагает те, для которых у него есть граф:
+  - **Qwen-Image 2.1**: файл `qwen_image_2.1…` в `diffusion_models`, кодировщик `qwen3vl_8b…` в `text_encoders` и
+    `qwen_image_2.1_vae…` в `vae`. Граф — как в шаблоне ComfyUI `image_qwen_image_2_1_t2i`: `UNETLoader`, `CLIPLoader`
+    (`type: qwen_image`), `VAELoader`, `TextEncodeQwenImage21`, `EmptyLatentImage`, `KSampler` (25 шагов, cfg 1,
+    euler, simple), `VAEDecode`, `SaveImage`.
+  - **Любой чекпоинт** из `checkpoints` (SD 1.5, SDXL и т. п.): `CheckpointLoaderSimple` и обычный `KSampler`
+    (25 шагов, cfg 6).
+- Рисует через API: граф в `POST /prompt`, ожидание `GET /history/<id>` (до 15 минут), картинка из `GET /view`. «Стоп» —
+  `POST /interrupt`. Ошибка ComfyUI (нехватка памяти, неизвестный узел) показывается его словами.
+- Бесплатно; в списке чатов-моделей у провайдера ничего нет, только картинки. Видео через ComfyUI пока нет.
+- Проверено на поддельном ComfyUI (`test/comfyui.test.ts`); вживую — нет: на компьютере владельца ComfyUI не стоит.

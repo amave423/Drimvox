@@ -73,7 +73,7 @@ export function ModelPicker({ value, onChange, placement = "below", kinds: wante
   const chainsTab = wanted.includes("text") && !audio && !vision;
   const sidebar = providers.length > 1 || (favorites.length > 0 && !audio) || chainsTab;
   // Three groups: by key, on this computer, by subscription (asked for: local models in a section of their own).
-  const local = (p: ProviderView) => p.preset === "ollama" || p.preset === "lmstudio" || p.preset === "sdcpp" || p.preset === "whispercpp";
+  const local = (p: ProviderView) => p.preset === "ollama" || p.preset === "lmstudio" || p.preset === "sdcpp" || p.preset === "whispercpp" || p.preset === "comfyui";
   const byKey = providers.filter((p) => p.billing !== "subscription" && !local(p));
   const onComputer = providers.filter(local);
   const bySubscription = providers.filter((p) => p.billing === "subscription");

@@ -210,6 +210,7 @@ export const en: Record<keyof typeof ru, string> = {
   "providers.hint.nvidia": "Models in the NVIDIA cloud, paid with credits",
   "providers.hint.ollama": "Local models on this computer",
   "providers.hint.lmstudio": "Local models through LM Studio",
+  "providers.hint.comfyui": "Pictures through ComfyUI on this computer",
   "providers.hint.groq": "Very fast open models; a free tier with limits",
   "providers.hint.cerebras": "The fastest answers from open models; a free tier with limits",
   "providers.hint.mistral": "Mistral and Codestral direct; a free tier to try",

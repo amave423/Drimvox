@@ -3,6 +3,7 @@ import { codeForStatus, describeError, detailFromBody, ProviderFailure } from ".
 import type { Connection } from "../providers/repo";
 import { usdPer } from "../rates";
 import { drawLocally } from "./local";
+import { drawComfy } from "./comfyui";
 
 const headers = (conn: Connection, json = true) => ({
   Accept: json ? "application/json" : "*/*",
@@ -55,6 +56,7 @@ export interface Generated {
 /** Draws one picture. Pictures take seconds to a minute; five minutes is the limit. */
 export async function generateImage(conn: Connection, model: MediaModel, prompt: string, o: MediaOptions, signal?: AbortSignal, photos: Photo[] = []): Promise<Generated> {
   if (conn.preset === "sdcpp") return drawLocally(model.id, prompt, o.aspectRatio, signal);
+  if (conn.preset === "comfyui") return drawComfy(conn, model.id, prompt, o.aspectRatio, signal);
   if (model.native === "gemini") return drawGemini(conn, model, prompt, o, signal, photos);
   if (model.native === "nvidia") return drawNvidia(conn, model, prompt, o, signal);
   if (model.viaChat) return drawInChat(conn, model, prompt, o, signal, photos);

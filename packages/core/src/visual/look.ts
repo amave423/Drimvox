@@ -131,7 +131,7 @@ export async function resolveVision(
 }
 
 /** Providers that never answer about a picture: command-line agents and engines of pictures, speech and local models. */
-const NOT_VISION = new Set(["claude-code", "codex", "gemini-cli", "antigravity", "sdcpp", "whispercpp", "ollama", "lmstudio"]);
+const NOT_VISION = new Set(["claude-code", "codex", "gemini-cli", "antigravity", "sdcpp", "whispercpp", "comfyui", "ollama", "lmstudio"]);
 const price = (m: ModelInfo | undefined) => m?.priceIn ?? Number.POSITIVE_INFINITY;
 const free = (m: ModelInfo | undefined) => !!m && (m.freeTier === true || (m.priceIn === 0 && m.priceOut === 0));
 

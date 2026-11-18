@@ -27,7 +27,7 @@ function groups(kind: "key" | "subscription"): { id: "all" | "some" | "paid" | "
   );
   if (kind === "subscription") return [{ id: "subscription", ids: shown }];
   // A server of one's own (LM Studio on this computer, any address) is neither free nor paid by itself.
-  const own = (id: PresetId) => id === "custom" || id === "lmstudio";
+  const own = (id: PresetId) => id === "custom" || id === "lmstudio" || id === "comfyui";
   return [
     ...(["all", "some", "paid"] as const).map((g) => ({ id: g, ids: shown.filter((id) => !own(id) && (presets[id].free ?? "paid") === g) })),
     { id: "own" as const, ids: shown.filter(own) },

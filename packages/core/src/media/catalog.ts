@@ -4,6 +4,7 @@ import { fetchJson } from "../providers/http";
 import type { Connection } from "../providers/repo";
 import { usdPer } from "../rates";
 import { localMediaModels } from "./local";
+import { comfyMediaModels } from "./comfyui";
 
 type Raw = Record<string, unknown>;
 
@@ -22,6 +23,7 @@ const style = (conn: Connection): "separate" | "combined" | null =>
 export async function listMediaModels(conn: Connection, kind: MediaKind): Promise<MediaModel[]> {
   // Pictures on this computer: the downloaded models, no catalog to ask.
   if (conn.preset === "sdcpp") return localMediaModels(kind);
+  if (conn.preset === "comfyui") return comfyMediaModels(conn, kind);
   // Gemini lists its picture models among the others; NVIDIA keeps them off its list (seen: both had none here).
   if (conn.preset === "google") return kind === "image" ? cached(conn, kind, () => geminiImageModels(conn)) : [];
   if (conn.preset === "nvidia") return kind === "image" ? NVIDIA_IMAGES.map(nvidiaModel) : [];
