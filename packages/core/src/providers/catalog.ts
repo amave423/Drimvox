@@ -150,16 +150,19 @@ export function normalizeModels(preset: PresetId, items: unknown[], toUsd = 1): 
 
     const freeTier = !(priceIn === 0 && priceOut === 0) && freeTierOf(preset, raw);
     const params = raw.supported_parameters;
-    const inputs = (raw.architecture as { input_modalities?: unknown } | undefined)?.input_modalities ?? raw.input_modalities;
+    // OpenCode lists its own way: limit.context, capabilities.tools.supported, modalities.input ("image/png").
+    const opencode = raw as { limit?: { context?: unknown }; capabilities?: { tools?: { supported?: unknown } }; modalities?: { input?: unknown } };
+    const listedInputs = Array.isArray(opencode.modalities?.input) ? (opencode.modalities!.input as unknown[]).map((m) => String(m).split("/")[0]) : undefined;
+    const inputs = (raw.architecture as { input_modalities?: unknown } | undefined)?.input_modalities ?? raw.input_modalities ?? listedInputs;
     models.push({
       id,
       name: typeof raw.name === "string" && raw.name ? raw.name : id,
-      contextLength: numberOrNull(raw.context_length ?? raw.context_window ?? raw.max_model_len),
+      contextLength: numberOrNull(raw.context_length ?? raw.context_window ?? raw.max_model_len ?? opencode.limit?.context),
       priceIn,
       priceOut,
       priceEstimated,
       ...(priceCacheRead !== null && priceIn !== null && priceCacheRead < priceIn ? { priceCacheRead } : {}),
-      tools: Array.isArray(params) ? params.includes("tools") : null,
+      tools: Array.isArray(params) ? params.includes("tools") : typeof opencode.capabilities?.tools?.supported === "boolean" ? opencode.capabilities.tools.supported : null,
       vision: Array.isArray(inputs) ? inputs.includes("image") : null,
       ...(Array.isArray(inputs) && inputs.includes("audio") ? { audio: true } : {}),
       ...(freeTier ? { freeTier: true } : {}),

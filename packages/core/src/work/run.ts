@@ -1,4 +1,5 @@
 import type { ActivityEntry, MonthUsage, ProviderError, StreamEvent } from "@drimvox/shared";
+import { inConversation } from "../providers/session";
 import type { McpAsk, McpHooks } from "../mcp/hub";
 import { fitContext } from "./context";
 import { HELD, keepChecked, lastChecked, NOTHING_TO_CHECK, PUBLISHES } from "./publish";
@@ -29,6 +30,7 @@ import type { ProjectGit } from "./project-git";
 import { changedSince, checkpoint, diffSince, dropCheckpoint, treeOf } from "../chats/checkpoint";
 import { weakenedNote, weakenedTests } from "./weakened";
 import { changedScreens, keepRecipe, readRecipe } from "./tester-memory";
+import { electronApp, packagedNote } from "./packaged-check";
 import { reviewCode, reviewMessage, type ReviewResult } from "./review";
 import { mirrorNotes, notesBlock, notesChangedSince, writeState } from "../agent/notes";
 import { toolbox, type ToolboxDeps } from "../tools";
@@ -301,7 +303,7 @@ export class WorkRun {
   }
 
   start(): void {
-    this.done = this.loop().catch((err) => {
+    this.done = inConversation(this.chatId, () => this.loop()).catch((err) => {
       this.d.repo.update(this.projectId, { status: "paused", reason: "error", detail: String(err).slice(0, 2000) });
     });
   }
@@ -977,7 +979,7 @@ export class WorkRun {
           save();
         },
       },
-      { asked, said: this.lastSaid, notes: notesBlock(this.folder), tests: weakenedNote(weakenedTests(turnDiff)), screens: changedScreens(turnDiff), recipe: readRecipe(this.folder) },
+      { asked, said: this.lastSaid, notes: notesBlock(this.folder), tests: weakenedNote(weakenedTests(turnDiff)), screens: changedScreens(turnDiff), recipe: readRecipe(this.folder), packaged: packagedNote(electronApp(this.folder), turnDiff) },
     );
     // What it started is stopped: the agent's own servers stay as they were.
     this.d.visualKit.background.stopAll(`${this.chatId}:check`);

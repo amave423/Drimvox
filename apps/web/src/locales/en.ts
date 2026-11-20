@@ -220,6 +220,7 @@ export const en: Record<keyof typeof ru, string> = {
   "providers.hint.zai-coding": "GLM Coding Plan subscription (the one Z Code uses): a key from the Z.ai console, GLM-5 for code",
   "providers.hint.kimi-coding": "Kimi Code subscription: a key from the Kimi Code console, its coding model",
   "providers.hint.qwen-coding": "Alibaba Cloud Coding Plan subscription: an sk-sp-… key, Qwen3 Coder and others",
+  "providers.hint.opencode-go": "OpenCode Go subscription ($10 a month): an oc_sk_… key from the OpenCode Console; DeepSeek V4.1 Flash, GPT-6 Luna, GLM, Kimi and others",
   "providers.hint.moonshot": "Kimi direct: long context, good at code",
   "providers.hint.qwen": "Qwen direct through Alibaba Cloud; a free quota for new accounts",
   "providers.hint.minimax": "MiniMax models direct: cheap, made for agents",

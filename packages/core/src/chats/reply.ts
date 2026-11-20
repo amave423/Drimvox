@@ -1,4 +1,5 @@
 import { isLocal, NO_LIMIT_MS } from "../budget";
+import { inConversation } from "../providers/session";
 import { existsSync, statSync } from "node:fs";
 import { mergeOptions, thinkingOptions } from "./thinking";
 import { DATA_HINT, FACTS_HINT, HONEST_HINT, toModelMessages } from "./history";
@@ -119,7 +120,11 @@ function shortened(messages: ModelMessage[], limit: number): ModelMessage[] {
   return copy;
 }
 
-export async function reply(i: ReplyInput): Promise<void> {
+export function reply(i: ReplyInput): Promise<void> {
+  return inConversation(i.chatId, () => answer(i));
+}
+
+async function answer(i: ReplyInput): Promise<void> {
   if (isCli(i.conn.preset) && i.cliDir) return cliReply(i, i.cliDir, FORMAT_HINT);
   const added = i.chats.addMessage({ chatId: i.chatId, role: "user", content: i.content, status: "done", ...(i.edit ? { parentId: i.edit.parentId } : {}) });
   if (i.attachments?.length) i.chats.attachments.attach(i.chatId, added.id, i.attachments);

@@ -10,6 +10,7 @@ export const presetIds = [
   "zai-coding",
   "kimi-coding",
   "qwen-coding",
+  "opencode-go",
   "anthropic",
   "openai",
   "google",
@@ -224,6 +225,19 @@ export const presets: Record<PresetId, Preset> = {
     baseUrl: "https://coding-intl.dashscope.aliyuncs.com/v1",
     keyRequired: true,
     keyUrl: "https://modelstudio.console.alibabacloud.com/?tab=coding-plan",
+    editableUrl: false,
+    billing: "paid",
+    currency: "USD",
+    plan: true,
+  },
+  // OpenCode's subscription ($10 a month): DeepSeek V4.1 Flash, GPT-6 Luna, GLM, Kimi and others, for other apps too, by a
+  // Console key (oc_sk_…). Each conversation sends its own session id (providers/session.ts).
+  "opencode-go": {
+    id: "opencode-go",
+    name: "OpenCode Go",
+    baseUrl: "https://opencode.ai/inference/go/openai/v1",
+    keyRequired: true,
+    keyUrl: "https://opencode.ai/console",
     editableUrl: false,
     billing: "paid",
     currency: "USD",

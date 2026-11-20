@@ -5,6 +5,7 @@ import { createOpenAICompatible, type MetadataExtractor } from "@ai-sdk/openai-c
 import type { JSONValue, LanguageModel } from "ai";
 import type { Connection } from "./repo";
 import { withCheapestProvider } from "./routing";
+import { sessionId } from "./session";
 
 /**
  * Anthropic, OpenAI and Google go through their own SDK packages, so tools, reasoning and pictures work as
@@ -30,12 +31,24 @@ export function languageModel(conn: Connection, modelId: string): LanguageModel 
         : // Behind RouterAI and OpenRouter one model has many providers: the cheapest one, kept, so its cache holds.
           conn.preset === "routerai" || conn.preset === "openrouter"
           ? withCheapestProvider(conn.baseUrl, fetch ?? globalThis.fetch)
-          : (fetch ?? globalThis.fetch),
+          : conn.preset === "opencode-go"
+            ? withOpenCodeSession(fetch ?? globalThis.fetch)
+            : (fetch ?? globalThis.fetch),
     ),
     headers: conn.preset === "openrouter" ? { "X-Title": "Drimvox" } : undefined,
     metadataExtractor: billed,
   });
   return provider.chatModel(modelId);
+}
+
+/** OpenCode Go: the conversation's session id and the app's own name on every request (its docs ask for both). */
+export function withOpenCodeSession(fetchFn: typeof fetch): typeof fetch {
+  return (input, init) => {
+    const headers = new Headers(init?.headers);
+    headers.set("x-opencode-session", sessionId());
+    headers.set("user-agent", `Drimvox/${process.env.npm_package_version ?? "app"}`);
+    return fetchFn(input, { ...init, headers });
+  };
 }
 
 /**

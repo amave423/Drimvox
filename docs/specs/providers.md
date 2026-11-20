@@ -93,3 +93,17 @@
 Теперь в `provider.order` — три самых дешёвых по порядку. После сбоя первого на 15 минут порядок начинается со
 второго, всегда одного и того же, и его кэш работает. Цены хода (`rates`) — того провайдера, с которого начинается
 порядок сейчас.
+
+## OpenCode Go (2026-11-20)
+
+Попросили: подписка OpenCode. **OpenCode Go** ($10 в месяц, Go Plus $40) — около 30 моделей (DeepSeek V4.1 Flash 1017,
+GPT-6 Luna, GLM-5.3, Kimi K3, Qwen 3.8 Max…) для любых программ по ключу из консоли OpenCode (`oc_sk_…`). Пресет
+`opencode-go` — тариф по ключу (`plan: true`), как GLM Coding Plan и Kimi Code: в разделе «По подписке», модели по нулевой
+цене, бюджет на них не тратится. Адрес — `https://opencode.ai/inference/go/openai/v1` (и список моделей, и чат).
+- Go отвечает только запросам со стабильным номером разговора в `x-opencode-session` и просит называть программу
+  своим именем (документация OpenCode, «Go»). Номер — `ses_` и id чата или разговора проекта (`providers/session.ts`:
+  `AsyncLocalStorage`, его ставят `reply()` и `WorkRun`); запросы вне разговора делят один номер на запуск Drimvox.
+  `User-Agent: Drimvox/<версия>`.
+- Каталог читает формат моделей OpenCode: окно — `limit.context`, инструменты — `capabilities.tools.supported`,
+  картинки — `modalities.input` («image/png»).
+- Проверено на поддельном сервере (`test/opencode-go.test.ts`); вживую — нет: ключа Go у владельца пока нет.
