@@ -89,7 +89,7 @@ const SYSTEM = (folder: string) =>
  */
 export async function checkWork(
   d: CheckDeps,
-  job: { asked: string; said: string; notes: string; tests?: string; recipe?: string; screens?: string[] },
+  job: { asked: string; said: string; notes: string; tests?: string; recipe?: string; screens?: string[]; packaged?: string | null },
 ): Promise<CheckResult | null> {
   let result: CheckResult | null = null;
   const messages: ModelMessage[] = [
@@ -101,6 +101,7 @@ export async function checkWork(
         job.tests ?? "",
         job.screens?.length ? `Interface files changed in this turn: ${job.screens.join(", ")}. Look at the screens they draw, up close.` : "",
         job.recipe ? `How the last tester started this project to try it (use it; fix it if it no longer works):\n${job.recipe}` : "",
+        job.packaged ?? "",
         job.notes ? `The project's notes (how to build, run and deploy; what the user wants and does not):\n${job.notes}` : "",
         "Test it now.",
       ]

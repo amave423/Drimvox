@@ -1056,6 +1056,18 @@ describe("the tester", () => {
     expect(second).toContain("npm install && npm start");
   });
 
+  // Seen live: Nexus crashed for its users on code behind app.isPackaged, which the tester's dev run never reached.
+  it("tells the tester of an Electron project to try the built app, and what of the turn runs only there", async () => {
+    mkdirSync(join(folder, "app", "electron"), { recursive: true });
+    writeFileSync(join(folder, "app", "package.json"), JSON.stringify({ devDependencies: { electron: "39", "electron-builder": "26" } }));
+    git(folder, "add", "-A");
+    git(folder, "commit", "-q", "-m", "An Electron app");
+    await open({ coder: [call("write_file", { path: "app/electron/main.cjs", content: "if (app.isPackaged) showNativeNotify();\n" }), { text: "Готово." }] });
+    const asked = JSON.stringify(testerAsks()[0]!.body.messages);
+    expect(asked).toContain("electron-builder --dir");
+    expect(asked).toContain("app/electron/main.cjs");
+  });
+
   // Seen in a video the user sent: a check removed from a test to make it pass. The tester is told which test lost it.
   it("tells the tester which test files lost assertions in the turn", async () => {
     mkdirSync(join(folder, "test"), { recursive: true });
